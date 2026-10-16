@@ -5,7 +5,7 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
 import type { Entry, FieldValue, OperationId, Request, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import { canonicalize, digestBytes, factRefOf, intentDigest, isRecord, newIncarnation, scopeIdOf, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, factRefOf, intentDigest, isRecord, newIncarnation, scopeIdOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { contentStates, owed, PROFILES, validateDefinition, valueDigest, type Fetched } from "@generalbusiness/dap-derive";
 import { keys } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION_5, destination5, destinationRules5, firstExtents, PUBLISHING_LANE_DIGESTS, platform } from "@generalbusiness/dap-platform";
@@ -20,13 +20,18 @@ import { repository, rita, una } from "./repository.ts";
 import { objectOf, reader, stubOf } from "./support.ts";
 import { room as realRoom } from "../../../apps/room/lanes/test/support/room.ts";
 
-test.each(["effective", "absent", "unavailable", "active", "root-full"] as const)("D1 native standing at capacity after restart: %s (compromise relay delayed)", async seen => {
+test.each(["effective", "absent", "unavailable", "active", "root-full", "file-superseded", "file-unknown"] as const)("D1 native standing and inherited file safety: %s (scripted creator/rules/Git)", async seen => {
+  const fileCase = seen === "file-superseded" || seen === "file-unknown";
   const fullRoot = seen === "root-full" ? await realRoom({ roster: ["@una"] }) : null;
   const room = fullRoot ? { M: fullRoot.M, una: fullRoot.members["@una"]!, unasKey: (await fullRoot.M.entries()).find(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "join" && entry.input.signed.intent.actor === una.key)!.seq } : await repository();
   const membership = await room.M.at();
   await room.M.did(rita, "set-role", { on: room.una, expected: await room.M.expected({ on: room.una }), fields: { role: "maintainer" } });
   const journey = publicationJourney(destination5, DESTINATION_5, destinationRules5);
-  const birth = journey.birth(true, membership, fullRoot ? await fullRoot.D.at() : undefined), name = scopeIdOf(birth.asked.to), control = controls(name, net.clock.now);
+  // Only the new file case scripts a complete immutable D8/application
+  // factory proof. No real Directory/application creation is claimed here.
+  const directorySeed: Seed = { v: 1, kind: "directory", definition: "platform:directory@8", creator: null, cause: textDigest("PUBLIC TEST D1 scripted file office"), ordinal: 0 };
+  const directory: ScopeRef = { scope: scopeIdOf(directorySeed), inc: newIncarnation(new Uint8Array(16).fill(85)), kind: "directory" };
+  const birth = journey.birth(true, membership, fullRoot ? await fullRoot.D.at() : fileCase ? directory : undefined), name = scopeIdOf(birth.asked.to), control = controls(name, net.clock.now);
   control.clock = net.clock;
   const foreign = new Map<string, { entry: Entry; under: string; origin?: readonly Fetched[] }>();
   const remember = (entry: Entry, under: string, origin?: readonly Fetched[]) => { foreign.set(factRefOf(entry).hash, { entry, under, ...(origin ? { origin } : {}) }); };
@@ -54,6 +59,7 @@ test.each(["effective", "absent", "unavailable", "active", "root-full"] as const
     }),
     outside: { accepts: (_owner, kind) => kind === driving, send: async request => {
       sent.push(request);
+      if (seen === "file-unknown" && request.kind === "push") return null; // Scripted lost provider reply after the real native sent mark.
       const answer = answers.get(request.operation);
       if (!answer) throw Error(`No scripted answer for ${request.kind} ${request.operation}`);
       replies.set(request.operation, { operation: request.operation, attempt: request.attempt, answer });
@@ -86,6 +92,81 @@ test.each(["effective", "absent", "unavailable", "active", "root-full"] as const
   expect(adopt.answer).toBe("accepted");
   const adoptSeq = (await history()).at(-1)!.entry.seq;
   await drive("adopt-read", `${adoptSeq}:0`, { seen: HEAD });
+
+  if (fileCase) {
+    const office: Entry = { ...handMade(directory, "unused"), seq: 0, prev: null, input: { type: "genesis", seed: directorySeed, inc: directory.inc, founding: null, source: null, n: null, message: null, kind: "found", decision: "applied" }, effects: [], sends: [] };
+    const definition = textDigest("PUBLIC TEST D1 scripted application");
+    const maker = handMade(directory, "establish-application", [], keys.rita, { definition });
+    if (maker.input.type !== "act") throw Error("Scripted application maker is an act");
+    const seed: Seed = { v: 1, kind: "lane", definition, creator: directory, cause: intentDigest(maker.input.signed.intent), ordinal: 0 };
+    const app: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(86)), kind: "lane" };
+    const creation: Request = { class: "request", type: "create", body: { kind: "establish", directory: directory as unknown as FieldValue, membership: membership as unknown as FieldValue, creationContext: { v: 1 }, fields: { destination: destination as unknown as FieldValue } } };
+    const sourceMaker = { ...maker, sends: [{ n: 0, to: seed, message: creation }] };
+    const genesis: Entry = { ...handMade(app, "unused"), seq: 0, prev: null, input: { type: "genesis", seed, inc: app.inc, founding: null, source: factRefOf(sourceMaker), n: 0, message: creation, kind: "establish", decision: "applied" }, effects: [], sends: [] };
+    const origin: Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "declared:application" }, { fact: factRefOf(sourceMaker), entry: sourceMaker, under: "platform:directory" }, { fact: factRefOf(office), entry: office, under: "platform:directory" }];
+    const deliverFile = async (content: string) => {
+      const message: Request = { class: "request", type: "tell", body: { message: "publish-file", fields: { path: "shelf/standing.md", content } } };
+      const source = handMade(app, "write", [{ n: 0, to: destination, message }]);
+      remember(source, "declared:application", origin);
+      expect(await surface.deliver({ to: destination, from: factRefOf(source), n: 0, message })).toMatchObject({ answer: "recorded" });
+      return source;
+    };
+    const old = await deliverFile("Older scripted application content\n");
+    const queued = await snapshot(), item = queued.items.find(row => row.type === "file-publication" && row.values["sourceSeq"] === old.seq)!;
+    const judge = queued.operations.find(op => op.for === item.id && op.kind === "file-judge")!;
+    await drive("file-judge", judge.id, { head: HEAD, present: true, tree: "d".repeat(40) });
+    const reserved = await snapshot(), mint = reserved.operations.find(op => op.for === item.id && op.kind === "mint")!;
+    await drive("mint", mint.id, { token: "scripted-file-mint", ends: timeOf(timeMs(control.clock.now)! + 60_000) });
+    const publishing = await snapshot(), push = publishing.operations.find(op => op.for === item.id && op.kind === "push")!;
+    expect(publishing.items.find(row => row.id === item.id)?.state).toBe("publishing");
+    expect(push.attempts[0]!.outcomes).toEqual([]);
+    if (seen === "file-unknown") {
+      driving = "push";
+      await evictDurableObject(object);
+      await surface.effect();
+      driving = "none";
+      const unknown = await snapshot();
+      expect(unknown.items.find(row => row.id === item.id)?.state).toBe("unresolved");
+      expect(unknown.operations.find(op => op.id === push.id)?.attempts[0]!.outcomes).toMatchObject([{ result: "unknown" }]);
+      await deliverFile("Newer content cannot prove the original push was unsent\n");
+      driving = "push";
+      await evictDurableObject(object);
+      await surface.effect();
+      driving = "none";
+      const kept = await snapshot();
+      expect(kept.items.find(row => row.id === item.id)?.state).toBe("unresolved");
+      expect(kept.items.find(row => row.id === 0)?.values["slot"]).toBe(item.id);
+      expect(kept.operations.find(op => op.id === push.id)?.attempts[0]!.outcomes).toMatchObject([{ result: "unknown" }]);
+      expect(sent.filter(request => request.kind === "push").map(request => request.operation)).toEqual([push.id]);
+      const marked = await runInDurableObject(object, (_instance, state) => {
+        const store = new SqliteStore({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
+        return store.sending(push.id, 1)?.sent;
+      });
+      expect(marked).not.toBeNull();
+      return;
+    }
+    const newer = await deliverFile("Newer scripted application content\n");
+    const before = await snapshot();
+    expect(before.items.find(row => row.type === "file-publication" && row.values["sourceSeq"] === newer.seq)?.state).toBe("queued");
+    driving = "push";
+    await evictDurableObject(object);
+    await surface.effect(); // Real native driver; beforeSend precedes mark/send.
+    driving = "none";
+    const after = await snapshot(), ended = after.items.find(row => row.id === item.id)!;
+    expect(ended.state).toBe("superseded");
+    expect(sent.filter(request => request.kind === "push")).toEqual([]);
+    const outcome = (await history()).find(row => row.entry.input.type === "outcome" && row.entry.input.operation === push.id)!;
+    expect(outcome.entry.input).toMatchObject({ type: "outcome", owner: DESTINATION_5, kind: "push", operation: push.id, attempt: 1, result: "refused", evidence: { basis: "own-answer", body: { send: "not-sent", seen: HEAD, supersededBy: { from: factRefOf(newer), n: 0 } } } });
+    expect(after.operations.find(op => op.id === push.id)?.attempts[0]!.outcomes).toMatchObject([{ result: "refused" }]);
+    const marked = await runInDurableObject(object, (_instance, state) => {
+      const store = new SqliteStore({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
+      return store.sending(push.id, 1)?.sent;
+    });
+    expect(marked).toBeNull();
+    await evictDurableObject(object);
+    expect(await snapshot()).toEqual(after);
+    return;
+  }
 
   // Immutable source affiliation is complete but explicitly scripted.
   const creator = handMade(birth.directory, "open-pr", [], keys.rita, { definition: PUBLISHING_LANE_DIGESTS[0] });

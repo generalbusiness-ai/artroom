@@ -2620,7 +2620,7 @@ export function filePublicationCurrent(state: Pick<StateView, "page">, item: Ite
 }
 /** Driver-only before-mark result: sent/unknown attempts never call this hook. */
 export function fileSupersededOutcome(state: StateView, operation: Operation, own: Own): import("@generalbusiness/dap-contract").Evidence | null {
-  if (operation.owner !== "platform:destination@4" || operation.kind !== "push") return null;
+  if (!["platform:destination@4", "platform:destination@5"].includes(operation.owner) || operation.kind !== "push") return null;
   const item = targetOf(state, own, operation), head = branchOf(state)?.values["head"];
   if (item?.type !== "file-publication" || branchOf(state)?.refs["slot"] !== item.id || !isObjectId(head) || closed(item) || filePublicationCurrent(state, item)) return null;
   // An earlier unknown outcome is never proof of a send that did not leave.

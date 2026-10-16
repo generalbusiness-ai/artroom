@@ -250,3 +250,44 @@ covers all tests successfully at this Source, but it is not a passing gate.
 No whole suite or gate was repeated, no timeout was widened, and the
 original failure is preserved for review. This report-only successor changes
 no implementation, test or generated asset from the corrected gate head.
+
+
+## Review F1: inherited file supersession
+
+Checker report `4e3bc6d8` requested changes to `5d21f417`. It found the
+remaining `fileSupersededOutcome` guard accepted only @4, although @5
+inherits that hook and the matching superseded-outcome validation. This
+weakened the existing automatic-file journey independently of the human
+D1 standing guarantee. The exact-head review found no other blocking issue;
+its bounded fixture and failed-gate qualifications remain as stated above.
+
+The guard now explicitly accepts @4 and @5, with future @6 still refused.
+The existing pure supersession witness runs for both versions and retains
+its unknown-outcome and absent-slot controls. The Page asset is rebuilt
+from this Source (JavaScript 670,477 bytes), with no rendered-UI claim.
+
+`/tmp/artroom-d1-supersession-correction-focus.log` passes 13 tests across
+three files: six pure file cases, the five existing D1 native standing
+cases plus the new native @5 unsent-file case, and the existing genuine @4
+application publication/source/replay journey. The new native case admits
+two file deliveries from the same source/path around a confirmed file
+judge and mint. The actual operation driver records the exact refused
+`not-sent`/`supersededBy` result for the older push before a sent mark,
+without calling the outside push adapter. The old file becomes superseded,
+the durable sent time remains null and restart preserves the resulting state.
+
+`/tmp/artroom-d1-file-unknown-focus.log` separately passes the added native
+@5 sent/unknown case (six unrelated cases filtered out). The actual driver
+marks and calls the original push once; a scripted lost reply gives an
+unknown outcome. A later same-path file and restart leave the original
+unresolved with its slot held, its original sent mark and no second push.
+This never labels a possibly sent write as not-sent.
+
+Both new cases use real destination@5 birth, admission, turns, SQLite,
+operation driver, rules and restart. Their Directory@8/application genesis,
+creator and source entries form a complete but scripted immutable proof;
+no actual application or Directory factory creates them. Membership is
+real; Git answers and lost replies are scripted. They establish the native
+receiver/driver boundary, not provider execution or a newly activated cohort.
+A new frozen Source gate and exact-head review follow this implementation
+correction; the prior failed gate remains preserved and is not relabelled.
