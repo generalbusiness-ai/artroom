@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:eab9dfd6e62e292a3617c39a9d550b22ece2e3f3","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/validate/binding.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f9818aaed303f8b03507c8dbc14908771f44085d","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-platform-integer-indexes.md."}
