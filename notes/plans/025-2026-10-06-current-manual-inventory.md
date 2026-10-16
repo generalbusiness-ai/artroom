@@ -16,7 +16,7 @@ to the existing R0 reconciliation request
 `efc0d86cc329025353f8e2dd21957b0f60ce68d8`; it closes neither request.
 Its source baseline is main `c6ed5dd0dd4facbc7a5065ab273a70f4aac306cb`.
 The preserved inventory is in
-[the documentation plan](../notes/2026-10-01-docs-plan.md), blob
+[the documentation plan](../2026-10-01-docs-plan.md), blob
 `5a8a6116ef7d5c58ce511bd6b69d674727fd6edc`.
 
 ## Page state and evidence
@@ -32,8 +32,8 @@ earlier documentation evidence is asserted.
 
 Existing source guides provide reusable material. They do not establish
 that a manual page's full outcome, executable sample or cold-reader test
-passed. The current guides include [scopes](../docs/scopes.md),
-[lanes](../docs/lanes.md), [testing](../docs/testing.md), and the package
+passed. The current guides include [scopes](../../docs/scopes.md),
+[lanes](../../docs/lanes.md), [testing](../../docs/testing.md), and the package
 READMEs. The old protocol, policy-pack and release guides are explicitly
 inactive historical material. Preserve their history; use current interfaces
 for new instructions.

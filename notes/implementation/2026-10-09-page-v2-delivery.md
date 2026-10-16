@@ -4,7 +4,7 @@ Request `3fd8cedfb065bbab93657dfb05c5385626a99a46`, builder promise
 `bac91cc6ae5eee91977aa28f6136b8d0745c749b`. Hugh directly clarified that
 the separate redesign was complete and this builder should implement
 planner's instructions. The accepted references are preserved in
-[Plan 027 v2](../../plans/027-artroom-usability/v2/design-review.md).
+[Plan 027 v2](../plans/027-artroom-usability/v2/design-review.md).
 
 ## Result
 

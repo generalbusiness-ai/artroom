@@ -1,7 +1,7 @@
 # Canonical token mints: who owns each token
 
 2026-10-02. Gitseq request `10fcfe4e` (builder), from checker audit handoff
-`9f2d8808` ([plans/README.md](../../plans/README.md), "Canonical mint
+`9f2d8808` ([notes/plans/README.md](../plans/README.md), "Canonical mint
 ownership"). Branch `request/mint-ownership`, cut from main `3ac55e96`.
 Revision 2 answers checker report `9ff903ab`; revision 3 answers the
 checker's two follow-up points on it (landing token IDs, and check jobs'

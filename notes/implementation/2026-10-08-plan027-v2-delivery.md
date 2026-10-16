@@ -2,7 +2,7 @@
 
 Planner request `fe9685564b97fd1f7a335e71ac29bc8e501221f0`, recorded at 21:25 Eastern on 2026-10-08, attributes Hugh’s acceptance of these v2 files as the workroom’s UI design. Builder promise `92b2467c3bad4aac0988de049714bade938142d0` covers their document-only publication. The plan README links the current accepted design and keeps the earlier proposal and handoff status intact. This delivery starts no application UI implementation.
 
-The producer-owned source is `/Users/hughpyle/play/artroom-worktrees/usability-review/plans/027-artroom-usability/v2`. Its worktree HEAD was `1eed91aacac56649ac0b75c0652215b0418eeff8`, but v2 was untracked: that HEAD does not identify these delivered bytes. Builder copied the complete 15-file directory and verified the source and candidate bytes at `2026-10-09T01:23:56Z`. The original files were not edited, regenerated or removed. Paths below are relative to `plans/027-artroom-usability/v2`.
+The producer-owned source is `/Users/hughpyle/play/artroom-worktrees/usability-review/plans/027-artroom-usability/v2`. Its worktree HEAD was `1eed91aacac56649ac0b75c0652215b0418eeff8`, but v2 was untracked: that HEAD does not identify these delivered bytes. Builder copied the complete 15-file directory and verified the source and candidate bytes at `2026-10-09T01:23:56Z`. The original files were not edited, regenerated or removed. Paths below are relative to `notes/plans/027-artroom-usability/v2`.
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

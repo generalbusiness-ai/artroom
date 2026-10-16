@@ -239,7 +239,7 @@ resolve once this head lands.
    and `packages/lanes/README.md` links to `../../docs/lanes.md`. This
    head may not change either, so `docs/lanes.md` stays as a pointer.
    Remove it when the generator and that README name
-   `apps/room/docs/lanes.md`. `plans/025-2026-10-06-current-manual-inventory.md`
+   `apps/room/docs/lanes.md`. `notes/plans/025-2026-10-06-current-manual-inventory.md`
    also links to `docs/lanes.md` and resolves through the pointer.
 4. **Product names in how-to and reference pages.** The new pages name
    no product but GitHub and Cloudflare's parts, except the commands a

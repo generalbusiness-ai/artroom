@@ -1014,7 +1014,7 @@ is recorded as decision 12 in section 13.
 ## 20. Sources read for this note
 
 `notes/2026-10-01-mcp-plan.md` (sections 1, 4, 5, 6, 10, 11, 12, 13, 14);
-`plans/009-2026-10-03-mcp-clarification.md`; decision `775acdd3`; review
+`notes/plans/009-2026-10-03-mcp-clarification.md`; decision `775acdd3`; review
 `ca8a00f6`; `docs/protocol.md` section 21 and section 34; `docs/scopes.md`;
 `docs/cli.md`; `docs/page.md`; `docs/testing.md`;
 `packages/contract/src/intent.ts`, `definition.ts`, `result.ts`,

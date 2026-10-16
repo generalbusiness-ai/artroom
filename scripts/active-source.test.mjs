@@ -2,10 +2,10 @@
 // no active file imports from spikes/parked/, and no active file names a format, binding or
 // variable that was deleted. Active: the packages, the root scripts and configuration,
 // and the guides that describe what is built. Not active, and not read here: spikes/parked/,
-// the dated notes and plans, the three guides marked inactive, and examples/, spikes/
-// and .github/, which later deliveries own (spikes/parked/README.md lists them). Only tracked
-// files are read: a checkout that once built the parked packages keeps their generated
-// output under the old paths, untracked, and that output is not source.
+// the dated notes and plans (notes/, with notes/plans/), the three guides marked inactive,
+// and examples/, spikes/ and .github/, which later deliveries own (spikes/parked/README.md
+// lists them). Only tracked files are read: a checkout that once built the parked packages
+// keeps their generated output under the old paths, untracked, and that output is not source.
 //
 //   node --test scripts/active-source.test.mjs
 import assert from "node:assert/strict";
@@ -19,7 +19,7 @@ import { moduleSpecifierSpans } from "./public-release-modules.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Preserve the existing dependency checks at their relocated physical paths.
 const packagePath = (file) => file.replace(/^apps\/room\/lanes\//, "packages/lanes/").replace(/^apps\/room\/page\//, "packages/page/");
-const INACTIVE = /^apps\/counter\/|^(notes|plans|examples|spikes|\.github)\/|^docs\/(protocol|policy-pack|release)\.md$|^scripts\/active-source\.test\.mjs$/;
+const INACTIVE = /^apps\/counter\/|^(notes|examples|spikes|\.github)\/|^docs\/(protocol|policy-pack|release)\.md$|^scripts\/active-source\.test\.mjs$/;
 const files = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter((f) => f !== "" && !INACTIVE.test(packagePath(f)));
 const text = (file) => { try { return readFileSync(join(root, file), "utf8"); } catch { return ""; } };   // a file deleted and not yet committed
 

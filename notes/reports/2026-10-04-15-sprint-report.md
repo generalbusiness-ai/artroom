@@ -118,7 +118,7 @@ The web UI runs locally on a mock room (observed run: `npx vite --port 5173` in 
 | Log publication to `refs/artroom/log` and `artroom verify` | log, git, room | works; Room still writes layout 1, publisher and verifier read both |
 | MCP server: ten tools on Workers and over stdio | mcp, cli | works (observed tools/list) |
 | Web UI: Needs you, Room, Proposal, Policy | ui | partial: mock room only, `LiveRoom` is a stub, not deployed |
-| Canonical token mints and cleanup ledgers (R-MINT) | room, git | works (tests, plus the credential cleanup plans in `plans/`) |
+| Canonical token mints and cleanup ledgers (R-MINT) | room, git | works (tests, plus the credential cleanup plans in `notes/plans/`) |
 | Durable Object row budgets and gate | room/measure | partial: needs an analytics token |
 | Declared acts (R-DECL, protocol section 33) | contract, docs | designed only: stage 1 types and text; no admission, log or client path |
 | Local development Room | room | not available: needs Artifacts, a container image, `PUBLIC_URL` and a secret |

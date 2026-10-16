@@ -3,7 +3,7 @@
 2026-10-08. Branch `claude/artroom-edit-page-site-navigation-vjqfjo`, on
 top of `planner/i5-demo-host` at `67fe67f9`, whose history is unchanged.
 It builds the rest of section 6 of plan 025
-(`plans/025-2026-10-07-published-pages.md` on `main`) as the planner's
+(`notes/plans/025-2026-10-07-published-pages.md` on `main`) as the planner's
 decisions for this task state it: a header, a breadcrumb, folder listings
 by title, a footer, a redirect to `HEAD` and a versions page. Built alone
 in a cloud container with no binding, no deployment credentials and no

@@ -129,7 +129,7 @@ reuse their exact tree evidence and run no project gate.
 These stories add no blanket Jam readiness gate. The builder judges when
 Artroom is sufficient to build Jam, may evolve the work vocabulary during
 self-hosting, and continues the authorized Jam work and
-[full manual](../notes/2026-10-01-docs-plan.md) in parallel. Hugh retains
+[full manual](../2026-10-01-docs-plan.md) in parallel. Hugh retains
 the documentation-host and cold-reader choices. Jam R9's timing direction
 is adopted by `2b3d0946`: actual hosted development needs a real deployment
 and destination publication, with plain-Git continuation after a recorded

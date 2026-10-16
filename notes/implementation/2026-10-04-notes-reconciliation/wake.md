@@ -5,8 +5,8 @@ Request `50d7806a`, input 1. Edited file:
 `/Users/hughpyle/play/artroom-worktrees/notes-reconcile` (branch
 `request/notes-reconcile`). Line numbers refer to the
 edited file (1041 lines). "008" is
-`plans/008-2026-10-03-wake-and-schedule-clarification.md`. "007" is
-`plans/007-2026-10-03-attention-runtime-handoff.md`. "Rev 2" is the
+`notes/plans/008-2026-10-03-wake-and-schedule-clarification.md`. "007" is
+`notes/plans/007-2026-10-03-attention-runtime-handoff.md`. "Rev 2" is the
 note at `337a449d`.
 
 ## A. Original request `24711ceb`: conditions

@@ -3,7 +3,7 @@
 2026-10-07. Branch `claude/i5-site-renderer-39k7iz` (built locally as
 `i5-site`), on top of `planner/i5-demo-host` at `714afda4`, whose history
 is unchanged. It builds section 6 of plan 025
-(`plans/025-2026-10-07-published-pages.md` on `main`), the renderer, and
+(`notes/plans/025-2026-10-07-published-pages.md` on `main`), the renderer, and
 nothing of its section 5 or of section 7, steps 3 and 4. Built alone in a
 cloud container with no binding, no deployment credentials and no
 workroom, so no gitseq request was opened or updated; the planner owes

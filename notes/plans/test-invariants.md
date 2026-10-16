@@ -1,8 +1,8 @@
 # Test invariants and their witnesses
 
-This file lists the invariants that Artroom's tests protect and, for each one, the test that is its witness. It is by group, not by case: a row names a `describe` block or one test, and stands for every case inside it. When you add an invariant, add a row. When you remove a witness, remove its row or name the witness that replaces it. [docs/testing.md](../docs/testing.md) says what makes a test useful and where a test belongs. Timings are in [plans/README.md](README.md).
+This file lists the invariants that Artroom's tests protect and, for each one, the test that is its witness. It is by group, not by case: a row names a `describe` block or one test, and stands for every case inside it. When you add an invariant, add a row. When you remove a witness, remove its row or name the witness that replaces it. [docs/testing.md](../../docs/testing.md) says what makes a test useful and where a test belongs. Timings are in [notes/plans/README.md](README.md).
 
-How to read a row. "Rule" is a rule of [docs/protocol.md](../docs/protocol.md), or the request, review or plan that set the invariant. "Witness" is a test file and, in quotes, the start or a distinctive part of a `describe` or test title in it. A file with no title means the whole file. "Removed or replaced" says what request `ecbc722a` took out, why, and what still protects the invariant.
+How to read a row. "Rule" is a rule of [docs/protocol.md](../../docs/protocol.md), or the request, review or plan that set the invariant. "Witness" is a test file and, in quotes, the start or a distinctive part of a `describe` or test title in it. A file with no title means the whole file. "Removed or replaced" says what request `ecbc722a` took out, why, and what still protects the invariant.
 
 ## Contract and policy
 
@@ -120,7 +120,7 @@ Files are in `packages/log/test/`. Only `golden.test.ts` also runs in workerd.
 
 ### Known gaps
 
-- Verify cannot yet show that a carry judgment which did not carry is missing when nothing later carried. That needs the Room to record each carry pass: [notes/implementation/2026-10-03-carry-accounting.md](../notes/implementation/2026-10-03-carry-accounting.md). It stays owed under stage 3's condition 2.
+- Verify cannot yet show that a carry judgment which did not carry is missing when nothing later carried. That needs the Room to record each carry pass: [notes/implementation/2026-10-03-carry-accounting.md](../implementation/2026-10-03-carry-accounting.md). It stays owed under stage 3's condition 2.
 - The log's test simulator now waits like the Room: it seals `land-evaluated` only when no blocking obligation is open. Six facts that the fixture used to show in honest reservation inputs are now shown by a forged `land-evaluated` event that verify refuses. One is not recovered: a land input that lists an objection as `basis: "here"` after it replaced a carried approval.
 - A review count compared as `> 0`, not as the required count, changes nothing in the fixtures, whose counts are all 1.
 - Section 30.7 gives its acceptance cases sizes. Only the entry of 8 MiB + 1 and the directory limit of 4,096 are tested at real size.
@@ -356,7 +356,7 @@ No other test runs a second time under `v2`: not founding, secret scanning, log 
   - section 30.7, in `packages/log/test/amendment-4.test.ts`: the large notification, and the recomputed obligations of the large activation;
   - section 29.6, in `packages/checkers/test`: concurrent jobs in both directions, and the earlier job's token after a configuration change;
   - section 23, in `packages/client/test/room.test.ts`: the `Room` handle yields the same updates.
-- The lesson is in [docs/testing.md](../docs/testing.md): an acceptance case is an invariant, and its witness is removed only with its replacement named.
+- The lesson is in [docs/testing.md](../../docs/testing.md): an acceptance case is an invariant, and its witness is removed only with its replacement named.
 - Some acceptance cases are still witnessed, but at a lower level than before the reduction. They are kept that way, and named here so that a reader can judge:
   - three carry-plan cases of section 23 (the room default `src/lib/**`, `package-lock.json`, `.artroom/policy.json`) are shown by the evaluator in `packages/policy/test/carry.test.ts`, no longer also through a Room;
   - four stage 5 cases are shown against the client's and the MCP server's stand-in room, no longer also against a real Room: named methods where `claim` differs, a grantor's role that lost the kind over MCP, every kind refused on the generic MCP path in a `v1` room, and the MCP `act` tool naming the thread;

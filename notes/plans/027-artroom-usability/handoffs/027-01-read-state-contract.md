@@ -1,6 +1,6 @@
 # Plan 027.1: Preserve read truth and action evidence
 
-> **Executor instructions:** Read this plan fully. Check source identity first, run each applicable verification once per changed invariant, and stop on the named conditions. This is a future proposed implementation handoff. It has not been commissioned, adopted or dispatched; publication authorizes no application change. When implementation is dispatched, track it with a gitseq request; the planner maintains the parent index. Update only the status row in `plans/027-artroom-usability/README.md` when the operator asks you to maintain it.
+> **Executor instructions:** Read this plan fully. Check source identity first, run each applicable verification once per changed invariant, and stop on the named conditions. This is a future proposed implementation handoff. It has not been commissioned, adopted or dispatched; publication authorizes no application change. When implementation is dispatched, track it with a gitseq request; the planner maintains the parent index. Update only the status row in `notes/plans/027-artroom-usability/README.md` when the operator asks you to maintain it.
 >
 > **Current baseline:** Accepted I5 is `7bb3a6415892138a25f5a147f89ae8469b0a716d`; the publication base is `16d7ba440d148c8d6dc29307810ee3c0c103c624`. [BASELINE.md](../BASELINE.md) supersedes the old findings below. Implementation remains uncommissioned and undispatched.
 >

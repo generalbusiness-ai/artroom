@@ -4497,7 +4497,7 @@ run the same step handlers, so what a `v2` document changes (admission
 steps 1, 4, 4a and 5, grants, sessions, check jobs, recovery and what a
 thread records) has direct tests of its own. The list of every converted
 test and the mutation of each declaration field are no longer kept;
-[plans/test-invariants.md](../plans/test-invariants.md) names the
+[notes/plans/test-invariants.md](../notes/plans/test-invariants.md) names the
 witnesses and says what the smaller run does not show.
 
 ### 33.7 Contract types and built-in data
@@ -4779,7 +4779,7 @@ Readers are the UI, the client, the CLI and the MCP tools.
 #### Acceptance cases (stage 5)
 
 Each is normative, and each has a test in the stage 5 report
-(`plans/README.md`).
+(`notes/plans/README.md`).
 
 | Case | Expected result | Rules |
 |---|---|---|

@@ -513,9 +513,9 @@ refactored, replaced, or retired.
 | `notes/2026-10-02-acts-review.md:461` | Full addressed-work lifecycle D1, including pre-work filing, negotiation, non-landing results, handover, cancellation and acceptance. |
 | N2 `9c43c17327cc26c2e5e54cd27fea197d26e803a5` | Owns the useful lifecycle outcomes. Reconcile its owner and conditions with composable lanes, explicitly retargeting or superseding the request when needed. |
 | N1 `53016b8e7ebc4ee50322fc85ce5e9f7a9d4d0dfa` | Real immutable proposal reads and reader authority, needed by the PR experience. |
-| `plans/005-2026-10-03-browser-cloud-work.md` | Reviewed durable coding/browser/device outcomes and C1–C6 owners. Reassess repository-room assumptions, identities, control paths and storage; retarget or supersede incompatible implementing lanes. |
-| `plans/006-2026-10-03-experience-and-developer-adoption-tasks.md` | Existing N1–N7 tasks for reads, lifecycle, starter, guidance, installation, complete manual, and human attention. |
-| `plans/012-2026-10-04-collections-clarification.md` | Proposed self-sufficient admission, imported authority/configuration, revocation, and grouped projections. Explicitly retarget engagement/control-room assumptions to composable scopes and revise or retire contrary work. |
+| `notes/plans/005-2026-10-03-browser-cloud-work.md` | Reviewed durable coding/browser/device outcomes and C1–C6 owners. Reassess repository-room assumptions, identities, control paths and storage; retarget or supersede incompatible implementing lanes. |
+| `notes/plans/006-2026-10-03-experience-and-developer-adoption-tasks.md` | Existing N1–N7 tasks for reads, lifecycle, starter, guidance, installation, complete manual, and human attention. |
+| `notes/plans/012-2026-10-04-collections-clarification.md` | Proposed self-sufficient admission, imported authority/configuration, revocation, and grouped projections. Explicitly retarget engagement/control-room assumptions to composable scopes and revise or retire contrary work. |
 | `notes/2026-10-02-positioning-exploration.md` H7 | Proposed rollout application; expressly excluded from this work. |
 
 Current source excerpts for drift checking:

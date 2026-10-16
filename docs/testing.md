@@ -571,7 +571,7 @@ check, and consider deleting the guard.
 
 ## The invariant map
 
-[plans/test-invariants.md](../plans/test-invariants.md) maps the earlier
+[notes/plans/test-invariants.md](../notes/plans/test-invariants.md) maps the earlier
 model's tests, which are removed. It is the proof plan's to replace. Until
 then each test's name states its invariant, and the two deltas notes name
 the witness of each decision.

@@ -2,7 +2,7 @@
 
 Use this shot list for Monday 12 October's rehearsal and Tuesday 13
 October's recording. The freeze is Monday at 23:00 Eastern. The cut runs
-6:40, under seven minutes. This script follows [plan 030](../../plans/030-2026-10-11-demo-plan-to-the-14th.md)
+6:40, under seven minutes. This script follows [plan 030](../plans/030-2026-10-11-demo-plan-to-the-14th.md)
 and supersedes the recording order in the 7 October draft.
 
 Commands below use today's executable, `artroom`. The rename changes that

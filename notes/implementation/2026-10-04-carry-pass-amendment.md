@@ -2,7 +2,7 @@
 
 Builder, 2026-10-04. Draft 3, for planning review. Draft 2 answered the
 planner's review of draft 1 (`85032553`), points A to F. The review of
-draft 2 (`794e6f86`, `plans/014-2026-10-04-carry-pass-draft2-review.md`)
+draft 2 (`794e6f86`, `notes/plans/014-2026-10-04-carry-pass-draft2-review.md`)
 accepted B, D, E and F with qualifications and asked for changes in A and
 C. This draft makes them, takes the three decided choices, and keeps all
 thirteen acceptance cases. It is not adopted, and nothing here is built. It

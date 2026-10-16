@@ -3,7 +3,7 @@
 A room's repository can be read as a site: each markdown file is a page,
 rendered as HTML by the scope Worker. This page says how to open a room's
 site, what renders and what does not, the limits, and who can read it.
-Plan 025 (`plans/025-2026-10-07-published-pages.md` on `main`) is the
+Plan 025 (`notes/plans/025-2026-10-07-published-pages.md` on `main`) is the
 design; this page describes what is built.
 
 ## Opening a site

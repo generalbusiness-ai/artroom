@@ -21,7 +21,7 @@ leave it running, and return on another device to watch, steer and review.
 Today's work advances its proposal and observation parts. Durable hosted
 workspaces and device continuity still have their own unfinished contracts
 and implementation; this sprint does not deliver that whole journey.
-The [connected-story task map](../../plans/023-2026-10-06-connected-story-current-tasks.md)
+The [connected-story task map](../plans/023-2026-10-06-connected-story-current-tasks.md)
 retains the complete workspace, browser and device acceptance requirements.
 
 ```mermaid
