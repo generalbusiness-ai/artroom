@@ -287,3 +287,32 @@ budget witnesses do.
 | Q7 | Does the recorded-membership read (`scope/src/authority.ts`) accept the membership in a platform-named creation body from a directory? | Builder confirms, with the Authority witness. |
 | Q8 | `SEAL_AT` at a quarter of `scopeEntries` | A proposal. R4 measures updates per lane. |
 | Q9 | The GitHub importer (`notes/2026-10-15-github-repository-import.md`, section 3) opens many lanes at once. | It handles `partition-full`, signs `seal`, and resolves the successor like any client. |
+
+## 11. Planner decisions on the open questions
+
+Decided by the planner on 2026-10-15 for checker review. The checker may
+correct any of them with a finding.
+
+- **Q1.** Adopt A1. A full partition answers `dropped` to an `index` update
+  from a declared advisory handler. Endless resends are a defect, not a
+  behaviour to keep.
+- **Q2.** Accept number jumps. The first jump comes only after a quarter of
+  a partition's entry budget, so most rooms never see one. Dense numbers
+  need coordination at the seal for little gain. Hugh may reverse this; the
+  numbering is confined to section 4.4 so that a later version can change
+  it.
+- **Q3.** Keep one row type. Pages are bounded and show `more`; a sparse
+  filtered page is acceptable. Splitting the row type waits for a measured
+  need.
+- **Q4.** No new index now. Lookup walks one partition's rows, which the
+  seal threshold bounds. The root's partition list records each
+  generation's number range, so a lookup by number reads one partition.
+- **Q5.** Reuse `issue.open`, limited by guards. No new membership
+  version.
+- **Q6, Q7.** Builder confirms both by search and by the Authority witness
+  in the first Source, before any reader change.
+- **Q8.** `SEAL_AT` is a quarter of `scopeEntries`, held as a versioned
+  constant in the partition definition. R4 measures updates per lane and
+  may propose a new version.
+- **Q9.** The GitHub importer handles `partition-full`, signs `seal` and
+  resolves the successor like any client. It has no special path.
