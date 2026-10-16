@@ -14,6 +14,10 @@ and directory `@9`. Section 12 maps each finding to its answer.
 (compromise relays must not be expendable), the preconditions of Q11, and
 the operator's one-shot resend. It adds section 4.10 and prerequisite D1.
 
+**Draft 4** answers checker review of Draft 3 at `6f8a94cc`: F8 (the
+relay recalls nothing) and F9 (D1's discriminator, closure and budget).
+Section 4.10 is rewritten.
+
 ## 1. Problem
 
 A room has one directory scope. It opens every lane, numbers it, and keeps
@@ -78,8 +82,9 @@ several scopes does not help if one root scope still records each update.
    4.10); A1, the `dropped` answer for a full partition's index handler
    (section 10).
 10. The `compromised` relay through the root stays capacity-limited. It
-   becomes an accelerator. D1 is the guarantee that a revoked key stops
-   publication (F7).
+   becomes an accelerator. D1 gates each push attempt on fresh key
+   standing at its mint outcome (F7, F9). Neither recalls a write that
+   already took effect (F8).
 
 ## 4. Protocol
 
@@ -270,48 +275,79 @@ keeps the first `scope`. So there are never two live successors.
 Without A1, an `index` that does not fit gets `retry("scope-full")`, as
 today. A1 (section 10) replaces that only when the refusal is permanent.
 
-### 4.10 A revoked key and publication (F7)
+### 4.10 A revoked key and publication (F7, F8, F9)
 
-Today a key revoked as compromised reaches the destination only through
-the root: membership tells the root (`membership.ts:512`), which tells the
-destination (`directory.ts:344-362`). The destination's `abort-if-behind`
-then sets `aborting`, revokes a live token and opens the deciding read
-(`destination.ts:439-457`, `:1729-1766`). The push rule reads `aborting`
-and makes no fresh membership read (`destination.ts:1934-1964`). Under
-C1, unrelated traffic can fill the root outside its reservation. The
-relay then waits at membership, and publication would continue.
+**Today.** A key revoked as compromised reaches the destination only
+through the root: membership tells the root (`membership.ts:512`), which
+tells the destination (`directory.ts:344-362`). There `abort-if-behind`
+sets `aborting`, revokes a live token and opens the deciding read
+(`destination.ts:439-457`, `:1729-1766`). The push outcome rule makes no
+fresh membership read (`destination.ts:1934-1964`). Under C1, unrelated
+traffic can fill the root outside its reservation, and the relay then
+waits at membership.
 
-**D1, the guarantee.** A new destination version, pinned by the partition
-cohort, adds observation rows to the `mint` outcome kind, as `judge`
-already has them (`destination.ts:465-471`):
-`{ of: "key", from: "rule", max: 9, window: 10, use: "once", without: "wait" }`.
-The rule names the keys behind the publication: those the reservation
-entry observed (the merger's key and the keys behind counted verdicts or
-the deciding result), at most 9. A push request is sent only after its
-mint has an outcome (`destination.ts:1944-1947`), so every push attempt
-is gated by that outcome entry.
+**Three different powers.** Neither the relay nor D1 can undo a write.
 
-- Every key is active in the read: the entry is as today.
-- A key is revoked or compromised: the entry sets `aborting`, revokes the
-  token it minted and opens the deciding read, as `abort-if-behind` does.
-  No push request leaves for that attempt.
-- The read cannot be made: the entry is not written (`without: "wait"`).
-  The mint has no outcome, so no push request leaves. Publication waits.
+| Power | What does it |
+|---|---|
+| Prevent a future send | `aborting` closes the target. The host's last check before a push, `allowed()`, reads the current state and custody (`scope/src/destination-host.ts:474-477`), so a send that has not passed it is not made. |
+| Revoke a credential | The `revoke` operation of the token. It ends the credential at the host; it does not roll back a write already accepted. |
+| Discover an already effective send | The deciding read. If the host ref is the publication's integration, `seenDecides` records `published`, also after `aborting` (`destination.ts:1023-1048`). |
 
-The read is bounded: at most 9 key observations, each one membership read
-under the observation limits the destination already uses. It adds no
-operation and changes no custody: tokens, receipts and the deciding read
-work as now.
+A push already accepted, or in flight past `allowed()`, takes effect. It
+is discovered, never recalled or cancelled.
 
-**What is guaranteed without the relay.** No push request leaves unless
-the entry that recorded its mint's outcome also recorded every key behind
-the publication as active, from a read at most 10 seconds old when that
-entry was written. A revocation that a membership read can see stops the
-next attempt. The time from that entry to the send is not bounded here;
-the minted token's own lifetime limits it. Not guaranteed without the relay: early revocation of a
-token minted before the revocation, the recall of a push already sent,
-and an abort while no attempt is due. The relay, when it arrives, still
-does these.
+**D1, the gate.** D1 is one rule, `standing-gate`, defined once beside
+the token rules (`mintOf`, `servedBy`, `targetOf` and the `mint` outcome
+rule, `destination.ts:780-830`, `:1870-1902`). It adds no separate token
+or custody mechanism.
+
+- *Discriminator.* It applies only to a confirmed `mint` whose served
+  write (`servedBy`) is a `push`, and whose target publication is not
+  closed. For every other served write (`first-head`, `receipt`,
+  `reservation-stage`, `reservation-delete`) the rule names no key, so no
+  read is made and the mint behaves as today. Revoked or unavailable
+  standing therefore never holds back a receipt or cleanup that finishes
+  an earlier publication. Staging is not gated: it writes no branch ref,
+  and its push is gated.
+- *The read.* The `mint` outcome kind gains the row
+  `{ of: "key", from: "rule", max: 9, window: 10, use: "once", without: "wait" }`,
+  the form `judge` uses (`destination.ts:465-471`). The rule names the
+  keys that the reservation entry observed: the merger's key and the keys
+  behind counted verdicts or the deciding result, at most 9.
+- *Every key active.* The outcome derives as today: `token` set, and
+  `publishing` for a reserved push.
+- *A key revoked or compromised.* The outcome sets `aborting` and does
+  not set `token`. It opens the `revoke` of this mint's token and one
+  deciding `read`, as `abort-if-behind` does. The push of that attempt is
+  refused at `allowed()` and is not sent.
+- *The read cannot be made.* The outcome entry is not written. The mint
+  has no outcome, so the push request is not sent and the publication
+  waits. Other writes, with their own mints, continue.
+
+**D1's declared closure** (verified in D1's own review, before partition
+Source):
+
+| Declaration | Today (`@4`) | D1 |
+|---|---|---|
+| `outcomes.mint.most.operations` | `["revoke"]` (`destination.ts:570`; `@2` at `:475`) | `["revoke", "read"]` |
+| `mint` rule `most` | `{ effects: 8, requests: 1, operations: 1 }` (`:2372`; `@2`: `:1882`) | `operations: 2`; effects stay at most 8 (the abort branch has 5: `aborting`, and an operation and its attempt for each of `revoke` and `read`) |
+| Publication holder (`holds`, `destination.ts:217` and the `@4` row) | Counts the reads and revokes of a publication | One abort opening for each publication, from either `abort-if-behind` or `standing-gate`. They exclude each other: each needs `aborting` unset and sets it. D1 shows the existing `read` and `revoke` counts include that opening, or raises each by one. |
+
+The outcome entry is a settling entry, so the branch must draw only on
+what the holder reserved. The full-destination witness checks that.
+
+**What is guaranteed.** At the entry that records a push attempt's mint
+outcome, every key behind the publication was active in a read at most
+10 seconds old. The later send is bounded only by `allowed()` and by the
+minted credential's lifetime. This is freshness at that entry, not a
+fence at send time and not immediate cessation of publication after a
+revocation.
+
+**What the relay adds, when it arrives.** It prevents a send that has
+not yet passed `allowed()`, revokes a live credential before it expires,
+and opens the deciding read that discovers a send that already took
+effect. It recalls nothing. It stays capacity-limited.
 
 The fallback named by the planner, a bounded relay reservation for lanes
 with reserved, publishing or unresolved work, is not taken, because D1's
@@ -399,8 +435,9 @@ the `seal` until it is used. Then `scope-full`, or A1.
 - `scopeEntries` and the existing reservation rules. Nothing raises a
   constant, resets history or moves entries.
 - Lane definitions, the `index` routing rule and the `create` body rule.
-- The membership role table and every grant. Membership, rules and
-  destination definitions and their reference to the root.
+- The membership role table and every grant. For old pins: the
+  membership, rules and destination definitions. D1 is a new destination
+  definition; membership and rules keep their reference to the root.
 - The bounded item query and its owners. The archive design.
 
 ## 9. Witnesses
@@ -419,7 +456,10 @@ path, as the existing budget witnesses use.
 | P1 | Interleave `seal` and `open-partition`; at every root head at most one item is `creating` or `active`. | Remove the P1 guard |
 | Unique numbers | Issues and post-seal concerns in two generations; no number repeats. | Drop the base offset |
 | Authority | `open-partition` without `issue.open`, an early `seal`, and a `seal` from a foreign directory-kind scope are refused. The partition's refs equal the root's. Root and partition consumers are told apart (Q6, Q7). | |
-| F7: revoked key behind a held publication | Fill unrelated root traffic to the new-work boundary, so the `compromised` relay is refused. Hold a publication in `reserved`; revoke, as compromised, the merger's key. The next mint outcome observes the key, sets `aborting`, revokes the token and opens the deciding read; no push request leaves. Repeat across a restart before and after that entry. Also: the membership read cannot be made, and the entry waits with no push. | Remove D1's observation: the push is sent |
+| F7: revoked key behind a held publication | Fill unrelated root traffic to the new-work boundary, so the `compromised` relay is refused. Hold a publication in `reserved`; revoke, as compromised, the merger's key. The next push mint outcome observes the key, sets `aborting`, opens `revoke` and the deciding read; the push is refused at `allowed()`. Repeat across a restart before and after that entry. Also: the membership read cannot be made, and the entry waits with no push. | Remove D1's observation: the push is sent |
+| F8: race with an effective send | A push is accepted by the host; then the `compromised` notice is recorded (`aborting`); the deciding read sees the integration. The publication is `published`, or `unresolved` until the read; never `aborted`. | Treat `aborting` as cancellation |
+| F9: full destination | The destination at its budget, with only reservations left. A push mint outcome with revoked standing is written and its `revoke` and `read` draw on the holder; no rule fault, nothing past the reservation. | D1 without the closure changes |
+| F9: cleanup and receipt continue | With the merger's key revoked, and again with the membership read unavailable: an earlier publication's receipt write and a `reservation-delete` mint, write and settle. | Gate every served write |
 | Old pins | Existing `@1` to `@9` witnesses replay unchanged. | |
 | A1, when built | Only a permanently full partition answers `dropped`; the lane stops sending; no partition entry; the reader marks the partition incomplete. | Drop on a transient refusal |
 
@@ -435,8 +475,10 @@ keep today's resends.
 - **C2, `int` indexed type.** Add `int` to the seven indexed types
   (`derive/src/binding.ts:38`, section 17.2a). The key is the canonical
   decimal text. Fixed and required, as for the others.
-- **D1, push-time key standing.** A new destination version (section
-  4.10), with its own review, pinned by the partition cohort.
+- **D1, push-mint key standing.** A new destination version with the
+  rule `standing-gate`, its observation row and the closure table of
+  section 4.10. Its own review verifies the closure and holder budget
+  before partition Source. Pinned by the partition cohort.
 - **A1, dropped index.** A platform `advisory` handler may declare
   `full: "drop"`. The receiver first verifies the source, the send, the
   address and the handler, as today. It answers `dropped` only when the
@@ -475,11 +517,12 @@ review `e8416df9`.
 - **Q10.** Changed after checker finding F7. The relay is not reserved,
   and is not the safety path. The primary guarantee is D1: each push
   attempt is gated by a fresh, bounded read of the standing of every key
-  behind the publication, and fails closed (section 4.10). The relay stays
-  capacity-limited and only speeds up the abort. The fallback, a bounded
-  relay reservation for lanes with held publications, is not needed,
-  because the read is bounded and reuses the destination's existing
-  observation rows.
+  behind the publication, made at its mint outcome, and fails closed
+  (section 4.10). The relay stays capacity-limited; it prevents a later
+  send, revokes a credential and opens the read, and recalls nothing. The
+  fallback, a bounded relay reservation for lanes with held publications,
+  is not needed: the read is bounded, uses the existing observation form,
+  and needs only D1's stated closure.
 - **Q11.** The checker confirmed it only for the one-namespace resolver
   and a correctly addressed `create`. Section 4.8 now states those
   preconditions, not a universal transport claim.
@@ -498,4 +541,6 @@ review `e8416df9`.
 | F5 | Lookups by generation, number and lane seed, each one key seek, with no walk fallback (4.3, 5); C2. |
 | F6 | No completion time is claimed; the pending conditions are stated (6). The resend after `delivery-unavailable` is the operator's explicit one-shot `sendAgain`. |
 | F7 | D1 gates every push attempt on a fresh read of key standing and fails closed; the relay is an accelerator, capacity-limited (4.10, 7, Q10). Witness F7. |
+| F8 | The relay prevents a future send, revokes a credential and discovers an effective send; it recalls nothing. D1's guarantee is freshness at the mint-outcome entry (4.10). Witness F8. |
+| F9 | `standing-gate` applies only to push mints; other served writes are not gated; the closure and holder budget are stated for D1's review (4.10, 10). Two witnesses. |
 | Q11 | Preconditions stated: one-namespace resolver, correctly addressed `create`, complete attempt log (4.8). |
