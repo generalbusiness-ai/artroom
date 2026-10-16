@@ -1,10 +1,12 @@
 # Write an application
 
 To write a dap application, declare its definitions as data, validate
-them, pin their bytes, and create scopes under them. This page shows each
-step. Two tutorials walk through a definition first:
-[Build a counter](build-a-counter.md) and
-[Build a lending library](build-a-lending-library.md).
+them, pin their bytes, and create scopes under them. This page is the
+reference for each step. For the guided path, take a tutorial first,
+[Build a counter](build-a-counter.md) or
+[Build a lending library](build-a-lending-library.md), then
+[Run your app](run-your-app.md), which runs the tutorial's definition in
+a room.
 [The architecture of a dap application](architecture.md) explains what
 the runtime does with one.
 
@@ -241,7 +243,8 @@ dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8
 
 Lanes that already exist keep the digest they pinned.
 
-**A new application scope.** A room created with
+**A new application scope.** [Run your app](run-your-app.md) walks
+through this path with the counter tutorial's definition. A room created with
 `dap install --cohort application` has a directory at version 5. Its act
 `establish-application` creates one scope under a definition that the
 rules scope has already activated. The act takes the definition's

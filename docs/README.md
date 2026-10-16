@@ -39,12 +39,14 @@ and deployment configuration. To run a room of your own, start with
 ## Build your own
 
 Each tutorial takes about 15 minutes. It runs in memory on your own
-computer and needs only Node.js and npm.
+computer and needs only Node.js and npm. Then run what you built as a
+real app.
 
 | Page | What it gives you |
 |---|---|
 | [Build a counter](build-a-counter.md) | People join and take turns to count. You write the rules, see requests refused with a reason, and read the history. |
 | [Build a lending library](build-a-lending-library.md) | Members donate, borrow and return things, and only staff can remove one. |
+| [Run your app](run-your-app.md) | Run the tutorial's definition in a room on your own service, for people and agents. Not yet run end to end. |
 
 ## Other applications
 

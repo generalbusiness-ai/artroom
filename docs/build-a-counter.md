@@ -54,13 +54,14 @@ const board: ItemType = {
 	},
 };
 
-// Starting the counter makes the board, with an owner and a target.
+// Starting the counter makes the board. The person who starts it, the
+// opener, owns it.
 const start: ActType = {
 	step: "open", on: "board", grant: "counter.start",
 	also: {}, guards: [], sends: [], attention: [],
-	fields: { owner: { type: "member", required: true }, target: { ...number, required: true } },
+	fields: { opener: { type: "member", required: true }, target: { ...number, required: true } },
 	effects: [
-		{ party: { slot: "owner", from: { field: "owner" } } },
+		{ party: { slot: "owner", from: { field: "opener" } } },
 		{ value: { slot: "target", from: { field: "target" } } },
 	],
 };
@@ -98,7 +99,7 @@ if (!checked.ok) {
 console.log(`valid: ${checked.definition.digest}`);
 
 // Start a counter in memory: @rita owns it and the target is 3.
-const scope = founded(valid(checked), { owner: keys.rita.member, target: 3 });
+const scope = founded(valid(checked), { opener: keys.rita.member, target: 3 });
 
 // Print one item: its type, its state and the slots that hold something.
 function show(id: number) {
@@ -127,7 +128,7 @@ node run.ts
 You should see:
 
 ```
-valid: sha256:b7637517c3af44fc6d3786430ab657c42c855e79e20ed67d7a50fd385c46c264
+valid: sha256:be3ba613091e3bc586ac2e84d741cc88f7c671eb9a31d5bd0c422c0ad6211e6c
   item 0, board, counting: owner=@rita target=3 count=0
 ```
 
@@ -200,7 +201,7 @@ show(2);
 Run `node run.ts` again. You should see:
 
 ```
-valid: sha256:5a15b8cf9073115926ee5c955529017f282a7ab80c149f6c56a5d26c63386456
+valid: sha256:316c7eb011abdaf7ce8df23d05e0b2d908f5374992d461d7fba96f6e264c6c8f
   item 0, board, counting: owner=@rita target=3 count=0
 @una join: took effect
 @vic join: took effect
@@ -358,6 +359,17 @@ players.
 > is **replay**. Anyone with the journal and the definition can replay
 > it and check the result.
 
+## Step 5: Turn it into a running app
+
+So far the counter has run in one process, with test keys. To make it a
+running dap app, you pin the definition's exact bytes, turn it on in a
+room, and ask the room to start the counter. The room fills in `opener`
+with whoever starts it, which is why the first act's field has that
+name. Members then sign with their own keys from the command line, and
+agents use tools named after your acts: `counter.join` and `counter.say`.
+[Run your app](run-your-app.md) takes you through it with this
+definition.
+
 ## What you just used, by its dap name
 
 | What you did | The dap name |
@@ -374,9 +386,11 @@ players.
 
 ## Where to go next
 
+- [Run your app](run-your-app.md): run this counter in a room, for
+  people and agents.
+- [Write an application](write-an-application.md): the reference for
+  definitions, where each kind of rule belongs, and pins.
 - [Build a lending library](build-a-lending-library.md): many things,
   each with its own life, and actions that only staff hold.
 - [The Counter](../apps/counter): the full app, which also checks whose
   turn it is from the list of players.
-- [Write an application](write-an-application.md): where each kind of
-  rule belongs, and how to pin a definition of your own.

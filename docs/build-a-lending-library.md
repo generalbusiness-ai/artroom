@@ -409,6 +409,16 @@ of keys in the source, so you have written that definition.
 > **final state**. The list of entries is the scope's **journal**, and
 > building the state again from it is **replay**.
 
+## Step 5: Turn it into a running app
+
+So far the library has run in one process, with test keys and
+permissions you made up. In a running dap app, a room gives the actions
+to roles, and each member signs with their own key. You pin the
+definition's exact bytes, turn it on in the room, and ask the room to
+create the library; the room fills in `opener` with you. This exact
+definition ran that way on a deployed service on 14 October 2026.
+[Run your app](run-your-app.md) takes you through it.
+
 ## What you just used, by its dap name
 
 | What you did | The dap name |
@@ -426,13 +436,15 @@ of keys in the source, so you have written that definition.
 
 ## Where to go next
 
-- [The lending library](../examples/lending): the full app, run in a
-  room. Its current definition also publishes a page for each thing to
-  the room's Git repository, through the room's
+- [Run your app](run-your-app.md): run this library in a room, for
+  people and agents.
+- [Write an application](write-an-application.md): the reference for
+  definitions, where each kind of rule belongs, and pins.
+- [The lending library](../examples/lending): the full app. Its current
+  definition also publishes a page for each thing to the room's Git
+  repository, through the room's
   [destination](manual/ten-terms.md#9-destination);
   [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
   shows how.
 - [Build a counter](build-a-counter.md): rules that do arithmetic, and
   the same request sent twice.
-- [Write an application](write-an-application.md): where each kind of
-  rule belongs, and how to pin a definition of your own.
