@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ccb63e062b17f8ce3c3e8d42ce1cfa20bba8adb4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-push-mint-standing.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d088d789a4bd476b6400a33c40229c5acf1edfc5","text":"Merge retired a covered predecessor; the successor is at packages/platform/test/file-publication.test.ts."}
