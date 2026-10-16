@@ -1,4 +1,0 @@
-node_modules/
-vendor/
-.wrangler/
-src/worker-runtime.d.ts
