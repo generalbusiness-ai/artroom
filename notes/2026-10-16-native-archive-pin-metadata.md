@@ -72,3 +72,22 @@ This checkpoint adds no read route, exporter, cohort certification,
 provider call, push or deployment. A composed frozen gate and exact-head
 review follow before local landing. The broader shared-consumer/scanner
 preparation remains on its own branch.
+
+## Frozen gate
+
+The clean composed Source head is
+`399f37674146900613c8a28f7bb88895e0dd9076`, tree
+`af212cc0e6a77b29e396cac5911baaa1a33a449c`, including local main
+`60ab711f`. The normal Page and Counting producers run without changing
+tracked assets. The original `caffeinate -is npm run gate` process closed
+with exit 0: installation 2.3 seconds elapsed / 3.4 CPU; whitespace
+0.1 / 0.1; typechecking 7.5 / 25.0; test stage 199.2 / 279.6. Vitest
+reports 1,387 passed and three skipped; all 16 Node checks and all 55
+Counting checks pass.
+
+The wrapper is `/tmp/artroom-archive-pin-399f3767-gate.log`; private raw
+stage logs are in `tmp.xEqApwsJbd`. Only closed public test metadata is
+offered to the checker, not a general read grant to raw logs or fixtures.
+This reporting-only successor changes this note alone. Source, tests and
+assets remain byte-identical to the gated head. Final review and governed
+local-main merge remain separate; this gate grants no export permission.
