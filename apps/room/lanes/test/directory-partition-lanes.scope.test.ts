@@ -5,7 +5,7 @@ import { ReceiverReads } from "../../../../packages/scope/src/receiver-reads.ts"
 import { ReadPreparation } from "../../../../packages/scope/src/read-preparation.ts";
 import { expect, test } from "vitest";
 import type { Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefOf, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, scopeIdOf, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { PARTITION_COHORT as C, partitionSourceName, partitionReceiverPolicy, partitionDeclaredCreationPolicy, platform } from "@generalbusiness/dap-platform";
 import { proofEntry, PROOF_BYTE_BOUNDS } from "../../../../packages/scope/src/proof-bytes.ts";
 import { namespace } from "../../../../packages/scope/src/namespace.ts";
@@ -294,3 +294,63 @@ test("mixed native cohorts keep old receiver meaning and replay each target from
     }
   } finally { life.release(); }
 });
+
+
+// A native residency exercise. Only a local inspector may set pause/release;
+// ordinary runs keep three short checkpoints without an attached inspector.
+// Heap samples are diagnostic observations, not a worst-case heap bound.
+test("native raw proof residency stays at thirty-two dense frames with one physical read", async () => {
+  type MemoryMarker = { phase: string; pause: boolean; resume: boolean; live: unknown; summary?: Record<string, number> };
+  const diagnostic = globalThis as typeof globalThis & { __ARTROOM_PARTITION_MEMORY__?: MemoryMarker };
+  const marker: MemoryMarker = { phase: "setup", pause: false, resume: false, live: null };
+  diagnostic.__ARTROOM_PARTITION_MEMORY__ = marker;
+  const checkpoint = async (phase: string) => {
+    marker.phase = phase; marker.resume = false;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    if (marker.pause) {
+      for (let n = 0; n < 50 && !marker.resume; n++) await new Promise(resolve => setTimeout(resolve, 100));
+      if (!marker.resume) throw new Error("local memory inspector did not release its checkpoint");
+    }
+  };
+  const room = await sessionRoom(C.register), { life } = room;
+  try {
+    const { P } = await preparedIssue(life, room), facts = [];
+    const conditions = Array.from({ length: 16 }, () => "z".repeat(4096));
+    let expectedBytes = 0;
+    for (let n = 0; n < 33; n++) {
+      const accepted = await P.stub.submit(await P.intent(rita, "open-issue", { expected: await P.expected({ repository: 0 }), fields: { definition: DIGESTS.issue, title: `Dense proof ${n}`, conditions } }), [], { values: [canonicalize(issue)] });
+      expect(accepted).toMatchObject({ answer: "accepted" });
+      if (accepted.answer !== "accepted") return;
+      const created = await P.stub.entry(reader, accepted.receipt.fact.seq);
+      if (!created.ok) return expect.fail("native dense creation entry is unavailable");
+      const send = created.value.entry.sends.find(send => (send.to as Seed).kind === "lane");
+      if (!send) return expect.fail("native dense issue has no creation");
+      const I = life.platform(scopeIdOf(send.to as Seed));
+      await dispatchFixture([P, I, ...room.children], life.wait);
+      const birth = (await I.entries())[0]!;
+      expect(birth.input).toMatchObject({ type: "genesis", decision: "applied" });
+      const bytes = utf8(canonicalize(birth)).length;
+      expect(bytes).toBeGreaterThan(128 * 1024); expect(bytes).toBeLessThan(256 * 1024);
+      if (n < 32) expectedBytes += bytes;
+      facts.push(factRefOf(birth));
+    }
+    const actual = namespace(env.PLATFORM); let physical = 0, pending = 0, peak = 0;
+    let operation: PartitionProofOperation | null = new PartitionProofOperation({
+      births: { read: async (at, ms, max) => {
+        physical++; pending++; peak = Math.max(peak, pending);
+        try { return await actual.births.read(at, ms, max); } finally { pending--; }
+      } }, proofs: actual.proofs,
+    });
+    marker.live = operation; await checkpoint("before");
+    const got = await Promise.all(facts.slice(0, 32).map(fact => operation!.raw(fact).then(frame => frame?.fact.hash === fact.hash)));
+    expect(got.every(Boolean)).toBe(true);
+    expect(operation.stats()).toMatchObject({ calls: 32, reads: 32, totalFrames: 32, actualBytes: expectedBytes, pending: 0 });
+    expect(physical).toBe(32); expect(peak).toBe(1);
+    expect(expectedBytes).toBeGreaterThan(4 * 1024 * 1024);
+    expect(await operation.raw(facts[32]!)).toBeNull(); expect(physical).toBe(32);
+    marker.summary = { ...operation.stats(), physical, peak };
+    await checkpoint("collected");
+    marker.live = null; operation = null;
+    await checkpoint("released");
+  } finally { delete diagnostic.__ARTROOM_PARTITION_MEMORY__; life.release(); }
+}, 60_000);

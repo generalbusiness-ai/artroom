@@ -629,3 +629,52 @@ budget checkpoint is local commit `376d7ec4b`; this replay phase is another
 unfinished local checkpoint, with no gate, Source review or provider action.
 Runtime memory, ordinary change relations, concern fulfilment, completed
 publication, factory capacity and the remaining consumer audit remain owed.
+
+
+## Native proof residency observation
+
+Thirty-three actual issue births use sixteen maximum-size condition strings
+apiece. One operation then retains thirty-two dense native genesis frames,
+with 4,299,780 actual UTF-8 proof bytes and thirty-two physical reads. It
+serializes the physical reads, with peak pending one, and refuses the
+thirty-third frame before an RPC. No heap setting is raised. The test uses
+the existing native fixture's setup, clock, scheduler, inspector and Git
+stand-ins; the genesis, SQLite data and raw proof RPCs are actual.
+
+A local workerd inspector observation uses explicit execution context,
+bounded data-only checkpoints and a GC before each sample. Used heap bytes
+are 63,029,396 before collection, 68,372,136 while the raw collection is
+reachable, and 63,993,748 after releasing it. Total heap bytes are
+64,471,040, 69,976,064 and 65,781,760 respectively. This is one observed
+residency exercise, not a worst-case or peak-heap guarantee, a sixteen MiB
+heap claim, or proof of zero residue or no leak. The native test and the
+final measurement both pass on local workerd 1.20260815.1.
+
+The closed safe result is the owned regular 0600 file
+`/private/tmp/artroom-directory-native-memory-attempt5-public.json`, 1,520
+bytes, SHA-256
+`11e10ea7fb6385d6d431b8816b60af7468806b79fdf2c2069c0e9f13a3167343`.
+The checker receives a closed read grant to that one file only, without
+adjacent raw logs, helper code, payloads or new-operation rights.
+
+Failures are retained. The original dense fixture treated a bounded first
+history page as the whole log; it now uses the actual exact entry RPC. An
+optional-marker type error was corrected. Inspector startup first lacked
+Vitest's required no-file-parallelism flag. Two native diagnostic runs
+passed without heap samples because Vitest intercepted console output,
+then because workerd has no default execution context. The next attempt
+collected a baseline but failed its checkpoint release: debugger-context
+timers cannot be used as a fixture continuation. The final data-only flag
+checkpoint resumes in the owned fixture's timer context and closes with
+three samples and no diagnostic errors. These failed or partial attempts
+are not counted as passing memory observations.
+
+## Destination consumer audit continues
+
+The Page's retained text editor now includes exact destination6 in both
+inherited head-read workflows; it still rejects destination7 and legacy
+LIST1. The four focused editor tests and Page typecheck pass. Its read-route
+stand-in proves bounded read/stop behavior without a mutation; it does not
+claim a native partition editing journey. The explicit source bundle must
+be rebuilt before the first frozen gate. Other root/partition consumers and
+remaining native protocol obligations are still under audit.
