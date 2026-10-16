@@ -8,7 +8,7 @@ import { PROFILES, grantFrom, ruleAt, useOf, validateDefinition, valueDigest, ty
 import { d, keys, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
 import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
 import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
-import { targetOf } from "../../platform/src/destination.ts";
+import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";

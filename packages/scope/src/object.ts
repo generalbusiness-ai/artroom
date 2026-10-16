@@ -33,8 +33,8 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, timeMs, type Item } from "@generalbusiness/dap-derive";
+import { canonicalize, digestBytes, isScopeId, retainedReadArgument, utf8 } from "@generalbusiness/artroom-bytes";
+import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
 import type { Delivered, StateView } from "@generalbusiness/dap-derive";
@@ -45,12 +45,20 @@ import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
+import { GenesisProofs, type ProofTimer } from "./genesis-proof.ts";
+import { EXACT_PROOF_RECEIVER_BOUNDS, ProofBytes } from "./proof-bytes.ts";
+import { PreparationFlights } from "./preparation-flight.ts";
+import { ItemQueries } from "./item-queries.ts";
+import { ReadPreparation } from "./read-preparation.ts";
+import { SessionReferences, type SessionReferenceSource } from "./session-reference.ts";
+import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
+import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading, type SignedReadObserver } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
-import { SqliteStore } from "./sqlite.ts";
+import { SqliteStore, type Sql } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
 import { siteDestination, sitePublication, sitePublishedCommit } from "./site/publication.ts";
 
@@ -91,6 +99,9 @@ export interface Wiring {
   readers?: (given: Given) => Readers;
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
+  sessionReferenceSource?: SessionReferenceSource;
+  /** Internal elapsed-time clock; production uses the shared preparation timer. */
+  queryTimer?: ProofTimer;
   limits?: LimitConfig;
   /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
   signedReadObserver?: SignedReadObserver;
@@ -99,11 +110,20 @@ export interface Wiring {
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #name: ScopeId | null;
   readonly #store: SqliteStore;
+  readonly #readSql: Pick<Sql, "exec">;
+  readonly #queryFlights: PreparationFlights;
+  readonly #itemQueries: ItemQueries;
+  readonly #proofBytes: ProofBytes;
+  readonly #genesisProofs: GenesisProofs;
+  readonly #readPreparation: ReadPreparation;
+  readonly #sessionReferences: SessionReferences;
+  readonly #sessionPreparation: SessionPreparation;
   readonly #scope: Scope;
   readonly #reads: Reads;
   readonly #deliveries: Deliveries;
   readonly #dispatcher: Dispatcher | null;
   readonly #operations: Operations;
+  readonly #wakes: Wakes;
   readonly #clock: Clock;
   readonly #transport: Transport | null;
   readonly #seconds: number;
@@ -130,8 +150,10 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     // Authority note, section 5.4, rule 7: the attempts of one operation are spaced by a backoff, to a cap. The first is due at its
     // entry's time. The texts state no numbers for it: the delays are the dispatcher's (I3 deltas, entry EB8).
     const spacing = (attempt: number) => (attempt < 2 ? 0 : Math.min(bounds.dispatchRetrySeconds * 2 ** Math.min(attempt - 2, 30), bounds.dispatchRetryMaxSeconds) * 1000);
+    this.#readSql = { exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) };
+    this.#queryFlights = new PreparationFlights(wiring.queryTimer);
     const store = new SqliteStore({
-      exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings),
+      ...this.#readSql,
       transaction: (closure) => ctx.storage.transactionSync(closure),
     }, spacing);
     // This object's one alarm. Its handler below starts the alarm's turn and a dispatch pass.
@@ -139,6 +161,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const given: Ports = { ...production(), alarm, ...wiring.ports };
     // The one alarm serves the earliest deadline, the next attempt of an outside operation and, with a transport, the next dispatch.
     const wakes = new Wakes(store, given.alarm, given.transport !== null);
+    this.#wakes = wakes;
     // The authority of a deployed scope reads this scope's own genesis entry, for the membership scope that it records.
     const genesis = (): Extract<Input, { type: "genesis" }> | null => {
       const kept = store.stored(0);
@@ -174,6 +197,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
+    this.#proofBytes = new ProofBytes(this.#readSql);
+    this.#genesisProofs = new GenesisProofs(this.#proofBytes, ports.proofs ?? null);
     this.#scope = new Scope(this.#name, store, ports, bounds);
     // A signed read is judged on this scope's clock, within the authority window of an intent (`signed-reads.ts`).
     // An entry that an entry of a cause chain names: one of this scope's own, one it retains, or one read from its own scope.
@@ -207,8 +232,26 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     });
     this.#limits = new JoinLimits(wiring.limits);
     this.#sessions = wiring.sessions ?? (() => null);
+    // One bounded immutable-content cache per object. These callbacks are
+    // the existing pure whole-support validators, never pinned()/genesis.
+    this.#readPreparation = new ReadPreparation(this.#readSql, {
+      policy: () => `native-read-support-v1:${digestBytes(utf8(canonicalize(bounds)))}`,
+      declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
+    });
+    this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);
+    this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock, wiring.sessionReferenceSource ?? null);
+    this.#itemQueries = new ItemQueries({ name: this.#name, sql: this.#readSql, preparation: this.#readPreparation,
+      sessionPreparation: this.#sessionPreparation, localSigners: store.localSigners, proofs: ports.proofs ?? null,
+      sessions: this.#sessions, clock: this.#clock, window: bounds.intentLifetimeSeconds, flights: this.#queryFlights });
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
+    // Only bounded control initialization happened above. No read runs a
+    // migration quantum; an activated legacy object schedules its owner.
+    const pending = store.localSigners.pending(), maintenance = store.signerMaintenance();
+    if (pending || maintenance !== null) {
+      // Preserve a durable earlier wake across repeated activation.
+      ctx.waitUntil(Promise.resolve(wakes.maintenance.set(pending ? maintenance ?? this.#maintenanceAt() : null)));
+    }
   }
 
   /**
@@ -275,7 +318,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const scope = this.#store.scope();
     const judged = () => this.#scope.submit(signed, grants, beside);
     if (scope?.at.kind !== "membership" || !isJoin(signed)) return this.#sent(await judged());
-    return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head }, signed, judged));
+    return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head, invitationProof: () => this.#scope.pinned()?.named === "platform:membership@6" }, signed, judged));
   }
   /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
   async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }
@@ -319,6 +362,29 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     }
     return sourced(this.#store, pinned, seq, origin, proof);
   }
+  /** Native query preparation only. The caller supplies fresh validated request checks; no HTTP route invokes this. */
+  protected genesisEligibility(request: () => { key: import("@generalbusiness/dap-contract").KeyId; since: number } | null) {
+    return this.#genesisProofs.eligible(request);
+  }
+  /** One owned bounded query; starts no activation turn or legacy read walk. */
+  queryItems(encoded: unknown, reader: unknown) { return this.#itemQueries.read(encoded, reader); }
+  /** Exact internal causal-proof bytes. Read-only: deliberately bypasses #first/sourceOrigin. */
+  proofSource(fact: unknown, maxBytes: number, milliseconds?: number) {
+    if (milliseconds === undefined) return this.#proofBytes.exact(fact, maxBytes);
+    const began = this.#queryFlights.clock.now(), ends = began + milliseconds;
+    if (!Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isFinite(began) || !Number.isFinite(ends)) return null;
+    const active = () => { const now = this.#queryFlights.clock.now(); return now >= began && now < ends; };
+    let calls = 0;
+    const bytes = new ProofBytes(this.#readSql, () => {
+      if (!active() || ++calls > EXACT_PROOF_RECEIVER_BOUNDS.sqlCalls) throw new Error("proof-unavailable");
+    });
+    const result = bytes.exact(fact, maxBytes);
+    return active() ? result : null;
+  }
+  /** Authenticated small directory witness. No HTTP route or activation turn. */
+  sessionReference(request: unknown): string | null { return this.#sessionReferences.read(request); }
+  /** Future bounded query support only; existing public reads are unchanged. */
+  protected sessionEligibility(reader: unknown, visibility: QueryVisibility): Promise<boolean> { return this.#sessionPreparation.eligible(reader, visibility); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
   demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
@@ -361,13 +427,26 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   dispatch(): Promise<number> { this.#first(); return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
   /** A pass of the operations driver now, or the one in flight. Resolves when it ends, with the number of requests it sent and outcomes it offered. */
   effect(): Promise<number> { this.#fresh = false; return this.#operations.run(); }
+  #maintenanceAt() {
+    let now = Date.now();
+    try { now = Math.max(now, timeMs(this.#clock.read()) ?? now); } catch { /* scheduler retry grants no authority */ }
+    return timeOf(now + SIGNER_INDEX_BOUNDS.retryMs);
+  }
   /** The alarm: a turn with no waiting input, at the earliest deadline (section 5.2), then a dispatch pass, then a pass of the operations driver. */
   override async alarm(): Promise<void> {
     this.#fresh = false;
-    await this.#scope.alarm();
-    await this.dispatch();
-    await this.effect();
-    this.#followed();
+    try {
+      // One synchronous bounded quantum gets a turn before potentially
+      // asynchronous native owners. A backlog never drains in one alarm.
+      try { this.#store.localSigners.maintain(); }
+      catch { /* A storage retry must not prevent the other native owners. */ }
+      try { await this.#wakes.maintenance.set(this.#store.localSigners.pending() ? this.#maintenanceAt() : null); }
+      catch { /* The final arbitration retries without hiding native work. */ }
+      await this.#scope.alarm();
+      await this.dispatch();
+      await this.effect();
+      this.#followed();
+    } finally { await this.#wakes.set(); }
   }
 
   /**

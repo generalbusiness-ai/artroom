@@ -1,10 +1,10 @@
 import { expect, test, onTestFinished } from "vitest";
 import type { SignedIntent } from "@generalbusiness/dap-contract";
-import { b64url, factRefOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
-import { secretSigner, signedIntent, type Fetch } from "@generalbusiness/artroom-client";
+import { b64url, factRefOf, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { invitationIssueFields, invitationRedemptionFields, secretSigner, signedIntent, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
-import { office, Platform, rita, routed, settle } from "../../scope/test/repository.ts";
+import { office, Platform, rita, routed, settle, una } from "../../scope/test/repository.ts";
 import { command, memoryStore, type Context } from "../src/index.ts";
 
 // Invariant: uncertain join delivery and accepted enrollment awaiting its
@@ -13,25 +13,31 @@ import { command, memoryStore, type Context } from "../src/index.ts";
 // STAND-IN directory (no founding); sibling IDs in the link are placeholders
 // never read here. memoryStore stands for local persistence. Loss/unavailable
 // replies and pause are STAND-INs for transport and scheduling, with no sleep.
-test("join retries its exact private envelope after accepted reply loss and inbox wait failure across restart; saved facts and links cannot substitute another enrollment", async () => {
+test.each(["platform:membership@2", "platform:membership@6"] as const)("join retries its exact private envelope after accepted reply loss and inbox wait failure across restart; saved facts and links cannot substitute another enrollment (%s)", async definition => {
   const clock = net.clock.now;
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: "a test reader" });
   onTestFinished(owner.close);
   try {
-    const { O, M } = await office();
+    const { O, M } = await office(null, definition);
     const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
     await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
     await settle(O, M, await M.created(seat));
-    const invitationSecret = "the private invitation secret of at least 32 bytes";
-    const invitation = await M.did(rita, "invite-member", { fields: { handle: "@joiner", role: "member", inviteHash: textDigest(invitationSecret), inviteEnds: timeOf(timeMs(net.clock.now)! + 3600_000) } });
-    const linkData = { v: 1, service: "https://scopes.test", repository: { directory: await O.at(), membership: await M.at(), rules: O.name, destination: O.name }, invitation, secret: invitationSecret, handle: "@joiner" };
+    const invitationSecret = definition === "platform:membership@6" ? b64url(new Uint8Array(32).fill(79)) : "the private invitation secret of at least 32 bytes";
+    const invitation = await M.did(rita, "invite-member", { fields: { handle: "@joiner", role: "member", ...invitationIssueFields(definition, invitationSecret), inviteEnds: timeOf(timeMs(net.clock.now)! + 3600_000) } });
+    const linkData = { v: 1, service: "https://scopes.test", repository: { directory: await O.at(), membership: await M.at(), rules: O.name, destination: O.name }, invitation, secret: invitationSecret, handle: "@joiner", ...(definition === "platform:membership@6" ? { definition } : {}) };
     const link = `artroom-invite:${b64url(utf8(JSON.stringify(linkData)))}`;
+    if (definition === "platform:membership@6") {
+      const before = (await M.summary()).at;
+      expect(await M.act(una, "join", { fields: { invitation, secret: invitationSecret } })).toMatchObject({ answer: "refused", reason: "bad-intent" });
+      expect((await M.summary()).at).toEqual(before);
+    }
     let lose = true;
     let hideInbox = true;
     let wrongReceipt = false;
     let wrongSettlement = false;
     const sent: SignedIntent[] = [];
+    const initialAnswers: unknown[] = [];
     const fetch = (async (url: string, init?: RequestInit) => {
       const path = new URL(url).pathname;
       const body = typeof init?.body === "string" ? JSON.parse(init.body) as { signed?: SignedIntent } : null;
@@ -40,6 +46,8 @@ test("join retries its exact private envelope after accepted reply loss and inbo
       if (hideInbox && path.startsWith("/v1/scopes/") && !path.slice("/v1/scopes/".length).includes("/") && !path.endsWith(M.name)) return Response.json({ ok: false, reason: "unavailable" });
       const response = await routed(url, init);
       if (signed?.intent.kind === "join" && lose) {
+        const judged = await response.clone().json() as { answer: string; reason?: string; name?: string };
+        initialAnswers.push([judged.answer, judged.reason ?? null, judged.name ?? null]);
         lose = false;
         await response.body?.cancel();
         throw new Error("scripted lost accepted join reply");
@@ -69,10 +77,17 @@ test("join retries its exact private envelope after accepted reply loss and inbo
     const key = (await store.secret("device"))!;
     expect(JSON.stringify(unsatisfied)).not.toContain(b64url(key));
     const joins = async () => (await M.entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "join");
+    expect(initialAnswers).toEqual([["accepted", null, null]]);
     expect(await joins()).toHaveLength(1);
+    if (definition === "platform:membership@6") {
+      const history = JSON.stringify(await M.entries());
+      expect(history).not.toContain(invitationSecret);
+      expect(history).not.toContain('"secret"');
+      expect((await joins())[0]!.input).toMatchObject({ type: "act", signed: { intent: { fields: { invitation, proof: expect.any(String) } } } });
+    }
     // The original broken retry signs another envelope: the real membership
     // refuses it because the accepted join already used this key/invitation.
-    const fresh = await signedIntent(secretSigner(key), { to: linkData.repository.membership, kind: "join", fields: { invitation, secret: invitationSecret } }, { now: timeMs(net.clock.now)! });
+    const fresh = await signedIntent(secretSigner(key), { to: linkData.repository.membership, kind: "join", fields: invitationRedemptionFields(definition, linkData.repository.membership, invitation, secretSigner(key).key, invitationSecret) }, { now: timeMs(net.clock.now)! });
     expect(await M.stub.submit(fresh, [])).toMatchObject({ answer: "refused", reason: "unauthorized" });
     expect(await command({ ...ctx }, ["join", `artroom-invite:${b64url(utf8(JSON.stringify({ ...linkData, handle: "@other" })))}`])).toMatchObject({ code: 1, lines: [expect.stringMatching(/^The invitation link does not match/)] });
     expect(sent).toHaveLength(1);
@@ -112,7 +127,14 @@ test("join retries its exact private envelope after accepted reply loss and inbo
     expect(finished.code, finished.lines.join("\n")).toBe(0);
     expect(sent).toHaveLength(beforeSettlement); // settlement is read-only, even past the saved deadline.
     expect([await store.secret("device"), (await store.config())!.join, (await store.config())!.repository!.inbox]).toEqual([key, undefined, accepted.join!.repository.inbox]);
+    expect(initialAnswers).toEqual([["accepted", null, null]]);
     expect(await joins()).toHaveLength(1);
+    if (definition === "platform:membership@6") {
+      const history = JSON.stringify(await M.entries());
+      expect(history).not.toContain(invitationSecret);
+      expect(history).not.toContain('"secret"');
+      expect((await joins())[0]!.input).toMatchObject({ type: "act", signed: { intent: { fields: { invitation, proof: expect.any(String) } } } });
+    }
     expect(finished.lines.join("\n")).not.toContain(invitationSecret);
     expect(sent.every((signed) => signed.intent.notAfter === saved.intent.notAfter)).toBe(true);
   } finally {

@@ -22,7 +22,7 @@ is allowed to do.
 
 A **lane** is a scope of the kind `lane`. Its pinned definition decides
 what it holds. The room has two lane definitions, `issue` and `change`,
-in [packages/lanes](../../../packages/lanes). [Lanes](lanes.md) describes
+in [apps/room/lanes](../../../apps/room/lanes). [Lanes](lanes.md) describes
 them.
 
 ## Issue
@@ -56,7 +56,7 @@ records of a hold's workspace.
 
 A **plan** is one way to split a goal into parts, and a **concern** is
 one part of a plan. Both are items of the room's issue definition, in
-[issue.ts](../../../packages/lanes/src/issue.ts). A plan is `open` while
+[issue.ts](../lanes/src/issue.ts). A plan is `open` while
 concerns are added, then `sealed` as the goal's current plan. Adding a
 concern sends a `create` for a new lane under the same definition, and
 the concern's state follows that request: `creating`, then `created`,
@@ -113,7 +113,7 @@ native item names in the definitions did not all change with them.
 Written against main `d309b6b9`. Sources:
 [membership](../../../packages/platform/src/membership.ts),
 [the inbox](../../../packages/platform/src/inbox.ts),
-[the issue definition](../../../packages/lanes/src/issue.ts),
-[the change definition](../../../packages/lanes/src/change.ts), and
+[the issue definition](../../../apps/room/lanes/src/issue.ts),
+[the change definition](../../../apps/room/lanes/src/change.ts), and
 [the command line's help](../../../packages/cli/src/line.ts). This page
 claims no run.

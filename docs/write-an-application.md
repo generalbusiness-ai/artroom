@@ -1,10 +1,12 @@
 # Write an application
 
 To write a dap application, declare its definitions as data, validate
-them, pin their bytes, and create scopes under them. This page shows each
-step. Two tutorials walk through a definition first:
-[Build a counter](build-a-counter.md) and
-[Build a lending library](build-a-lending-library.md).
+them, pin their bytes, and create scopes under them. This page is the
+reference for each step. For the guided path, take a tutorial first,
+[Build a counter](build-a-counter.md) or
+[Build a lending library](build-a-lending-library.md), then
+[Run your app](run-your-app.md), which runs the tutorial's definition in
+a room.
 [The architecture of a dap application](architecture.md) explains what
 the runtime does with one.
 
@@ -16,12 +18,12 @@ definition declares. You write no judging code.
 Start from a template and remove what your application does not need:
 
 - For a small application with turns and a target, start from the
-  [Counter definition](../examples/counting/definition.ts).
+  [Counter definition](../apps/counter/definition.ts).
 - For things that members hold, lend and remove, with a member role and a
   staff role, start from the
   [lending definition](../examples/lending/definition.ts).
 - For work shaped around issues and changes, start from the room's demo
-  profile in [demo.ts](../packages/lanes/src/demo.ts). It selects acts
+  profile in [demo.ts](../apps/room/lanes/src/demo.ts). It selects acts
   and handlers from the full lane definitions and keeps their item types
   and timed rules.
 
@@ -49,8 +51,8 @@ entry that stated the terms. Its states include `offered`, `accepted` and
 the final state `fulfilled`. A `report` is a separate item, so reporting
 work does not itself say that the requester accepted it.
 
-Read the actual [issue](../packages/lanes/src/issue.ts) and
-[change](../packages/lanes/src/change.ts) declarations alongside the
+Read the actual [issue](../apps/room/lanes/src/issue.ts) and
+[change](../apps/room/lanes/src/change.ts) declarations alongside the
 [generated row reference](lanes-reference.md). Keep the names your
 application needs and remove the others.
 
@@ -112,8 +114,8 @@ Use the installation's bounds. The supplied examples use
 `PROPOSED_BOUNDS`. These numbers are provisional. If the definition
 declares rule expressions, pass `RULE_PROFILES` from
 `@generalbusiness/dap-derive/rule` as the third argument, as the
-[Counter's tests](../examples/counting/definition.test.ts) do. The
-[lane definition tests](../packages/lanes/test/definitions.test.ts) show
+[Counter's tests](../apps/counter/definition.test.ts) do. The
+[lane definition tests](../apps/room/lanes/test/definitions.test.ts) show
 the validator calls for the room's lane definitions and their demo
 profiles, which declare no rule expressions.
 
@@ -129,7 +131,7 @@ this mixed example requires the checkout for `issueDemo` and `changeDemo`:
 node --input-type=module <<'JS'
 import { PROPOSED_BOUNDS } from '@generalbusiness/dap-contract';
 import { validateDefinition } from '@generalbusiness/dap-derive';
-import { issueDemo, changeDemo } from './packages/lanes/src/demo.ts';
+import { issueDemo, changeDemo } from './apps/room/lanes/src/demo.ts';
 for (const definition of [issueDemo, changeDemo]) {
 	const result = validateDefinition(definition, PROPOSED_BOUNDS);
 	if (!result.ok) {
@@ -165,22 +167,22 @@ whole value in the definition's byte domain, so changing any row changes
 it.
 
 Keep the declaration, its canonical bytes and its digest together. The
-Counter keeps them in [definition.ts](../examples/counting/definition.ts),
-[definition.json](../examples/counting/definition.json) and
-[pin.ts](../examples/counting/pin.ts), and its test checks that the three
+Counter keeps them in [definition.ts](../apps/counter/definition.ts),
+[definition.json](../apps/counter/definition.json) and
+[pin.ts](../apps/counter/pin.ts), and its test checks that the three
 agree. The room's lane package keeps its declarations in `src`, canonical
 bytes in `definitions` and digests in `src/digests.ts`. Its
-[pin script](../packages/lanes/scripts/pin.mjs) writes every lane
+[pin script](../apps/room/lanes/scripts/pin.mjs) writes every lane
 definition and its digest. Its
-[reference script](../packages/lanes/scripts/reference.mjs) writes the
+[reference script](../apps/room/lanes/scripts/reference.mjs) writes the
 row reference, [lanes-reference.md](lanes-reference.md).
 
 To pin the lane definitions and check the reference, run from the
 repository root:
 
 ```sh
-node packages/lanes/scripts/pin.mjs
-node packages/lanes/scripts/reference.mjs --check
+node apps/room/lanes/scripts/pin.mjs
+node apps/room/lanes/scripts/reference.mjs --check
 ```
 
 Run on 2026-10-12 at main `d309b6b9`, both exited 0. The pin script
@@ -210,9 +212,9 @@ from the same declarations before you review them.
 A scenario states one invariant and shows the acts that reach it. Include
 the refused path that distinguishes the invariant, as well as the path
 that takes effect. For the demo profile, the
-[story scenario](../packages/lanes/test/story.scope.test.ts) covers an
+[story scenario](../apps/room/lanes/test/story.scope.test.ts) covers an
 open extent and a controlled extent. The
-[real-room scenarios](../packages/lanes/test/wiring.scope.test.ts) cover
+[real-room scenarios](../apps/room/lanes/test/wiring.scope.test.ts) cover
 membership, rules and publication together.
 
 Read each scenario's stated boundary. These scenarios run real scopes
@@ -233,15 +235,16 @@ bytes.
 The room's directory then creates new lanes under it. The command reads
 the `--value` file at the path you give. For the demo profile of the
 change lane, run this from the repository root, where the pin script
-wrote `packages/lanes/definitions/change-demo.json`:
+wrote `apps/room/lanes/definitions/change-demo.json`:
 
 ```sh
-dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2 --set name=change --value packages/lanes/definitions/change-demo.json
+dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2 --set name=change --value apps/room/lanes/definitions/change-demo.json
 ```
 
 Lanes that already exist keep the digest they pinned.
 
-**A new application scope.** A room created with
+**A new application scope.** [Run your app](run-your-app.md) walks
+through this path with the counter tutorial's definition. A room created with
 `dap install --cohort application` has a directory at version 5. Its act
 `establish-application` creates one scope under a definition that the
 rules scope has already activated. The act takes the definition's

@@ -84,18 +84,19 @@
  * else. It travels in a header, never in a URL.
  */
 
-import type { Entry, FactUse, KeyId, ScopeId, Seed, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/dap-contract";
+import type { Entry, FactRef, FactUse, KeyId, ScopeId, Seed, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStrict, scopeIdOf, seedDigest, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
 import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/dap-derive";
 import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
+import { signerOf } from "./entry-signer.ts";
 
 /** How a reader presents a signed read: the `Authorization` header's value. */
 const SCHEME = "Signed ";
 /** The most characters of a presented value that are looked at. */
 const SIGNED_CHARS = 2048;
 /** The reads that a signed read may name. */
-export const SIGNED_READS: readonly SignedReadName[] = ["summary", "history", "entry", "log", "retained"];
+export const SIGNED_READS: readonly SignedReadName[] = ["summary", "history", "entry", "log", "retained", "query-items"];
 /** The most characters of a signed read's argument: a digest, the longest argument, is 71. */
 const ARG_CHARS = 128;
 
@@ -125,6 +126,12 @@ function openSignedRead(reader: string): SignedRead | null {
   } catch {
     return null;
   }
+}
+/** Pure admission before protected storage. Fresh clock/frame checks still follow at preparation and release. */
+export function scopedSignedRead(reader: unknown, to: ScopeId, read: SignedReadName, arg: string): SignedRead | null {
+  if (typeof reader !== "string" || reader.length > SCHEME.length + SIGNED_CHARS || !presentsSignedRead(reader)) return null;
+  const signed = openSignedRead(reader);
+  return signed && verifySignedRead(signed) && signed.request.to === to && signed.request.read === read && signed.request.arg === arg ? signed : null;
 }
 
 /** The signed entry at the root of a cause chain: its signer, its time, and where it is. */
@@ -163,11 +170,7 @@ export interface SignedReading {
 export const CHAIN_STEPS = 4;
 
 /** The key that signed an entry, or null: it has no signer (see the head of this file). */
-export function signerOf(entry: Entry): KeyId | null {
-  const input = entry.input;
-  if (input.type === "act" || input.type === "preparation") return input.signed.intent.actor;
-  return input.type === "genesis" && input.decision === "applied" && input.founding ? input.founding.intent.actor : null;
-}
+export { signerOf } from "./entry-signer.ts";
 
 /**
  * The root of an entry's cause chain (see the head of this file), or null:
@@ -178,9 +181,14 @@ export function signerOf(entry: Entry): KeyId | null {
  * scope by its position, for the cause of an outcome or a diagnosis; such a
  * cause of an entry of another scope ends the chain with no root.
  */
-export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry | null>, steps = CHAIN_STEPS, own?: { scope: ScopeId; entry(seq: number): Entry | null }): Promise<Root | null | "unavailable"> {
+export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry | null>, steps = CHAIN_STEPS, own?: { scope: ScopeId; entry(seq: number): Entry | null }, work?: () => void): Promise<Root | null | "unavailable"> {
+  const useOf = (entry: Entry, fact: FactRef) => {
+    for (const use of entry.uses) { work?.(); if (same(use.fact, fact)) return use; }
+    return undefined;
+  };
   let entry = start;
   for (let step = 0; ; step++) {
+    work?.();
     const actor = signerOf(entry);
     if (actor) return { actor, time: entry.time, scope: entry.at.scope, seq: entry.seq };
     if (step === steps) return null;
@@ -195,7 +203,7 @@ export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry
     }
     if (input.type === "delivery") {
       // The entry that made the send, which a delivery retains.
-      const use = entry.uses.find((u) => same(u.fact, input.from));
+      const use = useOf(entry, input.from);
       if (!use) return null;
       const source = await read(use);
       if (!source) return "unavailable";
@@ -203,7 +211,7 @@ export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry
       continue;
     }
     if (input.type !== "genesis" || input.decision !== "applied") return null;
-    const use = input.source ? entry.uses.find((u) => same(u.fact, input.source)) : undefined;
+    const use = input.source ? useOf(entry, input.source) : undefined;
     if (!use) return null;
     const source = await read(use);
     if (!source) return "unavailable";
@@ -215,6 +223,7 @@ export async function rootOf(start: Entry, read: (use: FactUse) => Promise<Entry
     // The cause is an act's intent: the source itself, or the act that opened the source outcome's operation, which the genesis retains.
     let act: Entry | null = null;
     for (const u of entry.uses) {
+      work?.();
       const used = u === use ? source : await read(u);
       if (!used) return "unavailable";
       if (used.input.type === "act" && intentDigest(used.input.signed.intent) === input.seed.cause) { act = used; break; }

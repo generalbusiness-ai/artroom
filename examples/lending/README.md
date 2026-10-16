@@ -74,7 +74,7 @@ previously observed staff role has changed.
 | `browser/join.ts` | Joining with an invitation link under a device key that WebCrypto holds, with the same custody; and finding the room's lending scope in its directory. |
 | `browser/storage.ts` | This origin's private storage: the device key, the seat (this member's item in membership), and the kept requests, in IndexedDB under a Web Lock. |
 | `browser/main.ts`, `index.html`, `style.css` | The screens: join, the shelf, donate, borrow, return, cancel, the kept request, each page's text, and the journal. |
-| `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `packages/scope/src/lending-assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
+| `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `examples/lending/worker/assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
 | `browser/model.test.ts`, `browser/custody.test.ts`, `browser/publication.test.ts`, `browser/storage.browser.test.ts` | Tests of the model, the custody, the published-page comparison, and the browser storage. |
 | `runbook.md` | Current publication-room provisioning, preserved rehearsal, and incomplete six-output observation ledger. |
 | `demo-script.md` | The script for the recording. |

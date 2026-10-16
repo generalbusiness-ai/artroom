@@ -73,6 +73,7 @@ export interface Stream { send: Send; notified: Digest | null; close(final: bool
 export interface LegacySession {
   id: string | null;
   created: number;
+  lastActive: number;
   version: string | null;
   initialized: boolean;
   capabilities: Record<string, unknown>;
@@ -116,7 +117,7 @@ export function frameOf(v: unknown): "request" | "notification" | "response" | "
 export const isFrame = (v: unknown): v is Message => frameOf(v) !== "invalid";
 
 export function newSession(id: string | null = null): LegacySession {
-  return { id, created: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null, ended: false };
+  return { id, created: 0, lastActive: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null, ended: false };
 }
 
 /** The revision a request is served by. */

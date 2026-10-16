@@ -1,7 +1,7 @@
 # Lanes
 
 This guide describes the two lane definitions, `issue` and `change`, which
-are in `packages/lanes`. It is for a technical reader who has not read the
+are in `apps/room/lanes`. It is for a technical reader who has not read the
 design notes. It says what the two definitions are, how to read one row,
 how the definitions are pinned, how a client uses one, and what runs today.
 
@@ -22,7 +22,7 @@ platform packages have no code for an issue or for a change. They import
 nothing from the lanes package, and `scripts/active-source.test.mjs` checks
 that.
 
-So `packages/lanes` holds no rule and no code that judges. It holds two
+So `apps/room/lanes` holds no rule and no code that judges. It holds two
 values of the contract's type `DeclaredDefinition`, their canonical bytes
 and their digests.
 
@@ -31,7 +31,7 @@ and their digests.
 | `issue` | A goal: its conditions, who has promised what, who holds a workspace, what was reported, how the goal was planned and split, its discussion, and whether it is open. | `file` |
 | `change` | A proposed change: its versions, each an exact selection of reports and an exact integration commit; its reviews, check jobs and threads; its links to issues; and its merge. | `open` |
 
-The counts, as `packages/lanes/test/definitions.test.ts` asserts them:
+The counts, as `apps/room/lanes/test/definitions.test.ts` asserts them:
 
 | Definition | Item types | Acts | Timed rules | Handlers | Canonical bytes |
 |---|---|---|---|---|---|
@@ -125,7 +125,7 @@ kind and definition of the scope it receives `from`, the item type it
 
 ### An act of `issue`: `accept`
 
-This is the row as it is in `packages/lanes/src/issue.ts`.
+This is the row as it is in `apps/room/lanes/src/issue.ts`.
 
 ```ts
 accept: {
@@ -167,7 +167,7 @@ Read it like this.
 
 ### An act of `change`: `link-own`
 
-This is the row as it is in `packages/lanes/src/change.ts`.
+This is the row as it is in `apps/room/lanes/src/change.ts`.
 
 ```ts
 "link-own": {
@@ -229,9 +229,9 @@ definition has one exact digest.
 
 | What | Where |
 |---|---|
-| The two values | `packages/lanes/src/issue.ts`, `change.ts`, and `shared.ts` for the rows that both state |
-| The canonical bytes of each | `packages/lanes/definitions/issue.json`, `change.json` |
-| The two digests, with the revision and commit of the lane forms that the rows were written from | `packages/lanes/src/digests.ts`, as `DIGESTS` and `LANE_FORMS` |
+| The two values | `apps/room/lanes/src/issue.ts`, `change.ts`, and `shared.ts` for the rows that both state |
+| The canonical bytes of each | `apps/room/lanes/definitions/issue.json`, `change.json` |
+| The two digests, with the revision and commit of the lane forms that the rows were written from | `apps/room/lanes/src/digests.ts`, as `DIGESTS` and `LANE_FORMS` |
 
 The digests at this head:
 
@@ -259,11 +259,11 @@ digest keeps it.
 When a row changes, a person runs two scripts:
 
 ```
-node packages/lanes/scripts/pin.mjs         # the two byte files and digests.ts
-node packages/lanes/scripts/reference.mjs   # docs/lanes-reference.md
+node apps/room/lanes/scripts/pin.mjs         # the two byte files and digests.ts
+node apps/room/lanes/scripts/reference.mjs   # docs/lanes-reference.md
 ```
 
-`packages/lanes/test/definitions.test.ts` fails while the byte files or
+`apps/room/lanes/test/definitions.test.ts` fails while the byte files or
 the digests are not the ones that `pin.mjs` writes, and while
 `docs/lanes-reference.md` is not the file that `reference.mjs` writes. Its
 four tests show that each definition is exactly its pinned bytes and
@@ -272,7 +272,7 @@ digest, that the counts are the ones above, that both definitions pass
 of the demo profile, `issue-demo` and `change-demo`, with each a strict
 subset of its full definition's rows.
 
-`node packages/lanes/scripts/reference.mjs --check` makes the same
+`node apps/room/lanes/scripts/reference.mjs --check` makes the same
 comparison outside a test run, and exits 1 when the file is stale.
 
 ## How a client uses a definition
@@ -356,12 +356,12 @@ type:
 
 | Shown | By | Label |
 |---|---|---|
-| Both definitions pass the real validator whole, and are exactly their pinned bytes | `packages/lanes/test/definitions.test.ts` | Real: plain functions, no stand-in |
+| Both definitions pass the real validator whole, and are exactly their pinned bytes | `apps/room/lanes/test/definitions.test.ts` | Real: plain functions, no stand-in |
 | For each family of forms: what the validator accepts and refuses, and what the judges derive | The `forms-*.test.ts` files of `packages/derive/test` | Real derivation, on small made-up definitions and not on the lane rows |
 | The production wiring creates a scope under a definition that needs a capability record, and in that scope no act and no step takes effect and nothing is sent; a runtime that lacks the code creates none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/dap-scope/testing` | A stand-in |
-| What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
-| What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `packages/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted. W5 signs the checker's answer in the test; no runner runs. These fixtures show no real host, tree or deployment |
+| What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `apps/room/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
+| What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `apps/room/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted. W5 signs the checker's answer in the test; no runner runs. These fixtures show no real host, tree or deployment |
 
 The eleven scenarios create scopes under both definitions. A
 scenario chooses the capability code of its namespace. `onCode`, of the
@@ -446,7 +446,7 @@ decide is in the data as the lane forms state it.
 | Need | Read |
 |---|---|
 | Every row, in tables | [lanes-reference.md](../../../docs/lanes-reference.md) |
-| The rows themselves | `packages/lanes/src` |
-| The package's exports and scripts | `packages/lanes/README.md` |
+| The rows themselves | `apps/room/lanes/src` |
+| The package's exports and scripts | `apps/room/lanes/README.md` |
 | What each form means | [scopes.md](../../../docs/scopes.md), "Definitions are data" and "Composition" |
 | The source choices behind the forms | `notes/2026-10-05-i2-contract-deltas.md` |

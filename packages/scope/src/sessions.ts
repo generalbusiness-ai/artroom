@@ -213,15 +213,19 @@ export interface SessionReading {
 }
 
 /** Authenticate locally before choosing a peer or inspecting its state. */
-function authenticatedSession(config: SessionReading, reader: unknown): { claims: SessionClaims; scope: ScopeState | null } | { refused: false | "sessions-unavailable" } {
+export function authenticateSession(sessionsOf: () => Sessions | null, reader: unknown): { claims: SessionClaims } | { refused: false | "sessions-unavailable" } {
   const token = presented(reader);
   if (token === null) return { refused: false };
-  const sessions = config.sessions();
+  const sessions = sessionsOf();
   if (!sessions) return { refused: "sessions-unavailable" };
   const claims = openSession(sessions, token);
-  return claims && claims.deployment === sessions.deployment ? { claims, scope: config.scope() } : { refused: false };
+  return claims && claims.deployment === sessions.deployment ? { claims } : { refused: false };
 }
-function sessionClock(config: SessionReading, scope: ScopeState, claims: SessionClaims): false | "clock-behind" | null {
+function authenticatedSession(config: SessionReading, reader: unknown): { claims: SessionClaims; scope: ScopeState | null } | { refused: false | "sessions-unavailable" } {
+  const authentic = authenticateSession(() => config.sessions(), reader);
+  return "claims" in authentic ? { ...authentic, scope: config.scope() } : authentic;
+}
+export function sessionClock(config: Pick<SessionReading, "clock">, scope: ScopeState, claims: SessionClaims): false | "clock-behind" | null {
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(claims.ends)];
   if (reading === null || previous === null || reading < previous) return "clock-behind";
   return ends === null || reading >= ends ? false : null;
@@ -357,7 +361,7 @@ export function issueSession(
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
   // A provisional membership answers no session (section 12.1.3).
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2" || pinned.named === "platform:membership@4" || pinned.named === "platform:membership@5") && platform(pinned.named))) return no("not-found");
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2" || pinned.named === "platform:membership@4" || pinned.named === "platform:membership@5" || pinned.named === "platform:membership@6") && platform(pinned.named))) return no("not-found");
   if (to.scope !== scope.at.scope || to.inc !== scope.at.inc || to.kind !== scope.at.kind) return no("misaddressed");
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
   if (reading === null || previous === null || reading < previous) return no("clock-behind");

@@ -57,7 +57,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
+**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments|invitation-key]`**
 creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -69,14 +69,14 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
+**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments|invitation-key]`**
 signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will create,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be created. It keeps the signed intent, the version and the
-ID in the config. An intent and its signature are no secret; the
-register's genesis records both. Only a definitely unsent legacy plan may
+ID in the config. This founding intent carries no invitation credential;
+the register's genesis records it and its signature. Only a definitely unsent legacy plan may
 be replaced. A selected application or Counting plan always retains its
 original envelope, version, register and deadline, including when planning
 is repeated.
@@ -86,7 +86,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`dap install --planned [--cohort application|application-publication|counting-commitments]`** creates the planned register, with the kept
+**`dap install --planned [--cohort application|application-publication|counting-commitments|invitation-key]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -101,7 +101,7 @@ or delete the original config or keys.
 
 For example, set `DAP_HOME` to a new private directory, then run
 `dap install --plan <base-url> --cohort <cohort> --host <host>
---namespace <namespace>`, using `application`, `application-publication` or `counting-commitments`
+--namespace <namespace>`, using `application`, `application-publication`, `counting-commitments` or `invitation-key`
 for `<cohort>`. After configuring the new register ID,
 run `dap install --planned --cohort <cohort>` with the same
 `DAP_HOME`. This creates separate custody and a new operator key; it
@@ -127,7 +127,10 @@ destination@2 and inbox@1, each with the `platform:` prefix.
 `--cohort counting-commitments` retains its separate register@6,
 directory@6 and membership@5 lineage. `--cohort application-publication`
 selects `FILE_PUBLICATION_COHORT`: register@9, directory@8, membership@4,
-rules@3, destination@4 and inbox@1. All three choices use the existing exact
+rules@3, destination@4 and inbox@1. `--cohort invitation-key` selects
+register@10, directory@9, membership@6, rules@3, destination@2 and inbox@1.
+It uses the application factory, not the file-publication factory. These
+choices use the existing exact
 planned-install custody. Unknown or multiple choices, another retained
 cohort, service, host or namespace refuse before signing or sending.
 `install --planned` may omit the selection: it uses the saved definition
@@ -245,8 +248,10 @@ You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 
 **`dap invite <@member> --role <role> [--hours 24]`** is
 membership's `invite-member`. It prints a link that holds the
-invitation's number and its secret. The secret is a one-time invitation
-secret, not a signing key; pass the link only to that member.
+invitation's number and its private credential. Legacy scopes use a
+one-time secret. Membership@6 uses a 32-byte invitation signing seed;
+join records only its signature over the full membership reference,
+invitation ID and joining key. Pass either link only to that member.
 
 ```
 Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
@@ -271,7 +276,9 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 **`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
-is absent from public config. It saves the recorded fact and inbox progress
+is absent from public config. Under membership@6, it is also absent from
+the signed request and native journal. Existing scopes keep their exact
+legacy protocol and can retain their secret in signed history. It saves the recorded fact and inbox progress
 before waiting for the member's inbox. After a lost reply or an interrupted
 wait, run `dap join` with the original link again. This reuses the same
 key, request and deadline. A request that took effect is confirmed by a read-only settlement, even after its deadline. A missing private request or a different
@@ -334,8 +341,8 @@ definition states, by its digest: the bytes of a definition for the rules
 scope's `activate` and the directory's `open-issue` and `open-pr`. For
 example, an admin activates the demo profile's change definition with
 `dap act activate --on rules --set digest=<digest> --set name=change
---value packages/lanes/definitions/change-demo.json`, whose digest is in
-`packages/lanes/src/digests.ts`.
+--value apps/room/lanes/definitions/change-demo.json`, whose digest is in
+`apps/room/lanes/src/digests.ts`.
 
 **`dap log <scope> [--limit n]`** and **`dap show <entry>`**
 read the journal and one entry over the read routes.
@@ -345,6 +352,22 @@ sc_p6xp2lmd...:8  2099-01-01T00:00:00Z  act add-member by key_baqzbaDy...; 6 eff
 sc_p6xp2lmd...:9  2099-01-01T00:00:00Z  delivery result from inbox:0; 0 effects, 1 sends
 10 entries in all.
 ```
+
+**`dap items <scope> --query <canonical-item-query-JSON>`** reads one
+explicit bounded item selection. The canonical JSON has exactly `cursor`,
+`ids`, `limit`, `scope`, `states`, `type` and `v`; `scope` is the full scope
+reference, `cursor` starts as `null`, and `ids: null` selects all matching
+IDs. States and explicit IDs must be sorted and unique. The SDK's
+`encodeItemQuery` produces this spelling. The command checks the query's
+scope against the selected scope before sending it.
+
+This command makes one query, with no per-item detail requests or automatic
+page loop. It prints the head, each item, whether the selected suffix is
+complete, and any next cursor. To continue, put that exact cursor in the
+next query. A refusal exits 1 and says coverage is incomplete. The whole
+reply is limited to 256 KiB and the query wait to 10 seconds. A smaller
+returned prefix is not a complete inventory; a later `row-too-large`
+refusal cannot make it complete.
 
 **`dap verify <scope>`** runs the replay verifier over the read
 routes, with the platform package's rules and the code of the two lane
@@ -368,7 +391,7 @@ journals. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
 scopes.`, or the first finding, and then the command exits 1. A journal
 that cannot be read is a finding. The example is from
-`packages/lanes/test/issues.scope.test.ts`, after two issues were closed by
+`apps/room/lanes/test/issues.scope.test.ts`, after two issues were closed by
 two published changes:
 
 ```
@@ -509,7 +532,7 @@ The demonstration uses two text files.
 **`dap edit <path> --file <local file> [--title <text>]`** writes one
 file of the repository through the room. The person never writes the
 repository: the room judges the change and its destination writes it. The
-examples have the form that `packages/lanes/test/edit.scope.test.ts`
+examples have the form that `apps/room/lanes/test/edit.scope.test.ts`
 asserts, with IDs cut short; the numbers in them are illustrative.
 
 1. It reads the local file. A file that is no UTF-8 text, or that has more
@@ -567,7 +590,7 @@ change's author may sign `link-own`; the demo profile has no `link-any`.
 So a member who opens a change can link it, but cannot merge it: members
 do not hold `change.merge`. The member's change waits, linked, and an
 admin or a maintainer merges it. The examples from here on have the form
-that `packages/lanes/test/issues.scope.test.ts` asserts, with IDs cut
+that `apps/room/lanes/test/issues.scope.test.ts` asserts, with IDs cut
 short; the numbers and hashes in them are illustrative.
 
 ```
@@ -592,7 +615,7 @@ one condition is its title, because the lane refuses an issue with no
 condition. The directory numbers issues and changes in one sequence. An
 admin activates the demo profile's issue definition as for the change
 definition: `--set name=issue --value
-packages/lanes/definitions/issue-demo.json`.
+apps/room/lanes/definitions/issue-demo.json`.
 
 ```
 Opened issue #1: The handbook has no start page. Its lane is sc_4bbosp5k....

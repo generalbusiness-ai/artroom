@@ -47,7 +47,7 @@ Put each test at the cheapest boundary that can show its property.
 | What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 | A form of a definition: that the validator accepts or refuses it, and what the judges derive from it | as a plain function in `derive`, on a small made-up definition, in the `forms-*.test.ts` file of its family |
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
-| What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
+| What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `apps/room/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
 
 A stand-in proves only the boundary it exposes. A retry, an order of events or a
 restart is shown against the thing that really retries, orders or restarts.
@@ -265,10 +265,10 @@ before it runs, what it starts, keeps and signs. It shows nothing about a
 lane's judgment, a storage's loss, a container or a real runner. The
 runner's checkout is tested on a real local repository, which is not a
 host. What a real change lane does with the service's signed results is
-one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
+one scenario of the lanes, `apps/room/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
-`packages/lanes/test/edit.scope.test.ts` runs `dap edit` as the
+`apps/room/lanes/test/edit.scope.test.ts` runs `dap edit` as the
 command-line story runs its commands, on each host through the production
 wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
 labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
@@ -278,7 +278,7 @@ because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
 git package.
 
-`packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
+`apps/room/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
 successor on real platform and lane scopes, through the production wiring
 of Cloudflare Artifacts over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
@@ -297,17 +297,17 @@ current-job read finished first. Other cases preserve an unresolved push
 when its retry is refused, cancel a pre-push reservation, drain its recorded
 deadline, and refuse a final membership read that exceeded its window.
 
-`packages/lanes/test/issues.scope.test.ts` runs `dap issue`,
+`apps/room/lanes/test/issues.scope.test.ts` runs `dap issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on Artifacts only, for the same reason.
-`packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
+`apps/room/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
 `scripts/demo/rehearse.ts`, the same way: every shot of the demo script's
 middle, from the planned install to the page, with a stand-in for `git`
 that reads the stand-in host. Its second test is the recorder for
 `scripts/demo-captures.ts --recorded`, and runs only with `DEMO_RECORD=1`
 ([demo.md](demo.md)).
 
-`packages/lanes/test/support/room.ts` creates a repository on the real
+`apps/room/lanes/test/support/room.ts` creates a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
 its real directory creates lanes under the digests that its real rules
 scope activated. The lane scenarios on it, `wiring.scope.test.ts` and
@@ -433,7 +433,7 @@ the repository (`vitest.config.ts` at the root, one project for each of
 `lending`), then the built-in Node checks in `scripts/active-source.test.mjs`,
 `scripts/cloudflare-pool-compat.test.mjs`, `homepage/test/home.test.mjs`, and
 `packages/cli/test/config-dir.test.mjs`. The existing Counting browser check
-in `examples/counting/scripts/test-browser.mjs` follows those Node checks.
+in `apps/counter/scripts/test-browser.mjs` follows those Node checks.
 The compatibility witness uses the guarded actual pool factory and private-copy
 workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
 active file imports from `spikes/parked/` or names a removed format, and that no
@@ -484,22 +484,22 @@ The gate does not invoke the CLI package's test script separately.
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.
 
-The page's story, `packages/page/test/story.scope.test.ts`, runs from the
-root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
+The page's story, `apps/room/page/test/story.scope.test.ts`, runs from the
+root inside the `scope` project too. Its room is `apps/room/page/test/support/demo.ts`:
 created by the command line over the Worker's HTTP routes, with the real
 read sessions under a TEST SECRET, and the site route for addresses under
 `/site/`; the Git host (`OwnGit` under the production wiring of Artifacts)
 and the scheduler are labelled stand-ins there. Its reads
 and acts are the page's own data functions. The `page` project is its Node
 tests: the states of a change, and that the scope Worker's page module
-(`packages/scope/src/page-assets.ts`) is the page's build of its source.
+(`apps/room/page/assets.ts`) is the page's build of its source.
 `record.scope.test.ts` is no test of a property: it runs only with
-`PAGE_RECORD=1`, and `packages/page/test/screens.mjs` uses what it prints
+`PAGE_RECORD=1`, and `apps/room/page/test/screens.mjs` uses what it prints
 to take the page's screenshots in Chromium. That script needs
 `playwright-core` installed outside the checkout; it is not part of the
 gate.
 
-The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+The lane scenarios, `apps/room/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
 names the lanes package. The Site publication and clock lifetime scenarios
@@ -517,16 +517,16 @@ through the Worker's entrypoint takes longer the more of them one run has
 made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
 The Node `lanes` project checks the definitions and the scripted CLI proposal
-outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
+outcomes in `apps/room/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
 witness has no native judgment or authority; its native counterparts stay in
 `manifest-tree.scope.test.ts`. The four definition tests read the four byte files
-under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
+under `apps/room/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those
 files alone is not selected by `npm run test:changed`; the gate runs it.
 Two sets of generated files follow the lane definitions:
-`packages/lanes/src/digests.ts` with the byte files, written by
-`packages/lanes/scripts/pin.mjs`, and `docs/lanes-reference.md`, written
-by `packages/lanes/scripts/reference.mjs`. The pins test fails while
+`apps/room/lanes/src/digests.ts` with the byte files, written by
+`apps/room/lanes/scripts/pin.mjs`, and `docs/lanes-reference.md`, written
+by `apps/room/lanes/scripts/reference.mjs`. The pins test fails while
 either is stale.
 
 Nothing under `spikes/parked/` is installed, typechecked or tested.

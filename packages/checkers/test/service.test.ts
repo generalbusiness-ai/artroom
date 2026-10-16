@@ -10,7 +10,7 @@ import { Lane, MemoryDurable, ScriptedRunner, T0, configuration, digest, lane, n
  * show the checker service's own side: what it reads before it runs, what
  * it starts, what it keeps and what it signs. They show nothing about a
  * lane's judgment, a real runner or a container. The lane's side of a
- * result is `packages/lanes/test/checks.scope.test.ts`, on real scopes.
+ * result is `apps/room/lanes/test/checks.scope.test.ts`, on real scopes.
  */
 function made(w = world()) {
   const key = newKey();

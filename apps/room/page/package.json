@@ -1,0 +1,41 @@
+{
+  "name": "@generalbusiness/dap-page",
+  "version": "0.1.0-dev.1",
+  "description": "The dap room page: issues, changes, rules and signed member actions over a scope service's HTTP routes, with a signing key kept in the browser.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node scripts/assets.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
+    "@generalbusiness/dap-cli": "0.1.0-dev.1",
+    "@generalbusiness/artroom-client": "0.1.0-dev.1",
+    "@generalbusiness/dap-contract": "0.1.0-dev.1",
+    "@generalbusiness/dap-platform": "0.1.0-dev.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "5.20260815.1",
+    "@generalbusiness/dap-lanes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-scope": "0.1.0-dev.1",
+    "esbuild": "0.28.1",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generalbusiness-ai/dap.git",
+    "directory": "apps/room/page"
+  },
+  "homepage": "https://dap.generalbusiness.ai/"
+}

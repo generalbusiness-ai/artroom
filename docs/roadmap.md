@@ -20,7 +20,7 @@ below refer to.
 | dap-room: membership, rules, issues, changes, reviews of an exact version, and publication to a Git host with a recorded outcome. Two changes on one base are settled by reservation and judgement. | [apps/room/docs](../apps/room/docs/first-change.md), [Rehearse the demo](demo.md) |
 | Two Git hosts: Cloudflare Artifacts and GitHub. | [Configure a Git host](hosts.md) |
 | A declared application: you write a definition as data, validate it, pin it, and create a scope under it in a room. Guards, grants, timed rules and detached texts are available to it. | [Write an application](write-an-application.md) |
-| dap-counter, a declared application in which people and agents take turns. | [The Counter source](../examples/counting/README.md), [Build a counter](build-a-counter.md) |
+| dap-counter, a declared application in which people and agents take turns. | [The Counter source](../apps/counter/README.md), [Build a counter](build-a-counter.md) |
 | dap-library, a declared lending library. Each act that changes a thing also publishes that thing's shelf page through the room's destination. | [The lending library](../examples/lending/README.md), [Build a lending library](build-a-lending-library.md) |
 | Agents act in a room through MCP: a local server over stdio or loopback HTTP, and a hosted endpoint on the scope Worker. | [MCP](mcp.md), [The hosted endpoint](mcp.md#the-hosted-endpoint) |
 | A room created from the served page, with no email; or a whole service run on your own account. | [Run dap in 10 minutes](self-host.md) |
@@ -276,7 +276,7 @@ computed value enters as a proposal. The signer sends the new value
 as a field, a rule checks it against the state, and an effect copies it.
 The Counter works this way: the signer proposes the next number and the
 next speaker, and
-[its rules](../examples/counting/definition.ts) check the arithmetic.
+[its rules](../apps/counter/definition.ts) check the arithmetic.
 
 **The gap.** Four things, none of them in the expression syntax:
 

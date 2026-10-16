@@ -3,9 +3,9 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Answer, Digest, Intent, PlatformDefinition, Seed, RetainedInput, OperationId, Read } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { clockOf, settleOutcome, validateDefinition, valueDigest, type OutcomeRule } from "@generalbusiness/dap-derive";
-import { grantOf } from "@generalbusiness/dap-derive/testing";
+import { grantOf, notesDefinition } from "@generalbusiness/dap-derive/testing";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import { controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
@@ -67,11 +67,13 @@ test("a value beside an intent, on real storage: the scope reads it only for a p
 // opens the operation through its act, receives the answer, retains the value on SQLite, and serves the replay over its real routes.
 // Invariant: an outcome's declared evidence values are matched by domain, digest and canonical byte bound, retained beside its entry
 // across a restart, and required by a replay even when the value was not read by a rule.
-test("an owner's evidence value on real storage and through the read routes: bad bytes write nothing; the valid late answer survives a restart and replays, while missing bytes make replay incomplete", async () => {
+test.each(["gate-proof-1", DOMAINS.definition])("an owner's evidence value in %s on real storage and through the read routes: bad bytes write nothing; the valid late answer survives a restart and replays, while missing bytes make replay incomplete", async (DOMAIN) => {
   const MADE = "platform:task@1" as PlatformDefinition;
-  const [DOMAIN, MAX] = ["gate-proof-1", 64];
-  const proof = { seat: 12 };
+  const MAX = DOMAIN === DOMAINS.definition ? PROPOSED_BOUNDS.definitionBytes : 64;
+  const proof = DOMAIN === DOMAINS.definition ? notesDefinition.declared : { seat: 12 };
   const input = { kind: "value", domain: DOMAIN, digest: valueDigest(DOMAIN, proof), bytes: canonicalize(proof) } as const;
+  const stored = DOMAIN === DOMAINS.definition
+    ? { kind: "definition", digest: input.digest, bytes: input.bytes } as const : input;
   const probe: OutcomeRule = {
     selects: false, read: false, retries: () => false,
     valueDomains: [{ domain: DOMAIN, max: MAX }],
@@ -102,8 +104,10 @@ test("an owner's evidence value on real storage and through the read routes: bad
     await driver().effect();
     const before = await stubOf(name).summary(reader);
     if (!before.ok) return expect.fail("no summary");
-    const kept = () => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec("SELECT domain, digest, bytes FROM retained_value").toArray());
-    const late = (digest: Digest, value?: RetainedInput) => runInDurableObject(objectOf(name), () => (out.deliver as LateAnswers)(operation, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { proof: digest } }, ...(value ? { retain: [value] } : {}) }));
+    const kept = () => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec(DOMAIN === DOMAINS.definition
+      ? "SELECT kind, digest, bytes FROM retained_input WHERE kind='definition'"
+      : "SELECT 'value' AS kind, domain, digest, bytes FROM retained_value").toArray());
+    const late = (digest: Digest, value?: RetainedInput, target = operation) => runInDurableObject(objectOf(name), () => (out.deliver as LateAnswers)(target, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { proof: digest } }, ...(value ? { retain: [value] } : {}) }));
     const long = { seat: 12, pad: "x".repeat(MAX) };
     for (const offered of [await late(input.digest), await late(input.digest, { ...input, bytes: canonicalize({ seat: 13 }) }), await late(valueDigest(DOMAIN, long), { ...input, digest: valueDigest(DOMAIN, long), bytes: canonicalize(long) })]) {
       expect(offered).toMatchObject({ recorded: "refused", detail: expect.stringContaining("bad-input") });
@@ -111,18 +115,29 @@ test("an owner's evidence value on real storage and through the read routes: bad
     expect([await kept(), (await stubOf(name).summary(reader))]).toEqual([[], before]);
     expect(await late(input.digest, input)).toMatchObject({ recorded: "written" });
     await evictDurableObject(objectOf(name));
-    expect(await kept()).toEqual([{ domain: DOMAIN, digest: input.digest, bytes: input.bytes }]);
+    expect(await kept()).toEqual([stored]);
     const source = httpSource("https://scope.test", { reader, fetch: async (url, init) => { const response = await route(new Request(url, init), env.SCOPES); return { status: response.status, body: response.body }; } });
-    expect(await source.retained(name, "value", input.digest, { bytes: 4096 }, DOMAIN)).toMatchObject({ ok: true, input });
+    const domain = "domain" in stored ? stored.domain : undefined;
+    expect(await source.retained(name, stored.kind, input.digest, { bytes: PROPOSED_BOUNDS.definitionBytes * 4 }, domain)).toMatchObject({ ok: true, input: stored });
+    if (DOMAIN === DOMAINS.definition) expect(await source.retained(name, "value", input.digest, { bytes: 4096 }, DOMAIN)).toEqual({ ok: false, reason: "not-found" });
     const options = { mode: "replay", grants: "as-recorded", scope: name, platform: (named: PlatformDefinition) => named === MADE ? { data: data as never, rules: code.rules } : null } as const;
     const good = await verify(source, options);
     expect([good.report.result, good.why]).toEqual(["consistent", null]);
-    const missing = await verify({ ...source, retained: async (...args) => args[1] === "value" ? { ok: false as const, reason: "not-found" } : source.retained(...args) }, options);
+    const missing = await verify({ ...source, retained: async (...args) => args[1] === stored.kind && args[2] === input.digest ? { ok: false as const, reason: "not-found" } : source.retained(...args) }, options);
     expect([missing.report.result, missing.report.at?.seq, missing.why]).toEqual(["incomplete", before.at.seq + 1, expect.stringContaining("the value named by outcome evidence")]);
+    // A different operation can use the already retained exact key without
+    // requiring the outside driver to return those immutable bytes again.
+    const next = await stubOf(name).submit(signIntent({ ...issue, fields: { hash: textDigest("two") }, idempotencyKey: crypto.randomUUID() }, rita.secret), [grantOf(rita, scope, ["gate.issue"])]);
+    if (next.answer !== "accepted") return expect.fail("second operation was not opened");
+    const second = `${next.receipt.fact.seq}:0` as OperationId;
+    out.answer(second, 1, null); await driver().effect();
+    expect(await late(input.digest, undefined, second)).toMatchObject({ recorded: "written" });
+    expect(await kept()).toEqual([stored]);
     // Section 4.3: once a decisive outcome is recorded, answering a copy or contradiction needs no new value read. Even a lost
     // retained value cannot make either answer unavailable or bad-input. The pure judge and the real driver agree.
     const again = await runInDurableObject(objectOf(name), (_instance, state) => {
-      state.storage.sql.exec("DELETE FROM retained_value WHERE domain = ? AND digest = ?", DOMAIN, input.digest);
+      if (DOMAIN === DOMAINS.definition) state.storage.sql.exec("DELETE FROM retained_input WHERE kind='definition' AND digest=?", input.digest);
+      else state.storage.sql.exec("DELETE FROM retained_value WHERE domain = ? AND digest = ?", DOMAIN, input.digest);
       const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
       const definition = validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true });
       if (!definition.ok) return expect.fail("the fixture definition no longer validates");

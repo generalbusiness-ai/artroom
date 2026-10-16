@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 const here = path => fileURLToPath(new URL(path, import.meta.url));
-export const MODULE = here("../packages/scope/src/brand-assets.ts");
+export const MODULE = here("../apps/room/brand/assets.ts");
 export const PUBLIC_BRAND_FILES = {
   "fonts.css": ["fonts.css", "text/css; charset=utf-8"],
   "fonts/LICENSE-OpenRunde.txt": ["fonts/LICENSE-OpenRunde.txt", "text/plain; charset=utf-8"],

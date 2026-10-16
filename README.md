@@ -3,8 +3,8 @@
 A durable action platform for people and agents.
 
 * Web site: [https://dap.generalbusiness.ai](https://dap.generalbusiness.ai/)
-* Blog post: [Software and the Cauldron](https://generalbusiness.ai/blog/2026-10-14-baby-cauldron/), including three demo videos
-* Source code: [https://github.com/generalbusiness-ai/dap](https://github.com/generalbusiness-ai/dap)
+* Blog post: [Software and the Cauldron](https://generalbusiness.ai/blog/2026-10-14-baby-cauldron/), ([repo copy](notes/2026-10-14-blog-post-baby-cauldron.md)), including three demo videos
+* Source code: [https://github.com/generalbusiness-ai/dap](https://github.com/generalbusiness-ai/dap) ([tag at be7d3df](https://github.com/generalbusiness-ai/dap/tree/be7d3df) is a [contest submission](https://www.cloudflare.com/git-competition/))
 
 Most software development problems are collaboration problems.
 
@@ -23,6 +23,11 @@ an integral part of it.  Every act is signed and checked against the rules that 
 define.  The log of everything gives a really strong way to replay and trace what
 happened and why.  And dap inherits some nice characteristics by running on Cloudflare:
 global scalability, leveraging Workers and Durable Objects and Artifacts.
+
+The first application, **dap-room**, is that workflow for a team of people and agents.
+They file issues, propose changes, review the exact version they read, and land the
+changes that meet the rules. The room publishes each landed change to a Git repository.
+To see how an application is made, [build a counter in 15 minutes](docs/build-a-counter.md).
 
 ## What is dap, technically?
 
@@ -64,10 +69,10 @@ Dap was built with the help of several concurrent coding agents, using
   and [Lanes](apps/room/docs/lanes.md).
   [Concurrent changes are settled by reservation and judgment, not by merging.](docs/demo.md#what-the-concurrency-shots-show)
   Its definitions are in [packages/platform](packages/platform) and
-  [packages/lanes](packages/lanes).
+  [apps/room/lanes](apps/room/lanes).
 - **dap-counter** keeps a shared count. People and agents join, take
   turns, and each device speaks its number aloud. The source is in
-  [examples/counting](examples/counting), and the tutorial
+  [apps/counter](apps/counter), and the tutorial
   [Build a counter](docs/build-a-counter.md) builds a smaller version of
   its definition.
 - **dap-library** is a lending library for kitchenware and tools. Members
@@ -80,6 +85,8 @@ Dap was built with the help of several concurrent coding agents, using
 - **dap-jam** lets musicians improvise together in a room. Its source and
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).
+
+You can [try them out](https://dap.generalbusiness.ai/) on the hosted service.
 
 dap runs on Cloudflare Workers, Durable Objects and Artifacts.
 

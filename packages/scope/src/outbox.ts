@@ -52,6 +52,8 @@ export class Wakes {
   readonly #alarm: Alarm;
   /** The alarm port the turn uses. */
   readonly deadline: Alarm;
+  /** Durable wake owned only by derived signer maintenance. */
+  readonly maintenance: Alarm;
 
   /** False: this scope has no transport, nothing dispatches its sends, and no wake is asked for them. */
   readonly #dispatches: boolean;
@@ -62,6 +64,7 @@ export class Wakes {
     this.#alarm = alarm;
     this.#dispatches = dispatches;
     this.deadline = { set: (at) => { store.setDeadline(at); return this.set(); } };
+    this.maintenance = { set: (at) => { store.setSignerMaintenance(at); return this.set(); } };
   }
 
   /** When the operations driver next has work that is in memory only, in milliseconds, or null. The next `set` uses it. */
@@ -71,7 +74,8 @@ export class Wakes {
   set(): void | Promise<void> {
     const deadline = this.#store.deadline();
     const dispatch = this.#dispatches ? this.#store.nextDispatch() : null;
-    const at = [deadline === null ? null : timeMs(deadline), dispatch, this.#store.nextSend(), this.#driver].filter((ms): ms is number => ms !== null);
+    const maintenance = this.#store.signerMaintenance();
+    const at = [deadline === null ? null : timeMs(deadline), dispatch, this.#store.nextSend(), this.#driver, maintenance === null ? null : timeMs(maintenance)].filter((ms): ms is number => ms !== null);
     return this.#alarm.set(at.length === 0 ? null : timeOf(Math.min(...at)));
   }
 }

@@ -134,4 +134,7 @@ export interface Store extends StateWriter {
   /** The deadline the turn last asked to be woken for, kept so that one alarm serves it and the dispatcher (section 5.2). */
   deadline(): Timestamp | null;
   setDeadline(at: Timestamp | null): void;
+  /** Independent derived-index maintenance wake; never native timed state. */
+  signerMaintenance(): Timestamp | null;
+  setSignerMaintenance(at: Timestamp | null): void;
 }

@@ -6,8 +6,8 @@ import { requestSession, secretSigner, sessionRequest, signedReader } from "@gen
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { COUNTING_COHORT, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { countingCommitments } from "../../../examples/counting/commitments.ts";
-import { COUNTING_COMMITMENTS_DEFINITION } from "../../../examples/counting/commitments-pin.ts";
+import { countingCommitments } from "../../../apps/counter/commitments.ts";
+import { COUNTING_COMMITMENTS_DEFINITION } from "../../../apps/counter/commitments-pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";

@@ -98,7 +98,7 @@ established. Sources: [entries and receipts](../../packages/contract/src/entry.t
 [report shape](../../packages/contract/src/report.ts),
 [CLI verifier](../../packages/cli/src/commands.ts),
 [replay limits](../../packages/replay/README.md), and
-[change publication handler](../../packages/lanes/src/change.ts).
+[change publication handler](../../apps/room/lanes/src/change.ts).
 Existing [scope replay witnesses](../../packages/scope/test/replay.test.ts)
 are reusable evidence with their stated stand-ins; this page claims no new
 run, offline export or release acceptance. See [the ledger](../../apps/room/docs/ledger.md).

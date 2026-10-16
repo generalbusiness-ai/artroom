@@ -9,6 +9,7 @@
  * are the platform package's, which is code of this runtime.
  */
 
+import type { ProofSource } from "./proof-bytes.ts";
 import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/dap-contract";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Fetched, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/dap-derive";
 import { evaluateRules } from "@generalbusiness/dap-derive/rule";
@@ -212,7 +213,7 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 /** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
 /** `incidents` and `waiting` are the reads of the operator's record and of the two lists of waiting requests (authority note, section 12, G13 and G17). */
 /** `credential` is the one-time read of a member's read token at a destination (the planner's decision for I5). */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting" | "credential";
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting" | "credential" | "query-items";
 
 /**
  * Who may read. `reader` is whatever the caller presented. The production
@@ -244,6 +245,8 @@ export interface Readers {
 }
 
 export interface Ports {
+  /** Dedicated trusted-native causal proof reads, admitted before materialization. No generic resolver fallback. */
+  proofs?: ProofSource;
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
   /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
   transport: Transport | null;

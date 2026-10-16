@@ -7,7 +7,7 @@ import { validateDefinition } from "@generalbusiness/dap-derive";
 import { VERSIONS } from "@generalbusiness/dap-platform";
 import { change, change3, changeDemo, changeDemo3, issue, issueDemo } from "@generalbusiness/dap-lanes";
 import { USAGE } from "../../cli/src/line.ts";
-import { counting } from "../../../examples/counting/definition.ts";
+import { counting } from "../../../apps/counter/definition.ts";
 import { DESCRIPTION_CHARS, WORDS, actTool, bindingsOf, checkWords, describeAct, listed, surfaceOf, McpService, memoryStore, type DefinitionLike, type Words } from "../src/index.ts";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { ACTIVE_DEMO, declared, demoInventory, platformData } from "./support/catalogue.ts";

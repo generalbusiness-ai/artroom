@@ -1,3 +1,5 @@
+import { INVITATION_KEY_COHORT, directory9, directoryRules9, membership6, membershipRules6 } from "./invitation-key.ts";
+export { INVITATION_KEY_COHORT, directory9, directoryRules9, membership6, membershipRules6 } from "./invitation-key.ts";
 /**
  * Artroom's platform definitions (authority note, section 12.1): the data of
  * each, as a `PlatformData` whose name is the platform name without its
@@ -123,6 +125,9 @@ export interface Platform {
  * cannot run.
  */
 const VERSION_DATA: Readonly<Record<string, Platform>> = {
+  [INVITATION_KEY_COHORT.register]: { data: register, rules: registerRules },
+  [INVITATION_KEY_COHORT.directory]: { data: directory9, rules: directoryRules9, membership: directoryMembership, rulesScope: directoryRulesScope },
+  [INVITATION_KEY_COHORT.membership]: { data: membership6, rules: membershipRules6, observed: (state, asked) => standingOf(state, asked, INVITATION_KEY_COHORT.membership) },
   [DEMO_REGISTER]: { data: demoRegister, rules: demoRegisterRules },
   [WEB_DEMO_REGISTER]: { data: webDemoRegister, rules: demoRegisterRules },
   [WEB_DEMO_COHORT.directory]: { data: directory7, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },

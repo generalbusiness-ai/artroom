@@ -10,7 +10,7 @@ timed entries may already have been written. Inspect the journal before another
 act. Recovery requires the same original signed envelope, which generic Page
 submission does not retain.
 
-The source is `packages/page`. The scope Worker serves it at `/page/`, on
+The source is `apps/room/page`. The scope Worker serves it at `/page/`, on
 the same origin as the routes it reads, so no second deployment and no
 cross-origin header is needed. The story test and earlier screenshots use
 the test Worker's recorded answers. They do not establish live enrollment;
@@ -21,15 +21,15 @@ current delivery evidence is reported separately.
 From the root of a checkout, after `npm ci`:
 
 ```
-npm run build --workspace @generalbusiness/dap-room-page
+npm run build --workspace @generalbusiness/dap-page
 ```
 
 This bundles the page with esbuild and writes three files:
-`packages/page/dist/index.html` and `page.js`, and
-`packages/scope/src/page-assets.ts`, the module from which the scope
+`apps/room/page/dist/index.html` and `page.js`, and
+`apps/room/page/assets.ts`, the module from which the scope
 Worker serves the two files. That module is committed. The page's test
 `assets.test.ts` fails while it differs from a fresh build of the page's
-source, so run the build after any change under `packages/page/src`, and
+source, so run the build after any change under `apps/room/page/src`, and
 commit the module with the change. Deploying the scope Worker deploys the
 page with it.
 
@@ -220,11 +220,11 @@ that the room's records show, with the record it comes from:
 
 ## Tests
 
-`packages/page/test/story.scope.test.ts` runs the page's data functions
+`apps/room/page/test/story.scope.test.ts` runs the page's data functions
 against the Worker's routes on a room that the command line creates, with
 the real read sessions, the edit command and the site route; the Git host
 and the scheduler are labelled stand-ins. `assets.test.ts` checks the
 Worker's page module, `states.test.ts` the states of a change, and
-`packages/scope/test/page-route.test.ts` the `/page/` route.
-`packages/page/test/screens.mjs` takes the screenshots in
-`packages/page/test/screenshots`.
+`apps/room/page/test/route.scope.test.ts` the `/page/` route.
+`apps/room/page/test/screens.mjs` takes the screenshots in
+`apps/room/page/test/screenshots`.

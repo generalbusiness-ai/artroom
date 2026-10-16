@@ -33,7 +33,7 @@ import { at, type Rec } from "./shape.ts";
 /**
  * Check 6: `indexes` is a list of 1 to 4 names, none twice. Each is a slot
  * of `refs` or of `values` of the type, fixed and required, of one of the
- * seven types. Null: it is stated ill, which is reported.
+ * supported indexed types, including int. Null: it is stated ill, which is reported.
  */
 export function indexes(d: Defining, v: unknown, path: string, slots: ReadonlyMap<string, Slot>): readonly string[] | null {
   const ill = (where: string, why: string): null => d.bad("unsupported-definition", where, why);

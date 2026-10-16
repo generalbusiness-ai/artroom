@@ -7,8 +7,8 @@ import { command, issueInvitation, memoryStore, type Context } from "../../cli/s
 import { keys } from "@generalbusiness/dap-derive/testing";
 import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { counting } from "../../../examples/counting/definition.ts";
-import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
+import { counting } from "../../../apps/counter/definition.ts";
+import { COUNTING_DEFINITION } from "../../../apps/counter/pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";

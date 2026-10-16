@@ -1,3 +1,5 @@
+import { INVITATION_KEY_COHORT } from "@generalbusiness/dap-platform";
+import { invitationIssueFields, invitationRedemptionFields } from "@generalbusiness/artroom-client";
 /**
  * The commands, as functions over a scope service's base URL and a signing
  * key. Each takes a `Context` and returns an `Outcome`: an exit code and
@@ -28,7 +30,7 @@
  */
 
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
-import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
@@ -337,22 +339,24 @@ async function createdBy(handle: ScopeHandle, seq: number): Promise<{ n: number;
 // ---------------------------------------------------------------- the commands
 
 /** Explicit selection only; omission retains the installed default cohort. */
-export type InstallCohort = "application" | "application-publication" | "counting-commitments";
+export type InstallCohort = "application" | "application-publication" | "counting-commitments" | "invitation-key";
 export interface InstallOptions { host?: string; namespace?: string; cohort?: InstallCohort }
 const INSTALL_COHORTS: Readonly<Record<InstallCohort, PlatformDefinition>> = {
+  "invitation-key": INVITATION_KEY_COHORT.register,
   application: APPLICATION_COHORT.register,
   "application-publication": FILE_PUBLICATION_COHORT.register,
   "counting-commitments": COUNTING_COHORT.register,
 };
 function selectedRegister(cohort: unknown): PlatformDefinition | undefined {
   if (cohort === undefined) return undefined;
+  if (cohort === "invitation-key") return INSTALL_COHORTS["invitation-key"];
   if (cohort === "application-publication") return INSTALL_COHORTS["application-publication"];
   if (cohort === "application") return INSTALL_COHORTS.application;
   if (cohort === "counting-commitments") return INSTALL_COHORTS["counting-commitments"];
-  return stop(usage("--cohort takes exactly application, application-publication or counting-commitments; nothing was signed or sent."));
+  return stop(usage("--cohort takes exactly application, application-publication, counting-commitments or invitation-key; nothing was signed or sent."));
 }
 const selectedPlan = (definition: PlatformDefinition): boolean =>
-  definition === APPLICATION_COHORT.register || definition === FILE_PUBLICATION_COHORT.register || definition === COUNTING_COHORT.register;
+  definition === APPLICATION_COHORT.register || definition === FILE_PUBLICATION_COHORT.register || definition === COUNTING_COHORT.register || definition === INVITATION_KEY_COHORT.register;
 
 /** Ordinary installs keep their legacy path; selected installs use exact planned custody. */
 export function install(ctx: Context, service: string, options: InstallOptions = {}): Promise<Outcome> {
@@ -846,7 +850,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     const shape = (await definitionOf(M, summary)).shape;
     const secret = b64url(fresh(32));
     const now = ctx.now?.() ?? Date.now();
-    const fields = { handle: member, role: options.role, inviteHash: textDigest(secret), inviteEnds: timeOf(Math.floor(now / 1000) * 1000 + (options.hours ?? 24) * 3600_000) };
+    const fields = { handle: member, role: options.role, ...invitationIssueFields(summary.definition, secret), inviteEnds: timeOf(Math.floor(now / 1000) * 1000 + (options.hours ?? 24) * 3600_000) };
     const signed = await signedIntent(signer, { to: repository.membership, kind: "invite-member", fields, expected: expectedOf(shape.acts["invite-member"]!, summary.items, null, fields) }, signing(ctx));
     const invitation = accepted(await M.submit(signed), M.scope, "Invited").receipt.fact.seq;
     const { inbox: _inbox, ...shared } = repository;
@@ -897,7 +901,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
       const loaded = platform(named);
       if (!loaded || loaded.data.name !== "platform:membership") return failed(`The invitation is in ${named}, which this command does not know as membership.`);
       const shape = loaded.data as unknown as DefinitionShape;
-      const fields = { invitation: link.invitation, secret: link.secret };
+      const fields = invitationRedemptionFields(named, link.repository.membership, link.invitation, signer.key, link.secret);
       signed = await signedIntent(signer, { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing(ctx));
       const request = `join-${b64url(fresh(12)).toLowerCase().replace(/_/g, "a")}`;
       // The envelope includes the invitation secret. Publish it privately,
@@ -912,7 +916,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     }
     const at = link.repository.membership;
     if (!validStep({ signed, ...(pending!.accepted ? { accepted: pending!.accepted } : {}) }, at, signer.key, "join")
-      || intentDigest(signed.intent) !== pending!.intent || signed.intent.fields["invitation"] !== link.invitation || signed.intent.fields["secret"] !== link.secret) return failed("The saved join does not match this invitation, membership and signing key; nothing was submitted.");
+      || intentDigest(signed.intent) !== pending!.intent || canonicalize(signed.intent.fields) !== canonicalize(invitationRedemptionFields(link.definition ?? "platform:membership@1", at, link.invitation, signer.key, link.secret))) return failed("The saved join does not match this invitation, membership and signing key; nothing was submitted.");
     const config: Config = { ...base, repository: link.repository };
     const M = await handleOf(ctx, config, at.scope, null);
     const digest = intentDigest(signed.intent);
@@ -1034,6 +1038,21 @@ export function act(ctx: Context, kind: string, options: { on?: string; target?:
     }
     const signed = await signedIntent(signer, { to: summary.scope, kind, on: target, fields, expected }, signing(ctx));
     return answered(scope, await handle.submit(signed, [], values.length > 0 ? { values } : {}), "Took effect");
+  });
+}
+
+/** One explicit bounded query page; no discovery scan or per-item detail reads. */
+export function items(ctx: Context, named: string, raw: string): Promise<Outcome> {
+  return run(async () => {
+    const query = readItemQuery(raw);
+    if (!query) return usage("--query needs canonical item-query JSON (at most 8192 UTF-8 bytes).");
+    const config = await configOf(ctx), scope = scopeNamed(config, named);
+    if (query.scope.scope !== scope) return usage("The query must name the selected scope's full reference.");
+    const reader = await readerOf(ctx, config), handle = await handleOf(ctx, config, scope, reader);
+    const page = await handle.queryItems(query);
+    if (!page.ok) return failed(`Item query refused: ${page.reason}. Coverage is incomplete.`);
+    return done(`Items of ${scope} at ${page.at.seq} (${page.at.hash}); selected suffix ${page.complete ? "complete" : "incomplete"}.`,
+      ...page.value.items.map(item => canonicalize(item)), ...(page.next === undefined ? [] : [`Next cursor: ${page.next}`]));
   });
 }
 

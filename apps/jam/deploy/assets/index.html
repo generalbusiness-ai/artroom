@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dap - jam</title>
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="brand/favicon.ico">
+<link rel="stylesheet" href="brand/tokens.css">
+<link rel="stylesheet" href="brand/fonts.css">
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0 auto; max-width: 820px; padding: 16px; background: var(--dap-bg); color: var(--dap-fg); font: 16px/1.4 var(--dap-font-sans); }
+  svg.stage { width: 100%; height: auto; display: block; }
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  select { font: inherit; padding: 8px; border: 2px solid var(--dap-line); border-radius: 0; }
+  button { font: inherit; padding: 8px 16px; border: 2px solid var(--dap-accent); background: var(--dap-green); color: var(--dap-white); border-radius: 0; cursor: pointer; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%); }
+  button:active { background: var(--dap-green-deep); }
+  button:focus-visible { clip-path: none; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--dap-accent); outline-offset: 3px; }
+  select, input { background: var(--dap-bg); color: var(--dap-fg); }
+  .identity { display: flex; align-items: center; gap: 24px; }
+  .wordmark { width: 96px; height: auto; padding: 12px; background: var(--dap-bg); }
+  .wordmark-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .wordmark-light { display: none; }
+    :root:not([data-theme="light"]) .wordmark-dark { display: block; }
+  }
+  :root[data-theme="dark"] .wordmark-light { display: none; }
+  :root[data-theme="dark"] .wordmark-dark { display: block; }
+  h1 { font-size: 24px; }
+  #ack, #pending, #bar, label { font: 14px/1.4 var(--dap-font-label); }
+  #ack { min-height: 1.4em; margin: 4px 0; color: var(--dap-accent); }
+  .entry-marker { display: inline-block; width: 8px; height: 8px; border: 1px solid currentColor; transform: rotate(45deg); margin-right: 8px; }
+  .entry-marker.recorded { background: currentColor; }
+  #mood { margin: 0; }
+  #mood input { font: inherit; padding: 8px; border: 2px solid var(--dap-line); border-radius: 0; width: 16em; max-width: 100%; box-sizing: border-box; }
+  #bar { font-variant-numeric: tabular-nums; }
+  #status, #pending { color: var(--dap-mute); margin: 4px 0; min-height: 1.4em; }
+  #captions { min-height: 4.5em; font-size: 20px; }
+  #captions p { margin: 2px 0; }
+</style>
+</head>
+<body>
+<header class="identity"><a class="identity-mark" href="https://dap.generalbusiness.ai/" aria-label="dap homepage"><img class="wordmark wordmark-light" src="brand/dap-wordmark-green.svg" alt="dap"><img class="wordmark wordmark-dark" src="brand/dap-wordmark-white.svg" alt="dap"></a><h1>Jam room · local procedural demo</h1></header>
+<p>This demo runs locally in your browser. Its musicians are procedural. No dap room, AI model or microphone is connected.</p>
+<svg class="stage" viewBox="0 0 800 400" role="img" aria-label="Three players at a table in a white room">
+  <!-- the room -->
+  <line x1="0" y1="350" x2="800" y2="350" stroke="#ccc" stroke-width="2"/>
+  <g transform="translate(90 80)" stroke="#bbb" stroke-linecap="round">
+    <circle r="32" fill="#fff" stroke-width="3"/>
+    <line x2="0" y2="-24" stroke-width="2"/>
+    <line x2="15" y2="4" stroke-width="3"/>
+  </g>
+
+  <!-- the unclaimed bass, leaning on the wall -->
+  <g transform="translate(735 345) rotate(-12)">
+    <rect x="-4" y="-190" width="8" height="140" fill="#8a6a45"/>
+    <ellipse cx="0" cy="-35" rx="26" ry="36" fill="#5a3d22"/>
+    <circle cx="0" cy="-35" r="7" fill="#222"/>
+  </g>
+  <text x="735" y="378" text-anchor="middle" font-size="12" fill="#999">bass (unclaimed)</text>
+
+  <!-- players behind the table; each head nods on the beat -->
+  <g id="synth-player" transform="translate(245 215)" style="visibility:hidden">
+    <rect x="-30" y="-12" width="60" height="80" rx="26" fill="#6c8ebf"/>
+    <g class="head">
+      <circle cx="0" cy="-40" r="26" fill="#f2c9a0"/>
+      <rect x="-20" y="-50" width="40" height="11" rx="4" fill="#111"/>
+      <path d="M -9 -26 q 9 6 18 0" stroke="#222" stroke-width="2.5" fill="none"/>
+    </g>
+  </g>
+  <g id="percussion-player" transform="translate(405 215)" style="visibility:hidden">
+    <rect x="-30" y="-12" width="60" height="80" rx="26" fill="#d67b5c"/>
+    <g class="head">
+      <circle cx="0" cy="-40" r="26" fill="#c99a6e"/>
+      <rect x="-26" y="-60" width="52" height="7" fill="#e33"/>
+      <circle cx="-9" cy="-42" r="6" fill="#fff" stroke="#222"/><circle cx="-7" cy="-41" r="2.5" fill="#222"/>
+      <circle cx="9" cy="-42" r="6" fill="#fff" stroke="#222"/><circle cx="11" cy="-44" r="2.5" fill="#222"/>
+      <ellipse cx="0" cy="-26" rx="6" ry="4" fill="#222"/>
+    </g>
+  </g>
+
+  <!-- the table and what is on it -->
+  <rect x="150" y="250" width="380" height="12" fill="#999"/>
+  <rect x="158" y="262" width="364" height="34" fill="#bbb"/>
+  <rect x="165" y="262" width="8" height="88" fill="#999"/>
+  <rect x="507" y="262" width="8" height="88" fill="#999"/>
+  <g id="synth" transform="translate(180 226)">
+    <rect width="140" height="24" rx="3" fill="#333"/>
+    <g fill="#fff">
+      <rect x="6" y="10" width="9" height="12"/><rect x="17" y="10" width="9" height="12"/><rect x="28" y="10" width="9" height="12"/>
+      <rect x="39" y="10" width="9" height="12"/><rect x="50" y="10" width="9" height="12"/><rect x="61" y="10" width="9" height="12"/>
+      <rect x="72" y="10" width="9" height="12"/><rect x="83" y="10" width="9" height="12"/><rect x="94" y="10" width="9" height="12"/>
+      <rect x="105" y="10" width="9" height="12"/><rect x="116" y="10" width="9" height="12"/><rect x="127" y="10" width="9" height="12"/>
+    </g>
+    <circle cx="12" cy="5" r="3" fill="var(--dap-accent)"/><circle cx="24" cy="5" r="3" fill="var(--dap-accent)"/><circle cx="36" cy="5" r="3" fill="var(--dap-accent)"/>
+  </g>
+  <g id="drum-pad" transform="translate(360 230)">
+    <rect width="90" height="20" rx="3" fill="#333"/>
+    <circle cx="14" cy="10" r="7" fill="var(--dap-green-deep)"/><circle cx="35" cy="10" r="7" fill="var(--dap-accent)"/>
+    <circle cx="56" cy="10" r="7" fill="var(--dap-green-tint)"/><circle cx="77" cy="10" r="7" fill="var(--dap-mute)"/>
+  </g>
+
+  <!-- the lead stands at the end of the table with a guitar -->
+  <g id="lead-player" transform="translate(610 215)" style="visibility:hidden">
+    <rect x="-30" y="-12" width="60" height="90" rx="26" fill="#7cb07c"/>
+    <rect x="-22" y="74" width="12" height="62" fill="#444"/>
+    <rect x="10" y="74" width="12" height="62" fill="#444"/>
+    <g class="head">
+      <circle cx="0" cy="-40" r="26" fill="#e8b88a"/>
+      <path d="M -14 -64 l 6 -18 l 6 14 l 6 -18 l 6 14 l 6 -14 l 2 22 z" fill="#222"/>
+      <circle cx="-9" cy="-42" r="3" fill="#222"/><circle cx="9" cy="-42" r="3" fill="#222"/>
+      <path d="M -10 -28 h 20" stroke="#222" stroke-width="2.5"/>
+    </g>
+    <g transform="translate(0 40) rotate(-25)">
+      <rect x="10" y="-5" width="80" height="7" fill="#8a6a45"/>
+      <ellipse cx="0" cy="0" rx="26" ry="20" fill="#c0392b"/>
+      <circle cx="2" cy="0" r="6" fill="#222"/>
+    </g>
+  </g>
+</svg>
+
+<div class="controls">
+  <label for="tune">Original phrase</label>
+  <select id="tune"><option value="synthetic-c">Original C phrase</option><option value="synthetic-eb">Original E-flat phrase</option></select>
+  <button id="sing" type="button">play phrase</button>
+  <button id="sing-rhythm" type="button">play rhythm</button>
+  <form id="mood" class="controls">
+    <input id="mood-text" type="text" maxlength="40" placeholder="a mood, such as detroit techno" aria-label="a mood for the band">
+    <button type="submit">say it</button>
+  </form>
+  <span id="bar">bar 0</span>
+</div>
+<p id="status">Choose an original phrase and press "play phrase". Both phrases and the rhythm are application-owned symbolic fixtures. No microphone or model is used.</p>
+<p id="pending"></p>
+<p id="ack" role="status"></p>
+<div id="captions" aria-live="polite"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -8,7 +8,8 @@
  */
 
 import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefName, factText, hex, sha1, sha256, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, editPath, factRefName, factText, hex, sha1, sha256, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+export { EDIT_PATH_BYTES, editPath } from "@generalbusiness/artroom-bytes";
 
 export type ObjectFormat = "sha1" | "sha256";
 export interface DestinationObject { kind: "blob" | "tree" | "commit"; body: Uint8Array; id: string }
@@ -69,22 +70,6 @@ export function receiptObjects(format: ObjectFormat, scope: ScopeId, time: Times
 }
 
 // ---------------------------------------------------------------- a one-file edit (i5 edit; plan 025, section 2, "Edit a page")
-
-/** The most bytes of the path of a one-file edit: the `max` of the slot `path` of the pinned `change` lane's manifest. */
-export const EDIT_PATH_BYTES = 1024;
-
-/**
- * The segments of a path that a one-file edit may write, or null. A path is
- * relative, at most 1024 bytes, made of segments split by `/`. No segment is
- * empty, `.` or `..`, or `.git` in any letter case, and no character is a
- * control character. These are the rules of a path in a published tree; the
- * destination refuses any other path by the name `path-invalid`.
- */
-export function editPath(path: unknown): readonly string[] | null {
-  if (typeof path !== "string" || path.length === 0 || utf8(path).length > EDIT_PATH_BYTES || /[\u0000-\u001f\u007f]/.test(path)) return null;
-  const segments = path.split("/");
-  return segments.every((segment) => segment !== "" && segment !== "." && segment !== ".." && segment.toLowerCase() !== ".git") ? segments : null;
-}
 
 /** The commit of a one-file edit: the published tree with the file written, one parent, the destination's identity and the time of the entry that reserved it. */
 export function editCommit(format: ObjectFormat, scope: ScopeId, time: Timestamp, tree: string, parent: string, path: string, operation: FactRef): DestinationObject {

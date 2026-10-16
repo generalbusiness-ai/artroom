@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import worker, { type Env } from "../src/worker.ts";
-import { BRAND_ASSETS } from "../src/brand-assets.ts";
+import worker, { type Env } from "../../../apps/room/worker.ts";
+import { BRAND_ASSETS } from "../../../apps/room/brand/assets.ts";
 
 // Invariant: public binary files survive Worker GET/HEAD without opening a private path.
 test("the Worker serves only allowlisted public brand bytes and refuses URL credentials before dispatch", async () => {

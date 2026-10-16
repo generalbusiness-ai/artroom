@@ -276,6 +276,21 @@ caller's `idempotencyKey`, in the config directory's
   `private/mcp-custody/capacity.lease.reclaim`), so its length does not
   depend on the home's. Archival reads each record again under its lock and
   skips one that is no longer terminal.
+  If a recorded PID has been reused by another user's process, a process
+  check can return `EPERM` (permission denied). The server treats that as
+  alive and leaves the lock in place; `blockedBy` can return no reclaim
+  path even when an old file blocks recovery. A deadline or an old file
+  time does not establish that the lock is safe to remove.
+
+  To recover, stop every process using the selected config directory.
+  Identify the exact lock or lease under `private/mcp-custody` and verify
+  that its original holder is gone, no process uses this store, and the
+  file still contains the same holding. Have an administrator check
+  process ownership if permission prevents that check. Once those facts
+  are established, remove only the verified stale lock or reclaim file.
+  Keep the records, segments, archives and their indexes. Restart the
+  server and check the retained original request. If ownership or a
+  stopped store cannot be verified, leave the lock in place.
 - **Steps with no act.** `prepare` without `kind` sends a capability step
   that has no act, such as hold@1's instance: the step's own intent, kept
   under custody under the caller's key, with its answers kept as the step's.
@@ -483,7 +498,7 @@ Creates a scope with no existing target, and records it in your configuration so
 
 ### `join`
 
-Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.
+Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link is private: this tool's result never repeats it. Legacy membership records the invitation secret in the join entry, visible through authorized history reads. The invitation-key cohort records a proof bound to this membership, invitation and joining key; its private invitation seed stays out of the entry.
 
 ```json
 {
@@ -1302,7 +1317,9 @@ refused when the server starts.
 
 Every command of the command line and every action of the page, with the
 tool calls that perform it in each launch mode and the count of calls.
-`packages/mcp/test/recipes.scope.test.ts` runs every row through the server
+The public item query is not yet available through MCP. Its marked gap
+row has no execution recipe; all other rows remain covered.
+`packages/mcp/test/recipes.scope.test.ts` runs every recipe row through the server
 on the real test Worker, with complete arguments, in the default and
 `--generic` modes, and checks that the tools called are the ones the row
 names, in order, as many times as it counts. In `--generic` mode, `actions`
@@ -1327,6 +1344,7 @@ works; the count given is the default recipe's.
 | `dap issue assign <issue> <@member>` | `issue.assign` on the issue's intent item with the assignees: 1 | `actions`, `act`: 2 | 1 |
 | `dap issue close <issue>` | `issue.close-own` when the caller opened it (issue.close-any otherwise), with the reason: 1 | `actions`, `act`: 2 | 1 |
 | `dap issues` | `room` for the lanes (paged by bytes), then `inspect` for each issue's own state: 1 + n | `room`, then `inspect` for each issue: 1 + n | 1 + n |
+| `dap items <scope> --query <canonical-item-query-JSON>` (MCP gap: public item query) | Unavailable in MCP; use the SDK, CLI or Page query surface | Unavailable in MCP | Unavailable in MCP |
 | `dap log <scope>` | `steps`, one per page: 1 | `steps`: 1 | 1 |
 | `dap show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
 | `dap verify <scope>` | `record`, one per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as dap verify itself: 1 | `record`: 1 | 1 |
@@ -1384,10 +1402,10 @@ not a second admitted one.
 Each further turn is one `inspect`, one `counting-commitments.commit` and
 one `counting-commitments.fulfill` (one `act` each in `--generic` mode).
 When more than one participant is active, the last speaker cannot commit
-next. [The Counter](../examples/counting/README.md) has diagrams of every
+next. [The Counter](../apps/counter/README.md) has diagrams of every
 act and who may attempt it.
 
-The commitments Counter (`examples/counting/commitments.ts`, the one the
+The commitments Counter (`apps/counter/commitments.ts`, the one the
 target-100 recording runs) grants differently from the Counter above: an
 agent's role needs `counting.participate`, `counting.activity` (which
 authorizes both `activate` and `deactivate`; there is no `counting.activate`
@@ -1541,8 +1559,18 @@ A batch is refused on every request; a body over 1 MiB is `413`; an
 `initialize` is admitted first and then ends the oldest; a refused
 `initialize` ends nothing) and 4 open streams, legacy streams and
 listens together (a 5th is `409`). Every byte bound here counts UTF-8
-bytes. A session survives the object's
-eviction; its open stream does not: when the stream reconnects, a list
+bytes. A legacy HTTP session expires after 30 minutes without a client
+request. The server checks expiry before an authenticated legacy request
+uses or creates a session; it does not run a separate expiry timer. A
+client request that reaches its session, including `GET`, renews the idle
+time; server notifications do not. Expiry removes the stored session,
+closes its stream with a final event, and leaves its ID answering `404`.
+Initialize again to obtain a new ID. Origin or bearer refusals and the
+stateless modern revision neither renew nor expire legacy sessions.
+
+A session's activity time survives the object's eviction. A stored row
+from before idle tracking uses its creation time until its next request.
+Its open stream does not survive eviction: when the stream reconnects, a list
 change the client has not listed is told once more.
 
 ### Budgets and recovery

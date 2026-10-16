@@ -1,0 +1,1021 @@
+import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
+/**
+ * The page's data functions: what it reads from a room and the one thing it
+ * writes, a signed act. Each takes a `Session`, the scope service's base URL
+ * and a 32-byte Ed25519 secret, and goes over the service's HTTP routes
+ * through the client's transport. The view (`view.ts`) only shows what these
+ * return, and a test calls them without a browser.
+ *
+ * The page judges nothing. What the caller may sign is listed from the
+ * definition and the caller's role in membership, as `artroom acts` lists it
+ * (`heldActs` of the command line). Whether an act takes effect is the
+ * scope's answer, and a refusal is shown with its reason; it writes nothing,
+ * and `act` reads the head before and after to show that.
+ *
+ * | Function | Reads |
+ * |---|---|
+ * | `placeOf` | Nothing: the room's directory and membership, from an invitation link or the command line's config file. |
+ * | `joinRoom` | Signs membership's `join` with an invitation link, which enrols the page's key. |
+ * | `openRoom` | A read session from membership; the directory's repository item, for the rules scope and the destination; the caller's standing in membership. |
+ * | `listLanes` | The directory's index rows, one for each lane, with each lane's own state. |
+ * | `loadIssue` | An issue lane: its intent, assignees, state and comments. |
+ * | `loadChange` | A change lane: its proposal, versions (a one-file version's path, digest and size), reviews by extent, review requests, checks, links and merges, the rules it holds, and for each merge the destination's publication and its outside operations. |
+ * | `loadRules` | The rules scope: the rules of the room, the active definitions, and which members may change the rules. |
+ * | `loadSite` | One page of the room's published site, as the site route answers it. |
+ * | `actsOn` | The acts of a scope's definition that the caller may sign now. |
+ * | `act` | Signs and sends one act, with a definition's bytes beside it where a field states their place, and reads the head before and after. |
+ *
+ * **Who reads.** Every read presents a read session that membership
+ * issued to the caller's key, renewed when it has ended. Where membership
+ * refuses one (a key that is no active member's, or a deployment with no
+ * session secret), each read the client can sign goes as a signed read by
+ * the caller's key, and the scope decides: it answers only where that key
+ * signed an entry within the window of an intent. A read that is refused
+ * is shown as its reason.
+ */
+
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
+import { LATE, b64url, byteOrder, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import {
+  ScopeHandle, collectItemQuery, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+} from "@generalbusiness/artroom-client";
+import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/dap-cli";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/dap-platform";
+import type { Extent as PolicyExtent } from "@generalbusiness/dap-platform";
+import { knownLIST1 } from "./source-support.ts";
+import { currentStanding, reviewCandidates } from "./membership-projection.ts";
+
+/** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
+export interface Session {
+  service: string;
+  secret: Uint8Array;
+  fetch?: Fetch;
+  /** The clock that intents and reads are signed by, in milliseconds. */
+  now?: () => number;
+}
+
+/**
+ * Where a room is: its directory, and its membership scope with the
+ * incarnation that a session request names. A key that is not yet a
+ * member reads neither, so the page is told both: by an invitation link,
+ * or by the command line's config file.
+ */
+export interface Place { directory: ScopeId; membership: ScopeRef }
+
+/** A room as the page has opened it: the four scopes it reads, and the caller's key and standing. */
+export interface Room {
+  session: Session;
+  directory: ScopeId;
+  directoryIndex: { scope: ScopeRef; definition: Summary["definition"] } | null;
+  membership: ScopeRef;
+  rules: ScopeId;
+  destination: ScopeId;
+  /** The repository name already recorded by the directory; no claimed display name is inferred. */
+  name?: string;
+  key: KeyId;
+  /** The caller's role and actions in membership, or null when the key is no active member's. */
+  me: (Standing & { ref?: MemberRef }) | null;
+  /** The read session the caller presents, or null when membership gave none; then reads are signed reads. */
+  reader: ReadSession | null;
+  /** Why membership gave no session, or null when it gave one. */
+  unsessioned: string | null;
+  /** Definitions read so far, by digest: a lane's definition is read once. */
+  definitions: Map<string, DeclaredDefinition>;
+}
+
+/** A read that failed: the page shows this text and nothing else about the thing it could not read. */
+export class Unreadable extends Error {
+  override readonly name = "Unreadable";
+}
+
+const nowOf = (session: Session): number => session.now?.() ?? Date.now();
+const transportOf = (session: Session, reader: string | null = null): Transport => {
+  const transport = httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {});
+  return typeof reader === "string" ? transport : signedReads(transport, secretSigner(session.secret), session.now ? { now: session.now } : {});
+};
+
+/** A handle on one scope that presents the caller's session, or signs each read where there is none. */
+const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => {
+  const reader = room.reader?.reader() ?? null;
+  return new ScopeHandle(transportOf(room.session, reader), scope, reader);
+};
+
+/** Renews the caller's session when it has ended, or will within ten seconds. A room that membership gave no session stays on signed reads. */
+async function fresh(room: Room): Promise<void> {
+  if (!room.reader || !room.reader.endedBy(timeOf(nowOf(room.session) + 10_000))) return;
+  const asked = await readerFor(room.session, room.membership);
+  room.reader = asked.session;
+  room.unsessioned = asked.why;
+}
+
+async function summaryOf(handle: ScopeHandle): Promise<{ summary: Summary; at: Head }> {
+  const read = await handle.summary();
+  if (!read.ok) throw new Unreadable(`Cannot read ${handle.scope}: ${read.reason}.`);
+  if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read ${handle.scope}: incomplete summary.`);
+  return { summary: read.value, at: read.at };
+}
+
+/** Refresh only the existing complete authenticated roster. Session renewal is
+ * not a fresh permission observation; a failed roster read cannot retain old standing. */
+async function refreshStanding(room: Room): Promise<Standing | null> {
+  room.me = null;
+  const { summary } = await summaryOf(handleOf(room, room.membership.scope));
+  if (canonicalize(summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The roster names another membership incarnation.");
+  room.me = currentStanding(summary.items, room.membership, room.key);
+  return room.me;
+}
+
+/** Collect only a complete enumeration. Existing caller budgets stay unchanged. */
+async function pagesOf<T>(request: (cursor?: string) => Promise<Read<readonly T[]>>, what: string, budget: number, at: Head): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | undefined;
+  for (let pages = 0; pages < budget; pages++) {
+    const page = await request(cursor);
+    if (!page.ok) throw new Unreadable(`${what}: ${page.reason}.`);
+    if (page.at.seq !== at.seq || page.at.hash !== at.hash) throw new Unreadable(`${what}: head changed; enumeration incomplete.`);
+    rows.push(...page.value);
+    if (page.next === undefined) {
+      if (!page.complete) throw new Unreadable(`${what}: incomplete enumeration.`);
+      return rows;
+    }
+    cursor = page.next;
+  }
+  throw new Unreadable(`${what}: page budget exhausted; enumeration incomplete.`);
+}
+
+/** A finite selected suffix at the same head as its surrounding view.
+ * Incomplete/refused coverage never becomes a complete item inventory. */
+async function itemsOf(room: Room, handle: ScopeHandle, summary: Summary, type: string, at: Head): Promise<Item[]> {
+  const declared = platform(summary.definition)?.data ?? await laneDefinition(room, handle, summary);
+  const selected = declared.items[type];
+  if (!selected) throw new Unreadable(`The definition of ${handle.scope} declares no ${type} items.`);
+  const states = Object.keys(selected.states).sort(byteOrder);
+  const coverage = await collectItemQuery(handle, { v: 1, scope: summary.scope, type, states, ids: null, limit: 100, cursor: null }, { pages: 4, bytes: 1024 * 1024, milliseconds: 10_000 });
+  if (!coverage.complete) throw new Unreadable(`Cannot read ${type} items of ${handle.scope}: incomplete (${coverage.reason ?? "unavailable"}); items read: ${coverage.items.length}.`);
+  if (!coverage.at || coverage.at.seq !== at.seq || coverage.at.hash !== at.hash) throw new Unreadable(`Cannot read ${type} items of ${handle.scope}: head changed; enumeration incomplete.`);
+  return [...coverage.items];
+}
+
+/** A detached text by its digest, or null when the scope holds none (as after a redaction) or the slot is empty. */
+async function textOf(handle: ScopeHandle, digest: FieldValue | null | undefined): Promise<string | null> {
+  if (typeof digest !== "string") return null;
+  const read = await handle.text(digest as Digest);
+  return read.ok ? read.value : null;
+}
+
+const memberOf = (party: unknown): string | null => (party && typeof party === "object" && "member" in party ? String((party as MemberRef).member) : null);
+const membersOf = (party: unknown): string[] => (Array.isArray(party) ? party.map(memberOf).filter((m): m is string => m !== null) : []);
+const text = (value: FieldValue | null | undefined): string | null => (typeof value === "string" ? value : null);
+const scopeOf = (ref: FieldValue | null | undefined): ScopeId | null => (ref && typeof ref === "object" && "scope" in ref ? (ref as { scope: ScopeId }).scope : null);
+
+// ---------------------------------------------------------------- the room
+
+const isScopeRef = (v: unknown): v is ScopeRef =>
+  typeof v === "object" && v !== null && typeof (v as ScopeRef).scope === "string" && typeof (v as ScopeRef).inc === "string" && typeof (v as ScopeRef).kind === "string";
+
+/**
+ * The room that a text names: an invitation link from `artroom invite`, or
+ * the command line's config file (`config.json`), whose `repository` names
+ * the directory and membership. Null when the text is neither. The link's
+ * secret is not kept here: `joinRoom` reads it from the link.
+ */
+export function placeOf(typed: string): Place | null {
+  const trimmed = typed.trim();
+  try {
+    const parsed = (trimmed.startsWith(LINK) ? linkOf(trimmed) : JSON.parse(trimmed)) as { repository?: { directory?: unknown; membership?: unknown }; directory?: unknown; membership?: unknown } | null;
+    const repository = parsed?.repository ?? parsed;
+    // Encoding only: a syntactically valid Place proves no birth or authority.
+    if (!fullScopeRef(repository?.directory) || repository.directory.kind !== "directory"
+      || !fullScopeRef(repository?.membership) || repository.membership.kind !== "membership") return null;
+    return { directory: repository.directory.scope, membership: repository.membership };
+  } catch {
+    return null;
+  }
+}
+
+/** Encoding checks before signing, not provenance or server authority.
+ * Routing stays on the configured service; normalization matches httpTransport. */
+function admittedInvitation(session: Pick<Session, "service">, link: NonNullable<ReturnType<typeof linkOf>>): boolean {
+  return typeof session.service === "string" && typeof link.service === "string"
+    && session.service.replace(/\/+$/, "").length > 0
+    && link.service.replace(/\/+$/, "") === session.service.replace(/\/+$/, "")
+    && typeof link.handle === "string" && link.invitation > 0
+    && fullScopeRef(link.repository?.directory) && link.repository.directory.kind === "directory"
+    && fullScopeRef(link.repository?.membership) && link.repository.membership.kind === "membership"
+    && isScopeId(link.repository?.rules) && isScopeId(link.repository?.destination)
+    && (link.definition === "platform:membership@1" || link.definition === "platform:membership@2" || link.definition === "platform:membership@6")
+    && platform(link.definition)?.data.name === "platform:membership";
+}
+
+/** Enrollment custody follows the actual target and signing key, independently
+ * of whichever room the Page currently selects. Another invitation does not
+ * settle an unknown enrollment under that same identity. */
+export function enrollmentAssociation(session: Session, membership: ScopeRef): string {
+  if (!fullScopeRef(membership) || membership.kind !== "membership") throw new Unreadable("Enrollment requires a complete membership reference.");
+  return canonicalize([session.service.replace(/\/+$/, ""), membership, keyIdOfSecret(session.secret)]);
+}
+
+export function joinAssociation(session: Session, typed: string): string {
+  const link = linkOf(typed.trim());
+  if (!link || !admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
+  return enrollmentAssociation(session, link.repository.membership);
+}
+
+/**
+ * Attempts to enrol the page's key in the room an invitation link names: membership's
+ * `join`, with the invitation's number and secret, signed by the key. Its
+ * fields are read from the exact supported membership hint the link names.
+ * The hint is not proven provenance; the answer is membership's. This direct
+ * request has no CLI-style saved enrollment envelope or durable recovery.
+ */
+export interface PreparedJoin { place: Place; definition: string; handle: string; link: Digest; signed: SignedIntent }
+/** Encoding only: validate the explicit invitation before a key is prepared. */
+export function invitationTarget(service: string, typed: string): Omit<PreparedJoin, "signed"> {
+  if (typed.length > 16 * 1024) throw new Unreadable("The invitation exceeds its bound.");
+  const link = linkOf(typed.trim());
+  if (!link || !admittedInvitation({ service }, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
+  return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, definition: link.definition!, handle: link.handle, link: textDigest(canonicalize(link)) };
+}
+/** Retain the exact signed request privately; legacy fields contain the invitation secret. */
+export async function prepareJoin(session: Session, typed: string): Promise<PreparedJoin> {
+  const target = invitationTarget(session.service, typed), link = linkOf(typed.trim())!;
+  const shape = platform(target.definition)!.data as unknown as DefinitionShape;
+  const fields = invitationRedemptionFields(target.definition, target.place.membership, link.invitation, keyIdOfSecret(session.secret), link.secret);
+  const signing: Signing = session.now ? { now: session.now() } : {};
+  const signed = await signedIntent(secretSigner(session.secret), { to: target.place.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  return { ...target, signed };
+}
+/** Submit the original envelope, never sign a replacement in this operation. */
+export async function submitJoin(session: Session, prepared: PreparedJoin): Promise<Answer> {
+  return new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).submit(prepared.signed);
+}
+/** Read-only settlement of the original signed request. Missing is not proof of no dispatch. */
+export async function settleJoin(session: Session, prepared: PreparedJoin): Promise<Receipt | null> {
+  const result = await new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).settle(prepared.signed);
+  return result.ok ? result.value : null;
+}
+export async function verifyJoinReceipt(session: Session, prepared: PreparedJoin, receipt: Receipt): Promise<boolean> {
+  if (receipt.definition !== prepared.definition || receipt.intent !== intentDigest(prepared.signed.intent) || canonicalize(receipt.fact.at) !== canonicalize(prepared.place.membership)) return false;
+  const followed = await new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).followReceipt(receipt);
+  return followed.ok && followed.entry.input.type === "act" && canonicalize(followed.entry.input.signed) === canonicalize(prepared.signed);
+}
+export async function joinRoom(session: Session, typed: string, submitting?: () => void): Promise<{ place: Place; answer: Answer }> {
+  const prepared = await prepareJoin(session, typed);
+  submitting?.();
+  return { place: prepared.place, answer: await submitJoin(session, prepared) };
+}
+
+/**
+ * Opens the room at `place`. The page asks membership for a read session
+ * signed for by the caller's key, and presents it to every read; where
+ * membership refuses one, the reads are signed reads. Then it reads the
+ * directory's repository item for the rules scope and the destination, and
+ * the caller's standing in membership.
+ */
+export async function openRoom(session: Session, place: Place): Promise<Room> {
+  const key = keyIdOfSecret(session.secret);
+  const asked = await readerFor(session, place.membership);
+  const room: Room = { session, directory: place.directory, directoryIndex: null, membership: place.membership, rules: "" as ScopeId, destination: "" as ScopeId, key, me: null, reader: asked.session, unsessioned: asked.why, definitions: new Map() };
+  const { summary } = await summaryOf(handleOf(room, place.directory));
+  room.directoryIndex = { scope: summary.scope, definition: summary.definition };
+  const repository = summary.items.find((item) => item.type === "repository");
+  const M = repository?.refs["membership"];
+  const rules = scopeOf(repository?.refs["rules"]);
+  const destination = scopeOf(repository?.refs["destination"]);
+  if (!repository || !isScopeRef(M) || !rules || !destination) throw new Unreadable(`The directory ${place.directory} names no membership, rules scope and destination yet.`);
+  if (M.scope !== place.membership.scope || M.inc !== place.membership.inc) throw new Unreadable(`The directory ${place.directory} names another membership scope than ${place.membership.scope}.`);
+  room.rules = rules;
+  room.destination = destination;
+  const recordedRepository = repository.values["repository"];
+  if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository["name"] === "string") room.name = recordedRepository["name"];
+  await refreshStanding(room);
+  return room;
+}
+
+/** A read session from membership, signed for by the caller's key, or why membership gave none. A request that got no reply is `no-reply`. */
+async function readerFor(session: Session, membership: ScopeRef): Promise<{ session: ReadSession | null; why: string | null }> {
+  const asked = sessionRequest(membership, session.secret, timeOf(Math.floor(nowOf(session) / 1000) * 1000 + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
+  try {
+    const answer = await requestSession(session.service, membership.scope, asked, session.fetch ? { fetch: session.fetch } : {});
+    return answer.ok ? { session: answer.session, why: null } : { session: null, why: answer.reason };
+  } catch {
+    return { session: null, why: "no-reply" };
+  }
+}
+
+/** One advisory directory-index row. Open the lane for its current state. */
+export interface LaneRow { scope: ScopeId; number: number | null; kind: "issue" | "pr" | null; title: string | null; state: string | null; draft: boolean | null }
+
+/** One bounded directory-index page. Its notices are advisory; opening a
+ * row reads that lane. Listing never fetches each lane's details. */
+export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; changes: LaneRow[] }> {
+  await fresh(room);
+  const index = room.directoryIndex;
+  if (!index || index.scope.scope !== room.directory) throw new Unreadable("The room has no bound directory index reference. Reopen the room.");
+  const declared = platform(index.definition)?.data.items["lane"];
+  if (!declared) throw new Unreadable("The directory index definition is unsupported.");
+  const handle = handleOf(room, room.directory);
+  const coverage = await collectItemQuery(handle, { v: 1, scope: index.scope, type: "lane", states: Object.keys(declared.states).sort(byteOrder), ids: null, limit: 100, cursor: null });
+  if (!coverage.complete) throw new Unreadable(`Directory index incomplete (${coverage.reason ?? "unavailable"}); rows read: ${coverage.items.length}.`);
+  const rows: LaneRow[] = [];
+  for (const item of coverage.items) {
+    const scope = scopeOf(item.refs["scope"]);
+    if (!scope) continue;
+    rows.push({ scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
+      title: text(item.values["title"]), state: text(item.values["state"]), draft: typeof item.values["draft"] === "boolean" ? item.values["draft"] : null });
+  }
+  rows.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+  return { issues: rows.filter(row => row.kind === "issue"), changes: rows.filter(row => row.kind === "pr") };
+}
+
+// ---------------------------------------------------------------- one lane
+
+/** A lane's definition, as the scope retains it under the digest its summary names. */
+async function laneDefinition(room: Room, handle: ScopeHandle, summary: Summary): Promise<DeclaredDefinition> {
+  const kept = room.definitions.get(summary.definition);
+  if (kept) {
+    if (definitionDigest(kept) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
+    return kept;
+  }
+  const read = await handle.definition();
+  if (!read.ok) throw new Unreadable(`Cannot read the definition of ${handle.scope}: ${read.reason}.`);
+  if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read the definition of ${handle.scope}: incomplete.`);
+  if (definitionDigest(read.value) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
+  room.definitions.set(summary.definition, read.value);
+  return read.value;
+}
+
+export interface Comment { id: number; author: string | null; state: string; body: string | null }
+
+const commentsOf = async (room: Room, handle: ScopeHandle, summary: Summary, at: Head): Promise<Comment[]> =>
+  Promise.all((await itemsOf(room, handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
+
+export interface IssueView {
+  /** The actual intent item used by transitions. */
+  intent?: number;
+  scope: ScopeId; ref: ScopeRef; definition: string; head: Head;
+  number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
+  createdAt: string | null; modifiedAt: string | null;
+  requesterRef: MemberRef | null; requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
+}
+
+/** Times are native genesis/latest-entry times at this full authenticated read frontier. */
+async function issueTimes(handle: ScopeHandle, summary: Summary, at: Head): Promise<{ createdAt: string | null; modifiedAt: string | null }> {
+  const unavailable = { createdAt: null, modifiedAt: null };
+  try {
+    const first = await handle.entry(0), last = at.seq === 0 ? first : await handle.entry(at.seq);
+    if (!first.ok || !last.ok || !first.complete || !last.complete || first.next !== undefined || last.next !== undefined) return unavailable;
+    const genesis = first.value.entry, latest = last.value.entry;
+    if (genesis.seq !== 0 || genesis.prev !== null || latest.seq !== at.seq
+      || canonicalize(genesis.at) !== canonicalize(summary.scope) || canonicalize(latest.at) !== canonicalize(summary.scope)
+      || entryHash(genesis) !== first.value.hash || entryHash(latest) !== last.value.hash || last.value.hash !== at.hash
+      || timeMs(genesis.time) === null || timeMs(latest.time) === null) return unavailable;
+    const final = await summaryOf(handle);
+    if (canonicalize(final.summary.scope) !== canonicalize(summary.scope) || canonicalize(final.at) !== canonicalize(at)) return unavailable;
+    return { createdAt: genesis.time, modifiedAt: latest.time };
+  } catch { return unavailable; } // A denied or changed read supplies no substitute clock.
+}
+
+/** An issue lane: its intent item, its comments, and the head it was read at. */
+export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at } = await summaryOf(handle);
+  const definition = await laneDefinition(room, handle, summary);
+  if (definition.name !== "issue") throw new Unreadable(`${scope} is a lane under ${definition.name}, not an issue.`);
+  const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(room, handle, summary, "intent", at))[0];
+  if (!intent) throw new Unreadable(`${scope} holds no issue.`);
+  return {
+    scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, intent: intent.id,
+    ...await issueTimes(handle, summary, at),
+    number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
+    state: intent.state, closeReason: text(intent.values["closeReason"]), requesterRef: isMemberRef(intent.parties["requester"]) ? structuredClone(intent.parties["requester"]) : null, requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
+    conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(room, handle, summary, at),
+  };
+}
+
+/**
+ * One version of a change. A one-file version (`propose-file`) names its
+ * `file`: the path, the digest and size of its bytes. Its legacy `page`
+ * address points at the latest published branch, not this immutable version;
+ * the Version screen does not offer it as a rendered-page link.
+ */
+export interface Manifest {
+  /** Native ISSUE report facts in selection order; null means unavailable or malformed. */
+  selectedReports?: FactRef[] | null;
+  id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
+  file: { path: string; digest: string | null; size: number | null; page: string;
+    /** Exact retained proposal text, verified for the selected version; null when unavailable. Never read from HEAD. */
+    content?: string | null } | null;
+}
+export interface Review { id: number; state: string; reviewer: string | null; manifest: number | null; verdict: string | null; extent: string | null }
+export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null; requestedRef: MemberRef | null; requesterRef: MemberRef | null }
+export interface Job { id: number; state: string; name: string | null; manifest: number | null }
+export interface Link { id: number; state: string; issue: ScopeId | null; how: string | null }
+export interface Extent { name: string; approvals: number; approver: string; checks: string[]; class: string; patterns?: string[] }
+/** The rules a change lane holds, as the rules scope last sent them. `revision`: the update's revision, which the relation counts. */
+export interface LaneRules { approvals: number | null; revision: number | null; ownerMayReview: boolean | null; extents: Extent[]; checks: { name: string; required: boolean }[] }
+/** One outside operation of the destination, for one publication: its kind, and the result of each of its attempts in order. */
+export interface Operation { id: string; kind: string; attempts: ("opened" | "confirmed" | "refused" | "unknown")[] }
+export interface Publication { id: number; state: string; reason: string | null; operations: Operation[] }
+export interface Merge { id: number; state: string; manifest: number | null; reason: string | null; commit: string | null; publication: Publication | null }
+
+export interface ChangeView {
+  /** Actual authenticated lane identity, including its incarnation. */
+  ref?: ScopeRef;
+  /** Full native policy bound to this current recorded one-file version; null means unknown applicability. */
+  reviewPolicy?: { manifest: number; source: FactRef; extents: PolicyExtent[] } | null;
+  /** The actual proposal item used by transitions. */
+  proposal?: number;
+  /** Actual current item; never a retained-version fallback for a mutation. */
+  currentManifest?: number | null;
+  /** Choices from held rules and authenticated membership; null means unavailable. */
+  reviewExtents?: { label: string; value: string }[] | null;
+  reviewMembers?: { label: string; value: string }[] | null;
+  /** Per held extent, current presentation candidates; null means its authority is unavailable, not destination readiness. */
+  reviewMembersByExtent?: Record<string, { label: string; value: string }[] | null> | null;
+  scope: ScopeId; definition: string; head: Head;
+  number: number | null; title: string | null; body: string | null; state: string; author: string | null;
+  manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
+}
+
+/** Known rules versions change policy only in publish, recording published=self.
+ * A later non-policy entry is harmless; any later publish makes this held
+ * update's full patterns unavailable, even if its five-field projection agrees. */
+async function reviewPolicyOf(room: Room, change: ScopeRef, proposal: Item, held: Item | undefined, manifest: number): Promise<NonNullable<ChangeView["reviewPolicy"]> | null> {
+  try {
+    const source = held?.refs["source"], named = proposal.refs["rulesScope"];
+    if (!held || !isFactRef(source) || !fullScopeRef(named) || source.at.scope !== room.rules || source.at.kind !== "rules"
+      || canonicalize(source.at) !== canonicalize(named) || held.values["revision"] !== source.seq) return null;
+    const handle = handleOf(room, source.at.scope);
+    const { summary, at } = await summaryOf(handle);
+    if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(source.at) || at.seq < source.seq
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return null;
+    const rules = summary.items.find(item => item.type === "rules" && item.state === "current");
+    if (!rules) return null;
+    const published = rules.refs["published"] ?? 0;
+    if (typeof published !== "number" || !Number.isSafeInteger(published) || published < 0 || published > source.seq) return null;
+    const read = await handle.entry(source.seq);
+    if (!read.ok || !read.complete || read.next !== undefined) return null;
+    const entry = read.value.entry;
+    if (entry.seq !== source.seq || canonicalize(entry.at) !== canonicalize(source.at)
+      || entryHash(entry) !== source.hash || read.value.hash !== source.hash) return null;
+    const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+    const sends = entry.sends.filter(send => canonicalize(send.to) === canonicalize(change) && send.message.class === "request"
+      && send.message.type === "relate" && record(send.message.body) && send.message.body["name"] === "rules");
+    if (sends.length !== 1) return null;
+    const message = sends[0]!.message;
+    if (message.class !== "request" || message.type !== "relate") return null;
+    const body = message.body;
+    if (!record(body) || body["state"] !== "current" || !isFactRef(body["item"])
+      || canonicalize(body["item"].at) !== canonicalize(source.at) || body["item"].seq !== rules.id || body["item"].hash !== rules.opened
+      || !record(body["detail"])) return null;
+    const detail = body["detail"];
+    for (const name of ["approvals", "ownerMayReview", "checks", "extents"]) {
+      const value = held.values[name] ?? (name === "checks" ? [] : null);
+      if (canonicalize(detail[name] ?? (name === "checks" ? [] : null)) !== canonicalize(value)) return null;
+      if (name !== "extents" && canonicalize(rules.values[name] ?? (name === "checks" ? [] : null)) !== canonicalize(value)) return null;
+    }
+    const approvals = rules.values["approvals"], checks = rules.values["checks"] ?? [];
+    if (typeof approvals !== "number" || !Array.isArray(checks)) return null;
+    const full = rules.values["extents"] ?? firstExtents({ approvals, checks: checks as unknown as { name: string; required: boolean }[] });
+    if (!isExtents(full)) return null;
+    const projected = full.map(({ name, approvals, approver, checks, class: of }) => ({ name, approvals, approver, checks, class: of }));
+    if (canonicalize(projected) !== canonicalize(held.values["extents"])) return null;
+    return { manifest, source, extents: full.map(extent => ({ ...extent, patterns: [...extent.patterns], checks: [...extent.checks] })) };
+  } catch { return null; }
+}
+
+const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
+
+/** The declared selection is the authority for its ISSUE report role. An
+ * absent optional typed slot is the native empty list, not a failed read. */
+function reportsOf(manifest: Item, definition: DeclaredDefinition): FactRef[] | null {
+  const slot = definition.items["manifest"]?.values["selected"];
+  const type = slot?.of;
+  if (!type || type.type !== "list" || type.of.type !== "record") return null;
+  const report = type.of.of["report"], accepted = type.of.of["accepted"];
+  if (report?.type !== "fact" || report.under !== "issue" || (report.kind.length !== 1 || report.kind[0] !== "report") || accepted?.type !== "fact" || accepted.under !== "issue" || (accepted.kind.length !== 1 || accepted.kind[0] !== "accept-report")) return null;
+  const selected = manifest.values["selected"];
+  if (selected === undefined || selected === null) return slot.required ? null : [];
+  if (!Array.isArray(selected) || selected.length > type.max) return null;
+  const reports: FactRef[] = [];
+  for (const row of selected) {
+    if (!row || typeof row !== "object" || Array.isArray(row) || !isFactRef(row["report"]) || !isFactRef(row["accepted"])) return null;
+    reports.push(row["report"]);
+  }
+  return reports;
+}
+
+
+/** Required merge facts without destination/history presentation reads.
+ * Reads use the caller's existing authenticated session or signed-read path. */
+export async function loadChangeSelection(room: Room, scope: ScopeId): Promise<{ scope: ScopeRef; head: Head; currentManifest: number | null; manifests: { id: number; state: string; selectedReports: FactRef[] | null }[] }> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at } = await summaryOf(handle);
+  const definition = await laneDefinition(room, handle, summary);
+  if (definition.name !== "change") throw new Unreadable(`${scope} is not a change lane.`);
+  const manifests = await itemsOf(room, handle, summary, "manifest", at);
+  return { scope: summary.scope, head: at, currentManifest: manifests.find((item) => item.state === "current")?.id ?? null,
+    manifests: manifests.map((item) => ({ id: item.id, state: item.state, selectedReports: reportsOf(item, definition) })) };
+}
+
+/** Item IDs are their opening entry positions (contract 4.1). Read just that
+ * authenticated entry and bind its signed bytes to the selected manifest.
+ * A missing, redacted or inconsistent source offers no preview. */
+async function manifestContent(handle: ScopeHandle, scope: Summary["scope"], manifest: Item): Promise<string | null> {
+  try {
+    const read = await handle.entry(manifest.id);
+    if (!read.ok || !read.complete || read.next !== undefined) return null;
+    const { entry, hash } = read.value;
+    if (entry.seq !== manifest.id || canonicalize(entry.at) !== canonicalize(scope) || entryHash(entry) !== hash || hash !== manifest.opened) return null;
+    if (!entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id)) return null;
+    const input = entry.input;
+    if (input.type !== "act" || input.signed.intent.kind !== "propose-file" || !verifySignedIntent(input.signed) || canonicalize(input.signed.intent.to) !== canonicalize(scope)) return null;
+    const author = input.authority.length === 1 ? input.authority[0] : null;
+    const authors = manifest.parties["authors"];
+    if (!author || author.key !== input.signed.intent.actor || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(authors) || !authors.some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { path, digest, size, content } = input.signed.intent.fields;
+    if (typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || path !== manifest.values["path"] || digest !== manifest.values["digest"] || size !== manifest.values["size"] || !fileSound({ path, digest, size, content })) return null;
+    return content;
+  } catch { return null; }
+}
+
+async function manifestListFile(handle: ScopeHandle, scope: ScopeRef, manifest: Item, definition: DeclaredDefinition, pin: string, sources: readonly Item[]): Promise<NonNullable<Manifest["file"]> | null> {
+  try {
+    if (!knownLIST1(definition, pin)) return null;
+    const files = manifest.values["files"];
+    if (!Array.isArray(files) || files.length !== 1) return null;
+    const row = files[0];
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row["path"] !== "string" || typeof row["digest"] !== "string" || typeof row["entry"] !== "number" || !Number.isSafeInteger(row["entry"]) || row["entry"] >= manifest.id) return null;
+    const opening = await handle.entry(manifest.id);
+    if (!opening.ok || !opening.complete || opening.next !== undefined) return null;
+    const frozenInput = opening.value.entry.input;
+    const frozenFiles = frozenInput.type === "act" ? frozenInput.signed.intent.fields["files"] : null;
+    if (!Array.isArray(frozenFiles) || frozenFiles.length !== 1) return null;
+    const frozen = frozenFiles[0];
+    if (!frozen || typeof frozen !== "object" || Array.isArray(frozen) || !isFactRef(frozen["entry"]) || frozen["path"] !== row["path"] || frozen["digest"] !== row["digest"]) return null;
+    const fact = frozen["entry"];
+    if (canonicalize(fact.at) !== canonicalize(scope) || fact.seq !== row["entry"]) return null;
+    const source = await handle.entry(fact.seq);
+    if (!opening.ok || !opening.complete || opening.next !== undefined || !source.ok || !source.complete || source.next !== undefined) return null;
+    const m = opening.value, s = source.value;
+    if (m.entry.seq !== manifest.id || canonicalize(m.entry.at) !== canonicalize(scope) || entryHash(m.entry) !== m.hash || m.hash !== manifest.opened || s.entry.seq !== fact.seq || canonicalize(s.entry.at) !== canonicalize(fact.at) || entryHash(s.entry) !== s.hash || s.hash !== fact.hash) return null;
+    const mi = m.entry.input, si = s.entry.input;
+    if (mi.type !== "act" || si.type !== "act" || mi.signed.intent.kind !== "propose-manifest" || si.signed.intent.kind !== "propose-file" || !verifySignedIntent(mi.signed) || !verifySignedIntent(si.signed) || canonicalize(mi.signed.intent.to) !== canonicalize(scope) || canonicalize(si.signed.intent.to) !== canonicalize(scope)) return null;
+    if (!m.entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id) || !s.entry.effects.some((effect) => effect.effect === "open" && effect.type === "source" && effect.item === fact.seq)) return null;
+    const storedSource = sources.find((item) => item.id === fact.seq && item.type === "source");
+    if (!storedSource || storedSource.opened !== fact.hash) return null;
+    if (mi.signed.intent.fields["base"] !== manifest.values["base"]) return null;
+    const author = mi.authority.length === 1 ? mi.authority[0] : null, sourceAuthor = si.authority.length === 1 ? si.authority[0] : null;
+    if (!author || !sourceAuthor || author.key !== mi.signed.intent.actor || sourceAuthor.key !== si.signed.intent.actor || si.signed.intent.actor !== mi.signed.intent.actor || canonicalize(sourceAuthor.subject) !== canonicalize(author.subject) || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(manifest.parties["authors"]) || !manifest.parties["authors"].some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { base, path, digest, size, content } = si.signed.intent.fields;
+    shapeDeclaredAct(definition, "propose-file", { on: null, fields: si.signed.intent.fields });
+    shapeDeclaredAct(definition, "propose-manifest", { on: null, fields: mi.signed.intent.fields });
+    if (base !== manifest.values["base"] || path !== row["path"] || digest !== row["digest"] || typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || !fileSound({ path, digest, size, content })) return null;
+    if (base !== storedSource.values["base"] || path !== storedSource.values["path"] || digest !== storedSource.values["digest"] || size !== storedSource.values["size"] || canonicalize(storedSource.parties["integrator"]) !== canonicalize(sourceAuthor.subject)) return null;
+    return { path, digest, size, content, page: "" };
+  } catch { return null; }
+}
+/**
+ * A change lane, and for each of its merges the destination's publication
+ * and that publication's outside operations, read from the destination's
+ * history: an operation is opened `for` the publication, and each attempt
+ * records its result.
+ */
+export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at } = await summaryOf(handle);
+  const definition = await laneDefinition(room, handle, summary);
+  if (definition.name !== "change") throw new Unreadable(`${scope} is a lane under ${definition.name}, not a change.`);
+  const all = (type: string) => itemsOf(room, handle, summary, type, at);
+  const proposal = summary.items.find((item) => item.type === "proposal") ?? (await all("proposal"))[0];
+  if (!proposal) throw new Unreadable(`${scope} holds no proposal.`);
+  const rulesItem = summary.items.find((item) => item.type === "rules");
+  const publications = await publicationsOf(room, scope);
+  const manifests = await all("manifest");
+  const current = manifests.find((m) => m.state === "current") ?? null;
+  const selected = current ?? manifests.at(-1); // Read-only preview may show retained history.
+  const extents = rulesItem?.values["extents"];
+  const reviewExtents = Array.isArray(extents) && extents.every((extent) => extent && typeof extent === "object" && !Array.isArray(extent) && typeof extent["name"] === "string")
+    ? extents.map((extent) => ({ label: String((extent as Record<string, FieldValue>)["name"]), value: String((extent as Record<string, FieldValue>)["name"]) })) : null;
+  let reviewMembers: { label: string; value: string }[] | null = null;
+  let reviewMembersByExtent: ChangeView["reviewMembersByExtent"] = null;
+  if (current) {
+    try {
+      room.me = null;
+      const membership = await summaryOf(handleOf(room, room.membership.scope));
+      if (canonicalize(membership.summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The reviewer roster names another membership incarnation.");
+      room.me = currentStanding(membership.summary.items, room.membership, room.key);
+      const candidates = reviewCandidates(membership.summary.items, room.membership, current.parties["authors"], rulesItem?.values["ownerMayReview"], extents);
+      reviewMembers = candidates?.members ?? null;
+      reviewMembersByExtent = candidates?.byExtent ?? null;
+    } catch { /* Missing authority offers no invented reviewer choices. */ }
+  }
+  const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
+  const listFile = selected && selected.values["files"] !== undefined ? await manifestListFile(handle, summary.scope, selected, definition, summary.definition, await all("source")) : null;
+  const reviewPolicy = current && (typeof content === "string" || listFile !== null)
+    ? await reviewPolicyOf(room, summary.scope, proposal, rulesItem, current.id) : null;
+  return {
+    scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers, reviewMembersByExtent, reviewPolicy,
+    number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
+    manifests: manifests.map((m) => ({
+      selectedReports: reportsOf(m, definition),
+      id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
+      base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
+      file: typeof m.values["path"] === "string" ? {
+        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]), ...(m === selected ? { content } : {}),
+      } : m === selected && listFile ? { ...listFile, page: siteAddress(room, listFile.path) } : null,
+    })),
+    reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
+    requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]), requestedRef: isMemberRef(r.parties["requested"]) ? structuredClone(r.parties["requested"]) : null, requesterRef: isMemberRef(r.parties["requester"]) ? structuredClone(r.parties["requester"]) : null })),
+    jobs: (await all("job")).map((j) => ({ id: j.id, state: j.state, name: text(j.values["name"]), manifest: localId(j.refs["manifest"]) })),
+    links: (await all("link")).map((l) => ({ id: l.id, state: l.state, issue: scopeOf(l.refs["issue"]), how: text(l.values["how"]) })),
+    merges: (await all("merge")).map((m) => ({
+      id: m.id, state: m.state, manifest: localId(m.refs["manifest"]), reason: text(m.values["reason"]), commit: text(m.values["commit"]), publication: publications.get(m.id) ?? null,
+    })),
+    rules: rulesItem ? {
+      approvals: localId(rulesItem.values["approvals"]), revision: localId(rulesItem.values["revision"]), ownerMayReview: typeof rulesItem.values["ownerMayReview"] === "boolean" ? rulesItem.values["ownerMayReview"] : null,
+      extents: Array.isArray(rulesItem.values["extents"]) ? (rulesItem.values["extents"] as unknown as Extent[]) : [],
+      checks: Array.isArray(rulesItem.values["checks"]) ? (rulesItem.values["checks"] as unknown as { name: string; required: boolean }[]) : [],
+    } : null,
+    comments: await commentsOf(room, handle, summary, at),
+  };
+}
+
+/** The destination's publications for one lane, by the lane's merge entry, each with the operations opened for it. */
+async function publicationsOf(room: Room, lane: ScopeId): Promise<Map<number, Publication>> {
+  const G = handleOf(room, room.destination);
+  const { summary, at } = await summaryOf(G);
+  const items = (await itemsOf(room, G, summary, "publication", at)).filter((item) => (item.refs["operation"] as FactRef | undefined)?.at.scope === lane);
+  if (items.length === 0) return new Map();
+  const operations = operationsOf(await historyOf(G, at));
+  return new Map(items.map((item) => [
+    (item.refs["operation"] as FactRef).seq,
+    { id: item.id, state: item.state, reason: text(item.values["reason"]), operations: operations.filter((o) => o.for === item.id).map(({ for: _for, ...o }) => o) },
+  ]));
+}
+
+async function historyOf(handle: ScopeHandle, at: Head): Promise<Entry[]> {
+  return (await pagesOf((cursor) => handle.history(cursor), `Cannot read the history of ${handle.scope}`, 1000, at)).map((sealed) => sealed.entry);
+}
+
+/**
+ * The outside operations a history records, with the item each is for. An
+ * operation is named `seq:k`, by the entry that opened it and its ordinal
+ * there; an attempt in that same entry names it `{ k }`. `for: "self"` is
+ * the item the same entry opens.
+ */
+export function operationsOf(entries: readonly Entry[]): (Operation & { for: number | null })[] {
+  const found = new Map<string, Operation & { for: number | null }>();
+  for (const entry of entries) {
+    const opened = entry.effects.find((effect) => effect.effect === "open");
+    for (const effect of entry.effects) {
+      if (effect.effect === "operation") {
+        const item = effect.for === "self" ? (opened && "item" in opened ? opened.item : null) : (effect.for ?? null);
+        found.set(`${entry.seq}:${effect.k}`, { id: `${entry.seq}:${effect.k}`, kind: effect.kind, attempts: [], for: item });
+      } else if (effect.effect === "attempt") {
+        const id = typeof effect.operation === "string" ? effect.operation : `${entry.seq}:${effect.operation.k}`;
+        const operation = found.get(id);
+        if (!operation) continue;
+        if (effect.result === "opened") operation.attempts.push("opened");
+        else operation.attempts[effect.attempt - 1] = effect.result;
+      }
+    }
+  }
+  return [...found.values()];
+}
+
+// ---------------------------------------------------------------- the published site
+
+/** The address of a path on the room's published site: the site route, on the published branch (`HEAD`). */
+export function siteAddress(room: Pick<Room, "session" | "directory">, path: string): string {
+  return `${room.session.service.replace(/\/+$/, "")}/site/${room.directory}/HEAD/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/** What the site route answered for one path: its status and its text. A refusal's text is its reason and a sentence. */
+export interface SitePage { address: string; status: number; text: string }
+
+/** The most bytes of a site page that the page reads: the site route's own bound on one file. */
+const SITE_BYTES = 1024 * 1024 + 64 * 1024;
+
+/** One page of the room's published site, as the site route answers it. No session is presented by this client; site eligibility remains the site owner's policy. */
+export async function loadSite(room: Pick<Room, "session" | "directory">, path: string): Promise<SitePage> {
+  const address = siteAddress(room, path);
+  const send = room.session.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
+  if (!send) throw new Unreadable("This runtime has no fetch.");
+  const response = await send(address, { method: "GET" });
+  const bytes = response.body ? await takeBytes(response.body, SITE_BYTES, AbortSignal.timeout(30_000)) : new Uint8Array(0);
+  if (bytes === null || bytes === LATE) throw new Unreadable(`The site's answer for ${path} is longer than this page reads, or did not come within 30 seconds.`);
+  return { address, status: response.status, text: new TextDecoder().decode(bytes) };
+}
+
+// ---------------------------------------------------------------- the rules
+
+/** Conservative presentation evidence; failed reads never imply an uninitialized room. */
+export type RoomInitialization =
+  | { state: "not-initialized"; scope: ScopeRef; head: Head; definition: Summary["definition"]; rulesItem: number; context: string }
+  | { state: "configured" }
+  | { state: "unknown"; reason: string };
+
+const initializationContext = (room: Room): string => canonicalize({ service: room.session.service, directory: room.directory, membership: room.membership, key: room.key, rules: room.rules });
+
+/** One final head/context check after the view's other reads; no classification or pagination repeats. */
+export async function initializationStillCurrent(room: Room, proof: Extract<RoomInitialization, { state: "not-initialized" }>): Promise<boolean> {
+  if (initializationContext(room) !== proof.context) return false;
+  try {
+    await fresh(room);
+    const { summary, at } = await summaryOf(handleOf(room, room.rules));
+    return initializationContext(room) === proof.context && summary.status === "active"
+      && canonicalize(summary.scope) === canonicalize(proof.scope) && summary.definition === proof.definition && canonicalize(at) === canonicalize(proof.head);
+  } catch { return false; }
+}
+
+export async function roomInitialization(room: Room): Promise<RoomInitialization> {
+  const unavailable: RoomInitialization = { state: "unknown", reason: "The complete rules could not be read. Check status before editing." };
+  const context = () => initializationContext(room);
+  const captured = context();
+  try {
+    await fresh(room);
+    const directory = await summaryOf(handleOf(room, room.directory));
+    const repository = directory.summary.items.find(item => item.type === "repository");
+    const named = repository?.refs["rules"];
+    if (directory.summary.status !== "active" || directory.summary.scope.scope !== room.directory || directory.summary.scope.kind !== "directory"
+      || !fullScopeRef(named) || named.kind !== "rules" || named.scope !== room.rules
+      || canonicalize(repository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    const handle = handleOf(room, room.rules), { summary, at } = await summaryOf(handle);
+    if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(named)
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return unavailable;
+    const rules = summary.items.filter(item => item.type === "rules");
+    if (rules.length !== 1) return unavailable;
+    const current = rules[0]!;
+    if (current.id !== 0 || current.state !== "current" || !Number.isSafeInteger(current.revision) || current.revision < 1) return unavailable;
+    // Complete summary evidence already proves configured. A historical read
+    // cannot discard that positive result or delay ordinary navigation.
+    const published = current.refs["published"];
+    if (published !== undefined && published !== null || current.revision > 1 || summary.items.some(item => item.type === "definition")) return { state: "configured" };
+    // Proving absence still needs complete coherent current/retained pages:
+    // a retired definition also proves that this room has been configured.
+    const definitions = await itemsOf(room, handle, summary, "definition", at);
+    if (definitions.length > 0) return { state: "configured" };
+    // Known rules1–4 initial item; only the explicit rules4 pin defaults owner review to true.
+    if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
+      || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"
+      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== (summary.definition === "platform:rules@4") || current.values["singleControllerException"] !== false
+      || ["checks", "labels", "extents"].some(name => current.values[name] !== undefined && current.values[name] !== null)) return unavailable;
+    const after = await summaryOf(handle);
+    const latestDirectory = await summaryOf(handleOf(room, room.directory));
+    const latestRepository = latestDirectory.summary.items.find(item => item.type === "repository");
+    if (context() !== captured || canonicalize(after.at) !== canonicalize(at) || canonicalize(after.summary.scope) !== canonicalize(summary.scope)
+      || latestDirectory.summary.status !== "active" || canonicalize(latestDirectory.summary.scope) !== canonicalize(directory.summary.scope)
+      || canonicalize(latestRepository?.refs["rules"]) !== canonicalize(named)
+      || canonicalize(latestRepository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    return { state: "not-initialized", scope: summary.scope, head: at, definition: summary.definition, rulesItem: current.id, context: captured };
+  } catch {
+    return unavailable;
+  }
+}
+
+export interface RulesView {
+  /** The actual rules item, used by publish transitions. */
+  item?: number;
+  scope: ScopeId; head: Head;
+  /** The position of the last `publish` in the rules scope's history: the revision of the rules. Null before the first. */
+  revision: number | null;
+  approvals: number | null; ownerMayReview: boolean | null; singleControllerException: boolean | null;
+  checks: { name: string; required: boolean; checker?: unknown; configuration?: string }[]; labels: string[]; extents: Extent[] | null;
+  definitions: { name: string; digest: string; state: string }[];
+  /** The members whose role holds `rules.publish`, the action a change of the rules needs. */
+  controllers: string[];
+}
+
+/** The rules of the room, as the rules scope holds them, and the members who may change them. */
+export async function loadRules(room: Room): Promise<RulesView> {
+  await fresh(room);
+  const handle = handleOf(room, room.rules);
+  const { summary, at } = await summaryOf(handle);
+  const rules = summary.items.find((item) => item.type === "rules");
+  if (!rules) throw new Unreadable(`${room.rules} holds no rules.`);
+  // The slot holds the position of the last `publish` in this scope's history: the revision of the rules (`revisionOf`).
+  const published = rules.refs["published"];
+  return {
+    scope: room.rules, item: rules.id, head: at, revision: typeof published === "number" ? published : null,
+    approvals: localId(rules.values["approvals"]), ownerMayReview: typeof rules.values["ownerMayReview"] === "boolean" ? rules.values["ownerMayReview"] : null,
+    singleControllerException: typeof rules.values["singleControllerException"] === "boolean" ? rules.values["singleControllerException"] : null,
+    checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
+    labels: Array.isArray(rules.values["labels"]) ? (rules.values["labels"] as string[]) : [],
+    extents: Array.isArray(rules.values["extents"]) ? (rules.values["extents"] as unknown as Extent[]) : null,
+    definitions: (await itemsOf(room, handle, summary, "definition", at)).map((d) => ({ name: String(d.values["name"]), digest: String(d.values["digest"]), state: d.state })),
+    controllers: holdersOf((await summaryOf(handleOf(room, room.membership.scope))).summary.items, "rules.publish"),
+  };
+}
+
+/** The handles of the active members whose role's list in the roster holds `action`. */
+export function holdersOf(items: readonly Item[], action: string): string[] {
+  const roster = items.find((item) => item.type === "roster");
+  if (!roster) return [];
+  const roles = (Object.keys(ROLE_LISTS) as Role[]).filter((role) => ((roster.values[ROLE_LISTS[role]] as readonly string[] | null) ?? []).includes(action));
+  return items.filter((item) => item.type === "member" && item.state === "active" && roles.includes(item.values["role"] as Role)).map((item) => String(item.values["handle"]));
+}
+
+// ---------------------------------------------------------------- acts
+
+/** One act the caller may sign now, as the page offers it: its fields, by declared type, and one line made from its declaration. */
+/**
+ * One act the caller may sign now, as the page offers it: its fields, by declared type, and one line made from its declaration. A
+ * field whose value is a definition's bytes, by their digest, lists as `choices` the definitions the rules scope holds active.
+ */
+export interface Offered {
+  kind: string; step: ActShape["step"]; on: string | null; line: string;
+  fields: { name: string; type: string; required: boolean; choices?: { label: string; value: string }[] }[];
+}
+
+/** The byte domain of a field's stated value place, or null when it states none: its bytes travel beside the act, named by their digest. */
+const domainOf = (field: unknown): string | null => {
+  const value = (field as { value?: { domain?: unknown } } | null)?.value;
+  return typeof value?.domain === "string" ? value.domain : null;
+};
+
+/** The definitions the rules scope holds active, latest first: a choice for a field that takes a definition's bytes. */
+async function activeDefinitions(room: Room): Promise<{ label: string; value: string; name: string }[]> {
+  const { summary } = await summaryOf(handleOf(room, room.rules));
+  return summary.items.filter((item) => item.type === "definition" && item.state === "active").sort((a, b) => b.id - a.id)
+    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]), name: String(item.values["name"]) }));
+}
+
+/**
+ * The bytes of each value that the act's fields name at a stated place. A
+ * definition's bytes are read from the rules scope, which retains them when
+ * it activates the definition, and must hash to the digest; the scope
+ * checks that again. The page has no other source of bytes.
+ */
+async function valuesOf(room: Room, act: ActShape, fields: Record<string, FieldValue>): Promise<string[]> {
+  const values: string[] = [];
+  for (const [name, field] of Object.entries(act.fields)) {
+    const domain = domainOf(field);
+    const digest = fields[name];
+    if (domain === null || typeof digest !== "string") continue;
+    if (domain !== DEFINITION_DOMAIN) throw new Unreadable(`The field ${name} takes a value in ${domain}, which this page cannot supply.`);
+    // A value in the domain of a definition is kept as a definition, and read by that kind (as `artroom edit` reads it).
+    const reader = room.reader?.reader() ?? null;
+    const kept = await transportOf(room.session, reader).retained(room.rules, reader, "definition", digest as Digest);
+    if (!kept.ok) throw new Unreadable(`Cannot read the definition ${digest} from the rules scope: ${kept.reason}. Nothing was signed.`);
+    values.push(kept.value.bytes);
+  }
+  return values;
+}
+
+/** A scope's definition, as the page reads it: a platform one from the platform package, a lane's as the scope retains it. */
+async function shapeOf(room: Room, handle: ScopeHandle, summary: Summary): Promise<{ shape: DefinitionShape; declared: DeclaredDefinition | null }> {
+  const supplied = platform(summary.definition);
+  if (supplied) return { shape: supplied.data as unknown as DefinitionShape, declared: null };
+  const declared = await laneDefinition(room, handle, summary);
+  return { shape: declared as unknown as DefinitionShape, declared };
+}
+
+/**
+ * The acts of the scope's definition that the caller may sign now, from the
+ * definition and the caller's role, as `artroom acts` lists them. The scope
+ * can still refuse one on its guards or its state. `hidden`: how many need
+ * an action the caller's role does not hold.
+ */
+export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offered[]; hidden: number }> {
+  await fresh(room);
+  const me = await refreshStanding(room);
+  const handle = handleOf(room, scope);
+  const { shape } = await shapeOf(room, handle, (await summaryOf(handle)).summary);
+  const { acts, hidden } = heldActs(shape, me);
+  const definitions = acts.some(([, a]) => Object.values(a.fields).some((f) => domainOf(f) === DEFINITION_DOMAIN)) ? await activeDefinitions(room) : [];
+  return {
+    acts: acts.map(([kind, a]) => ({
+      kind, step: a.step, on: a.on, line: describe(kind, a),
+      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions.filter((definition) => kind !== "open-issue" && kind !== "open-pr" || definition.name === (kind === "open-issue" ? "issue" : "change")) } : f.type === "enum" && Array.isArray((f as { of?: unknown }).of) ? { choices: ((f as { of: string[] }).of).map((value) => ({ label: value.replace(/-/g, " "), value })) } : {}) })),
+    })),
+    hidden,
+  };
+}
+
+/** Reads a field's value from the text a person typed, by the field's declared type, as `artroom act --set` does. */
+export function fieldValue(room: Room, type: string, typed: string): FieldValue {
+  return valueOf({ repository: { membership: room.membership } as never }, { type }, typed);
+}
+
+/** The scope's answer and independent before/after observations. A category alone proves no absence of timed entries. */
+export interface Acted {
+  service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
+  answer: Answer; before: Head; after: Head | null; observation: string | null;
+}
+export type IssueCreation = { state: "confirmed"; child: ScopeRef } | { state: "pending" } | { state: "unavailable" };
+/** Read only the original accepted creation; missing proof is never a pending outcome. */
+export async function issueCreation(room: Room, result: Acted, current: () => boolean = () => true): Promise<IssueCreation> {
+  const unavailable: IssueCreation = { state: "unavailable" };
+  if (!current() || result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
+    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return unavailable;
+  try {
+    await fresh(room);
+    if (!current()) return unavailable;
+    const receipt = result.answer.receipt, handle = handleOf(room, room.directory);
+    const source = await handle.entry(receipt.fact.seq);
+    if (!current()) return unavailable;
+    if (!source.ok || !source.complete || source.next !== undefined) return unavailable;
+    const entry = source.value.entry;
+    if (entry.seq !== receipt.fact.seq || canonicalize(entry.at) !== canonicalize(receipt.fact.at) || entryHash(entry) !== receipt.fact.hash || source.value.hash !== receipt.fact.hash
+      || entry.input.type !== "act" || entry.input.signed.intent.kind !== "open-issue" || !verifySignedIntent(entry.input.signed)
+      || canonicalize(entry.input.signed.intent.to) !== canonicalize(receipt.fact.at) || entry.input.signed.intent.actor !== room.key || intentDigest(entry.input.signed.intent) !== receipt.intent) return unavailable;
+    const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
+    if (creates.length !== 1) return unavailable;
+    const seed = creates[0]!.to;
+    if (!isSeed(seed) || seed.kind !== "lane" || canonicalize(seed.creator) !== canonicalize(receipt.fact.at) || seed.cause !== receipt.intent) return unavailable;
+    const { summary, at } = await summaryOf(handle);
+    if (!current()) return unavailable;
+    if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return unavailable;
+    const row = summary.items.find(item => item.id === receipt.fact.seq && item.type === "lane" && item.values["kind"] === "issue");
+    const child = row?.refs["scope"];
+    if (!row || row.state !== "listed") return unavailable;
+    const pending = async (provisional: boolean): Promise<IssueCreation> => {
+      const dutyId: DutyId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      if (!receipt.sends.includes(dutyId)) return unavailable;
+      if (!current()) return unavailable;
+      const read = await handle.followDuty(dutyId);
+      if (!current()) return unavailable;
+      if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
+      const duty = read.value;
+      if (duty.duty !== dutyId || duty.class !== "request" || duty.held || canonicalize(duty.to) !== canonicalize(seed) || duty.diagnosis !== null) return unavailable;
+      const final = await summaryOf(handle);
+      if (!current()) return unavailable;
+      if (canonicalize(final.summary.scope) !== canonicalize(receipt.fact.at)) return unavailable;
+      // A normal listed row has no child reference until create.applied.
+      // An applied result can precede the earlier projection or child confirmation.
+      if ((!provisional && duty.result === null) || (duty.result?.clause === "applied" && (provisional || duty.result.seq > at.seq))) return { state: "pending" };
+      return unavailable;
+    };
+    if (child === undefined || child === null) return await pending(false);
+    if (!fullScopeRef(child) || child.kind !== "lane" || child.scope !== scopeIdOf(seed)) return unavailable;
+    if (!current()) return unavailable;
+    const read = await summaryOf(handleOf(room, child.scope));
+    if (!current()) return unavailable;
+    if (canonicalize(read.summary.scope) !== canonicalize(child) || !read.summary.items.some(item => item.type === "intent")) return unavailable;
+    if (read.summary.status === "provisional") return await pending(true);
+    if (read.summary.status !== "active") return unavailable;
+    return { state: "confirmed", child: structuredClone(child) };
+  } catch { return unavailable; }
+}
+
+/** Immediate selection only; callers needing later native confirmation use issueCreation. */
+export async function createdIssue(room: Room, result: Acted): Promise<ScopeRef | null> {
+  const read = await issueCreation(room, result);
+  return read.state === "confirmed" ? read.child : null;
+}
+
+/** Memory-only association; contains no signing key or current permission. */
+export function actAssociation(room: Pick<Room, "session" | "directory" | "membership">, scope: ScopeId): string {
+  return JSON.stringify([room.session.service.replace(/\/+$/, ""), room.directory, room.membership, keyIdOfSecret(room.session.secret), scope]);
+}
+
+/**
+ * Signs and sends one act. The expected revision of each item the act
+ * names is read from the summary, and the scope checks each again. A lane's
+ * act goes through the client's declared handle, which checks each field's
+ * shape before it signs and carries detached texts beside the intent.
+ */
+export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void, submitting?: () => void): Promise<Acted> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at: before } = await summaryOf(handle);
+  const { shape, declared } = await shapeOf(room, handle, summary);
+  const declaration = shape.acts[kind];
+  if (!declaration || kind === shape.genesis) throw new Unreadable(`${kind} is not an act of ${shape.name}.`);
+  const fields = asked.fields ?? {};
+  const on = asked.on ?? null;
+  const expected = expectedOf(declaration, summary.items, on, fields);
+  const values = await valuesOf(room, declaration, fields);
+  const signer = secretSigner(room.session.secret);
+  const signing: Signing = room.session.now ? { now: room.session.now() } : {};
+  let answer: Answer;
+  if (declared) {
+    const typed = await declaredHandle(handle, declared);
+    if (!typed.ok) throw new Unreadable(`Cannot act on ${scope}: ${typed.reason}.`);
+    const { signed, beside } = await typed.handle.intent(signer, kind as never, { on, fields, expected } as never, signing);
+    submitting?.();
+    answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
+  } else {
+    // The shaping helper reads only the actual act declaration. Platform
+    // fields use the same typed inputs and detached-text transport as lanes.
+    const ordinary = Object.fromEntries(Object.entries(declaration.fields).filter(([, field]) => field.type !== undefined && field.type !== "code"));
+    if (Object.keys(fields).some((name) => !Object.hasOwn(declaration.fields, name)) || Object.entries(declaration.fields).some(([name, field]) => field.required && !Object.hasOwn(fields, name))) throw new Unreadable("The fields do not match this native action's declaration.");
+    const typedFields = Object.fromEntries(Object.entries(fields).filter(([name]) => Object.hasOwn(ordinary, name)));
+    const shaped = shapeDeclaredAct({ ...shape, acts: { ...shape.acts, [kind]: { ...declaration, fields: ordinary } } } as unknown as DeclaredDefinition, kind as never, { on, fields: typedFields } as never);
+    const marked = Object.fromEntries(Object.entries(fields).filter(([name]) => !Object.hasOwn(ordinary, name)));
+    const signedFields = { ...shaped.fields, ...marked };
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on: shaped.on, fields: signedFields, expected: expectedOf(declaration, summary.items, shaped.on, signedFields) }, signing);
+    submitting?.();
+    answer = await handle.submit(signed, [], values.length > 0 ? { ...shaped.beside, values } : shaped.beside);
+  }
+  const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
+  received?.(result); // Preserve the real answer before any awaited refresh.
+  try { result.after = (await summaryOf(handle)).at; result.observation = null; }
+  catch (error) { result.observation = error instanceof Unreadable ? error.message : "The observation refresh failed."; }
+  return result;
+}

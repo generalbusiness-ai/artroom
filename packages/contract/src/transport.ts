@@ -9,6 +9,7 @@
  * note's. Every list is a page with a cursor (section 9.1).
  */
 
+import type { ItemQueryRead } from "./item-query.ts";
 import type { Answer, DeliveryRefusal, RefusalReason, UnavailableReason } from "./result.ts";
 import type { DeclaredDefinition } from "./definition.ts";
 import type { DutyId, Receipt } from "./entry.ts";
@@ -71,6 +72,8 @@ export interface ScopeApi {
   summary(scope: string, reader: unknown): Promise<Read<Summary>>;
   /** A page of the retained final items of one type. */
   items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>>;
+  /** One bounded selection page. The encoded query is decoded only by its scope owner. */
+  queryItems(scope: string, reader: unknown, encoded: string): Promise<ItemQueryRead>;
   history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>>;
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>>;
   outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>>;

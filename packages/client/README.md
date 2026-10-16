@@ -19,7 +19,7 @@ entries DJ1, DJ7 and DJ23 to DJ25.
 | Module | Holds |
 |---|---|
 | `intent` | `signedIntent(signer, asked, signing?)`: an intent with a fresh idempotency key and a `notAfter` within the lifetime bound, signed. The intent is a detached copy of what was asked, taken before the signer is awaited, so the value returned is the value signed. `Signer`; `secretSigner(secret)`; `webCryptoSigner()`, over a key that cannot be read; `newIdempotencyKey()`. |
-| `handle` | `ScopeHandle`: `submit(signed, grants?, beside?)`, `settle`, the reads `summary`, `items`, `history`, `entry` and `outbox`, `definition`, `text(digest)`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?, reader?, beside?)`. `Transport`, `TransportError`. |
+| `handle` | `ScopeHandle`: `submit(signed, grants?, beside?)`, `settle`, the reads `summary`, `items`, `queryItems`, `history`, `entry` and `outbox`, `definition`, `text(digest)`, `followReceipt` and `followDuty`. `found(transport, founding, definition, definitions?, reader?, beside?)`. `Transport`, `TransportError`. |
 | `session` | A read session, as a device holds one: `sessionRequest(to, secret, notAfter, operation)` signs a request with the device's key; `requestSession(service, membership, signed)` asks the membership scope over the HTTP route; `Session` keeps the token in memory, gives `reader()` for a `ScopeHandle`, and leaves the token out of its JSON and its text. A session signs nothing. |
 | `declared` | `declaredHandle(scope, definition)`: a `DeclaredHandle` typed from the definition's own data, or a refusal when the scope publishes another definition. `DeclaredHandle`: `intent(signer, kind, asked, signing?)` and `submit(signed, grants?, beside?)`. `ShapeError`. The types `Kind`, `AskedOf`, `ValueOf`, `Members`, `Signed` and `Declared`. The section "A handle from a declared definition" below says what it checks. |
 | `http` | `httpTransport(service, options?)`: the transport over the service's HTTP routes. `options`: `fetch`, `bytes` and `seconds`. `REPLY_BYTES`, `REPLY_SECONDS`. |
@@ -30,6 +30,37 @@ entries DJ1, DJ7 and DJ23 to DJ25.
 entrypoint implements the same interface, and a typechecked file in the
 scope package, `test/conformance.types.ts`, stops compiling if either side
 drifts from it.
+
+## Bounded item selections
+
+`ScopeHandle.queryItems(query)` reads one selected page. The query names
+its full scope reference, item type, sorted unique states, optional sorted
+unique IDs, row limit and exact cursor (or `null`). It accepts at most 100
+items and 256 KiB for the whole canonical reply. The HTTP transport reads
+that byte limit before parsing and checks the full scope, selection digest,
+exact page argument, head, item order and continuation. Query transport
+options may tighten its 10-second completion deadline and byte limit.
+A deadline ends the caller's wait; it does not prove physical cancellation.
+
+`complete` means the selected suffix is exhausted at that head. It says
+nothing about a prefix before the cursor, other states or other item types.
+An incomplete page has a nonempty prefix and its exact `next` cursor. A
+later `row-too-large` refusal leaves that earlier prefix incomplete.
+
+`collectItemQuery(handle, query, options?)` defaults to **one page**. Its
+result keeps `items`, `at`, `next`, `complete` and a refusal or budget reason.
+Explicit options can request more pages, bounded by four attempts, 1 MiB
+of reply reservations, 10 seconds and one drift restart. Before each call
+it reserves the full 256 KiB legal reply; a small actual reply does not
+refund that reservation. A restart keeps the consumed attempts, bytes and
+original deadline. There is no default all-pages scan or per-item detail
+fetch. Service-binding data is already materialized by RPC; its trusted
+producer owns the allocation bound, and the client checks its context.
+
+Sessions use their existing summary/items claims according to declared
+live/final visibility. A signed query binds its own `query-items` resource
+and exact argument; bootstrap signing permits live selections only. These
+checks do not extend a session or give authority for an act.
 
 ## What travels beside an intent
 

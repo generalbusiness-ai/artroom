@@ -3,7 +3,7 @@ import type { SessionClaims, Timestamp } from "@generalbusiness/dap-contract";
 import { newIncarnation } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/dap-derive/testing";
 import { DIRECTORY } from "@generalbusiness/dap-platform";
-import { Branch, MEMBERSHIP, rita } from "../../platform/test/support-destination.ts";
+import { Branch, MEMBERSHIP, rita } from "../../../packages/platform/test/support-destination.ts";
 import { repositorySessionMembership, fixedMembership, type Repository } from "../src/authority.ts";
 import { mintSession, readerOf, sessionReaders, sessionsOf } from "../src/sessions.ts";
 

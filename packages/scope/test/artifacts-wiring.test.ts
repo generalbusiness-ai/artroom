@@ -4,7 +4,7 @@ import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, sco
 import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/dap-derive";
 import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/dap-platform";
-import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../platform/test/support-founding.ts";
+import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-founding.ts";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside, type ArtifactsBindings } from "../src/artifacts-wiring.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";

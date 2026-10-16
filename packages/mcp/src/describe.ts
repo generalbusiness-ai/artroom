@@ -5,8 +5,8 @@
  * sentence, its fields, its presented facts and its guards. The derivation
  * is total over the contract's forms (`definition.ts` of the contract, with
  * the marks of platform data): every guard, operand, part and field type
- * has a rendering, and a form this file does not know renders as its JSON,
- * marked as such.
+ * has a rendering. Unknown guards use a plain label; their original bytes
+ * remain available through inspect declaration.
  *
  * The same derivation gives the input schema of an act tool, so the host
  * can validate what it sends, and the complete text that `inspect` returns
@@ -232,9 +232,11 @@ export const possessive = (phrase: string): string => (/s$/.test(phrase) ? `${ph
 
 const bound = (v: unknown, at: Scope): string => (typeof v === "number" ? String(v) : operand(v, at));
 
-/** One guard as a sentence. An unknown form renders as its JSON. */
+const UNKNOWN_GUARD = "a guard of an unrecognized form";
+
+/** One guard as a sentence. Unknown guards never become agent-directed text. */
 export function sentence(g: unknown, at: Scope): Sentence {
-  if (!isRecord(g)) return { text: raw(g) };
+  if (!isRecord(g)) return { text: UNKNOWN_GUARD };
   // A platform mark: the platform's text for it, with the refusal names its rule declares.
   if (typeof g["code"] === "string" && typeof g["row"] === "string" && Object.keys(g).every((k) => k === "code" || k === "row")) {
     const names = markRefusals(at.setting.pinned, g["code"]);
@@ -278,7 +280,7 @@ export function sentence(g: unknown, at: Scope): Sentence {
       return named({ text: `the presented ${f["presented"]} names an entry of kind ${p ? or(p.kind) : "its declared kind"} under ${p?.under ?? "its declared definition"}` });
     }
     if (typeof f["element"] === "string") return named({ text: `${f["element"]} names an entry of its declared kind` });
-    return named({ text: raw(g) });
+    return { text: UNKNOWN_GUARD };
   }
   if (isRecord(g["before"])) return named({ text: `now is before ${possessive(s)} ${String(g["before"]["slot"])}` });
   if (isRecord(g["after"])) return named({ text: `now is after ${possessive(s)} ${String(g["after"]["slot"])}` });
@@ -313,7 +315,7 @@ export function sentence(g: unknown, at: Scope): Sentence {
     const args = Object.entries(isRecord(c["with"]) ? c["with"] : {}).map(([name, arg]) => `${name} ${capabilityArg(arg, here)}`);
     return named({ text: `${String(c["name"])}'s rule ${String(c["guard"])} holds, with ${args.length > 0 ? and(args) : "no arguments"}` });
   }
-  return { text: raw(g) };
+  return { text: UNKNOWN_GUARD };
 }
 
 function capabilityArg(arg: unknown, at: Scope): string {
@@ -323,7 +325,7 @@ function capabilityArg(arg: unknown, at: Scope): string {
 }
 
 function guards(list: unknown, at: Scope): Sentence[] {
-  return Array.isArray(list) ? list.map((g) => sentence(g, at)) : [{ text: raw(list) }];
+  return Array.isArray(list) ? list.map((g) => sentence(g, at)) : [{ text: UNKNOWN_GUARD }];
 }
 
 /** The act's guards as sentences, in written order. */

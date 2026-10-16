@@ -1,28 +1,29 @@
 /**
  * The hosted MCP endpoint on real scopes (notes/2026-10-13-hosted-mcp-endpoint.md, section 6): the registry and the agent
- * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the Worker's own
- * routes (`mcpRoute`), with the pinned MCP client where a client is named. rita founds the room through her own MCP service
+ * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the production app
+ * Worker's default fetch, with the pinned MCP client where a client is named. rita founds the room through her own MCP service
  * and performs the admin's acts; the agent is created by a control request she signs.
  */
 import { env } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { ControlRequest, Digest, FactRef, KeyId, MemberId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, digestBytes, keyIdOfSecret, newIncarnation, signControl, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
-import { encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
+import { invitationIssueFields, encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF, firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
-import { counting } from "../../../examples/counting/definition.ts";
-import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
+import { counting } from "../../../apps/counter/definition.ts";
+import { COUNTING_DEFINITION } from "../../../apps/counter/pin.ts";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-import { mcpRoute } from "../../scope/src/worker.ts";
+import worker from "../../../apps/room/worker.ts";
 import { hostedTest } from "../../scope/test/worker.ts";
 import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { founded } from "./support/story.ts";
 
-/** The Worker's routes, as a client's fetch: every request of the story goes through `mcpRoute`, in this isolate. */
-const routed = (url: string | URL, init?: RequestInit): Promise<Response> => mcpRoute(new Request(url, init), env).then((r) => r ?? new Response(null, { status: 404 }));
+/** Production default dispatch, in this isolate. The actual native PLATFORM namespace is this fixture's Scope binding;
+ * REGISTRIES and AGENTS keep their existing native subclasses, clocks, custody and control fences. */
+const routed = (url: string | URL, init?: RequestInit): Promise<Response> => worker.fetch(new Request(url, init), { ...env, SCOPES: env.PLATFORM });
 const fetchLike = ((url: string | URL | Request, init?: RequestInit) => routed(url instanceof Request ? url.url : url, init)) as unknown as typeof fetch;
 
 /** Every step of a scope, across the steps tool's pages. */
@@ -50,20 +51,20 @@ async function allItems(agent: Agent, scope: string): Promise<{ id: number; type
 }
 
 /** An admin's two acts, and the agent-key invitation they make, as `dap invite --kind agent-key` would encode it. */
-async function invite(room: Room, rita: Agent, handle: string): Promise<{ link: string; invitation: AgentKeyInvitation; secret: string }> {
+async function invite(room: Room, rita: Agent, handle: string, definition: AgentKeyInvitation["definition"] = "platform:membership@2"): Promise<{ link: string; invitation: AgentKeyInvitation; secret: string }> {
   const M = rita.config.repository!.membership;
   const added = await rita.ok("member.add", { fields: { handle, kind: "agent", controller: "@rita" }, idempotencyKey: `add-${handle}` });
   expect(added["answer"], JSON.stringify(added)).toBe("accepted");
   const member = added["fact"] as FactRef;
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const invited = await rita.ok("key.invite", { fields: { member: member.seq, kind: "agent", inviteHash: textDigest(secret), inviteEnds: timeOf(room.now() + 3_600_000) }, idempotencyKey: `invite-${handle}` });
+  const invited = await rita.ok("key.invite", { fields: { member: member.seq, kind: "agent", ...invitationIssueFields(definition, secret), inviteEnds: timeOf(room.now() + 3_600_000) }, idempotencyKey: `invite-${handle}` });
   expect(invited["answer"], JSON.stringify(invited)).toBe("accepted");
   const items = await allItems(rita, "membership");
   const roster = items.find((i) => i.type === "roster")!;
   const memberItem = items.find((i) => i.type === "member" && i.values["handle"] === handle)!;
   const { inbox: _inbox, ...repository } = rita.config.repository!;
   const invitation: AgentKeyInvitation = {
-    v: 1, kind: "agent-key", service: SERVICE, repository, definition: "platform:membership@2", handle, controller: { membership: M, member: "@rita" as MemberId },
+    v: 1, kind: "agent-key", service: SERVICE, repository, definition, handle, controller: { membership: M, member: "@rita" as MemberId },
     member, invitation: invited["fact"] as FactRef, secret, expected: { on: roster.revision, member: memberItem.revision },
   };
   return { link: encodeAgentKeyInvitation(invitation), invitation, secret };
@@ -77,18 +78,20 @@ function control(room: Room, secret: Uint8Array, action: ControlRequest["action"
 }
 const post = (path: string, authorization: string, body: string, method = "POST") => routed(`${SERVICE}${path}`, { method, headers: { authorization, "content-type": "application/json" }, body });
 
-test("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinned client in both revisions acts as the agent", async () => {
+test.each(["platform:register@3", "platform:register@10"] as const)("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinned client in both revisions acts as the agent (%s)", async registerDefinition => {
   const room = mcpRoom();
   hostedTest.now = () => room.now();
   hostedTest.pause = (waiting) => room.pause(waiting);
   try {
     const rita = room.agent("rita");
-    await founded(room, rita, "default");
+    await founded(room, rita, "default", registerDefinition);
+    const definition = registerDefinition === "platform:register@10" ? "platform:membership@6" : "platform:membership@2";
+    const inviteAgent = (handle: string) => invite(room, rita, handle, definition);
     const M = rita.config.repository!.membership;
     // The rules published and the issue definition activated, as the room story does, so an agent may open issues.
     expect((await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }))["answer"]).toBe("accepted");
     expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
-    const { link, invitation } = await invite(room, rita, "@bot");
+    const { link, invitation } = await inviteAgent("@bot");
     const body = JSON.stringify({ link });
     // The controller's create: the registry reserves, the agent object enrols its own key, and the bearer is shown once.
     const created = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, "create-1"), body));
@@ -99,14 +102,14 @@ test("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinn
     const again = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, "create-1"), body));
     expect([again.status, (await again.json() as { bearer: string }).bearer]).toEqual([201, answer.bearer]);
     // Two concurrent creates under one op, from the reservation through the enrolment: one agent, one key, one bearer.
-    const { link: link3 } = await invite(room, rita, "@bot3");
+    const { link: link3 } = await inviteAgent("@bot3");
     const body3 = JSON.stringify({ link: link3 });
     const pair = await room.wait(() => Promise.all([1, 2].map(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body3, "create-3"), body3))));
     const answers = await Promise.all(pair.map((r) => r.json() as Promise<{ agent: string; key: string; bearer: string }>));
     expect(pair.map((r) => r.status), JSON.stringify(answers)).toEqual([201, 201]);
     expect([answers[0]!.agent, answers[0]!.key, answers[0]!.bearer]).toEqual([answers[1]!.agent, answers[1]!.key, answers[1]!.bearer]);
     expect((await registryStub(M.scope).agents()).filter((a) => a.handle === "@bot3")).toHaveLength(1);
-    const other = JSON.stringify({ link: (await invite(room, rita, "@bot2")).link });
+    const other = JSON.stringify({ link: (await inviteAgent("@bot2")).link });
     expect((await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, other, "create-1"), other))).status, "another request under the same op").toBe(409);
     // The key reads back active for @bot, enrolled by the entry the answer names.
     const keys = await allItems(rita, "membership");
@@ -133,7 +136,19 @@ test("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinn
     // The secret of the invitation appears in no hosted row but the retained envelope: the agent object's tables hold no copy.
     const registry = env.REGISTRIES.get(env.REGISTRIES.idFromName(M.scope)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]> };
     expect(await registry.agents()).toEqual(expect.arrayContaining([{ agent: answer.agent, handle: "@bot", key: answer.key, state: "enrolled" }]));
-    void invitation;
+    if (definition === "platform:membership@6") {
+      const privateSeed = b64url(new Uint8Array(32).fill(81));
+      const invited = await rita.ok("member.invite", { fields: { handle: "@visitor", role: "member", ...invitationIssueFields(definition, privateSeed), inviteEnds: timeOf(room.now() + 3_600_000) }, idempotencyKey: "person-invitation" });
+      expect(invited["answer"]).toBe("accepted");
+      const { inbox: _inbox, ...repository } = rita.config.repository!;
+      const link = INVITATION_LINK + b64url(utf8(JSON.stringify({ v: 1, service: SERVICE, repository, invitation: (invited["fact"] as FactRef).seq, secret: privateSeed, handle: "@visitor", definition })));
+      const visitor = room.agent("visitor");
+      expect((await visitor.ok("join", { link, idempotencyKey: "person-join" }))["answer"]).toBe("accepted");
+      const history = JSON.stringify(await room.platform(M.scope).entries());
+      expect(history).not.toContain(privateSeed);
+      expect(history).not.toContain(invitation.secret);
+      expect(history).not.toContain('"secret"');
+    }
   } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
 

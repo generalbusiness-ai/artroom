@@ -10,7 +10,9 @@ configuration. The guest used an independent browser profile with its own key.
 These times do not measure human typing, login, or a second physical device.
 The [delivery note](../notes/2026-10-13-self-host-delivery.md) records the exact
 source, commands, results, and remaining cleanup duty. Run notes at each step
-identify command variations and steps that were not exercised.
+identify command variations and steps that were not exercised. The commands
+below use the current application paths; the delivery note retains the
+original run's exact source and commands.
 
 ## Deploy a room
 
@@ -32,13 +34,13 @@ no global installation or Wrangler dependency in this checkout is needed.
    unpinned clone above and optional asset rebuild below were not exercised.
 
    `npm ci` reports the installed packages. The room assets are committed in
-   `packages/scope/src/page-assets.ts`. If you change the page source, rebuild
-   them with `node packages/page/scripts/assets.mjs` before deployment.
+   `apps/room/page/assets.ts`. If you change the page source, rebuild
+   them with `node apps/room/page/scripts/assets.mjs` before deployment.
 
-2. Log in to Cloudflare from the scope package.
+2. Log in to Cloudflare from the room application.
 
    ```sh
-   cd packages/scope
+   cd apps/room
    npx -y wrangler@4.147.0 login
    npx -y wrangler@4.147.0 whoami
    cd ../..
@@ -52,7 +54,7 @@ no global installation or Wrangler dependency in this checkout is needed.
    Keep that ID for the Artifacts hostname below.
 
 3. Choose an unused Worker name and a new Artifacts namespace, such as
-   `dap-my-room`. Edit `packages/scope/wrangler.jsonc`: set `name` to that
+   `dap-my-room`. Edit `apps/room/wrangler.jsonc`: set `name` to that
    Worker name, set the `artifacts` entry's `namespace` to your namespace,
    and add the following top-level plain variables with your chosen values.
 
@@ -79,7 +81,7 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    ```sh
    npm run deploy:scope
-   cd packages/scope
+   cd apps/room
    node --input-type=module -e 'import { randomBytes } from "node:crypto"; process.stdout.write(JSON.stringify({DEPLOYMENT:"dap-my-room",SESSION_SECRET:randomBytes(32).toString("base64url")}));' | npx -y wrangler@4.147.0 secret bulk
    cd ../..
    ```
@@ -176,7 +178,7 @@ needs no external Git credential.
 The same scope Worker serves `/counting/`. A second Worker is optional if
 its data needs a separate namespace. Deploying its page alone does not create
 or authorize the Counting application. Follow
-[Counter setup](../examples/counting/browser/startup.md) for the explicit
+[Counter setup](../apps/counter/browser/startup.md) for the explicit
 Counting cohort, native factory, membership grants, and device enrollment.
 
 ## Run the lending library
@@ -220,7 +222,7 @@ Delete the exact repository names from your new Artifacts namespace first.
 List their names, then delete each one with the pinned Wrangler CLI:
 
 ```sh
-cd packages/scope
+cd apps/room
 npx -y wrangler@4.147.0 artifacts repos list --namespace dap-my-room
 npx -y wrangler@4.147.0 artifacts repos delete <repository-name> --namespace dap-my-room
 cd ../..
@@ -237,10 +239,10 @@ Deleting a Worker does not by itself prove its Durable Object storage was
 removed. For this disposable deployment, create a replacement entry point:
 
 ```sh
-printf '%s\n' 'export default { fetch() { return new Response("Removed", {status: 410}); } };' > packages/scope/cleanup-worker.mjs
+printf '%s\n' 'export default { fetch() { return new Response("Removed", {status: 410}); } };' > apps/room/cleanup-worker.mjs
 ```
 
-In `packages/scope/wrangler.jsonc`, change `main` to `cleanup-worker.mjs`,
+In `apps/room/wrangler.jsonc`, change `main` to `cleanup-worker.mjs`,
 remove `durable_objects`, and append this migration after `v1`:
 
 ```json
@@ -252,7 +254,7 @@ migration, then delete the Worker:
 
 ```sh
 npm run deploy:scope
-cd packages/scope
+cd apps/room
 npx -y wrangler@4.147.0 delete
 cd ../..
 ```
