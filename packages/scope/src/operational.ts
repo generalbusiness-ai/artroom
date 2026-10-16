@@ -27,7 +27,12 @@ export interface Operational {
   entryFailures?: { count: number };
 }
 const local = new AsyncLocalStorage<Operational>();
-export const operational = (): Operational | undefined => local.getStore();
+/** Promise callbacks can retain an ALS store after its invocation closes.
+ * A closed collector cannot own new work or supply its request identity. */
+export function operational(): Operational | undefined {
+  const context = local.getStore();
+  return context && context.invocation.users > 0 ? context : undefined;
+}
 /** Operational inputs are untrusted correlation, not reader or signer identities. */
 export function operationContext(env: MetricEnvironment, scope: string | null, place: string, identity: OperationalIdentity, sidecar?: Pick<Invocation, "recordEntry" | "recordDuty">): Operational {
   const request = isRequestId(identity.request) ? identity.request : null;

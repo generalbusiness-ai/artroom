@@ -9,6 +9,7 @@ import { ScopeObject, SqliteStore, type EffectAnswer, type EffectRequest, type O
 import { variant } from "@generalbusiness/dap-derive/testing";
 import type { MetricPoint } from "../src/metrics.ts";
 import { metricBindings } from "./worker.ts";
+import { operational, type Operational } from "../src/operational.ts";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { open } from "./operation-opening.ts";
@@ -34,6 +35,31 @@ const own = (commit: string): EffectAnswer => ({ result: "confirmed", evidence: 
 const outcomes = (status: OperationStatus) => status.operation.attempts.map((a) => a.outcomes.map((o) => `${o.result} at ${o.seq}`));
 
 describe("outside operations at a real scope (scope contract, section 4.3; authority note, section 5.4). The outside system and the opening entry are stand-ins", () => {
+  // The opening/owner and outside provider are the existing labelled stand-ins.
+  // Actual Operations.#answer registers its late callback under the alarm's ALS
+  // context. A short fixture deadline ends that invocation before release.
+  test("a late original send answer under a closed invocation writes its native outcome and a fresh dispatch turn", async () => {
+    const s = await found({ dispatchSeconds: 0.01 });
+    const points: MetricPoint[] = [];
+    metricBindings.set(s.object.id.toString(), { DEPLOYMENT: "inherited-late-test", METRICS: { writeDataPoint: p => points.push(structuredClone(p)) } });
+    let release!: (answer: EffectAnswer) => void;
+    const held = new Promise<EffectAnswer>(resolve => { release = resolve; });
+    let original: Operational | undefined, sends = 0;
+    wired.set(s.name, () => ({ outside: { accepts: () => true, send: () => { sends++; original = operational(); return held; } } }));
+    await s.restart();
+    const [op] = await open(s, pushOf(1)) as [OperationId];
+    expect(await s.alarm()).toBe(true);
+    expect([original?.place, original?.invocation.users, outcomes(await seen(s, op)), sends]).toEqual(["dispatch", 0, [["unknown at 2"]], 1]);
+    const before = points.length;
+    release(own("late-original"));
+    for (let n = 0; n < 100 && (await s.head()).seq < 3; n++) await tick();
+    await tick();
+    expect([(await s.head()).seq, outcomes(await seen(s, op)), sends]).toEqual([3, [["unknown at 2", "confirmed at 3"]], 1]);
+    const latePoints = points.slice(before);
+    expect(latePoints.some(p => p.blobs[0] === "turn" && p.blobs[3] === "dispatch" && p.blobs[4] === "answer" && p.blobs[6] === "none" && p.doubles[5] === 1)).toBe(true);
+    expect(latePoints.some(p => p.blobs[0] === "metric-dropped" && p.doubles.every((value, index) => value === (index === 0 ? 1 : 0)))).toBe(true);
+  });
+
   test("T19: an attempt is recorded before it is sent, and sent at most once; a stop between the send and the outcome leaves `unknown`, which a restart, elapsed time, a later attempt that succeeds, a new ref and a listing do not settle, and its own late answer does", async () => {
     const s = await found();
     const out = outsideOf(s.name);

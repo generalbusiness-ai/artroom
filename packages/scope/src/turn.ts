@@ -161,7 +161,7 @@ export class Turns {
    */
   #sealed: (() => void) | null = null;
   #measurement: (() => Operational) | null = null;
-  /** An independent late callback has no caller context to inherit. */
+  /** Independent callbacks need a context when their caller's is absent or closed. */
   measureWith(context: () => Operational): void { this.#measurement = context; }
   onSealed(told: () => void): void { this.#sealed = told; }
 
