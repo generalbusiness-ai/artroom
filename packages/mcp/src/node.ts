@@ -83,7 +83,13 @@ export function releaseLock(held: Holding): void {
  */
 function takeReclaim(path: string): Holding | null { return create(path, {}); }
 
-/** The reclaim lock that a dead process left beside this lock file, if one blocks its recovery; null otherwise. */
+/**
+ * The reclaim lock that a dead process left beside this lock file, if one blocks its recovery; null otherwise.
+ * EPERM is treated as alive, including a PID reused by another user's process, so null does not prove there is no stale lock.
+ * For operator recovery, stop every process using this config directory, verify the original holder is gone and identify the
+ * unchanged stale lock or reclaim file (with an administrator if process ownership cannot be checked). Only then remove that
+ * file, preserving every custody record and archive. If ownership or quiescence is uncertain, leave the lock in place.
+ */
 export function blockedBy(path: string): string | null {
   const reclaim = `${path}.reclaim`;
   const held = readHolding(reclaim);
