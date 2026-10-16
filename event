@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:74a3b60d46c2287430b61bddd97e3eeb9b20fad0","text":"Merge retired a covered predecessor; the successor is at packages/cli/tsconfig.scope.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d6598e11b0c7575a69cd4fad8b1bb2968b25b20","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/ports.ts."}
