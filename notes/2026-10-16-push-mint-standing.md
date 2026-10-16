@@ -98,3 +98,45 @@ and wrong frame/holder/attempt/accepted effect. They are not native @5
 admission or fresh-standing witnesses. The checker-omission control fails
 by assertions when the accepted checker's key is removed and restores the
 helper. No full gate or Source review is claimed at this checkpoint.
+
+## Versioned admission checkpoint
+
+The implementation now registers explicit `platform:destination@5`. Its
+default and application pins remain unchanged. The regular mint row names
+the complete set through nine distinct keys and uses a ten-second, once-only
+read. Missing, unknown, stale, reused, wrong-incarnation or contradictory
+standing writes no mint outcome. Inactive standing sets aborting, opens this
+mint's revocation and one deciding read, and installs no credential.
+
+The existing passes slot now contains a closed record. The merger and up
+to 64 counted approving facts are separate from at most 32 current check
+rows, so no list bound rises. Stored references use closed record shapes,
+validated by the provenance reader as full fact references. They are not
+foreign fact fields: rewriting those fields would demand all earlier check
+bodies again when another generation changes. The native admission step
+captures each actual signer/result, and mint checks the exact accepted own
+decision, operation, attempt and effect. No new request field supplies keys.
+
+The new holder has four reads rather than three: the three inherited push
+reads and the mutually exclusive abort read. It keeps ten revokes. The
+mint declares revoke/read and a two-operation maximum. Its read route
+checks the confirmed mint's own scope, hash, exact read opening and attempt,
+served push and common holder. It returns the target to the inherited
+publication decision; an already effective integration can still publish.
+
+Thirteen selected tests pass: eight D1 admission cases, three bounded
+provenance cases and two inherited file-publication bounds cases. These
+use actual validators, in-memory judges and folding, with scripted creator,
+lane, membership/rules and host answers. The actual reservation-tree case
+admits staging, check fence, checked delivery and check-judge, captures the
+post-reservation checker and aborts when that checker is retired while the
+merger remains active. A replacement-generation case drops the previous
+signer. Other cases cover active/compromised/unavailable standing, late
+settled-attempt and receipt exemptions, the separate automatic file path,
+and exact-target mint-abort read discovery of an effective integration.
+The initial fixture and metadata-type failures remain failed diagnostics;
+the corrected selected run is `/tmp/artroom-d1-current-generation-focus.log`.
+
+Native SQLite/runtime, restart, driver, full-root relay-delay, full holder
+capacity, remaining exemption/order controls and the frozen gate are still
+owed. This checkpoint is not a Source review, activation or provider proof.

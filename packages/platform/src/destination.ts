@@ -24,9 +24,10 @@
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, entryHash, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, PublicationOrigin, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/dap-derive";
-import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
+import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, judgeReservationWithStanding, fileSound, type ReservationAsked, type ReservationRead, type ReservationStanding, type Statement } from "./reservation.ts";
+import { publicationStandingRecord, publicationStandingKeys, type PublicationStandingRecord } from "./publication-standing.ts";
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";
 import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane, sourcesOf, manifestFiles } from "./destination-reading.ts";
@@ -716,7 +717,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const checked = ["platform:destination@3", "platform:destination@4"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
+    const checked = ["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
     if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
@@ -822,8 +823,8 @@ export function targetOf(state: Pick<StateView, "item" | "page">, own: Own, writ
   const { input, effects } = ownEntry(own, at);
   if (write.kind === DESTINATION_KINDS.receipt) return receiptAt(state, input.type === "act" ? input.signed.intent.fields["receipt"] : at);
   if (input.type === "act") return publicationAt(state, input.signed.intent.on);
-  if (["platform:destination@3", "platform:destination@4"].includes(write.owner) && write.kind === "reservation-delete") return publicationAt(state, write.for);
-  if (["platform:destination@3", "platform:destination@4"].includes(write.owner) && (input.type === "delivery" || input.type === "outcome")) return publicationAt(state, write.for);
+  if (["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(write.owner) && write.kind === "reservation-delete") return publicationAt(state, write.for);
+  if (["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(write.owner) && (input.type === "delivery" || input.type === "outcome")) return publicationAt(state, write.for);
   const change = effects.find((effect) => effect.effect === "state" && effect.state === "reserved");
   return change?.effect === "state" ? publicationAt(state, change.item) : null;
 }
@@ -1053,8 +1054,8 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
       const [compromised, next] = [publication.values["aborting"] === true, andNext(given, state, { slot: true })];
       const reason = compromised ? "compromised" : "host-refused";
       return {
-        effects: [{ effect: "state", item: id, state: ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
-        opens: [...next.opens, ...(["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
+        effects: [{ effect: "state", item: id, state: ["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
+        opens: [...next.opens, ...(["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
         update: { publication, state: "aborted", outcome: compromised ? "aborted" : "refused", reason },
       };
     }
@@ -1231,13 +1232,26 @@ const createDecides = (column: typeof firstHeadSeen): Decides => (given, write) 
  * publication that `abort-if-behind` set `aborting`. It is read from the
  * entry that opened the read.
  */
-export function readFor(state: Pick<StateView, "operation" | "item" | "page">, own: Own, read: Operation): Item | "first-head" | "receipt" | null {
+export function readFor(state: Pick<StateView, "operation" | "item" | "page"> & Partial<Pick<StateView, "scope">>, own: Own, read: Operation): Item | "first-head" | "receipt" | null {
   const { input, effects } = ownEntry(own, seqOf(read.id));
   if (input.type === "delivery") {
     const set = effects.find((effect) => effect.effect === "value" && effect.slot === "aborting" && effect.value === true);
     return set?.effect === "value" ? publicationAt(state, set.item) : null;
   }
   const of = input.type === "outcome" ? state.operation(input.operation) : null;
+  if (read.owner === DESTINATION_5 && read.kind === "read" && input.type === "outcome" && input.owner === DESTINATION_5 && input.kind === "mint") {
+    const scope = state.scope?.(), origin = own(seqOf(read.id)), ordinal = Number(read.id.split(":")[1]);
+    const current = state.operation(read.id);
+    if (!scope || !origin || origin.entry.seq !== seqOf(read.id) || canonicalize(origin.entry.at) !== canonicalize(scope.at) || entryHash(origin.entry) !== origin.hash || input.result !== "confirmed" || of?.owner !== DESTINATION_5 || of.kind !== "mint"
+      || !current || canonicalize(current) !== canonicalize(read) || read.most !== 1 || read.attempts.length !== 1 || read.attempts[0]?.attempt !== 1 || read.attempts[0].opened !== origin.entry.seq) return null;
+    const served = servedBy(state, own, of), target = served ? targetOf(state, own, served.write) : null;
+    if (!served || served.write.owner !== DESTINATION_5 || served.write.kind !== "push" || target?.type !== "publication" || of.for !== target.id || served.write.for !== target.id || read.for !== target.id
+      || !of.attempts.some(attempt => attempt.attempt === input.attempt && attempt.outcomes.some(outcome => outcome.seq === origin.entry.seq && outcome.result === "confirmed"))) return null;
+    const opened = effects.filter(effect => effect.effect === "operation" && effect.k === ordinal);
+    if (opened.length !== 1 || opened[0]?.effect !== "operation" || opened[0].owner !== DESTINATION_5 || opened[0].kind !== "read" || opened[0].for !== target.id || opened[0].attempts !== 1
+      || !effects.some(effect => effect.effect === "value" && effect.item === target.id && effect.slot === "aborting" && effect.value === true)) return null;
+    return target;
+  }
   if (!of || !ours(of, ...WRITES)) return null;
   return of.kind === DESTINATION_KINDS.push ? targetOf(state, own, of) : (of.kind as "first-head" | "receipt");
 }
@@ -1428,7 +1442,7 @@ function reportsBound(given: Pick<RuleGiven, "uses" | "own">, statement: Stateme
   const commits = reportCommits(given, statement);
   if (!manifest || commits === undefined) return undefined;
   // i5 edit: a one-file manifest selects no report.
-  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (["platform:destination@3", "platform:destination@4"].includes(pinnedOf(given.own) ?? "") && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
+  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinnedOf(given.own) ?? "") && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
   if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
   const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
   return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
@@ -1478,7 +1492,14 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
   }
   const asked = { recorded: typeof head === "string" ? head : null, evidence, statement, time, file };
   // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
-  let [read, judged] = [null as ReservationRead | null, judgeReservation({ ...asked, read: null })];
+  let standing: ReservationStanding | null = null;
+  const decide = (asked: ReservationAsked) => {
+    if (input.owner !== DESTINATION_5) return judgeReservation(asked);
+    const detailed = judgeReservationWithStanding(asked);
+    standing = detailed.reserved ? detailed.standing ?? null : null;
+    return detailed;
+  };
+  let [read, judged] = [null as ReservationRead | null, decide({ ...asked, read: null })];
   if (judged.reserved === null) {
     read = reservationRead(given, publication, asked.statement, reads(given, publication, asked.statement));
     // i5 edit: the tree of a one-file manifest is the host's evidence, the published tree with the file written; its commit is
@@ -1499,9 +1520,9 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
         read = { ...read, manifest: { ...read.manifest, integration: commit.id, tree: evidence.tree } };
         const withoutChecks = { ...read.rules!, content: { ...read.rules!.content, checks: [] } } as ReservationRead["rules"];
         const policy = { ...read, rules: withoutChecks, extents: read.extents?.map((extent) => ({ ...extent, checks: [] })) ?? null };
-        judged = judgeReservation({ ...asked, read: policy });
+        judged = decide({ ...asked, read: policy });
       }
-    } else judged = judgeReservation({ ...asked, read });
+    } else judged = decide({ ...asked, read });
   }
   if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");
   const rules = read?.rules?.revision ?? null;
@@ -1512,6 +1533,15 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
       opens: next.opens,
       update: { publication, state: "not-reserved", outcome: "refused", reason: judged.reason, rules },
     };
+  }
+  let standingRecord: PublicationStandingRecord | null = null;
+  if (input.owner === DESTINATION_5) {
+    const selected = standing as ReservationStanding | null;
+    if (!selected) throw new Error("D1 counted reservation provenance is unavailable");
+    standingRecord = publicationStandingRecord({ reservation: resolved.self, base: { merger: selected.base[0], approvals: selected.base.slice(1) },
+      checks: selected.checks.map(check => ({ name: check.name, job: check.job, passed: true, proof: { key: check.key, result: check.result, decided: resolved.self } })),
+    });
+    if (!standingRecord) throw new Error("D1 counted reservation provenance exceeds its bound");
   }
   const requiredChecks = list && read?.rules?.content.asked === "rules" ? [...new Set([
     ...read.rules.content.checks.filter((check) => check.required).map((check) => check.name),
@@ -1525,6 +1555,7 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
       { effect: "state", item: publication.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: publication.id }, { effect: "ref", item: branch.id, slot: "judging", to: null },
       { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
       ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
+      ...(standingRecord ? [{ effect: "value", item: publication.id, slot: "passes", value: standingRecord as unknown as FieldValue } as const] : []),
       ...(list ? [{ effect: "value", item: publication.id, slot: "tree", value: evidence.tree! } as const, ...(requiredChecks.length ? [{ effect: "value", item: publication.id, slot: "requiredChecks", value: requiredChecks } as const, { effect: "value", item: publication.id, slot: "checkDeadline", value: timeOf(timeMs(time)! + 1800_000) } as const] : [])] : []),
     ],
     opens: list ? [opening(given, "reservation-stage", 1, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)] : [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
@@ -1687,7 +1718,7 @@ const WRITTEN: Rules = {
     place: "effect", most: 3,
     run: (given) => {
       const { state, resolved } = given;
-      const expiredSlot = ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
+      const expiredSlot = ["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinnedBy(given)) && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self, ...(expiredSlot ? { slot: true } : {}) })];
       return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, queuedJudgeKind(state, publication, given.input, resolved.self), DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
@@ -1893,7 +1924,7 @@ const WRITTEN: Rules = {
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || (closed(target) && !(["platform:destination@3", "platform:destination@4"].includes(served.write.owner) && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
+        if (target === null || (closed(target) && !(["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(served.write.owner) && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
           effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...((target.type === "publication" || target.type === "file-publication") && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
@@ -2233,11 +2264,19 @@ function cleanupStatus(publication: Item, changed: { ref?: string | null; token?
   const deletes = Math.max(publication.values["cleanupAttempts"] as number, changed.deletes ?? 0);
   return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(duties) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: duties as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
 }
-const generations = (publication: Item): CheckGeneration[] => (publication.values["passes"] ?? []) as unknown as CheckGeneration[];
+const generations = (publication: Item, given: RuleGiven): CheckGeneration[] => {
+  const value = publication.values["passes"];
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) return value as unknown as CheckGeneration[];
+  if (pinnedBy(given) !== DESTINATION_5) throw new Error("This destination version keeps array generations");
+  const record = publicationStandingRecord(value);
+  if (!record || record.reservation !== publication.values["reservedAt"]) throw new Error("D1 current generation provenance is unavailable");
+  return [...record.checks];
+};
 const resultGeneration = (given: RuleGiven, publication: Item): boolean => {
   const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check");
   const name = job?.entry.input.type === "act" ? job.entry.input.signed.intent.fields["name"] : null;
-  return !!job && generations(publication).some((row) => row.name === name && canonicalize(row.job) === canonicalize(job.fact));
+  return !!job && generations(publication, given).some((row) => row.name === name && canonicalize(row.job) === canonicalize(job.fact));
 };
 
 export const destinationRules3: Rules = (() => {
@@ -2286,14 +2325,14 @@ export const destinationRules3: Rules = (() => {
       if (pushesOf(given.state, given.own, publication, given.resolved.self).length) return { holds: false, name: "publication-started" };
       if (publication.state !== "reserved") return { holds: false, name: "not-the-reservation" };
       if (!stagedOwn(given, publication, given.resolved.self)) return { holds: false, name: "not-the-reservation" };
-      const rows = generations(publication), name = given.resolved.fields["name"], prior = rows.find((row) => row.name === name);
+      const rows = generations(publication, given), name = given.resolved.fields["name"], prior = rows.find((row) => row.name === name);
       const earlier = given.resolved.fields["earlier"];
       return (!prior && earlier === undefined) || (prior !== undefined && isFactRef(earlier) && canonicalize(prior.job) === canonicalize(earlier)) ? { holds: true } : { holds: false, name: "generation-mismatch" };
     } },
     "fence-generation": { place: "effect", most: 1, run: (given) => {
       const publication = given.resolved.subjects.get("also.publication")!;
       const name = given.resolved.fields["name"] as string, job = given.resolved.fields["job"] as FactRef;
-      return [{ effect: "value", item: publication.id, slot: "passes", value: [...generations(publication).filter((row) => row.name !== name), { name, job, passed: false }] as unknown as FieldValue }];
+      return [{ effect: "value", item: publication.id, slot: "passes", value: [...generations(publication, given).filter((row) => row.name !== name), { name, job, passed: false }] as unknown as FieldValue }];
     } },
     "checked-publication": { place: "also", bind: (items) => items[0]?.id ?? null },
     "checked-bound": { place: "guard", refusals: ["not-the-reservation", "not-this-check"], run: (given) => {
@@ -2323,7 +2362,7 @@ export const destinationRules3: Rules = (() => {
       const publication = given.resolved.subjects.get("also.publication")!;
       const job = given.uses.find((use) => use.fact.hash === (given.resolved.fields["job"] as FactRef).hash)!.entry;
       const name = job.input.type === "act" ? job.input.signed.intent.fields["name"] as string : "";
-      const passes = generations(publication).map((row) => row.name === name ? { ...row, passed: true } : row);
+      const passes = generations(publication, given).map((row) => row.name === name ? { ...row, passed: true } : row);
       const required = (publication.values["requiredChecks"] ?? []) as string[];
       const ready = publication.values["checkDeadline"] !== undefined && required.every((check) => passes.some((row) => row.name === check && row.passed));
       return [{ effect: "value", item: publication.id, slot: "passes", value: passes as unknown as FieldValue }, ...(ready ? [
@@ -2430,7 +2469,7 @@ export const destinationRules3: Rules = (() => {
       if (fields?.["outcome"] !== "passed") return updateRequest(given, { publication, state: "not-reserved", outcome: "refused", reason: "required-check-failed" });
       const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check")?.entry;
       const name = job?.input.type === "act" ? job.input.signed.intent.fields["name"] : null;
-      const passes = generations(publication).map((row) => row.name === name ? { ...row, passed: true } : row);
+      const passes = generations(publication, given).map((row) => row.name === name ? { ...row, passed: true } : row);
       const complete = ((publication.values["requiredChecks"] ?? []) as string[]).every((check) => passes.some((row) => row.name === check && row.passed));
       return complete && publication.values["checkDeadline"] !== undefined ? updateRequest(given, { publication, state: "reserved", outcome: "committed", tree: publication.values["tree"] as string, commit: publication.values["integration"] as string }) : null;
     } },
@@ -2488,7 +2527,7 @@ export const destinationRules3: Rules = (() => {
   });
 })();
 
-// ---------------------------------------------------------------- file publication, version 4 only
+// ---------------------------------------------------------------- file publication, versions 4 and 5
 
 const FILE_STATES = ["queued", "reserved", "publishing", "unresolved", "published", "aborted", "superseded"] as const;
 const ITEM_ID = { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER } as const;
@@ -2709,4 +2748,123 @@ export const destinationRules4: Rules = (() => {
       } : undefined,
     } }];
   }));
+})();
+
+/** D1 is an explicit cohort; existing pins and default founding stay put.
+ * Only regular review-backed publication receives the standing contract.
+ * Automatic file-publication keeps its separate @4 authority journey. */
+export const DESTINATION_5 = "platform:destination@5" satisfies PlatformDefinition;
+const D1_DECIDED = { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER } as const;
+const D1_KEY = { type: "text", max: 256 } as const;
+// Internal references have already been admitted by the native transition.
+// A fact-typed slot would demand every old foreign body again whenever a
+// different generation changes. These closed records instead keep exact
+// references for the bounded own-record provenance check at mint.
+const D1_FACT = { type: "record", of: {
+  at: { type: "record", required: true, of: {
+    scope: { type: "text", max: 64, required: true }, inc: { type: "text", max: 64, required: true }, kind: { type: "enum", of: ["lane"], required: true },
+  } }, seq: { ...D1_DECIDED, required: true }, hash: { type: "digest", required: true },
+} } as const;
+const D1_BASE = { type: "record", of: {
+  key: { ...D1_KEY, required: true }, from: { ...D1_FACT, required: true },
+} } as const;
+const D1_PASSES = { type: "record", of: {
+  reservation: { ...D1_DECIDED, required: true },
+  base: { type: "record", required: true, of: {
+    merger: { ...D1_BASE, required: true }, approvals: { type: "list", max: 64, required: true, of: D1_BASE },
+  } },
+  checks: { type: "list", max: 32, required: true, of: { type: "record", of: {
+    name: { type: "text", max: 128, required: true }, job: { ...D1_FACT, required: true }, passed: { type: "bool", required: true },
+    proof: { type: "record", required: false, of: {
+      key: { ...D1_KEY, required: true }, result: { ...D1_FACT, required: true }, decided: { ...D1_DECIDED, required: true },
+    } },
+  } } },
+} } as const;
+export const destination5: PlatformData = {
+  ...destination4,
+  items: { ...destination4.items, publication: { ...destination4.items["publication"]!,
+    values: { ...destination4.items["publication"]!.values, passes: { fixed: false, required: false, of: D1_PASSES } },
+    holds: { ...destination4.items["publication"]!.holds!, operations: { ...destination4.items["publication"]!.holds!.operations, read: 4 } },
+  } },
+  outcomes: { ...destination4.outcomes,
+    judge: { ...destination4.outcomes["judge"]!, most: { ...destination4.outcomes["judge"]!.most!, effects: 13 } },
+    mint: { ...destination4.outcomes["mint"]!, most: { ...destination4.outcomes["mint"]!.most!, operations: ["revoke", "read"] }, observes: [{ of: "key", from: "rule", max: 9, window: 10, use: "once", without: "wait" }] },
+  },
+};
+
+/** The gate's discriminator is local operation provenance, before any
+ * membership read. Late/closed/non-push/file work keeps existing cleanup. */
+function standingTarget(given: RuleGiven, mint: Operation): Item | null {
+  if (mint.owner !== DESTINATION_5 || mint.kind !== "mint" || given.input.type !== "outcome" || given.input.result !== "confirmed") return null;
+  const served = servedBy(given.state, given.own, mint);
+  if (!served || served.write.owner !== DESTINATION_5 || served.write.kind !== "push") return null;
+  const attempt = served.write.attempts.find(attempt => attempt.attempt === served.attempt);
+  const target = targetOf(given.state, given.own, served.write);
+  if (!target || target.type !== "publication" || closed(target) || !attempt || attempt.outcomes.length !== 0) return null;
+  if (mint.for !== target.id || served.write.for !== target.id) throw new Error("D1 mint and served push need the same native holder");
+  return target;
+}
+function standingKeys(given: RuleGiven, publication: Item): readonly KeyId[] {
+  const scope = given.state.scope(), membership = destinationMembership(given.state);
+  if (!scope || !membership?.inc) throw new Error("D1 membership incarnation is unavailable");
+  const found = publicationStandingKeys({ at: scope.at, membership: { scope: membership.scope, inc: membership.inc, kind: "membership" }, owner: DESTINATION_5, before: given.resolved.self, own: given.own, operation: id => given.state.operation(id) }, publication);
+  if (!found.ok) throw new Error(`D1 standing provenance ${found.reason}`);
+  return found.keys;
+}
+/** Preserve base provenance on each current-generation update. A fence
+ * constructs a new false row with no proof; a successful check captures
+ * the exact native result signer and this accepted own position. */
+function standingEffects(given: RuleGiven, effects: readonly RuleEffect[]): readonly RuleEffect[] {
+  return effects.map(effect => {
+    if (effect.effect !== "value" || effect.slot !== "passes" || !Array.isArray(effect.value)) return effect;
+    const publication = given.state.item(effect.item), record = publicationStandingRecord(publication?.values["passes"]);
+    if (!publication || !record || record.reservation !== publication.values["reservedAt"]) throw new Error("D1 generation base is unavailable");
+    let checks = effect.value;
+    if (given.input.type === "outcome" && given.input.kind === "check-judge") {
+      const operation = given.state.operation(given.input.operation), origin = operation ? given.own(seqOf(operation.id))?.entry : null;
+      const message = origin?.input.type === "delivery" ? origin.input.message : null;
+      const fields = message?.class === "request" && message.type === "tell" && isObject(message.body) && isObject(message.body["fields"]) ? message.body["fields"] : null;
+      const job = fields?.["job"], result = fields?.["result"];
+      const entry = isFactRef(result) ? given.uses.find(use => canonicalize(use.fact) === canonicalize(result))?.entry : null;
+      if (!isFactRef(job) || !isFactRef(result) || entry?.input.type !== "act") throw new Error("D1 accepted checker provenance is unavailable");
+      const proof = { key: entry.input.signed.intent.actor, result, decided: given.resolved.self };
+      checks = checks.map(row => isObject(row) && row["passed"] === true && canonicalize(row["job"]) === canonicalize(job) ? { ...row, proof } : row);
+    }
+    const next = publicationStandingRecord({ ...record, checks });
+    if (!next) throw new Error("D1 current generation exceeds its bound");
+    return { ...effect, value: next as unknown as FieldValue };
+  });
+}
+export const destinationRules5: Rules = (() => {
+  const rules: Record<string, PlatformRule> = Object.fromEntries(Object.entries(destinationRules4).map(([name, rule]) => {
+    if (rule.place === "effect") return [name, { ...rule, run: (given: RuleGiven) => standingEffects(given, rule.run(given)) }];
+    if (rule.place !== "outcome" || !rule.rules.derives) return [name, rule];
+    return [name, { ...rule, rules: { ...rule.rules, derives: (given: RuleGiven, operation: Operation, selected: boolean | null) => {
+      const result = rule.rules.derives!(given, operation, selected);
+      return { ...result, effects: standingEffects(given, result.effects) };
+    } } }];
+  }));
+  const judge = rules["judge"] as Extract<PlatformRule, { place: "outcome" }>;
+  rules["judge"] = { ...judge, rules: { ...judge.rules, most: { ...judge.rules.most!, effects: 13 } } };
+  const mint = rules["mint"] as Extract<PlatformRule, { place: "outcome" }>;
+  rules["mint"] = { ...mint, rules: { ...mint.rules, most: { effects: 8, requests: 1, operations: 2 },
+    subjects: (given, operation) => { const target = standingTarget(given, operation); return target ? standingKeys(given, target) : []; },
+    derives: (given, operation, selected) => {
+      const target = standingTarget(given, operation);
+      if (!target) return mint.rules.derives!(given, operation, selected);
+      const membership = destinationMembership(given.state);
+      if (!membership?.inc) throw new Error("D1 membership incarnation is unavailable");
+      let active = true;
+      for (const key of standingKeys(given, target)) {
+        const seen = given.observed({ key })?.observation;
+        if (!seen || "subject" in seen || seen.key !== key || seen.of.scope !== membership.scope || seen.of.inc !== membership.inc || seen.of.kind !== "membership" || seen.keyState === "unknown"
+          || (seen.controller === null) !== (seen.controllerActive === null)) throw new Error("D1 complete fresh standing is unavailable");
+        active &&= seen.keyState === "active" && seen.memberState === "active" && (seen.controller === null && seen.controllerActive === null || seen.controllerActive === true)
+          && (seen.notAfter === null || timeMs(seen.notAfter)! > timeMs(given.time)!);
+      }
+      if (active) return mint.rules.derives!(given, operation, selected);
+      return { effects: [{ effect: "value", item: target.id, slot: "aborting", value: true }], sends: [], opens: [opening(given, "revoke", DESTINATION_ATTEMPTS.revoke, target.id), opening(given, "read", DESTINATION_ATTEMPTS.read, target.id)] };
+    },
+  } };
+  return rules;
 })();

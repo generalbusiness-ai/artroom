@@ -19,7 +19,7 @@ export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";
-import { destination, destination2, destination3, destination4, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRules4, destinationRulesScope } from "./destination.ts";
+import { destination, destination2, destination3, destination4, destination5, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRules4, destinationRules5, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
 import { DEMO_REGISTER, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, demoRegister, demoRegisterRules, webDemoRegister } from "./demo-register.ts";
@@ -30,12 +30,12 @@ import type { RecordedRef, Rules, StateView } from "@generalbusiness/dap-derive"
 import { RULES } from "./rules.ts";
 import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScope4, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
-export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2, destination4, destinationRules4 };
+export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2, destination4, destination5, destinationRules4, destinationRules5 };
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
 export { ACTIONS_MOST, FIRST_ACTIONS, FIRST_ACTIONS_OF, MEMBERSHIP, MEMBERSHIP_1, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, ROLE_TABLE_OF, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, SIBLINGS_OF, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
-export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, foundingOf, revokedToken } from "./destination.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_5, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, foundingOf, revokedToken } from "./destination.ts";
 export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree, manifestCommit } from "./destination-objects.ts";
 export { PROPOSE_FILE, fileOf, sourcesOf, manifestFiles } from "./destination-reading.ts";
@@ -156,6 +156,7 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
   "platform:destination@1": { data: destination, rules: destinationRules, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@3": { data: destination3, rules: destinationRules3, membership: destinationMembership, rulesScope: destinationRulesScope },
+  "platform:destination@5": { data: destination5, rules: destinationRules5, membership: destinationMembership, rulesScope: destinationRulesScope },
 };
 
 /** Stable native code objects with the same source policy for runtime and replay. */

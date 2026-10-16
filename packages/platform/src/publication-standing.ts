@@ -15,7 +15,7 @@ export interface StandingCheck {
 /** Versioned shape inside @5's existing passes slot; old pins keep arrays. */
 export interface PublicationStandingRecord {
   readonly reservation: number;
-  readonly base: ReservationStanding["base"];
+  readonly base: { readonly merger: ReservationStanding["base"][number]; readonly approvals: ReservationStanding["base"] };
   readonly checks: readonly StandingCheck[];
 }
 export interface PublicationStandingContext {
@@ -34,8 +34,8 @@ const named = (value: unknown): value is string => typeof value === "string" && 
 
 /** Closed metadata before any own-record lookup. */
 export function publicationStandingRecord(value: unknown): PublicationStandingRecord | null {
-  if (!isRecord(value) || !fields(value, "base,checks,reservation") || !natural(value["reservation"]) || !Array.isArray(value["base"]) || value["base"].length === 0 || value["base"].length > 9 || !Array.isArray(value["checks"]) || value["checks"].length > 32) return null;
-  if (!value["base"].every(base => isRecord(base) && fields(base, "from,key") && isFactRef(base["from"]) && isKeyId(base["key"]))) return null;
+  if (!isRecord(value) || !fields(value, "base,checks,reservation") || !natural(value["reservation"]) || !isRecord(value["base"]) || !fields(value["base"], "approvals,merger") || !Array.isArray(value["base"]["approvals"]) || value["base"]["approvals"].length > 64 || !Array.isArray(value["checks"]) || value["checks"].length > 32) return null;
+  if (![value["base"]["merger"], ...value["base"]["approvals"]].every(base => isRecord(base) && fields(base, "from,key") && isFactRef(base["from"]) && isKeyId(base["key"]))) return null;
   const names = new Set<string>();
   for (const check of value["checks"]) {
     if (!isRecord(check) || !fields(check, Object.hasOwn(check, "proof") ? "job,name,passed,proof" : "job,name,passed") || !named(check["name"]) || names.has(check["name"]) || !isFactRef(check["job"]) || typeof check["passed"] !== "boolean") return null;
@@ -84,7 +84,7 @@ export function publicationStandingKeys(context: PublicationStandingContext, pub
       return observations.length === 1 && same(observations[0]!.observation.of, context.membership);
     };
     const keys = new Set<KeyId>();
-    for (const base of record.base) {
+    for (const base of [record.base.merger, ...record.base.approvals]) {
       if (!same(base.from.at, lane) || !reservation.got.entry.uses.some(use => same(use.fact, base.from)) || !keyObserved(record.reservation, base.key)) return unavailable();
       keys.add(base.key);
     }

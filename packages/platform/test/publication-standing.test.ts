@@ -23,10 +23,10 @@ function fixture(count = 1) {
     seal(seq, input, [
       { effect: "value", item, slot: "passes", value: copy(record) as unknown as FieldValue },
       ...(kind === "judge" ? [{ effect: "value" as const, item, slot: "reservedAt", value: seq }] : []),
-    ], record.base.map(base => ({ fact: base.from, content: base.from.hash })));
+    ], [record.base.merger, ...record.base.approvals].map(base => ({ fact: base.from, content: base.from.hash })));
     operations.set(input.operation, { id: input.operation, owner, kind, most: 1, for: item, selected: null, attempts: [{ attempt: 1, opened: opening, outcomes: [{ seq, result: "confirmed", evidence: d("b"), selected: null }] }] });
   };
-  let record: PublicationStandingRecord = { reservation: 5, base: [{ key: rita.key, from: from(100) }], checks: [] };
+  let record: PublicationStandingRecord = { reservation: 5, base: { merger: { key: rita.key, from: from(100) }, approvals: [] }, checks: [] };
   accepted(5, 3, "judge", record, [rita.key]);
   const add = (name: string, n: number, key = keyIdOfSecret(new Uint8Array(32).fill(n + 10))) => {
     const opening = 10 + n * 2, decided = opening + 1, job = from(200 + n), result = from(300 + n);
