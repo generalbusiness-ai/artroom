@@ -13,7 +13,7 @@
  * by an exception. Nothing here reads a scope, a store or a host.
  */
 
-import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
+import type { Digest, FactRef, KeyId, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, isDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "@generalbusiness/dap-derive";
 import { editPath } from "./destination-objects.ts";
@@ -173,7 +173,22 @@ const WINDOW_MS = 10_000;
  * statement says is `evidence-invalid`, and it is said before a rule that
  * is not met (I3 deltas, entry FA10).
  */
-export function judgeReservation({ recorded, evidence, statement, read, time, file = null }: ReservationAsked): Reservation {
+export interface ReservationStanding {
+  readonly base: readonly { readonly key: KeyId; readonly from: FactRef }[];
+  readonly checks: readonly { readonly name: string; readonly job: FactRef; readonly result: FactRef; readonly key: KeyId }[];
+}
+/** Internal native metadata only. Null means a successful old-style
+ * judgment lacks complete deciding provenance for the new D1 contract. */
+export type ReservationWithStanding = Reservation & { readonly standing?: ReservationStanding | null };
+
+/** Preserve the existing result shape and work path for every old caller. */
+export function judgeReservation(asked: ReservationAsked): Reservation { return reservationDecision(asked, false); }
+
+/** D1 captures the keys of the actual reservation decision, using the same
+ * native eligibility and touched-extent computation, not a second policy. */
+export function judgeReservationWithStanding(asked: ReservationAsked): ReservationWithStanding { return reservationDecision(asked, true); }
+
+function reservationDecision({ recorded, evidence, statement, read, time, file = null }: ReservationAsked, retainStanding: boolean): ReservationWithStanding {
   const no = (reason: string): Reservation => ({ reserved: false, reason });
   // G5: the member `changes` is over its bound. Nothing more is judged.
   if (evidence.changes !== null && "over" in evidence.changes) return no("evidence-too-large");
@@ -220,7 +235,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time, fi
   const changesAsked = statement.verdicts.some((verdict) => verdict.verdict === "request-changes");
   const approvals = statement.verdicts.flatMap((verdict, n) => {
     const key = read.verdicts[n]?.key ?? null;
-    return verdict.verdict === "approve" && key !== null && key.keyState !== "compromised" && key.member === verdict.reviewer.member ? [{ extent: verdict.extent ?? null, member: key.member, holds: key.actions }] : [];
+    return verdict.verdict === "approve" && key !== null && key.keyState !== "compromised" && key.member === verdict.reviewer.member ? [{ extent: verdict.extent ?? null, member: key.member, holds: key.actions, key: key.key, from: verdict.review }] : [];
   });
   /** One required check, by the second table of section 6.5. */
   const check = (name: string): "met" | "unmet" | "invalid" => {
@@ -234,6 +249,18 @@ export function judgeReservation({ recorded, evidence, statement, read, time, fi
     // Checks 4 to 8.
     return shown.deciding && shown.key !== null && shown.key.keyState !== "compromised" ? "met" : "invalid";
   };
+  const success = (reason: string | null, countedApprovals: typeof approvals, required: readonly string[]): ReservationWithStanding => {
+    const reserved: Reservation = { reserved: true, integration, reason };
+    if (!retainStanding) return reserved;
+    const checks: ReservationStanding["checks"][number][] = [];
+    for (const name of required) {
+      const jobs = statement.jobs.filter(job => job.name === name), shown = read.checks[name];
+      const job = jobs[0];
+      if (jobs.length !== 1 || !job || job.state !== "passed" || !job.decidedBy || !shown?.deciding || !shown.key) return { ...reserved, standing: null };
+      checks.push({ name, job: job.job, result: job.decidedBy, key: shown.key.key });
+    }
+    return { ...reserved, standing: { base: [{ key: merger.key, from: statement.operation }, ...countedApprovals.map(({ key, from }) => ({ key, from }))], checks } };
+  };
   const authors = new Set(manifest.authors);
 
   if (read.extents === null) {
@@ -244,7 +271,7 @@ export function judgeReservation({ recorded, evidence, statement, read, time, fi
     invalid ||= checks.includes("invalid");
     if (invalid) return no("evidence-invalid");
     if (changesAsked || checks.includes("unmet") || new Set(approvals.map((approval) => approval.member).filter(independent)).size < rules.approvals) return no("rules-not-met");
-    return manifest.complete ? { reserved: true, integration, reason: null } : no("incomplete");
+    return manifest.complete ? success(null, approvals.filter(approval => independent(approval.member)), rules.checks.filter(required => required.required).map(required => required.name)) : no("incomplete");
   }
 
   // Section 12.1.4a, "How the rule `judge` judges extents", steps 1 to 7.
@@ -289,7 +316,8 @@ export function judgeReservation({ recorded, evidence, statement, read, time, fi
   if (ordered.length > 0) return no(`rules-not-met:${ordered.join(",")}`);
   if (touched.unclassified.length > 0) return no("rules-not-met");
   if (!manifest.complete) return no("incomplete");
-  return { reserved: true, integration, reason: used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null };
+  const counted = approvals.filter(approval => judged.some(extent => extent.extent === approval.extent && extent.counted.includes(approval.member)));
+  return success(used ? `single-controller:${RULES_EXTENT}:${excepted}:m${read.controllersHead ?? merger.head.seq}:r${read.rules.revision}:h${read.rules.head.seq}` : null, counted, asked);
 }
 
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;

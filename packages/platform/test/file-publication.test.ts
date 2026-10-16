@@ -65,16 +65,17 @@ for (const format of ["sha1", "sha256"] as const) test(`file ${format} commit an
 });
 
 
-test("only an unsent stale file holding the shared slot yields a cause-bound supersession; an unknown attempt stays held", () => {
+test.each(["platform:destination@4", "platform:destination@5"] as const)("%s: only an unsent stale file holding the shared slot yields a cause-bound supersession; unknown stays held", owner => {
   const state = new MemoryState(), early = file(1, 7, 0, "reserved"), later = file(4, 8, 0, "published");
   state.putItem({ ...file(0, 0), type: "branch", state: "ready", refs: {}, values: { slot: early.id, judging: null, head: "a".repeat(40) } });
   state.putItem(early); state.putItem(later);
-  const operation: Operation = { id: "2:0", owner: "platform:destination@4", kind: "push", for: early.id, most: 1, selected: null, attempts: [{ attempt: 1, opened: 2, outcomes: [] }] };
+  const operation: Operation = { id: "2:0", owner, kind: "push", for: early.id, most: 1, selected: null, attempts: [{ attempt: 1, opened: 2, outcomes: [] }] };
   const entry: Entry = { v: 1, at: { ...sender, kind: "destination" }, seq: 2, prev: null, time: "2026-10-14T03:00:00Z", clamped: false, epoch: 0,
-    input: { type: "outcome", owner: "platform:destination@4", kind: "judge", operation: "1:0", attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { head: "a".repeat(40), present: true, tree: "b".repeat(40) } } }, uses: [], prepared: [], effects: [{ effect: "state", item: early.id, state: "reserved" }], sends: [] };
+    input: { type: "outcome", owner, kind: "judge", operation: "1:0", attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { head: "a".repeat(40), present: true, tree: "b".repeat(40) } } }, uses: [], prepared: [], effects: [{ effect: "state", item: early.id, state: "reserved" }], sends: [] };
   const own: Own = seq => seq === 2 ? { entry, hash: textDigest("PUBLIC TEST scripted opening") } : null;
   const before = state.snapshot();
   expect(fileSupersededOutcome(state, operation, own)).toEqual({ basis: "own-answer", body: { send: "not-sent", seen: "a".repeat(40), supersededBy: filePublicationCause(later) } });
+  expect(fileSupersededOutcome(state, { ...operation, owner: "platform:destination@6" }, own)).toBeNull();
   expect(state.snapshot()).toEqual(before);
   const unknown: Operation = { ...operation, attempts: [{ ...operation.attempts[0]!, outcomes: [{ seq: 3, result: "unknown", evidence: textDigest("PUBLIC TEST unknown"), selected: null }] }] };
   expect(fileSupersededOutcome(state, unknown, own)).toBeNull();

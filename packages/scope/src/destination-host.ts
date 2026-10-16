@@ -10,6 +10,7 @@
 import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isOperationId, isFactRef, verifySignedIntent, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/dap-derive";
+import { publicationStandingRecord } from "@generalbusiness/dap-platform";
 import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, filePublicationCause, filePublicationCurrent, filePublicationCommit, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
@@ -78,10 +79,10 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return ["platform:destination@4", "platform:destination@5"].includes(owner) && kind === "file-judge" || isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
+    accepts: (owner: string, kind: string): boolean => ["platform:destination@4", "platform:destination@5"].includes(owner) && kind === "file-judge" || isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -177,7 +178,7 @@ export class DestinationHost implements Outside {
         if (reply?.["id"] !== token || typeof reply["revoked"] !== "boolean") return null;
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
-      if (operation.kind === DESTINATION_KINDS.judge || operation.owner === "platform:destination@4" && operation.kind === "file-judge") {
+      if (operation.kind === DESTINATION_KINDS.judge || ["platform:destination@4", "platform:destination@5"].includes(operation.owner) && operation.kind === "file-judge") {
         const publication = this.#judging();
         if (publication?.type === "file-publication") return this.#inspectFile(repository, ref, publication);
         const list = this.#list(this.#judging());
@@ -255,7 +256,7 @@ export class DestinationHost implements Outside {
     const reader = this.#options.snapshotReader;
     const scope = this.#given.scope();
     const intent = asked?.intent;
-    if (!reader || scope?.at.kind !== "destination" || !["platform:destination@3", "platform:destination@4"].includes(this.#given.genesis()?.seed.definition ?? "") || !verifySignedIntent(asked)
+    if (!reader || scope?.at.kind !== "destination" || !["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(this.#given.genesis()?.seed.definition ?? "") || !verifySignedIntent(asked)
       || intent.kind !== "git-read@1:job-read" || intent.on !== null || Object.keys(intent.expected).length || Object.keys(intent.fields).length !== 1 || !isFactRef(intent.fields["job"])) return null;
     const jobFact = intent.fields["job"];
     if (!intent.to || canonicalize(intent.to) !== canonicalize(jobFact.at)) return null;
@@ -282,7 +283,16 @@ export class DestinationHost implements Outside {
     const check = recordedRules && "content" in recordedRules && recordedRules.content.asked === "rules" ? recordedRules.content.checks.find((check) => check.name === fields["name"] && check.configuration === fields["configuration"]) : null;
     const membership = branch?.values["membership"];
     if (!check || typeof membership !== "string") return null;
-    const generationFits = () => ((this.#given.state.item(publication.id)?.values["passes"] ?? []) as unknown as { name: string; job: FactRef }[]).some((row) => row.name === fields["name"] && canonicalize(row.job) === canonicalize(jobFact));
+    const generationFits = () => {
+      const current = this.#given.state.item(publication.id), value = current?.values["passes"];
+      let rows: readonly { name: string; job: FactRef }[];
+      if (this.#given.genesis()?.seed.definition === "platform:destination@5") {
+        const record = publicationStandingRecord(value);
+        if (!record || record.reservation !== current?.values["reservedAt"]) return false;
+        rows = record.checks;
+      } else rows = (value ?? []) as unknown as { name: string; job: FactRef }[];
+      return rows.some(row => row.name === fields["name"] && canonicalize(row.job) === canonicalize(jobFact));
+    };
     if (!generationFits()) return null;
     const readAt = timeMs(this.#given.clock.read());
     const standing = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; at?: unknown; controllerActive?: unknown } | null;

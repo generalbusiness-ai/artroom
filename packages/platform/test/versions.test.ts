@@ -20,6 +20,7 @@ import { rita } from "./support-founding.ts";
 // Evidence: /tmp/artroom-cohort25-generation-one/result.json
 // SHA-256: e2a2052d23705690ec4b884786f453718875f6505d515fdda88a20191eb64269.
 const DIGESTS: Readonly<Record<string, string>> = {
+  "platform:destination@5": "sha256:aed97f875f0331aeb249deff7a35b45378decfae43a3efedb5eac8ca43433f96",
   "platform:register@10": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@9": "sha256:cc7e926210e93355ea5bb57143f9b0be63dac0bcfd25ebdc6010a750276155c6",
   "platform:membership@6": "sha256:1ee5b8983cb1f1d7ff7c6a4ad5744bfc06cc81ee1e608088973fe56695b51abc",
@@ -63,9 +64,9 @@ test("every shipped version resolves to its own data, pinned by digest, and vers
   expect(digests["platform:rules@4"]).not.toBe(DIGESTS["platform:rules@3"]);
   expect(["platform:rules@1", "platform:rules@2", "platform:rules@3"].map(named => platform(named)!.data.items["rules"]!.values["ownerMayReview"]!.default)).toEqual([false, false, false]);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
-  expect(["platform:destination@5", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
+  expect(["platform:destination@6", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
   // Explicit application and demo pins do not replace the existing default cohort.
-  const supporting = new Set<string>([...Object.values(INVITATION_KEY_COHORT).filter(pin => pin !== "platform:inbox@1" && pin !== "platform:destination@2"), FILE_PUBLICATION_COHORT.register, FILE_PUBLICATION_COHORT.directory, FILE_PUBLICATION_COHORT.destination, APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4", DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT.directory]);
+  const supporting = new Set<string>([...Object.values(INVITATION_KEY_COHORT).filter(pin => pin !== "platform:inbox@1" && pin !== "platform:destination@2"), FILE_PUBLICATION_COHORT.register, FILE_PUBLICATION_COHORT.directory, FILE_PUBLICATION_COHORT.destination, APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4", "platform:destination@5", DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT.directory]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.
