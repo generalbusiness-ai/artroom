@@ -6,7 +6,7 @@ to it. The target runtime is Cloudflare Workers: one Durable Object with
 SQLite storage for each scope, named by the scope's ID in one namespace.
 
 The scope and replay contract is the authority. Comments cite its sections.
-Where the contract was silent, `notes/2026-10-04-i1-contract-deltas.md`
+Where the contract was silent, `notes/implementation/2026-10-04-i1-contract-deltas.md`
 records what was implemented, in its sections "The runtime", "Repairs to
 the runtime", "Composition and transport" and "A child's definition".
 
@@ -73,7 +73,7 @@ package's own test project, which the root `vitest.config.ts` arranges:
 no file of this package names the lanes package. A scenario's client
 calls `api` of `worker.ts` in the test's isolate, and uses the HTTP routes
 for a few acts
-(`notes/2026-10-05-i2-contract-deltas.md`, entries DK1 to DK4 and DK11).
+(`notes/implementation/2026-10-05-i2-contract-deltas.md`, entries DK1 to DK4 and DK11).
 
 ## Ports and their production defaults
 
@@ -247,7 +247,7 @@ the designs, and is no review of this source.
   recorded.
 - The platform package holds the data of `platform:register@1` and of
   `platform:directory@1`, with a rule for every mark of each
-  (`notes/2026-10-05-i3-contract-deltas.md`, section 26). A founding
+  (`notes/implementation/2026-10-05-i3-contract-deltas.md`, section 26). A founding
   under `platform:register@1` founds a register, by an `install` intent.
   Its selecting outcome creates the directory, whose genesis creates
   membership, the rules scope and the destination. Every destination mark

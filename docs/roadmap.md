@@ -138,7 +138,7 @@ fork. The performer never holds a token to the destination.
 **State.** [Plan 029](../plans/029-2026-10-11-artifacts-forks.md). A
 first measurement created a fork on Cloudflare Artifacts and committed to
 it; what a fork costs in storage is not yet measured
-([the measurement](../notes/2026-10-13-fork-cost-measurement.md)).
+([the measurement](../notes/implementation/2026-10-13-fork-cost-measurement.md)).
 
 ### Offline work and propose from a branch
 

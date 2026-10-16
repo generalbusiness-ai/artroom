@@ -27,7 +27,7 @@ const stubOf = (name: string): DurableObjectStub => env.NET.get(env.NET.idFromNa
 /**
  * The Worker's routes, called in the test's isolate: the same `route` that the Worker's `fetch` runs, over the same namespace.
  * A test that is about a route and not about the pool's entrypoint uses this. In the Workers pool each call through
- * `SELF.fetch` or the service binding takes longer the more of them one run has made (notes/2026-10-05-scope-test-cost.md),
+ * `SELF.fetch` or the service binding takes longer the more of them one run has made (notes/implementation/2026-10-05-scope-test-cost.md),
  * so `routes.test.ts` and `client.test.ts` keep the one test for each of those two paths.
  */
 export const routed = (url: string, init?: RequestInit): Promise<Response> => route(new Request(url, init), env.NET);

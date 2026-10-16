@@ -880,7 +880,7 @@ the planner's scratchpad (`cloud-mcp-prompt.txt`). It delivers:
 - `docs/mcp.md`: how to connect an agent host, the tool reference as sent,
   the five worked examples, the W1 inventory, the budgets and the observed
   figures;
-- `notes/2026-10-13-mcp-generic-delivery.md`: what was built, what ran, what
+- `notes/implementation/2026-10-13-mcp-generic-delivery.md`: what was built, what ran, what
   the figures were and how they were taken, the SDK and specification
   versions, and what is owed;
 - the parked ledger row for `mcp` updated; the SDK pinned in the lockfile

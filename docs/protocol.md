@@ -3032,7 +3032,7 @@ P2 and one wording fault.
 Request 1c785ed8 asked the contract to keep every git object the log
 writes under Artifacts' object limit, and to report a refused push as a
 definite failure. The bounded-memory log work (request a6aa60c9, landed at
-main b5864882; `notes/2026-10-01-log-bounded.md`) measured the limit on
+main b5864882; `notes/implementation/2026-10-01-log-bounded.md`) measured the limit on
 2026-10-02: Artifacts accepts a git object of 33,554,432 bytes (32 MiB) and
 refuses one byte more with `artifacts_git_receive_pack_object_too_large`.
 
@@ -3486,7 +3486,7 @@ revision 5 answers checker report 851b215b.
 
 The design, the mint sites, the provider evidence, and each lane's edits
 and tests are in
-[notes/2026-10-02-canonical-mint-ownership.md](../notes/2026-10-02-canonical-mint-ownership.md).
+[notes/implementation/2026-10-02-canonical-mint-ownership.md](../notes/implementation/2026-10-02-canonical-mint-ownership.md).
 These rules add obligations to R-PUB-3, R-LOG-8, R-CARRY-15, R-PROP-1,
 R-PROP-2, R-PROP-7 and R-EXEC-9. They change no token lifetime and no
 landing rule.

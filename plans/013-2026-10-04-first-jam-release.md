@@ -103,7 +103,7 @@ limits, including unavailable Git objects and stage 6 transition checking.
 CLI text and machine-readable output must preserve the qualification.
 Do not call a partial report “complete accounting”.
 
-The claim in `notes/2026-10-03-carry-accounting.md` that removing a
+The claim in `notes/implementation/2026-10-03-carry-accounting.md` that removing a
 non-carry judgment cannot admit an improper landing is a source argument,
 not proof supplied by Stage 2 approval. The independent release review
 must assess its applicability to the actual intermediate source and

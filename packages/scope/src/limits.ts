@@ -30,7 +30,7 @@
  * nothing is recorded and no key is used up.
  *
  * It replaces the parked `room/src/ratelimit.ts`, after the review in
- * `notes/2026-10-05-i3-limits-review.md`.
+ * `notes/reviews/2026-10-05-i3-limits-review.md`.
  */
 
 import type { Answer, Head } from "@generalbusiness/dap-contract";

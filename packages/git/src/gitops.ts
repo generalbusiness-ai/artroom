@@ -2,7 +2,7 @@
  * The Git commands of the publisher and the stager (authority note, sections
  * 6.2, 6.5, 6.6, 6.10 and 12.2): a read of a ref, a list of refs, a fetch,
  * and the one send. It is the reviewed successor of the earlier publisher's
- * `gitops.ts` (`notes/2026-10-05-i3-git-review.md`, section 3).
+ * `gitops.ts` (`notes/reviews/2026-10-05-i3-git-review.md`, section 3).
  *
  * **Every send is one compare-and-set of one ref** (section 6.6): move this
  * ref from this old value to this new one. A ref that must not exist yet has
