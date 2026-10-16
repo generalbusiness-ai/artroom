@@ -182,4 +182,19 @@ original place; the actual operations driver uses `dispatch`, and that
 oracle was corrected. No timeout or native guard changed.
 
 This implementation correction is beyond the original gate's tree.
-Its successor gate and exact-head review remain pending.
+Its one complete successor gate passed at frozen implementation
+`e90e1599b297adaa6328bb3bed64324a87efd31d`, tree
+`d969af6fee4552c7ae865668dc2d07e38972ad7d`. Original session 54307
+closed with exit 0: 1,465 Vitest tests passed, 3 skipped, 16 Node checks
+and 55 Counting checks passed. Dependency installation passed in 2.2
+seconds, whitespace passed, typechecking passed in 7.7 seconds, and tests
+passed in 217.8 seconds with 305.1 CPU seconds. This gate followed the
+implementation correction. No complete suite was repeated at this head.
+
+Only this note changes after the frozen successor gate. All 1,397 other
+tracked blobs and modes must match it. Original output is retained in
+`/tmp/artroom-observability-e90e1599-gate.log` and the gate-owned temporary
+directory. Those paths grant no raw-file access. The exact successor
+review will grant one separately pinned public JSON summary. The
+scripted fault and cancellation diagnostics remain qualified as in the
+original passing gate. Exact-head review and normal landing remain owed.
