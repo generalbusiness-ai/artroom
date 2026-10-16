@@ -120,7 +120,7 @@ compromised key incorrectly installs the token and enters publishing.
 The exact pre-control Source is restored (SHA256
 `9a1b892e6144f296ca2455e4efa46db862df9f41bc4e676edc1cc74459887f8d`).
 The final read route then gained two additional served-attempt/most guards;
-the inactive gate is unchanged. Final destination Source SHA256 is
+the inactive gate is unchanged. The withdrawn candidate's destination Source SHA256 is
 `70e0d9aed805b0befd1d33b105e5f95f00e1c687123449e630eb0a08e511420a`.
 This is one distinguishing control, not a mutation sweep.
 
@@ -131,7 +131,7 @@ second-generation refusal also exposed the foreign-fact metadata problem
 fixed above. No failed diagnostic is relabelled. The Page asset is regenerated from the version registry, without a rendered
 UI change claim. Scope and platform typechecks pass.
 
-## Frozen gate
+## Previous frozen gate and withdrawn review
 
 The first and only D1 full gate passed at clean Source
 `2286345e8e7df6f5e74764053ff2d96d2b9ba077`, tree
@@ -151,12 +151,65 @@ scripted-reset and retention-fault diagnostics and one Vitest cross-object
 abort/timeout diagnostic; the reported terminal and suite outcomes are as
 above. This is not a claim of diagnostic-free execution.
 
-The review candidate updates only this report after the gate. The producer
-checks exact correspondence of every other tracked path before filing;
-no Source, test, generated asset, package or lock bytes change afterward.
-Exact-head independent review and landing remain pending.
+The previous review candidate `01c96279` updated only this report after
+that gate. The producer verified exact correspondence of all other 1,384
+tracked paths before filing. That candidate was then withdrawn as described
+below; its gate does not cover the corrected runtime Source.
 
 Cloudflare deployment, version upload, binding, secret and migration changes
 remain held. No such operation or real Git-provider mutation ran. The
 workroom's owner update `257e9bdb` reopens GitHub pushes only after reviewed
 local landings; no D1 push or landing has occurred at this checkpoint.
+
+## Runtime compatibility correction
+
+After filing review `49cd06cb`, the builder found missing closed-version
+checks outside the platform package: production host file-judge admission,
+recovery and dispatch; reservation snapshots and expiry projection; automatic
+file source checks; replay's matching application-origin checks; immutable
+site receipt routing; the checker snapshot owner and the Page's head reader.
+The host snapshot also treated passes as an array. These were real gaps:
+the first native witnesses used a scripted outside adapter. The original
+passing gate did not establish production-host compatibility.
+
+The builder withdrew review `49cd06cb` through `9bef4355` before approval or
+landing. The checker confirmed no review/approval was filed, and no retired
+basis is overridden. The old candidate, public projection and gate remain
+historical evidence with their original outcomes. No D1 landing or push ran.
+
+The corrected Source adds explicit @5 to the relevant inherited closed
+branches in runtime, replay and Page. It adds @5 to the checker's existing
+@3 reservation owner boundary, preserving its previous @4 refusal. No
+unknown future version is accepted by these new branches. The snapshot host
+uses the shared closed metadata parser and reservation stamp for @5's
+current generations; old valid array paths remain unchanged. Existing
+platform data, defaults and caller pins remain unchanged. File publication
+still has its separate authority journey and remains outside fresh standing.
+
+`/tmp/artroom-d1-runtime-complete-compat-focus.log` passes 13 tests in four
+files. It includes all five native D1 cases, with an actual @5 expiry
+projection and rejection of a file source lacking immutable factory proof;
+six production DestinationHost cases, including direct @5 file inspection
+and read-only recovery, and the fenced record-shaped generation reaching
+the staged-ref snapshot boundary; one inherited real @4 application
+publication/source/replay scenario; and one @5 immutable-publication selector
+case. That last case projects actual in-memory judged @5 file/receipt entries
+into fresh native SQLite: it proves the integer publication pointer and exact
+file reservation are selected without writes, and a pending receipt denies
+selection. It is a storage projection fixture, not native admission or HTTP.
+Production-host provider, source and membership answers remain scripted;
+its missing-stage result is not a full @5 Git snapshot/provider proof.
+
+`/tmp/artroom-d1-checker-compat-focus.log` passes the pure checker owner
+boundary case. It transforms the retained @3 snapshot's owner/hash/ref as
+an explicitly synthetic cohort-selection control, not a native @5 producer.
+It accepts @3/@5 and preserves refusal of @4 and unknown @6.
+`/tmp/artroom-d1-editor-compat-focus.log` passes four editor tests, including
+both @5 workflows, unchanged older workflow bounds and @6 refusal, with no
+mutation when the published base moved. This is a scripted HTTP/function
+boundary, not rendered browser evidence. The Page asset is regenerated.
+
+The corrected frozen Source needs its own gate and exact-head review.
+The original `2286345e` pass is not carried across these implementation
+changes. The historical inactive-gate control concerns the unchanged gate
+branch only; it is not a control for the newly corrected host/read paths.

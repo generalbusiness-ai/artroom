@@ -2643,7 +2643,7 @@ function fileEnd(given: RuleGiven, item: Item, supersededBy: import("./destinati
     ...(supersededBy ? [{ effect: "value", item: given.resolved.self, slot: "supersededBy", value: supersededBy as unknown as FieldValue } as const] : []), ...next.effects,
   ], opens: [opening(given, "receipt", 3, item.id), opening(given, "mint", 1, item.id), ...next.opens], update: null };
 }
-/** Only version 4 translates heterogeneous pointer writes into integer values. */
+/** Versions 4 and 5 translate heterogeneous pointer writes into integer values. */
 function fileEffects(effects: readonly RuleEffect[], state: Pick<StateView, "page">): readonly RuleEffect[] {
   const branch = branchOf(state);
   return effects.map(effect => effect.effect === "ref" && ((effect.item === branch?.id && ["slot", "judging"].includes(effect.slot)) || effect.slot === "publication")

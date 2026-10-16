@@ -43,6 +43,8 @@ export { sourceName, applicationPublicationOrigin, publishingLaneOrigin, publish
 export { filePublicationCause, filePublicationCurrent, newestFilePublication, fileSupersededOutcome, destinationPublicationAt } from "./destination.ts";
 export { filePublicationCommit, fileReceiptObjects, fileReceiptRef, type FilePublicationCause } from "./destination-objects.ts";
 export type { LaneRead } from "./destination.ts";
+/** Internal versioned metadata reader shared by native host and rules. */
+export { publicationStandingRecord } from "./publication-standing.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
 export { mintRevoked as destinationRevokedMint } from "./destination.ts";

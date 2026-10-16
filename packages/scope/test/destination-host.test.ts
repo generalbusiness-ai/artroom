@@ -1,8 +1,12 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, OperationId, RetainedInput, ScopeId } from "@generalbusiness/dap-contract";
-import { canonicalize, entryHash, factRefOf, newIncarnation } from "@generalbusiness/artroom-bytes";
+import type { Digest, FieldValue, OperationId, RetainedInput, ScopeId } from "@generalbusiness/dap-contract";
+import { canonicalize, entryHash, factRefOf, newIncarnation, signIntent } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/dap-derive/testing";
-import { destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { DESTINATION_5, destination5, destinationRules5, destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { useOf } from "@generalbusiness/dap-derive";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { publicationJourney } from "../../platform/test/support-publication-journey.ts";
+import { keyObserved } from "../../platform/test/support-destination.ts";
 import { Branch, HEAD, NEXT, OTHER, TREE, handMade, rita } from "../../../packages/platform/test/support-destination.ts";
 import { CredentialStore } from "../src/credential-store.ts";
 import { DestinationHost, type DestinationBinding, type DestinationHostOptions, type DestinationInspection, type DestinationProvider, type DestinationRepository } from "../src/destination-host.ts";
@@ -277,5 +281,53 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       // The port forwards host evidence, without making a second reservation judgment.
       expect(f.branch.item(publication.seq).state).toBe("queued");
     });
+  });
+});
+
+// Invariant: the production host retains @4 file inspection and fenced
+// reservation snapshot behavior for explicit @5, using its record-shaped
+// generations. Creator/lane/membership/provider answers remain stand-ins.
+test("D1 production host inspects automatic files and reads the current fenced checker generation without treating metadata as an array", async () => {
+  const storage = await found();
+  await storage.inside(async state => {
+    const journey = publicationJourney(destination5, DESTINATION_5, destinationRules5);
+    const make = () => {
+      const ledger = journey.make(), provider = new Provider(), retained = new Map<Digest, RetainedInput>();
+      const given: OutsideGiven = { state: ledger.state, own: ledger.own, scope: () => ledger.state.scope(),
+        genesis: () => { const input = ledger.own(0)?.entry.input; return input?.type === "genesis" ? input : null; },
+        retained: (_kind, digest) => retained.get(digest) ?? null, clock: { read: () => ledger.now }, random: { bytes: n => new Uint8Array(n) } };
+      const custody = new CredentialStore(state.storage.sql, () => ledger.at);
+      const options: DestinationHostOptions = { host: "git.example", namespace: "public-test", provider, custody };
+      const request = (operation: OperationId): EffectRequest => { const record = ledger.state.operation(operation)!; return { scope: ledger.at, operation, attempt: 1, owner: record.owner, kind: record.kind, origin: ledger.own(Number(operation.split(":")[0]))! }; };
+      return { ledger, provider, retained, given, options, request };
+    };
+    const file = make(), fileHost = new DestinationHost(file.given, file.options);
+    expect(journey.file(file.ledger).result).toBe("write");
+    file.provider.seen = HEAD; // empty scripted object response means absent path
+    const fileJudge = `${file.ledger.head.seq}:0` as OperationId;
+    expect(fileHost.accepts(DESTINATION_5, "file-judge")).toBe(true);
+    expect(fileHost.recovery.accepts(DESTINATION_5, "file-judge")).toBe(true);
+    expect(fileHost.accepts("platform:destination@6", "file-judge")).toBe(false);
+    expect(await fileHost.send(file.request(fileJudge))).toMatchObject({ result: "confirmed", evidence: { body: { head: HEAD, present: false, tree: null } } });
+    expect(await fileHost.recovery.read(file.request(fileJudge))).toMatchObject({ result: "confirmed", evidence: { body: { head: HEAD, present: false } } });
+    expect(file.provider.calls.map(call => call.kind)).toEqual(["ref", "objects", "ref", "objects"]);
+
+    const tree = make(), configuration = `sha256:${"8".repeat(64)}` as Digest;
+    const reserved = journey.reserve(tree.ledger, { list: true, checks: [{ name: "unit", configuration, checker: keys.una.member.member, required: true }] });
+    journey.answer(tree.ledger, reserved.push, { send: "accepted", seen: reserved.publication.values["integration"]!, tree: reserved.publication.values["tree"]! });
+    const job = handMade(reserved.manifest.at, "request-check", [], rita, { manifest: reserved.manifest.seq, name: "unit", configuration }, seq => [
+      { effect: "value", item: seq, slot: "tree", value: reserved.publication.values["tree"]! }, { effect: "value", item: seq, slot: "deadline", value: t(600) },
+    ]);
+    journey.tell(tree.ledger, "check-fence", { operation: factRefOf(reserved.merge) as unknown as FieldValue, job: factRefOf(job) as unknown as FieldValue, name: "unit" }, [reserved.merge, job]);
+    for (const fact of tree.ledger.foldOptions.facts ?? []) { const use = useOf(fact.fact, fact.entry); tree.retained.set(use.content, { kind: "entry", digest: use.content, bytes: canonicalize(fact.entry), under: fact.under }); }
+    let keyReads = 0;
+    const host = new DestinationHost(tree.given, { ...tree.options, snapshotReader: {
+      job: async fact => canonicalize(fact) === canonicalize(factRefOf(job)) ? { entry: job, under: "change", state: "requested" } : null,
+      key: async () => { keyReads++; return keyObserved(keys.una, tree.ledger.now, { actions: ["change.check"] }); },
+    } });
+    const ask = signIntent({ v: 1, to: job.at, actor: keys.una.key, kind: "git-read@1:job-read", on: null, expected: {}, fields: { job: factRefOf(job) as unknown as FieldValue }, idempotencyKey: "D1 scripted job read", notAfter: t(60) }, keys.una.secret);
+    expect(await host.snapshot(ask)).toEqual({ refused: "reservation-stage-missing" });
+    expect(keyReads).toBe(1);
+    expect(tree.provider.calls.map(call => call.kind)).toEqual(["ref"]);
   });
 });

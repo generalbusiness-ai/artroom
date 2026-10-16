@@ -105,6 +105,10 @@ test.each(["effective", "absent", "unavailable", "active", "root-full"] as const
   const changes = { paths: ["standing.md"], links: [], unreadable: 0 }, changed = valueDigest("artroom-changed-set-1", changes);
   await drive("judge", `${publication}:0`, { head: HEAD, present: true, tree: "d".repeat(40), firstParent: HEAD, ancestors: [], changes: changed }, [{ kind: "value", domain: "artroom-changed-set-1", digest: changed, bytes: canonicalize(changes) }]);
   const reserved = await snapshot();
+  const summary = await stubOf(name).summary(reader);
+  expect(summary.ok).toBe(true);
+  if (!summary.ok) throw Error("Native D1 summary unavailable");
+  expect(summary.value.reservationExpiry).toBeDefined();
   expect(reserved.items.find(item => item.id === publication)?.state, JSON.stringify({ sent: sent.map(request => [request.kind, request.operation]), keyReads, operations: reserved.operations, last: (await history()).at(-1)?.entry.input.type })).toBe("reserved");
   const mint = reserved.operations.find(operation => operation.kind === "mint" && operation.for === publication)!;
   expect(mint).toBeDefined();
@@ -164,6 +168,11 @@ test.each(["effective", "absent", "unavailable", "active", "root-full"] as const
     expect(item).toMatchObject({ state: "publishing", values: { aborting: false, token: mint.id } });
     expect(aborted.operations.filter(operation => operation.for === publication && ["revoke", "read"].includes(operation.kind))).toEqual([]);
     expect(replies.has(mint.id)).toBe(false);
+    const message: Request = { class: "request", type: "tell", body: { message: "publish-file", fields: { path: "unproven.md", content: "Unproven application" } } };
+    const unproven = handMade(lane, "donate", [{ n: 0, to: destination, message }]);
+    remember(unproven, "lending"); // deliberately lacks immutable factory proof
+    expect(await surface.deliver({ to: destination, from: factRefOf(unproven), n: 0, message })).toMatchObject({ answer: "retry", reason: "dependency-unavailable" });
+    expect(await snapshot()).toEqual(aborted);
     await evictDurableObject(object);
     expect(await snapshot()).toEqual(aborted);
     return;

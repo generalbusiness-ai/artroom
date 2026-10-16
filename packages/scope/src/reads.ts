@@ -213,7 +213,7 @@ export class Reads {
     // Projection only: no timed judgment, write, alarm or provider call.
     // Read one clock after collecting the recorded state at this same head.
     let reservationExpiry: Summary["reservationExpiry"];
-    if (pinned.named === "platform:destination@3" || pinned.named === "platform:destination@4") {
+    if (["platform:destination@3", "platform:destination@4", "platform:destination@5"].includes(pinned.named)) {
       reservationExpiry = { clock: "unavailable" };
       try {
         const reading = this.#signed?.clock.read();
