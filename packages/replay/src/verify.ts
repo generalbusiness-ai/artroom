@@ -37,14 +37,14 @@
  * under `trusts`, that the head is the service's answer.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, retainedValueKey, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { rawRetainedJSON, domainRetainedJSON, canonicalize, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, retainedValueKey, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
+  requiredDependency, observationDependency, textDependency, HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
+  judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, windowOf,
 } from "@generalbusiness/dap-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import type { DependencyOrigin, RequiredDependency, ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/dap-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
@@ -561,7 +561,10 @@ class Verifier {
   }
 
   /** Section 9.2: an input an entry names by digest. One that is missing makes the replay `incomplete`. */
-  async #retained(run: Run, at: FactRef, kind: RetainedInput["kind"], digest: Digest, what: string, domain?: string): Promise<RetainedInput> {
+  async #retained(run: Run, dependency: RequiredDependency, what: string): Promise<RetainedInput> {
+    const { key, origin: { at } } = dependency;
+    const { kind, digest } = key;
+    const domain = "domain" in key ? key.domain : undefined;
     const left = this.#limits.bytes - this.#bytes;
     const got = await this.#source.retained(run.id, kind, digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, domain);
     if (!got.ok) {
@@ -578,20 +581,17 @@ class Verifier {
    * holds no bytes under that digest, or holds bytes that are not that
    * text. Such a text is owed until a tombstone answers for it.
    */
-  async #text(run: Run, digest: Digest): Promise<number | null> {
+  async #text(run: Run, origin: DependencyOrigin, digest: Digest): Promise<number | null> {
     const left = this.#limits.bytes - this.#bytes;
-    const got = await this.#source.retained(run.id, "text", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
+    const { key } = textDependency(origin, digest);
+    const got = await this.#source.retained(run.id, key.kind, key.digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) });
     if (!got.ok) {
       this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`);
       return null;
     }
     this.#count(got.bytes);
-    try {
-      const text: unknown = parseStrict(got.input.bytes);
-      return typeof text === "string" && textDigest(text) === digest ? utf8(text).length : null;
-    } catch {
-      return null;
-    }
+    const text = domainRetainedJSON(DOMAINS.text, digest, got.input.bytes);
+    return typeof text === "string" ? utf8(text).length : null;
   }
 
   /**
@@ -729,18 +729,12 @@ class Verifier {
   // ---------------------------------------------------------------- replay of one entry
 
   /** The pinned definition, from the retained declaration the genesis's seed names (sections 6.1 and 9.2). */
-  async #pin(run: Run, where: FactRef): Promise<ValidDefinition> {
+  async #pin(run: Run, where: FactRef, input: Entry["input"]["type"]): Promise<ValidDefinition> {
     const digest = run.named;
     if (isPlatformDefinition(digest)) return this.#code(run, digest, where);
     if (!isDigest(digest)) throw new Stop("unsupported-definition", `the scope pins ${String(digest)}, which this replay has no code for`, where);
-    const kept = await this.#retained(run, where, "definition", digest, "the definition's declaration");
-    let declared: unknown;
-    try {
-      declared = parseStrict(kept.bytes);
-      if (definitionDigest(declared as never) !== digest) declared = undefined;
-    } catch {
-      declared = undefined;
-    }
+    const kept = await this.#retained(run, requiredDependency({ at: where, input }, "declaration", { kind: "definition", digest }), "the definition's declaration");
+    const declared = domainRetainedJSON(DOMAINS.definition, digest, kept.bytes);
     // Bytes that do not parse, or do not hash to the value named, are rejected before anything in them is read (section 9.4).
     if (declared === undefined) throw new Stop("incomplete", `a retained input is not the one named: the definition's declaration, ${digest}`, where);
     const checked = validateDefinition(declared, this.#bounds, RULE_PROFILES);
@@ -1050,13 +1044,13 @@ class Verifier {
     const domains = retainsOf(run.definition!);
     for (const digest of observed.flatMap((use) => namedBy(use.observation))) {
       let found: string | null = null;
-      for (const domain of domains) {
+      const probe = observationDependency({ at: where, input: entry.input.type }, digest, domains);
+      for (const { domain, key } of probe.choices) {
         const left = this.#limits.bytes - this.#bytes;
-        const key = retainedValueKey(domain, digest);
         const got = await this.#source.retained(run.id, key.kind, key.digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, "domain" in key ? key.domain : undefined);
         if (!got.ok) { this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`); continue; }
         this.#count(got.bytes);
-        try { if (valueDigest(domain, parseStrict(got.input.bytes)) === digest) found = got.input.bytes; } catch { /* not the one named */ }
+        if (domainRetainedJSON(domain, digest, got.input.bytes) !== undefined) found = got.input.bytes;
         if (found !== null) break;
       }
       if (found === null) throw new Stop("incomplete", `a retained input is missing: the value that an observation of the entry names, ${digest}`, where);
@@ -1124,7 +1118,7 @@ class Verifier {
     const record = ancestryOf(input);
     for (const digest of record ? [...named, record.snapshot.digest] : named) {
       if (run.snapshots.has(digest)) continue;
-      const kept = await this.#retained(run, where, "snapshot", digest, "the snapshot of staged refs");
+      const kept = await this.#retained(run, requiredDependency({ at: where, input: "outcome" }, "outcome-snapshot", { kind: "snapshot", digest }), "the snapshot of staged refs");
       if (snapshotRead(digest, kept.bytes) === null) throw new Stop("incomplete", `a retained input is not the one named: the snapshot of staged refs, ${digest}`, where);
       run.snapshots.set(digest, kept.bytes);
     }
@@ -1196,7 +1190,7 @@ class Verifier {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     const input = entry.input;
     const state = run.state;
-    const definition = run.definition ?? (run.definition = await this.#pin(run, where));
+    const definition = run.definition ?? (run.definition = await this.#pin(run, where, input.type));
     const bounds = this.#bounds;
     // Sections 4.1 and 9.4: a genesis states the genesis act of the definition that it pins. Integrity mode reads no definition, and does not check this.
     if (input.type === "genesis" && input.kind !== definition.declared.genesis) throw mismatch(`genesis-kind: the genesis records the kind ${input.kind}, and the genesis act of the pinned definition is ${definition.declared.genesis}`);
@@ -1204,13 +1198,8 @@ class Verifier {
     // The retained copy of each foreign entry this entry used, by its content digest (section 9.2).
     const facts: Fetched[] = [];
     for (const use of entry.uses) {
-      const kept = await this.#retained(run, where, "entry", use.content, `the foreign entry ${use.fact.seq} of ${use.fact.at.scope}`);
-      let copy: unknown;
-      try {
-        copy = digestBytes(utf8(kept.bytes)) === use.content ? parseStrict(kept.bytes) : undefined;
-      } catch {
-        copy = undefined;
-      }
+      const kept = await this.#retained(run, requiredDependency({ at: where, input: input.type }, "foreign-use", { kind: "entry", digest: use.content }), `the foreign entry ${use.fact.seq} of ${use.fact.at.scope}`);
+      const copy = rawRetainedJSON(use.content, kept.bytes);
       if (copy === undefined) throw new Stop("incomplete", `a retained input is not the one named: the foreign entry ${use.fact.seq} of ${use.fact.at.scope}`, where);
       if (!isEntry(copy)) throw mismatch("a used foreign entry is not an entry");
       facts.push({ fact: use.fact, entry: copy, under: kept.under ?? "" });
@@ -1247,13 +1236,8 @@ class Verifier {
     for (const p of entry.prepared) {
       const source = typeof p.rule === "string" && Object.hasOwn(definition.declared.rules, p.rule) ? definition.declared.rules[p.rule]! : null;
       if (source === null || !isDigest(p.input)) throw mismatch("the entry records the result of a rule its definition does not declare");
-      const kept = await this.#retained(run, where, "rule", p.input, `the input of rule ${p.rule}`);
-      let read: unknown;
-      try {
-        read = digestBytes(utf8(kept.bytes)) === p.input ? parseStrict(kept.bytes) : undefined;
-      } catch {
-        read = undefined;
-      }
+      const kept = await this.#retained(run, requiredDependency({ at: where, input: input.type }, "rule-input", { kind: "rule", digest: p.input }), `the input of rule ${p.rule}`);
+      const read = rawRetainedJSON(p.input, kept.bytes);
       if (read === undefined) throw new Stop("incomplete", `a retained input is not the one named: the input of rule ${p.rule}`, where);
       const [again] = await evaluateRules([{ rule: p.rule, source, input: read, digest: p.input }]);
       if (again?.result !== p.result) throw mismatch(`rule ${p.rule}, evaluated again over its retained input, does not give the recorded result`);
@@ -1267,7 +1251,7 @@ class Verifier {
     const texts = new Map<Digest, number | null>();
     // A message that no handler received names none: a handler whose `from` names another definition than the sender pins did not.
     for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
-      const size = await this.#text(run, text);
+      const size = await this.#text(run, { at: where, input: input.type }, text);
       texts.set(text, size);
       if (size === null && !run.owed.has(text)) run.owed.set(text, where);
     }
@@ -1329,9 +1313,8 @@ class Verifier {
         for (const place of placesOf(own(definition.declared.acts, input.signed.intent.kind)?.fields, input.signed.intent.fields)) {
           const what = `the value that the field ${place.field} names, in the domain ${place.domain}`;
           const key = retainedValueKey(place.domain, place.digest);
-          const kept = await this.#retained(run, where, key.kind, key.digest, what, "domain" in key ? key.domain : undefined);
-          let named = false;
-          try { named = valueDigest(place.domain, parseStrict(kept.bytes)) === place.digest; } catch { /* not the one named */ }
+          const kept = await this.#retained(run, requiredDependency({ at: where, input: "act" }, "act-value", key), what);
+          const named = domainRetainedJSON(place.domain, place.digest, kept.bytes) !== undefined;
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
         }
@@ -1428,10 +1411,8 @@ class Verifier {
         const values = [...(kindRows?.values ?? [])];
         for (const value of named) {
           const key = retainedValueKey(value.domain, value.digest);
-          const kept = await this.#retained(run, where, key.kind, key.digest, "the value named by outcome evidence", "domain" in key ? key.domain : undefined);
-          try {
-            if (utf8(kept.bytes).length > value.max || canonicalize(parseStrict(kept.bytes)) !== kept.bytes || valueDigest(value.domain, parseStrict(kept.bytes)) !== value.digest) throw new Error();
-          } catch { throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where); }
+          const kept = await this.#retained(run, requiredDependency({ at: where, input: "outcome" }, "outcome-value", key), "the value named by outcome evidence");
+          if (domainRetainedJSON(value.domain, value.digest, kept.bytes, { canonical: true, max: value.max }) === undefined) throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where);
           values.push(kept.bytes);
         }
         judged = judgeOutcome(state, definition, input, { clock, bounds, owners: this.#owners, platform: run.platform ?? undefined, own: reading.own, facts, ...(input.observed ? { observed: input.observed } : {}), ...(kindRows ?? {}), values });
