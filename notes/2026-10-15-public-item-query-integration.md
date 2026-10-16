@@ -369,3 +369,29 @@ fixes. Page and Counting assets are regenerated from this composition.
 The corrected frozen gate runs with `caffeinate -is`; the failed
 `77478ed8` gate remains historical evidence, with no success inferred
 from focused reruns.
+
+## Corrected frozen gate
+
+The clean composed Source head is
+`49941df6c2607ccaeac300cacaa0c53159837345`, tree
+`00f5b2348b0e2cdb7c46a7a4e0b1d442cfb5961f`. The original gate process
+closed with exit 0 under `caffeinate -is npm run gate`. Its adopted
+lockfile stamp matched, so installation was skipped. Whitespace passed
+in 0.1 seconds elapsed / 0.1 CPU; typechecking passed in 7.2 / 24.8;
+the test stage passed in 199.2 / 279.9. Vitest reports 1,374 passed and
+three skipped; all 16 Node checks and all 55 Counting checks passed.
+This replaces the failed gate as final evidence; it does not erase that
+failed run or its corrections.
+
+The wrapper log is `/tmp/artroom-query-49941df6-gate.log`; private raw
+stage logs are in `tmp.h2y26jkfdK` under the system temporary directory.
+Only closed, public test metadata is offered to the checker. Raw gate,
+native recording and browser fixture logs are not a public read grant.
+
+This reporting-only successor changes this note alone. Runtime, tests,
+MCP inventory and generated assets remain byte-identical to the gated
+head. The earlier rendered Page checks remain historical evidence at
+`02213cf9`; this successor has no new rendered UI claim. The final gate
+covers the current asset producers and native integration. No deployed
+route was contacted. Final Source review and local-main merge remain
+separate steps; MCP query support remains unavailable.
