@@ -60,7 +60,7 @@ function context(facts: readonly Fetched[], partition: ScopeRef, root: ScopeRef,
     || !same(partBirth.seed.creator, root) || rootBirth.seed.creator?.kind !== "register" || !isFactRef(rootBirth.source)
     || !same(rootBirth.source.at, rootBirth.seed.creator) || rootBirth.seed.ordinal !== 0
     || !isFactRef(partBirth.source) || !same(partBirth.source.at, root) || partBirth.seed.ordinal !== 0
-    || partBirth.n !== 0 || !partBirth.message || partBirth.message.class !== "request" || partBirth.message.type !== "create" || !isObject(partBirth.message.body)) return invalid;
+    || partBirth.n === null || !partBirth.message || partBirth.message.class !== "request" || partBirth.message.type !== "create" || !isObject(partBirth.message.body)) return invalid;
   const opening = frame(facts, partBirth.source);
   if (!opening) return null;
   if (opening.under !== "platform:directory" || !isEntryOf(opening.entry, opening.fact)) return invalid;
@@ -87,7 +87,7 @@ function context(facts: readonly Fetched[], partition: ScopeRef, root: ScopeRef,
     if (!child.ok) return invalid;
     const birth = child.value.entry.input;
     if (birth.type !== "genesis" || !same(birth.seed.creator, root) || birth.seed.ordinal !== ordinal
-      || birth.seed.cause !== seedDigest(rootBirth.seed) || !same(birth.source, office.value.fact) || birth.n !== ordinal || !birth.message || birth.message.class !== "request" || birth.message.type !== "create"
+      || birth.seed.cause !== seedDigest(rootBirth.seed) || !same(birth.source, office.value.fact) || birth.n === null || !birth.message || birth.message.class !== "request" || birth.message.type !== "create"
       || !sentBy(office.value.entry, { from: office.value.fact, n: birth.n, to: birth.seed, message: birth.message })
       || !isObject(birth.message.body) || !isObject(birth.message.body["fields"]) || !same(birth.message.body["fields"]["directory"], root)) return invalid;
     const childFields = birth.message.body["fields"];

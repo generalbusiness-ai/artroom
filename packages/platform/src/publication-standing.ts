@@ -5,6 +5,7 @@ import type { FactRef, KeyId, OperationId, PlatformDefinition, ScopeRef } from "
 import { canonicalize, entryHash, isFactRef, isKeyId, isRecord, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Operation, Own } from "@generalbusiness/dap-derive";
 import type { ReservationStanding } from "./reservation.ts";
+import { isStandingDestination } from "./versions.ts";
 
 export interface StandingCheck {
   readonly name: string;
@@ -54,7 +55,7 @@ export function publicationStandingKeys(context: PublicationStandingContext, pub
   const unavailable = (): PublicationStandingRead => ({ ok: false, reason: "unavailable" });
   try {
     const record = publicationStandingRecord(publication.values["passes"]), lane = publication.refs["lane"];
-    if (context.owner !== "platform:destination@5" || publication.type !== "publication" || !natural(context.before) || !record || !isScopeRef(lane) || record.reservation !== publication.values["reservedAt"] || record.reservation >= context.before) return unavailable();
+    if (!isStandingDestination(context.owner) || publication.type !== "publication" || !natural(context.before) || !record || !isScopeRef(lane) || record.reservation !== publication.values["reservedAt"] || record.reservation >= context.before) return unavailable();
     const cache = new Map<number, ReturnType<Own>>();
     const own = (seq: number) => {
       if (!natural(seq) || seq < record.reservation || seq >= context.before) return null;

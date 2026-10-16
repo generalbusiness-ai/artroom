@@ -20,6 +20,10 @@ import type { Own, RuleGiven } from "@generalbusiness/dap-derive";
 /** True when the value is a version of the platform definition of that name, such as `platform:destination@2` of `platform:destination`. */
 export const isOf = (named: unknown, name: string): named is PlatformDefinition => isPlatformDefinition(named) && platformName(named) === name;
 
+/** Only these explicit destination pins use D1's standing record. Future
+ * versions do not acquire that provenance contract by numeric comparison. */
+export const isStandingDestination = (named: unknown): named is "platform:destination@5" | "platform:destination@6" => named === "platform:destination@5" || named === "platform:destination@6";
+
 /** The version of a platform definition: the number after its `@`. */
 export const versionOf = (named: PlatformDefinition): number => Number(named.slice(named.lastIndexOf("@") + 1));
 

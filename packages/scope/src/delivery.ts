@@ -132,7 +132,7 @@ export class Deliveries {
     const receiving = this.#scope.pinned();
     const reserve = receiving && isPlatformDefinition(receiving.named) && platformName(receiving.named) === "platform:destination"
       && message.class === "request" && message.type === "tell" && isObject(message.body) && message.body["message"] === "reserve";
-    const file = ["platform:destination@4", "platform:destination@5"].includes(receiving?.named ?? "") && message.class === "request" && message.type === "tell"
+    const file = ["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(receiving?.named ?? "") && message.class === "request" && message.type === "tell"
       && isObject(message.body) && message.body["message"] === "publish-file";
     const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
     if (read === LATE || read === null) return retry("dependency-unavailable");

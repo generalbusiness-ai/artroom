@@ -18,8 +18,10 @@ export function scriptedPartitionOrigin(name: "application" | "change" | "issue"
   const siblingSeeds = siblingPins.map(([kind, pin], n) => seedOf(kind, pin, root, seedDigest(rootSeed), n));
   const [membership, rules, destination] = siblingSeeds.map(address) as [ScopeRef, ScopeRef, ScopeRef];
   const messages = siblingSeeds.map((_seed, n) => ({ class: "request", type: "create", body: { fields: { directory: root, ...(n > 0 ? { membership: membership.scope } : {}), ...(n === 2 ? { rules: rules.scope } : {}) } } }) as const);
-  const rootGenesis: Entry = { ...birth(rootSeed, root, "establish", { at: register, seq: 1, hash: d("3") }, 0, { class: "request", type: "create", body: {} }), sends: siblingSeeds.map((to, n) => ({ n, to, message: messages[n]! })) };
-  const siblings = siblingSeeds.map((seed, n) => birth(seed, [membership, rules, destination][n]!, "establish", factRefOf(rootGenesis), n, messages[n]!));
+  // Native genesis replies before its three creates: send n is not the
+  // creation ordinal. These raw protocol fixtures retain the actual n=1..3.
+  const rootGenesis: Entry = { ...birth(rootSeed, root, "establish", { at: register, seq: 1, hash: d("3") }, 0, { class: "request", type: "create", body: {} }), sends: siblingSeeds.map((to, n) => ({ n: n + 1, to, message: messages[n]! })) };
+  const siblings = siblingSeeds.map((seed, n) => birth(seed, [membership, rules, destination][n]!, "establish", factRefOf(rootGenesis), n + 1, messages[n]!));
   const open = signed(root, "open-partition", {}, "scripted-partition-open"), partSeed = seedOf("directory", C.partition, root, intentDigest(open.intent)), partition = address(partSeed);
   const partMessage = { class: "request", type: "create", body: { directory: root, membership, fields: { root, membership, rules, destination, generation: 1, base: 1 } } } as const;
   const rootOpening: Entry = { ...empty(root), seq: 1, prev: factRefOf(rootGenesis).hash, input: { type: "act", signed: open, authority: [], presented: {} }, sends: [{ n: 0, to: partSeed, message: partMessage }] };

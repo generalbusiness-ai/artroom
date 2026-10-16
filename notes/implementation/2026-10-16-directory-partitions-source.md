@@ -85,7 +85,7 @@ unavailable resolved cause; the new name is now explicit, and delivery
 creation uses the contract's delivery-cause digest. No transport value
 or other name was added.
 
-The catalog, destination6 policies, bounded immutable proof production,
+At that checkpoint the catalog, destination6 policies, bounded immutable proof production,
 replay selection, real Authority/capacity/handoff witnesses and operator
 consumers are unfinished. The separate A1 dropped-advisory contract is
 not included. No production capacity claim follows from a smaller test
@@ -168,7 +168,77 @@ than the wider message union; the policy's fields needed explicit object
 narrowing. No runtime fault or relaxed native guard follows from those
 type corrections.
 
-This note now follows `ec695f11` under `notes/implementation/`. The new
+This note now follows `ec695f11` under `notes/implementation/`. At the
+raw-collector checkpoint, the new
 catalog, receiver bootstrap, raw retention and mixed replay selection,
 full native factory/Authority witnesses and operator consumers remain
 unfinished. No first Source approval or activation is claimed.
+
+## Explicit catalog and first native factory evidence
+
+The branch now incorporates Main `8412601d`, including the approved
+retain/count implementation and notes layout. The sole merge conflict
+combined two additive namespace imports. Scope typechecking passed after
+the merge.
+
+The local catalog now supports only the stated new pins: register11,
+root directory10, partition1 and destination6, with exact register and
+sibling tables. Default founding and all earlier data digests are
+unchanged. Destination6 reuses destination5's D1 data and rules. Standing
+records and operation provenance accept exactly versions5 and6, keep
+every same-owner comparison, and reject future versions. Closed file,
+cleanup, read and host cases explicitly include6. These changes do not
+select the new source identity policy. Existing global origin helpers
+still refuse partition-born sources until the receiver work is complete.
+
+The original in-memory standing witnesses now run under both5 and6.
+Together with the bounded provenance file, 33 focused tests pass. They
+cover active mint, abort with this mint's revoke and one deciding read,
+missing or stale standing, changed checker signer, cleanup, and automatic
+file work without the regular-publication standing read. Their lane,
+membership and host inputs remain the documented stand-ins. Four focused
+catalog and partition cases pass. The first catalog run failed because
+the exact golden inventory still omitted the four new pins. Its observed
+new digests are now recorded as literals, and the unsupported-version
+control advances from6 to7. No old digest is changed.
+
+The first real factory witness creates register11, root10, membership6,
+rules3, destination6 and partition1 through production data, rules,
+Authority, dispatch and SQLite. The partition holds the root's exact
+confirmed references, and resolves its membership and rules after a
+restart. An unknown key is unauthorized at root and partition; the
+registered founder reaches the early-seal guard and is refused
+`partition-not-full`. The control that permits early seal distinguishes
+that real native refusal and restores the cutoff.
+
+The same native scenario activates the actual Counting definition and
+creates it through the partition's application factory. Actual bounded
+native birth and exact-entry RPCs collect eight frames in eight calls.
+The shared application-origin validator accepts those actual immutable
+births; the legacy validator rejects this factory. A later actual
+confirmed entry needs nine calls, with its requested source entry kept
+separate from the eight birth frames. The current-source and collector
+files pass three focused cases. This is neither an Initialize/controller
+journey nor a publication send. The register Git host, clock, finite
+scheduler and inspected setup reads retain the existing explicit fixture
+boundaries.
+
+The initial native factory fixture seated the founder but omitted its
+normal `first-key` act, so the real observation correctly answered unknown
+and the opening was unauthorized. A focused standing assertion exposed
+the omission; the corrected fixture registers the actual first key. Its
+first seal intent also included an unused expected alias and was refused
+`bad-intent`; the corrected intent names only `on`. The initial typecheck
+used a nonexistent summary `head` field instead of its envelope `at`.
+Those failed setup runs remain retained. Production authority and guard
+code were not loosened to satisfy them. Inspection of the actual factory
+also corrected an overstrict proof draft: a child's send number differs
+from its creation ordinal because genesis replies first. The validator
+keeps the exact ordinal and matches the actual request number through
+`sentBy`, including automatic handoff replies.
+
+Receiver bootstrap and eligibility, raw retention and per-run mixed
+replay interpretation, ordinary issue/change and nested concern native
+journeys, handoff/capacity failures, and operator consumers remain owed.
+This branch has no directory gate or Source approval yet. The new cohort
+is not landed, pushed, deployed or activated on any host.

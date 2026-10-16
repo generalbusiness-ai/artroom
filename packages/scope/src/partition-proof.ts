@@ -15,6 +15,9 @@ import { LATE, within } from "./turn.ts";
 export const PARTITION_PROOF_BOUNDS = Object.freeze({ frames: PARTITION_IDENTITY_BOUNDS.facts, calls: 16, bytes: 16 * PROOF_BYTE_BOUNDS.body, laneDepth: PARTITION_IDENTITY_BOUNDS.laneDepth, milliseconds: 10_000 });
 export type RawPartitionFrame = PartitionNativeFrame;
 export interface PartitionProof {
+  source: RawPartitionFrame;
+  /** Eight base origin frames, plus any concern ancestors. The separately
+   * requested current source entry is not repeated here unless it is genesis. */
   frames: readonly RawPartitionFrame[];
   calls: number;
   reservedBytes: number;
@@ -110,8 +113,8 @@ class Collection {
     }
     return true;
   }
-  finish(): PartitionProof | null {
-    return this.#remaining() > 0 ? { frames: [...this.#frames.values()], calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
+  finish(source: RawPartitionFrame): PartitionProof | null {
+    return this.#remaining() > 0 ? { source, frames: [...this.#frames.values()].filter(frame => source.fact.seq === 0 || !same(frame.fact, source.fact)), calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
   }
 }
 
@@ -122,6 +125,7 @@ export async function partitionProof(ports: PartitionProofPorts, from: FactRef):
   if (!isFactRef(from) || from.at.kind !== "lane") return null;
   try {
     const collection = new Collection(ports);
-    return await collection.exact(from) && await collection.lane(from.at) ? collection.finish() : null;
+    const source = await collection.exact(from);
+    return source && await collection.lane(from.at) ? collection.finish(source) : null;
   } catch { return null; }
 }

@@ -117,10 +117,10 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
         if (!opening || !opening.entry.effects.some(e => e.effect === "open" && e.item === receipt.id && e.type === "receipt")
           || !opening.entry.effects.some(e => e.effect === "value" && e.item === receipt.id && e.slot === "commit" && e.value === commit)) continue;
         let judged = opening;
-        const publicationId = receipt.refs["publication"] ?? (["platform:destination@4", "platform:destination@5"].includes(definition ?? "") ? receipt.values["publication"] : undefined);
+        const publicationId = receipt.refs["publication"] ?? (["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(definition ?? "") ? receipt.values["publication"] : undefined);
         if (typeof publicationId === "number") {
           const published = item(publicationId);
-          if (!published || !(published.type === "publication" || ["platform:destination@4", "platform:destination@5"].includes(definition ?? "") && published.type === "file-publication") || published.values["integration"] !== commit
+          if (!published || !(published.type === "publication" || ["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(definition ?? "") && published.type === "file-publication") || published.values["integration"] !== commit
             || !opening.entry.effects.some(e => e.effect === "state" && e.item === publicationId && e.state === "published")) continue;
           const reservedAt = published.values["reservedAt"];
           if (typeof reservedAt !== "number") continue;
