@@ -143,5 +143,18 @@ Earlier bounded JSON-work and foreign-copy controls each fail their intended
 assertion with the guard removed and restore it. Their guard text and
 witness remain; subsequent frame/support checks are additional Source.
 
-The final frozen gate and exact-head review remain to be recorded. No
-push or deployment ran.
+## Frozen gate
+
+The one gate at Source `2e3cd9183bdb98d54e76b0704ebe21cb93e6ee7d`, tree
+`6b3d9914090be1603969dee20388304faea8e449`, closed with exit 0. It ran
+under temporary caffeinate on the local Mac, with the existing workspace
+load and the gate's normal dependency-cache behavior. Installation passed
+(2.4 s elapsed, 3.7 s CPU), whitespace passed (0.2 / 0.1 s), workspace
+typechecks passed (7.8 / 25.6 s), and tests passed (207.0 / 291.3 s).
+These are separate step measurements, not a measured whole-gate duration.
+There were 1,420 Vitest passes and three skips, 16 Node passes and 55
+Counting passes. No failed gate is being relabelled or retried.
+
+This successor changes only this report note; every Source/test/package
+path remains exactly the gated bytes. Raw logs remain private. Exact-head
+checker review remains owed. No push or deployment ran.
