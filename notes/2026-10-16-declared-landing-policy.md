@@ -68,8 +68,9 @@ name and field the destination reads, and adds:
 - **`assessment`** items (at most 64) and the act `assess`
   (`change.assess`). Values: `confidence` (integer 0 to 100), `model`,
   `version`, and `tree`, fixed. Refs: `manifest`, fixed. Guards: the
-  manifest is current; `tree` equals the manifest's tree; one assessment
-  for each signer and version. An assessment is advisory input only.
+  manifest is current; `tree` equals the manifest's tree; the signer is
+  not an author (`notIn`, as `change.ts:929` uses); one assessment for
+  each signer and version. An assessment is advisory input only.
 - **`disposition`** items (at most 64), one for each version, opened by
   two acts with grant `change.dispose`:
   - `send-back`, with guards in this order: the version is current
