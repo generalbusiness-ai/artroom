@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f1ccb392ed6e95e28aa4ba5db2873c89a9e8ae20","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/settle.ts."}
+{"kind":"artifact","text":"notes/2026-10-15-unified-forge-design.md at exact bc15550cc93714eb430f68e862fd23bdbacbe6c8 on planner/forge-carry-forward-20261016, under promise git:sha1…cadbd87 on request git:sha1…fdd5e67","body":{"commit":"bc15550cc93714eb430f68e862fd23bdbacbe6c8","path":"notes/2026-10-15-unified-forge-design.md"}}
