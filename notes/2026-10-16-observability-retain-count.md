@@ -127,6 +127,26 @@ method annotation were corrected for typechecking. The earlier sidecar
 ordering expectation was corrected to compare parsed timestamps. No
 existing native guard or timeout was relaxed. No mutation sweep ran.
 
-The one complete gate at the frozen implementation head is pending.
-Its original completion, counts and qualifications will be appended
-before review; this sentence is not a passing-gate claim.
+The one complete gate at frozen implementation head
+`63bb3eada28f9b2df32b0e4ca8a06a9155530eb1`, tree
+`1ce69c333f58491b754285802f65424d65bec7ce`, passed. Original session
+62481 closed with exit 0: 1,464 Vitest tests passed, 3 skipped, 16 Node
+checks and 55 Counting checks passed. Dependency installation passed in
+3.4 seconds, whitespace passed, workspace typechecks passed in 10.4
+seconds, and tests passed in 283.1 seconds. No suite or gate was repeated.
+The original output retains scripted reset, injected retention-fault and
+Vitest timeout-cancellation diagnostics; the terminal result is exit 0.
+Their presence does not establish a new production failure or diagnose
+the earlier D1 gate failures.
+
+Only this reporting note changes after that frozen gate. All other
+tracked blobs and modes must match that head before exact-head review.
+Raw output remains at `/tmp/artroom-observability-63bb3ead-gate.log` and
+its gate-owned temporary directory. Those raw paths are not an access
+grant. A separately named finite public JSON summary will be the sole
+execution-evidence grant for the checker.
+
+The implementation was composed with reviewed D1 Main `5caa62f3` and
+the planner's MVP plan Main `3267fbbe`. Existing defaults and every older
+platform pin remain. The Source configuration was prepared only; no
+Cloudflare release, binding, secret or provider operation occurred.
