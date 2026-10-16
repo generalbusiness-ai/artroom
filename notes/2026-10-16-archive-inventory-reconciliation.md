@@ -57,7 +57,7 @@ A source wrapper that logs all verifier reads would therefore cross the
 archive cutoff and would also select foreign histories. It is not, by
 itself, an archive inventory implementation.
 
-## Differences that need an explicit decision
+## Differences identified before the decision
 
 The adopted table says that declarations named by declarations or fields
 are followed to closure. The current verifier reads a pin once in `#pin`
@@ -89,7 +89,13 @@ uncertified domain or foreign-copy cohort gains permission from appearing
 in the dependency table. Room consent, access disclosure and actual writer
 admission remain required before any export.
 
-## Proposed next source boundary
+## Source boundary decided by checker
+
+Checker report `78127fe6` settles the technical boundary below. The
+companion amendment to section 15.3 records its distinct replay and archive
+purposes and the native declaration-reference grammar. Both remain a
+proposed documentation successor for planner to adopt before dependent
+inventory Source; this note is not a statement that they have landed.
 
 Use a shared, bounded dependency selection interface at the consumers
 above, with the local full scope, input variant, entry position, kind,
@@ -104,8 +110,22 @@ consumer must either have a declared per-variant selection or refuse the
 inventory as unsupported. Do not add a permissive catch-all kind or infer
 dependencies from the current retained-store contents.
 
-Before dependent Source, checker must settle the declaration-closure
-grammar, the proposed shared interface and the handling of failed probes.
+The grammar is the existing `creates()` function: typed create-definition
+edges, with selected seed/definition-domain roots, shared rather than
+copied. Required keys, ordered optional probes and text omissions are
+separate operations. Byte validation precedes selection; every attempt,
+including failed and cached work, spends one cumulative pass allowance.
+Unknown consumers or owners without static declarations refuse. Ordinary
+replay keeps its existing unused-child behavior; archive closure requires
+the additional child bytes. Exact aggregate limits must be stated and
+enforced in Source, with no complete prefix result on exhaustion.
+
+Checker also found that the native producer stores definition-domain
+values as `definition`, while replay observation/evidence consumers request
+`value`. Separate Source child `a1622876` corrects that prerequisite with
+native service/replay witnesses. It is not an inventory implementation or
+an export permission.
+
 The next implementation must witness a selected cutoff followed by a turn
 that retains another input: rebuilding the selected manifest reads only
 its named immutable inputs. It must also distinguish text omission,

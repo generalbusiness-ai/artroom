@@ -1491,37 +1491,64 @@ a claim. That is the same copy that the lane's own readers can read
 today.
 
 **The input set of a pass is closed under a cutoff.** A pass archives
-the entries from `archivedThrough + 1` to a cutoff `through`, and
-exactly the retained inputs a replay of those entries reads. The
-inventory is the replay's own (`packages/replay/src/verify.ts`, each
-`#retained` and `source.retained` call at main `70729eac`), listed here
-by input variant so that the archiver and the verifier share one list:
+the entries from `archivedThrough + 1` to a cutoff `through`, the retained
+inputs required by the local replay consumers of those entries, and the
+stronger declaration closure below. Replay and archive selection share
+typed consumer and storage-key rules. They have two purposes:
+`replay-required` preserves ordinary replay's reads and verdicts;
+`archive-closure` also selects unused static child declarations. The
+consumer inventory (`packages/replay/src/verify.ts`, each `#retained` and
+direct `source.retained` call) is listed here by input variant:
 
 | Entry input | Retained inputs the replay reads | Kind |
 |---|---|---|
-| Any | The declaration the genesis seed names (`seed.definition`), read once per history by `#pin`; and every declaration a declaration or a field names in the definition domain, followed to closure | `definition` |
+| Any | The declared definition the genesis seed names (`seed.definition`), read once per history by `#pin`. A platform pin uses supplied native code instead. | `definition` |
+| Any selected definition-domain root | Its static child declarations, followed to closure for the separate `archive-closure` purpose described below | `definition` |
 | Any that records `uses` | Each foreign entry a use cites, by its content digest | `entry` |
 | Any that records `prepared` | The input of each rule evaluated | `rule` |
 | `act` | The value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains (`#hand`, line 1048) | `value`, `definition` |
 | `timed` | As `prepared` above | `rule` |
 | `outcome` | The snapshots of staged refs its evidence names under its owner's `retains`, and the snapshot its ancestry record names (`#snapshots`, lines 1094 to 1127, called at 1372): each is retained before the entry that names it, and a later act's `ancestry` guard reads it; the values its evidence names under its owner declaration, by domain and digest (line 1388); and the values its recorded observations name (`#hand`) | `snapshot`, `value` |
 | `delivery` | The values the observations of a result's clause name, under the definition's retained domains (`#hand`, called at line 1322 for an observing definition) | `value` |
-| `checkpoint` | None beyond `uses` and `prepared` | |
+| `genesis`, `diagnosis`, `preparation`, `checkpoint` | No additional retained consumer beyond the shared rows | |
 | Any | A detached text | `text`: never archived (15.1, point 4) |
 
-The closure is transitive: a declaration that names another declaration
-brings it in, and an archived foreign entry brings in nothing further,
-since its own inputs belong to its own scope's archive. A retained input
+The declaration closure uses the native `creates()` grammar in
+`packages/scope/src/definitions.ts`: digest-valued `create.definition`
+positions in acts' and receives' sends are static edges. `self` reuses
+the current declaration; platform pins terminate at supplied native code.
+Roots are the digest-valued seed definition and actual selected values
+that a supported native consumer types as the definition domain. A field
+declaration without a selected digest is not a root. Arbitrary strings,
+ordinary digest fields, rule expressions, snapshots and copied foreign
+entries supply no recursive declaration edges. Validate canonical bytes
+and their definition digest before following edges, in deterministic byte
+order, with visited keys and one cumulative native closure allowance.
+
+This closure is stronger than ordinary replay. The current `#pin` reads
+and validates the root; it does not require bytes of an unused static
+child. Native founding may also leave an absent supplied child waiting
+for its later creation. Keep that ordinary replay behavior. An unavailable
+archive-closure child prevents a complete archive manifest even when
+ordinary replay could be consistent. A complete inventory is not a replay
+verdict and does not derive an ancestry walk again.
+
+An archived foreign entry brings in nothing further, since its own inputs
+belong to its own scope's archive. A retained input
 is immutable by digest and an entry by position, so the selection is a
 pure function of the cutoff. An input that a later turn retains belongs
 to an entry past the cutoff and is not in the set. The kinds and domains
 left out (`text`, and any domain J2 excludes) are listed in the pass's
 manifest as omissions by kind, domain and digest, so a reader of the
 archive can tell "left out by rule" from "missing". A1 keeps this table
-and the verifier's reads in step by consumer: for each input variant,
-each kind and domain the verifier reads is a row here, and a read the
-table does not cover, for that variant, fails the slice. Listing a call
-somewhere is not coverage.
+and the verifier's reads in step by consumer and purpose: for each input
+variant, each selected kind and domain is covered here. An unknown
+consumer or unsupported owner refuses inventory. Listing a call somewhere
+is not coverage. A failed observation-domain probe spends its allowance
+but is not a selected dependency; only its first validated matching key is
+selected. Timeout or limit remains terminal, not an ordinary probe miss.
+Archive selection records a detached-text omission without fetching its
+body, following foreign proof histories or seeking later tombstones.
 
 **What the archive does not change.** A replay from the service already
 reads an ancestry snapshot's bytes and never walks the commits it names,
