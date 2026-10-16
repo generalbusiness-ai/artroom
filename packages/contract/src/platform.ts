@@ -181,8 +181,12 @@ export type PlatformReceive = Omit<ReceiveType, "fields" | "also" | keyof Marked
 /**
  * `indexes` (revision 23, section 17.2a, "An index that an item type
  * declares"): one to four of the type's own slots of `refs` or of `values`,
- * each fixed and required and of one of seven types. The scope keeps, for
- * each, one row for each item of the type, from the entry that opens it.
+ * each fixed and required and of type fact, item, scope, member, digest,
+ * commit, tree or int. An int key is its canonical unquoted decimal text;
+ * its declared safe min/max still apply. This is equality lookup, without
+ * numeric ordering or uniqueness. The scope keeps one row per indexed
+ * slot and item, from the entry that opens it. Declared definitions cannot
+ * state indexes; a new platform cohort needs its own immutable version.
  */
 export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
   refs: Record<string, SlotRule & { to: PlatformFieldType }>;
