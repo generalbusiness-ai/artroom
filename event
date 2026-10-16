@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8ea853e0c829d480557a332ba606841f0b642b8a","text":"The replacement review explicitly owes a verdict rather than a landing. Source request4c8c6377 separately owns local integration; no change to candidate57c8 or its artifacts."}
+{"kind":"promise","text":"I will complete the independent exact57c8cec3 review under this review-only request using the source comparison already completed. No Source changes, repeated tests, push or deployment; the original operation/accounting remains unresolved."}
