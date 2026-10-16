@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8d12a74e7a5e97e1925271231a1153637e660d85","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/operational.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8d63def643faba85e89168bd774ba3c82294200e","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-observability-design.md."}
