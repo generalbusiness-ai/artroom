@@ -128,10 +128,33 @@ Earlier fixture failures remain failures: missing scripted rules extent
 bytes, a noncanonical scripted timestamp, incomplete retained-source lists
 and guessed operation ordinals were corrected before the passing runs. The
 second-generation refusal also exposed the foreign-fact metadata problem
-fixed above. No failed gate is relabelled; no D1 full gate has run yet.
-The Page asset is regenerated from the version registry, without a rendered
-UI change claim. Scope and platform typechecks pass. The frozen full gate,
-exact-head review and landing are still pending at this Source checkpoint.
+fixed above. No failed diagnostic is relabelled. The Page asset is regenerated from the version registry, without a rendered
+UI change claim. Scope and platform typechecks pass.
+
+## Frozen gate
+
+The first and only D1 full gate passed at clean Source
+`2286345e8e7df6f5e74764053ff2d96d2b9ba077`, tree
+`6e7b873583ea4f3087e107b458be446f17240a94`, composed over Main `54dcefbc`.
+Its original process closed with exit 0: 1,444 Vitest passes and three
+skips (275 files passed, one skipped), 16 Node passes and 55 Counting
+passes. There was no gate retry. The wrapper log is
+`/tmp/artroom-d1-2286345e-gate.log`; original private step logs are under
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.ZoSeVwIX9R`.
+These paths identify producer evidence, not a grant to adjacent/raw files.
+
+Step elapsed/CPU seconds were install 3.5/5.3, whitespace 0.0/0.0,
+typecheck 9.3/29.9 and test 307.7/419.3. These are step measurements on
+the local shared Mac with caffeinate and normal dependency/cache state,
+not isolated benchmarks or the whole gate's wall time. The log includes
+scripted-reset and retention-fault diagnostics and one Vitest cross-object
+abort/timeout diagnostic; the reported terminal and suite outcomes are as
+above. This is not a claim of diagnostic-free execution.
+
+The review candidate updates only this report after the gate. The producer
+checks exact correspondence of every other tracked path before filing;
+no Source, test, generated asset, package or lock bytes change afterward.
+Exact-head independent review and landing remain pending.
 
 Cloudflare deployment, version upload, binding, secret and migration changes
 remain held. No such operation or real Git-provider mutation ran. The
