@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/archive-pin.test.ts","body":{"commit":"8e7481eee2e722c9e742c71d90f43764f0921820","path":"packages/scope/test/archive-pin.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0e95cc2656ad2706f2b250b05380137b28956697","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/archive-pin.test.ts."}
