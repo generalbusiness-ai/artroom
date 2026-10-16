@@ -42,17 +42,23 @@ test("native incarnation, cutoff, gap and size damage cannot yield prefix admiss
     const wrongInc = read({ ...lane.at, inc: newIncarnation(new Uint8Array(16).fill(39)) }, through);
     const future = read(lane.at, { ...through, seq: through.seq + 1 });
     const wrongHash = read(lane.at, { ...through, hash: syntheticHash });
+    const original = state.storage.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'scope'").one().v;
+    const changed = JSON.parse(original); changed.head.extra = true;
+    state.storage.sql.exec("UPDATE meta SET v = ? WHERE k = 'scope'", canonicalize(changed));
+    const unknownFrame = read(lane.at, through);
+    state.storage.sql.exec("UPDATE meta SET v = ? WHERE k = 'scope'", original);
     state.storage.sql.exec("UPDATE entry SET size = size + 1 WHERE seq = 1");
     const size = read(lane.at, through);
     state.storage.sql.exec("UPDATE entry SET size = size - 1 WHERE seq = 1");
     state.storage.sql.exec("DELETE FROM entry WHERE seq = 1");
     const gap = read(lane.at, through);
-    return { wrongInc, future, wrongHash, size, gap };
+    return { wrongInc, future, wrongHash, unknownFrame, size, gap };
   });
   expect(result.wrongInc.reason).toBe("unavailable");
   expect(result.wrongInc.queries.some(query => /FROM entry/.test(query))).toBe(false);
   expect(result.future.reason).toBe("incomplete");
   expect(result.wrongHash.reason).toBe("mismatch");
+  expect(result.unknownFrame.reason).toBe("unavailable");
   expect(result.size.reason).toBe("mismatch");
   expect(result.gap.reason).toBe("incomplete");
   // The declaration is a genuine native pin, not an asserted flag.

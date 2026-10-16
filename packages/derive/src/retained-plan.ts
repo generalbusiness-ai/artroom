@@ -1,8 +1,8 @@
 /** Closed native retained consumers, shared by replay and local inventory.
  * A plan names a read. Selection still requires the consumer's byte checks;
  * a plan is neither privacy admission nor a replay/custody verdict. */
-import type { Digest, Evidence, FactRef, FieldValue, Input, ObservationUse } from "@generalbusiness/dap-contract";
-import { DOMAINS } from "@generalbusiness/dap-contract";
+import type { Bounds, Digest, Entry, Evidence, FactRef, FieldValue, Input, ObservationUse } from "@generalbusiness/dap-contract";
+import { DOMAINS, RETAINED_INPUT_BYTES } from "@generalbusiness/dap-contract";
 import { isDigest, isFactRef, retainedValueKey } from "@generalbusiness/artroom-bytes";
 
 import type { ValidDefinition } from "./validate/index.ts";
@@ -65,7 +65,7 @@ function originOf(origin: DependencyOrigin): DependencyOrigin {
   if (!origin || !isFactRef(origin.at) || !(ALL as readonly string[]).includes(origin.input)) return unsupported();
   return origin;
 }
-function keyOf(key: RetainedKey): RetainedKey {
+export function checkedRetainedKey(key: RetainedKey): RetainedKey {
   if (!key || !isDigest(key.digest)) return unsupported();
   const fields = Object.keys(key);
   if (key.kind === "value") {
@@ -76,13 +76,13 @@ function keyOf(key: RetainedKey): RetainedKey {
 
 export function requiredDependency(origin: DependencyOrigin, consumer: RequiredConsumer, key: RetainedKey): RequiredDependency {
   const form = Object.hasOwn(REQUIRED, consumer) ? REQUIRED[consumer] : null;
-  if (!form || !(form.inputs as readonly string[]).includes(originOf(origin).input) || !(form.kinds as readonly string[]).includes(keyOf(key).kind)) return unsupported();
+  if (!form || !(form.inputs as readonly string[]).includes(originOf(origin).input) || !(form.kinds as readonly string[]).includes(checkedRetainedKey(key).kind)) return unsupported();
   return { mode: "required", origin, consumer, purpose: consumer === "definition-child" ? "archive-closure" : "replay-required", key };
 }
 
 export function observationDependency(origin: DependencyOrigin, digest: Digest, domains: readonly string[]): ProbeDependency {
   if (!["act", "delivery", "outcome"].includes(originOf(origin).input) || !isDigest(digest)) return unsupported();
-  const choices = domains.map(domain => ({ domain, key: keyOf(retainedValueKey(domain, digest)) }));
+  const choices = domains.map(domain => ({ domain, key: checkedRetainedKey(retainedValueKey(domain, digest)) }));
   return { mode: "probe", origin, consumer: "observation-value", purpose: "replay-required", choices };
 }
 
@@ -121,18 +121,56 @@ export function outcomeValueDependencies(origin: DependencyOrigin, rules: Operat
 /** The native ancestry grammar names its snapshot even when the owner's
  * ordinary retained list omits it. This is selection only: neither the
  * record nor an owner's list proves the ancestry walk or snapshot count. */
-export function outcomeSnapshotDependencies(origin: DependencyOrigin, input: Extract<Input, { type: "outcome" }>, rules: () => OperationRules | null | undefined): { record: AncestryCheck | null; dependencies: readonly RequiredDependency[] } {
+export function outcomeSnapshotDependencies(origin: DependencyOrigin, input: Extract<Input, { type: "outcome" }>, rules: () => OperationRules | null | undefined): { record: AncestryCheck | null; dependencies: readonly RequiredDependency[]; readable: boolean } {
+  let readable = true;
   let named: readonly Digest[] = [];
   try { named = rules()?.retains?.(input.evidence) ?? []; }
-  catch { /* Ordinary replay leaves unreadable evidence to its judge. */ }
+  catch { readable = false; /* Ordinary replay leaves this evidence to its judge. */ }
   const body: unknown = isObject(input.evidence) ? input.evidence["body"] : null;
   const candidate = input.owner === HOLD && input.kind === HOLD_KINDS.check && input.result === "confirmed" && isObject(body) ? body["record"] : null;
   const record = isAncestryCheck(candidate) ? candidate : null;
-  return { record, dependencies: (record ? [...named, record.snapshot.digest] : named).map(digest => requiredDependency(origin, "outcome-snapshot", { kind: "snapshot", digest })) };
+  return { record, readable, dependencies: (record ? [...named, record.snapshot.digest] : named).map(digest => requiredDependency(origin, "outcome-snapshot", { kind: "snapshot", digest })) };
 }
 
 /** Domain declarations use the native value-place and observation grammar,
  * independently of whether an entry happened to supply a matching value. */
 export function declarationValueDomains(definition: ValidDefinition): readonly string[] {
   return [...new Set([...Object.values(definition.declared.acts).flatMap(act => valuePlaces(act.fields).map(place => place.domain)), ...retainsOf(definition)])];
+}
+
+export interface PlannedRetainedDependency { readonly dependency: RetainedDependency; readonly max: number }
+export interface LocalRetainedPlan {
+  readonly dependencies: readonly PlannedRetainedDependency[];
+  readonly ancestry: AncestryCheck | null;
+}
+/** Composition for local inventory, using the same selectors as replay's
+ * actual reads above. This does not prove judgments, foreign histories,
+ * current authority, owner evidence or the ancestry walk. */
+export function localRetainedPlan(definition: ValidDefinition, entry: Entry, hash: Digest, rules: OperationRules | null, bounds: Bounds, deliveryUnder?: string): LocalRetainedPlan {
+  const input = entry.input, origin: DependencyOrigin = { at: { at: entry.at, seq: entry.seq, hash }, input: input.type };
+  originOf(origin);
+  const dependencies: PlannedRetainedDependency[] = [];
+  const add = (dependency: RetainedDependency, max: number) => dependencies.push({ dependency, max });
+  for (const use of entry.uses) add(requiredDependency(origin, "foreign-use", { kind: "entry", digest: use.content }), RETAINED_INPUT_BYTES);
+  for (const prepared of entry.prepared) {
+    if (!Object.hasOwn(definition.declared.rules, prepared.rule)) return unsupported();
+    add(requiredDependency(origin, "rule-input", { kind: "rule", digest: prepared.input }), RETAINED_INPUT_BYTES);
+  }
+  for (const text of detachedTextDependencies(definition, origin, input, deliveryUnder)) add(text, 0);
+  if (input.type === "act") for (const { dependency, place } of actValueDependencies(definition, origin, input.signed.intent.kind, input.signed.intent.fields)) add(dependency, place.max);
+  if ("observed" in input) for (const { dependency } of observedValueDependencies(definition, origin, input.observed ?? [])) add(dependency, RETAINED_INPUT_BYTES);
+  let ancestry: AncestryCheck | null = null;
+  if (input.type === "outcome") {
+    if (!rules) return unsupported();
+    const snapshots = outcomeSnapshotDependencies(origin, input, () => rules);
+    if (!snapshots.readable) return unsupported();
+    ancestry = snapshots.record;
+    for (const dependency of snapshots.dependencies) add(dependency, RETAINED_INPUT_BYTES);
+    const values = outcomeValueDependencies(origin, rules, input.evidence);
+    if (values === null) return unsupported();
+    for (const { dependency, value } of values) add(dependency, value.max);
+  }
+  // Definitions are validated under their own native ceiling, even when a
+  // value place or observation permits a larger retained reply.
+  return { dependencies: dependencies.map(plan => plan.dependency.mode === "required" && plan.dependency.key.kind === "definition" ? { ...plan, max: Math.min(plan.max, bounds.definitionBytes) } : plan), ancestry };
 }

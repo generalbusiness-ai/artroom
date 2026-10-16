@@ -1,8 +1,9 @@
 /** Native metadata sizing before JSON inspection. This is not a complete
  * privacy inventory or permission to select/export payload bodies. */
 import type { Bounds, Digest, Head, ScopeRef } from "@generalbusiness/dap-contract";
-import { isDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isFactRef, isHead, isRecord, isScopeRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { admitArchivePin, type ArchiveExportRefusal } from "@generalbusiness/artroom-git/archive-policy";
+import { timeMs, type ScopeState } from "@generalbusiness/dap-derive";
 import { ARCHIVE_BOUNDS, ArchiveBudget } from "./archive-budget.ts";
 import { ARCHIVE_PIN_BYTES, ARCHIVE_SCOPE_METADATA_BYTES, readArchivePin, type ArchivePin } from "./archive-pin.ts";
 import type { Sql } from "./sqlite.ts";
@@ -18,6 +19,7 @@ const fail = (reason: ArchivePrefixReason): never => { throw new ArchivePrefixSt
 export interface ArchivePosition { readonly seq: number; readonly hash: Digest; readonly bytes: number }
 export interface ArchivePrefix {
   readonly pin: ArchivePin;
+  readonly frame: ScopeState;
   readonly through: Head;
   readonly positions: readonly ArchivePosition[];
   readonly bytes: number;
@@ -26,7 +28,7 @@ const natural = (n: unknown): n is number => typeof n === "number" && Number.isS
 
 /** `expected` and certificates come from native caller-owned context and
  * trusted reviewer configuration, never a request's claimed safe flags. */
-export function archivePrefixMetadata(sql: Pick<Sql, "exec">, expected: ScopeRef, through: Head, bounds: Pick<Bounds, "entryBytes">, budget: ArchiveBudget, certified: ReadonlySet<Digest>): ArchivePrefix {
+export function archivePrefixMetadata(sql: Pick<Sql, "exec">, expected: ScopeRef, through: Head, bounds: Pick<Bounds, "entryBytes" | "sendsPerEntry">, budget: ArchiveBudget, certified: Pick<ReadonlySet<Digest>, "has">): ArchivePrefix {
   budget.check();
   // Reserve validation as well as raw metadata replies, including cache hits.
   budget.spend({ inputWork: 4 * (ARCHIVE_PIN_BYTES + ARCHIVE_SCOPE_METADATA_BYTES) });
@@ -42,12 +44,17 @@ export function archivePrefixMetadata(sql: Pick<Sql, "exec">, expected: ScopeRef
   const sizes = sizeSql.exec("SELECT octet_length(v) AS size, typeof(v) AS type FROM meta WHERE k = 'scope' LIMIT 1").toArray();
   const size = sizes[0]?.["size"];
   if (sizes.length !== 1 || sizes[0]?.["type"] !== "text" || !natural(size) || size > ARCHIVE_SCOPE_METADATA_BYTES) return fail("unavailable");
-  const frameSql = budget.native(sql, () => ({ metadata: 128, inputWork: size * 4 }));
-  const heads = frameSql.exec("SELECT json_extract(v, '$.head.seq') AS seq, CASE WHEN typeof(json_extract(v, '$.head.hash')) = 'text' AND octet_length(json_extract(v, '$.head.hash')) = 71 THEN json_extract(v, '$.head.hash') ELSE NULL END AS hash FROM meta WHERE k = 'scope' AND octet_length(v) = ? LIMIT 1", size).toArray();
-  const head = heads[0];
-  if (heads.length !== 1 || !natural(head?.["seq"]) || !isDigest(head?.["hash"])) return fail("unavailable");
-  if (through.seq > head["seq"]) return fail("incomplete");
-  if (through.seq === head["seq"] && through.hash !== head["hash"]) return fail("mismatch");
+  const frameSql = budget.native(sql, () => ({ metadata: size + 128, inputWork: size * 8 }));
+  const frames = frameSql.exec("SELECT v FROM meta WHERE k = 'scope' AND typeof(v) = 'text' AND octet_length(v) = ? LIMIT 1", size).toArray(), frameBytes = frames[0]?.["v"];
+  if (frames.length !== 1 || typeof frameBytes !== "string" || frameBytes.length > size || utf8(frameBytes).length !== size) return fail("unavailable");
+  const frame: unknown = parseStrict(frameBytes);
+  if (!isRecord(frame) || Object.keys(frame).sort().join(",") !== "at,creator,genesis,head,held,status,time" || canonicalize(frame) !== frameBytes || !isScopeRef(frame["at"]) || canonicalize(frame["at"]) !== canonicalize(expected) || frame["creator"] !== null && !isScopeRef(frame["creator"]) || canonicalize(frame["creator"]) !== canonicalize(pin.seed.creator) || !isHead(frame["head"]) || !natural(frame["head"].seq) || typeof frame["time"] !== "string" || timeMs(frame["time"]) === null || !["active", "provisional", "refused"].includes(frame["status"] as string)) return fail("unavailable");
+  const genesis = frame["genesis"], held = frame["held"];
+  if (!isRecord(genesis) || Object.keys(genesis).sort().join(",") !== "hash,n,source" || genesis["hash"] !== pin.genesis || genesis["source"] !== null && !isFactRef(genesis["source"]) || (genesis["source"] === null ? genesis["n"] !== null : !natural(genesis["n"])) || !Array.isArray(held) || held.length > bounds.sendsPerEntry || held.some((n, i) => !natural(n) || n >= bounds.sendsPerEntry || i > 0 && n <= held[i - 1])) return fail("unavailable");
+  budget.check();
+  const head = frame["head"];
+  if (through.seq > head.seq) return fail("incomplete");
+  if (through.seq === head.seq && through.hash !== head.hash) return fail("mismatch");
   const limit = Math.min(through.seq + 1, ARCHIVE_BOUNDS.entries + 1);
   const positionsSql = budget.native(sql, () => ({ metadata: limit * POSITION_METADATA_BYTES, inputWork: 0 }));
   // Column byte lengths use SQLite metadata. No entry JSON operation or
@@ -65,5 +72,5 @@ export function archivePrefixMetadata(sql: Pick<Sql, "exec">, expected: ScopeRef
   if (positions[0]?.hash !== pin.genesis || positions.at(-1)?.hash !== through.hash) return fail("mismatch");
   budget.spend({ entries: positions.length, inputWork: bytes * ARCHIVE_PRIVACY_JSON_PASSES });
   budget.check();
-  return { pin, through, positions, bytes };
+  return { pin, frame: frame as unknown as ScopeState, through, positions, bytes };
 }

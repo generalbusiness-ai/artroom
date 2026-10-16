@@ -13,7 +13,7 @@ export interface ArchivePrivacyInventory { readonly customDomains: boolean; read
  * Passing this policy establishes no history integrity or replay completeness. */
 /** Pin stage only. Success is not whole-cohort admission or permission to
  * read/export payloads; the complete privacy inventory is still required. */
-export function admitArchivePin(definition: string, certified: ReadonlySet<Digest>): ArchiveExportAdmission {
+export function admitArchivePin(definition: string, certified: Pick<ReadonlySet<Digest>, "has">): ArchiveExportAdmission {
   if (definition !== INVITATION_KEY_MEMBERSHIP) {
     if (definition.startsWith("platform:membership@")) return { ok: false, reason: "unsupported-credential-cohort" };
     if (!isDigest(definition) || !certified.has(definition)) return { ok: false, reason: "unsupported-archive-cohort" };

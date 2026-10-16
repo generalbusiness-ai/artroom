@@ -3,8 +3,9 @@
  * replay, access/consent admission or permission to export. */
 import { DOMAINS } from "@generalbusiness/dap-contract";
 import type { Digest, Input, PlatformDefinition } from "@generalbusiness/dap-contract";
-import { isDigest, platformName } from "@generalbusiness/artroom-bytes";
-import { declarationValueDomains, type OperationRules, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { isDigest, isPlatformDefinition, platformName } from "@generalbusiness/artroom-bytes";
+import { declarationValueDomains, type Capabilities, type OperationRules, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { platform } from "@generalbusiness/dap-platform";
 import { ArchiveBudget } from "./archive-budget.ts";
 import { ArchivePrefixStopped, type ArchivePrefix, type ArchivePosition } from "./archive-prefix.ts";
 import type { Sql } from "./sqlite.ts";
@@ -14,6 +15,7 @@ import type { Sql } from "./sqlite.ts";
 export interface ArchiveSupport {
   readonly named: Digest | PlatformDefinition;
   readonly definition: ValidDefinition;
+  readonly capabilities?: Capabilities;
   readonly owners: ReadonlyMap<string, ReadonlyMap<string, OperationRules>>;
   readonly records: ReadonlyMap<string, ReadonlySet<string>>;
   readonly preparations: ReadonlyMap<string, ReadonlySet<string>>;
@@ -31,11 +33,41 @@ const HEADER = `SELECT json_extract(bytes, '$.seq') AS seq, ${text("$.at.scope",
 const OWNER_LIMIT = 65;
 const natural = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0 && !Object.is(n, -0);
 
+/** Complete trusted support metadata, including owners/domains on selected
+ * declarations with no entries in this prefix. The registry is finite;
+ * its presence does not create a certificate or load package code. */
+export function archiveSupportMetadata(support: ArchiveSupport, budget: ArchiveBudget): void {
+  budget.check();
+  if (declarationValueDomains(support.definition).some(domain => !nativeDomains.has(domain))) return stop("unsupported-custom-domain");
+  const known = (name: string) => name === "hold@1" || name === "git-read@1" || isPlatformDefinition(name) && platform(name) !== null;
+  if (support.owners.size > 64 || support.preparations.size > 64 || support.records.size > 64) return stop("limit");
+  for (const [name, kinds] of support.owners) {
+    if (name.length > 128 || !known(name)) return stop("unsupported-archive-cohort");
+    if (kinds.size > 64) return stop("limit");
+    for (const [kind, rules] of kinds) {
+      budget.spend({ inputWork: 512 });
+      if (!kind || kind.length > 128 || rules.values !== undefined && rules.valueDomains === undefined) return stop("unsupported-archive-cohort");
+      if (rules.valueDomains !== undefined && (!Array.isArray(rules.valueDomains) || rules.valueDomains.length > 64)) return stop("limit");
+      for (const domain of rules.valueDomains ?? []) {
+        budget.spend({ inputWork: 512 });
+        if (!nativeDomains.has(domain.domain)) return stop("unsupported-custom-domain");
+        if (!Number.isSafeInteger(domain.max) || domain.max < 1 || domain.max > 1024 * 1024) return stop("unavailable");
+      }
+    }
+  }
+  for (const table of [support.preparations, support.records]) for (const [name, kinds] of table) {
+    if (!["hold@1", "git-read@1"].includes(name)) return stop("unsupported-archive-cohort");
+    if (kinds.size > 64) return stop("limit");
+    for (const kind of kinds) { budget.spend({ inputWork: 256 }); if (!kind || kind.length > 128) return stop("unavailable"); }
+  }
+  budget.check();
+}
+
 export function archivePrivacyMetadata(sql: Pick<Sql, "exec">, prefix: ArchivePrefix, support: ArchiveSupport, budget: ArchiveBudget): ArchivePrivacyPrefix {
   budget.check();
   const named = prefix.pin.seed.definition;
   if (support.named !== named || (isDigest(named) ? support.definition.digest !== named : support.definition.declared.name !== platformName(named))) return stop("unavailable");
-  if (declarationValueDomains(support.definition).some(domain => !nativeDomains.has(domain))) return stop("unsupported-custom-domain");
+  archiveSupportMetadata(support, budget);
   const owner = (name: unknown, kind: unknown) => {
     if (typeof name !== "string" || typeof kind !== "string") return stop("unavailable");
     const rules = support.owners.get(name)?.get(kind);
