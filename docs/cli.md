@@ -674,10 +674,10 @@ be filtered; a sparse page is not complete replay evidence. Replay still states 
   it drives dispatchers in place of deployment alarms. The deployed
   repository journey still needs its own evidence.
 - `edit` carries a file as UTF-8 text of at most 65,536 bytes: no image
-  or other binary file. See `notes/2026-10-07-i5-edit-page-delivery.md`,
+  or other binary file. See `notes/implementation/2026-10-07-i5-edit-page-delivery.md`,
   section 3.
 - `issue open` has no flag for an issue's conditions: the title is its one
-  condition. See `notes/2026-10-07-i5-issues-delivery.md`, section 5.
+  condition. See `notes/implementation/2026-10-07-i5-issues-delivery.md`, section 5.
 - A member cannot merge their own change: `merge` needs `change.merge`.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
@@ -685,7 +685,7 @@ be filtered; a sparse page is not complete replay evidence. Replay still states 
   the seat, the founder reads the new scopes by signed reads only, and
   those last for the intent window after the claim. A claim whose
   creation takes longer gives up, and a resumed claim cannot read the
-  directory either. See `notes/2026-10-07-i5-live-ops-delivery.md`,
+  directory either. See `notes/implementation/2026-10-07-i5-live-ops-delivery.md`,
   section 4.
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
@@ -695,6 +695,6 @@ be filtered; a sparse page is not complete replay evidence. Replay still states 
   before accepting a session, even before its first retained observation. The first `remote` or `clone`
   need not occur within 15 minutes of the claim. Signed reads without a
   session retain their window. See the destination-read follow-up in
-  `notes/2026-10-07-i5-clone-delivery.md`.
+  `notes/implementation/2026-10-07-i5-clone-delivery.md`.
 - `git fetch` and `git pull` in a clone have no command that gives them a
   token.

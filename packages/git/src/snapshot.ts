@@ -3,7 +3,7 @@
  * I3 plan, step 24): the files of one tree that a check may read, and the
  * commit that holds exactly those files. It is the successor of three
  * earlier files, written again after their review
- * (`notes/2026-10-05-i3-snapshot-review.md`).
+ * (`notes/reviews/2026-10-05-i3-snapshot-review.md`).
  *
  * Two functions, and nothing else:
  *
@@ -17,7 +17,7 @@
  * **A tree that cannot be read is not an empty tree.** The earlier code took
  * a tree that the store did not return as one with no entries, so a missing
  * subtree gave the snapshot of an empty directory, with a digest
- * (`notes/2026-10-05-i3-host-review.md`, fault A3). Here every tree is read
+ * (`notes/reviews/2026-10-05-i3-host-review.md`, fault A3). Here every tree is read
  * by `Reader.tree`, which refuses an absent object `missing-object`, a
  * corrupt one `hash-mismatch`, and a blob or a commit in a tree's place
  * `wrong-type`. A refusal ends the whole read: no list is returned for a

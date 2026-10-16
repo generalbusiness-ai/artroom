@@ -5,7 +5,7 @@ and a draft for Hugh's reading. It adopts nothing. Its purpose is to turn
 one discussion into numbered requirements that later requests can cite.
 
 Revised 2026-10-04: reconciled with the reviewed clarification
-`plans/012-2026-10-04-collections-clarification.md` under request
+`notes/plans/012-2026-10-04-collections-clarification.md` under request
 `50d7806a`. Section 10 lists, by place, the statements that this
 revision corrects.
 
@@ -1337,7 +1337,7 @@ The corrections made under the planner's direction `fceb27d0`
 (2026-10-04) follow. The clarification left each of these passages at
 odds with its own, more specific corrections. The planner directed that
 the operative text be corrected. The middle column quotes the wording of
-`plans/012-2026-10-04-collections-clarification.md` that was replaced,
+`notes/plans/012-2026-10-04-collections-clarification.md` that was replaced,
 so the reviewed text stays visible. That file is frozen and unchanged.
 Apart from these corrections and the added labels, pins and names key,
 sections Summary to 9 carry the clarification's wording.

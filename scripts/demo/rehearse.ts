@@ -1,5 +1,5 @@
 /**
- * The rehearsal of the demo script's middle (notes/2026-10-07-demo-script-draft.md, shots 3 to 12, in the order of the 23:00
+ * The rehearsal of the demo script's middle (notes/reports/2026-10-07-demo-script-draft.md, shots 3 to 12, in the order of the 23:00
  * sprint report's observed run): each shot is one command line, run by the command line's own function `command` with the
  * person's `Context`, or one read of `git log` or of a page. Each shot states the exit code and the lines it expects; the
  * rehearsal records what was printed, how long it took and whether it matches.

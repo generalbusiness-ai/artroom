@@ -4,7 +4,7 @@
  * The checker service (authority note, sections 3.11, 5.5 and 6.3; I3 plan,
  * step 25). It is a separate service with its own key, and it is not a
  * scope. The review that each retained part passed is
- * `notes/2026-10-05-i3-checkers-review.md`.
+ * `notes/reviews/2026-10-05-i3-checkers-review.md`.
  *
  * - `job`: the origin read.
  * - `configuration`: a check's configuration, read from its bytes.

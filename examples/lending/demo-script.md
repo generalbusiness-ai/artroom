@@ -14,7 +14,7 @@ The earlier publication run is retained as a rehearsal because its Small pot
 description differed. Its browser and Git extraction results remain real,
 separate evidence. Local Git history extraction passed. The curated public history is now published and anonymously verified.
 Homepage publication `89750` and the original gate at `f33a7d7f` completed.
-The [completion note](../../notes/2026-10-14-library-publication-completion.md)
+The [completion note](../../notes/implementation/2026-10-14-library-publication-completion.md)
 keeps that gate separate from the later MCP composition. The journal and
 staff-control follow-up still awaits its own validation, gate, and deployment.
 

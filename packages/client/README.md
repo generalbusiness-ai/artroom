@@ -10,8 +10,8 @@ reading the scope's summary and its published definition.
 
 The scope and replay contract is the authority, in its sections 2.1, 4.2,
 9.1 and 11.5. Where the contract was silent,
-`notes/2026-10-04-i1-contract-deltas.md` records what was implemented, in
-its section "Client", and `notes/2026-10-05-i2-contract-deltas.md` in its
+`notes/implementation/2026-10-04-i1-contract-deltas.md` records what was implemented, in
+its section "Client", and `notes/implementation/2026-10-05-i2-contract-deltas.md` in its
 entries DJ1, DJ7 and DJ23 to DJ25.
 
 ## What it exports

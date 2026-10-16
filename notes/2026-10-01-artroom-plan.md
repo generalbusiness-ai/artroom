@@ -55,7 +55,7 @@ Revision 4 answers review `bce3646e`:
 
 Revised 2026-10-04 under request `50d7806a`: one paragraph of section 3,
 the comparison with jj, is replaced. The new text is the reviewed
-paragraph in section 6 of `plans/011-2026-10-04-jj-clarification.md`,
+paragraph in section 6 of `notes/plans/011-2026-10-04-jj-clarification.md`,
 applied on the planner's direction `fceb27d0`. Nothing else in revision
 4 is changed.
 

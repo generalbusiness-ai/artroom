@@ -10,8 +10,8 @@ calls the same functions over a state it folds in memory. So what the
 runtime writes and what a verifier derives cannot drift apart.
 
 The scope and replay contract is the authority. Comments cite its sections.
-Where the contract was silent, `notes/2026-10-04-i1-contract-deltas.md`
-and `notes/2026-10-05-i2-contract-deltas.md` record what was implemented.
+Where the contract was silent, `notes/implementation/2026-10-04-i1-contract-deltas.md`
+and `notes/implementation/2026-10-05-i2-contract-deltas.md` record what was implemented.
 
 The package has two entry points:
 

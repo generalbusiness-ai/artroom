@@ -7,7 +7,7 @@ The design note "Lane forms and browser flow", revision 14, at `4b3bf5da`,
 is the authority for every row: its sections 3, 4 and 8.1. Each member of
 a definition is one row of that note, written as the row states it. Where
 the note or the scope contract was silent,
-`notes/2026-10-05-i2-contract-deltas.md` records what was implemented, in
+`notes/implementation/2026-10-05-i2-contract-deltas.md` records what was implemented, in
 its sections 6, 14 and 17.
 
 [docs/lanes.md](../../../docs/lanes.md) is the guide: what the definitions
@@ -56,7 +56,7 @@ only when an adopted revision of that note changes it, and then set
 that `src/change.ts` marks "i5 wiring" are the exception: they are what the
 lane needs to run against the real rules scope and destination, and no
 adopted revision states them yet
-(`notes/2026-10-07-i5-lane-wiring-delivery.md`).
+(`notes/implementation/2026-10-07-i5-lane-wiring-delivery.md`).
 
 ```
 node apps/room/lanes/scripts/pin.mjs

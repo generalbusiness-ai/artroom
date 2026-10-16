@@ -8,7 +8,7 @@ in 31.235 seconds and accepted a guest in 35.481 seconds from the start of the
 clone. Login was already complete, and an operator helper entered the
 configuration. The guest used an independent browser profile with its own key.
 These times do not measure human typing, login, or a second physical device.
-The [delivery note](../notes/2026-10-13-self-host-delivery.md) records the exact
+The [delivery note](../notes/implementation/2026-10-13-self-host-delivery.md) records the exact
 source, commands, results, and remaining cleanup duty. Run notes at each step
 identify command variations and steps that were not exercised. The commands
 below use the current application paths; the delivery note retains the

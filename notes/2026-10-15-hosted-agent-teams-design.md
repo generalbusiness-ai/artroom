@@ -291,7 +291,7 @@ Neither operation pretends to reverse an already admitted action. Cleanup
 and settlement can continue under their own retained authority after new
 work stops. The design must reserve capacity for that work.
 
-Carry forward the existing [controller and device policy](../plans/005-2026-10-03-browser-cloud-work.md):
+Carry forward the existing [controller and device policy](plans/005-2026-10-03-browser-cloud-work.md):
 closing a browser is different from revoking a device key, losing the
 controller's last active key, removing the controller, or revoking the
 agent. The runtime must map each case to explicit control and dispatch
@@ -434,10 +434,10 @@ ends token use and has explicit retirement guards. Ending a hold does not
 delete its fork. Automation needs an authorized scheduler and retained
 cleanup duties that respect those guards.
 
-[Plan 029](../plans/029-2026-10-11-artifacts-forks.md) is the starting point,
+[Plan 029](plans/029-2026-10-11-artifacts-forks.md) is the starting point,
 but requires revision before implementation. Its immediate-deletion wording
 and readiness probe do not match this lifecycle or the observed API. The
-[fork measurement](2026-10-13-fork-cost-measurement.md) observed readiness
+[fork measurement](implementation/2026-10-13-fork-cost-measurement.md) observed readiness
 through successful access and found no status in `info`. Its small run is
 neither a provisioning SLA nor a measurement of large-fork storage cost.
 
@@ -580,15 +580,15 @@ not itself revoke the membership key, delete custody, dispose a workspace,
 or cancel a provider effect. The new lifecycle must explicitly coordinate
 those different operations and retain their separate outcomes.
 
-The [current task map](../plans/023-2026-10-06-connected-story-current-tasks.md)
+The [current task map](plans/023-2026-10-06-connected-story-current-tasks.md)
 assigns hosted runtime outcomes to C1 and IA (`b538c5ea`, amended by
 `d55da8ef`, with design milestone `b01321d3`). It marks the old C3 request
 stale and carries useful outcomes into IA, I5, and I6. Inspect those exact
 records and amendments before commissioning a successor implementation.
 Do not revive an obsolete engine from an earlier plan's path names.
 
-Carry forward the [durable input handoff](../plans/007-2026-10-03-attention-runtime-handoff.md)
-and [wake clarification](../plans/008-2026-10-03-wake-and-schedule-clarification.md).
+Carry forward the [durable input handoff](plans/007-2026-10-03-attention-runtime-handoff.md)
+and [wake clarification](plans/008-2026-10-03-wake-and-schedule-clarification.md).
 The older handoff's proposed-status header is historical; the later
 clarification records its independent approval. Their current scope
 mapping still needs reconciliation in the runtime contract.

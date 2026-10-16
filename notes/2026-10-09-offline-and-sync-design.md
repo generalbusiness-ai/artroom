@@ -272,7 +272,7 @@ git show 8b1c3c9d7987fba6ac5f5b31fbe329d50a3f568b:notes/2026-10-04-authority-eff
 Exact artifact records: contract
 `e15527f604e515339893ecae91efe1aaa841ce0c`; authority
 `d8e94aba76f298da706a6bf566371e753d215d9f`. The adoption baseline is
-recorded in [the I3 fourth milestone delivery](2026-10-06-i3-fourth-milestone-delivery.md).
+recorded in [the I3 fourth milestone delivery](implementation/2026-10-06-i3-fourth-milestone-delivery.md).
 Current source interfaces are
 [intent](../packages/contract/src/intent.ts),
 [settlement and reads](../packages/contract/src/read.ts),
