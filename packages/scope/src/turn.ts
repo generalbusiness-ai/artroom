@@ -19,7 +19,7 @@
 
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/dap-contract";
 import { CanonicalError, canonicalize, entryHash, parseStrict, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, timeMs, timeOf } from "@generalbusiness/dap-derive";
+import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, StandingError, timeMs, timeOf } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, RuleInput, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { ownOf, retainedFacts, snapshotsOf } from "./core.ts";
 import type { Ports, Resolver } from "./ports.ts";
@@ -289,6 +289,7 @@ export class Turns {
     } catch (error) {
       // The entry would have left an admitted duty no room to settle. The transaction wrote nothing.
       if (error instanceof Full && full) return { end: "answer", answer: (full as () => A)() };
+      if (error instanceof StandingError) return { end: "unavailable" };
       throw error;
     }
   }

@@ -33,6 +33,7 @@ import type { Reading } from "./fields.ts";
 import type { Account, StateView } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { isLocalId, own } from "./values.ts";
+import { checkStandingEntry, StandingError } from "./standing.ts";
 
 /**
  * Section 17.2a, "Past a count": the entry would open an operation of a held
@@ -177,6 +178,10 @@ export function drawsOf(view: StateView, definition: ValidDefinition, entry: Dra
 export function withinCounts<J extends { result: string }>(view: StateView, definition: ValidDefinition, judged: J): J | { result: "unavailable"; reason: "unavailable" } {
   if (judged.result !== "write" || !("draft" in judged)) return judged;
   const draft = judged.draft as Pick<Entry, "input" | "effects" | "sends"> & { bound?: { item: number; message: string } };
+  if (definition.standing) {
+    try { checkStandingEntry(view, definition, draft.effects, (view.scope()?.head.seq ?? -1) + 1); }
+    catch (error) { if (error instanceof StandingError) return { result: "unavailable", reason: "unavailable" }; throw error; }
+  }
   // The judge has just derived this binding. The fold and replay derive it
   // from the recorded message instead, never from a Draft.
   const drawn = drawsOf(view, definition, { seq: (view.scope()?.head.seq ?? -1) + 1, input: draft.input, effects: draft.effects, sends: draft.sends }, {}, draft.bound ?? null);

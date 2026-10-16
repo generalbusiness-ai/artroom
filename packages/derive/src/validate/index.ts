@@ -32,6 +32,7 @@ import type { Markers } from "../markers.ts";
 import { decisions } from "./binding.ts";
 import { setOnce } from "./markers.ts";
 import { timedEntryBytes, timedGraph, timedKinds, timedRules } from "./timed.ts";
+import { standingOf, type Standing } from "./standing.ts";
 
 export type { MarkKind, MarkPlace, RangeIndex } from "./context.ts";
 export type { Problem, ProblemCode } from "./shape.ts";
@@ -43,6 +44,8 @@ export { timedGraph, type TimedGraph, type TimedMove } from "./timed.ts";
 export interface ValidDefinition {
   readonly declared: DeclaredDefinition;
   readonly digest: Digest;
+  /** C1's platform-only monotone singleton entry reservation. Absent: none. */
+  readonly standing?: Standing;
   readonly timedTypes: readonly string[];   // section 5.2
   readonly holdTypes: readonly string[];    // section 6.8: the types a `hold: open` effect targets
   readonly indexes: readonly RangeIndex[];
@@ -151,7 +154,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const { problems, bad, rec, entries, str } = read;
 
   const platform = options.platform === true;
-  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules", ...(platform ? ["outcomes"] : [])], ["level"]);
+  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules", ...(platform ? ["outcomes"] : [])], ["level", ...(platform ? ["standing"] : [])]);
   if (!top) return { ok: false, problems };
   // Section 6.1: the bound on a definition's canonical bytes limits the validator's work, so it is checked before anything is read.
   // A value with no canonical bytes is refused at the end, as before.
@@ -272,11 +275,12 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   if (problems.length > 0) return { ok: false, problems };
   // Section 17.2a: a reservation that an item holds, and what each kind of `outcomes` reserves. In platform data only.
   const reserved = reserving(d, top, capacity, options.outcomeValues);
+  const standing = Object.hasOwn(top, "standing") ? standingOf(d, top["standing"], top["items"]) : null;
   const { decisionEntries: _decisionEntries, ...persistedCapacity } = capacity;
   if (problems.length > 0) return { ok: false, problems };
   try {
     const keyed = [...d.types.values()].flatMap((type): [string, readonly string[]][] => (type.indexes ? [[type.name, type.indexes]] : []));
-    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...persistedCapacity, underived: d.underived, marks: d.marks, observing: d.observing, ...(reserved ? { reserving: reserved } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
+    return { ok: true, definition: { declared, digest: definitionDigest(declared), timedTypes: [...timedTypes].sort(), holdTypes: [...d.holdTypes].sort(), indexes: d.indexes, ...persistedCapacity, underived: d.underived, marks: d.marks, observing: d.observing, ...(reserved ? { reserving: reserved } : {}), ...(standing ? { standing } : {}), ...(keyed.length > 0 ? { keyed: Object.fromEntries(keyed) } : {}) } };
   } catch {
     return { ok: false, problems: [{ code: "shape", path: "", message: "has no canonical bytes" }] };
   }
