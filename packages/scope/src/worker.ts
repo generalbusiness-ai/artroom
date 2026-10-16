@@ -1,3 +1,4 @@
+import { health } from "./health.ts";
 /**
  * The Worker (scope contract, sections 2.3, 7.1 and 9.1): the routes of a
  * deployment, addressed by scope, over the one scope namespace.
@@ -502,6 +503,8 @@ export default {
     return measuredRequest(request, env, async () => {
     if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    const healthy = await health(request, env);
+    if (healthy) return healthy;
     const hosted = await mcpRoute(request, env);
     return hosted ?? (isSite(request) ? site(request, env) : route(request, env.SCOPES));
     });

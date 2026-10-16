@@ -37,7 +37,7 @@ import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
 import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
-import { DeployedScope, McpAgent, McpRegistry, ScopeService, mcpRoute, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
+import scopeWorker, { DeployedScope, McpAgent, McpRegistry, ScopeService, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
 import type { HostedAgent } from "@generalbusiness/dap-mcp";
 import { outsideOf, owners, wired } from "./outside.ts";
 import type { MetricEnvironment } from "../src/operational.ts";
@@ -186,7 +186,8 @@ export class NetService extends ScopeService<NetEnv> {
   protected override scopes() { return this.env.NET; }
 }
 
-export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promise<Response> => (await mcpRoute(request, env)) ?? route(request, env.NET) };
+// Exercise the production entrypoint with the same NET namespace as before.
+export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promise<Response> => scopeWorker.fetch(request, { ...env, SCOPES: env.NET }) };
 
 /**
  * The hosted MCP endpoint in this Worker: the deployed classes over the

@@ -24,6 +24,9 @@ import { ITEM_QUERY_BOUNDS, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-
 import type { ItemQuery, ScopeApi } from "@generalbusiness/dap-contract";
 import { LATE, takeBytes, within, readItemQueryParameter, readItemQueryReply, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { ANSWERS } from "./answers.ts";
+import { OPERATIONAL_ANSWERS, type OperationalApi } from "./operational.ts";
+type HttpApi = ScopeApi & OperationalApi;
+const HTTP_ANSWERS = { ...ANSWERS, ...OPERATIONAL_ANSWERS };
 import { TransportError, type Transport } from "./handle.ts";
 
 /** The little of `fetch` this package uses. The global `fetch` of Node, workerd and a browser satisfies it. */
@@ -43,16 +46,16 @@ export const REPLY_SECONDS = 30;
 const UNKNOWN = "The outcome of the submitted intent is unknown: it may have been recorded. The same signed intent may be sent again.";
 
 /** `service` is the service's base URL. `fetch` replaces the runtime's own. `bytes` and `seconds` replace `REPLY_BYTES` and `REPLY_SECONDS`. */
-export function httpTransport(service: string, options: { fetch?: Fetch; bytes?: number; seconds?: number } = {}): Transport {
+export function httpTransport(service: string, options: { fetch?: Fetch; bytes?: number; seconds?: number } = {}): Transport & OperationalApi {
   const base = `${service.replace(/\/+$/, "")}/v1/scopes`;
   const part = encodeURIComponent;
   const most = options.bytes ?? REPLY_BYTES;
   const seconds = options.seconds ?? REPLY_SECONDS;
 
-  type Answered<K extends keyof ScopeApi> = Awaited<ReturnType<ScopeApi[K]>>;
+  type Answered<K extends keyof HttpApi> = Awaited<ReturnType<HttpApi[K]>>;
 
   /** One request of operation `op`. Its reply is returned only when it is an answer of that operation. */
-  async function call<K extends keyof ScopeApi>(op: K, path: string, reader: unknown, body?: unknown, query?: ItemQuery): Promise<Answered<K>> {
+  async function call<K extends keyof HttpApi>(op: K, path: string, reader: unknown, body?: unknown, query?: ItemQuery): Promise<Answered<K>> {
     // A founding, an act and a request for a step submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
     const failed = (what: string) => new TransportError(op === "found" || op === "submit" || op === "prepare" ? `${what}. ${UNKNOWN}` : `${what}. Nothing was read; the read may be made again.`);
     const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
@@ -87,7 +90,7 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     // The guard walks the reply. A reply it cannot walk is no answer, as one that does not parse is none.
     const sound = (): boolean => {
       try {
-        return ANSWERS[op](answer);
+        return HTTP_ANSWERS[op](answer);
       } catch {
         return false;
       }
@@ -113,6 +116,18 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     history: (scope, reader, cursor) => call("history", `/${part(scope)}/history${page(cursor)}`, reader),
     entry: (scope, reader, seq) => call("entry", `/${part(scope)}/entries/${seq}`, reader),
     outbox: (scope, reader, cursor) => call("outbox", `/${part(scope)}/outbox${page(cursor)}`, reader),
+    incidents: (scope, reader, cursor) => call("incidents", `/${part(scope)}/incidents${page(cursor)}`, reader),
+    waiting: (scope, reader, list, cursor) => {
+      if (list !== "diagnosed" && list !== "unanswered") throw new TransportError("invalid waiting list");
+      return call("waiting", `/${part(scope)}/waiting/${list}${page(cursor)}`, reader);
+    },
+    requests: async (scope, reader, request, cursor) => {
+      if (typeof request !== "string" || !/^[0-9a-f]{16}$/.test(request)) throw new TransportError("invalid request ID");
+      if (cursor !== undefined && (typeof cursor !== "string" || !/^[0-9]{1,16}\.[1-9][0-9]{0,15}$/.test(cursor) || !cursor.split(".").every(value => Number.isSafeInteger(Number(value))))) throw new TransportError("invalid request cursor");
+      const reply = await call("requests", `/${part(scope)}/requests?request=${request}${cursor === undefined ? "" : `&cursor=${part(cursor)}`}`, reader);
+      if (reply.ok && reply.value.rows.some(row => row.request !== request)) throw new TransportError("the reply does not match the request ID");
+      return reply;
+    },
     duty: (scope, reader, duty) => call("duty", `/${part(scope)}/outbox/${part(duty)}`, reader),
     log: (scope, reader, cursor) => call("log", `/${part(scope)}/log${page(cursor)}`, reader),
     retained: (scope, reader, kind, digest, domain) => call("retained", `/${part(scope)}/retained/${part(kind)}/${part(digest)}${domain === undefined ? "" : `?domain=${part(domain)}`}`, reader),

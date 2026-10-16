@@ -1,4 +1,4 @@
-# Operational metrics and request correlation
+# Operational status, metrics and request correlation
 
 The room Worker prepares the `METRICS` Analytics Engine binding and
 `VERSION_METADATA` in [its configuration](../apps/room/wrangler.jsonc).
@@ -9,6 +9,65 @@ These settings take effect only through a separately authorized deployment.
 Metrics and correlation are operational data. They grant no authority and
 are absent from signed answers, sealed entries, outbox messages and replay.
 A missing, failing or slow metric binding does not own a native reply.
+
+## Status reads
+
+`dap status` uses a fresh room session to read the configured register,
+directory, membership, rules, destination and caller's inbox. It discovers
+other scopes from confirmed references and recorded creation sends.
+`dap status membership` selects one configured scope. A scope ID also
+selects one scope.
+
+Each scope has a summary with its status, time and type-state counts.
+The outbox column counts requests without a result and diagnosed sends.
+An admin session also reads both waiting lists and operational incidents.
+A member sees those columns as `denied`.
+
+Each list stops after 20 pages. Discovery stops at 1,000 scopes and reads
+at most 20 history pages per scope. A count at a page limit is `more;
+partial`. A refused read is `denied` when the reason is `forbidden`.
+Other refusals, transport failures, repeated cursors and a native head
+change between pages produce `unknown`. These states never become zero.
+A partial summary keeps its partial label.
+
+Each column prints the head from its own read. The columns are separate
+observations. They do not describe one room snapshot, and operational rows
+can change without a native entry. Discovery follows the caller's read
+permissions and limits. The final scope count is an observation count,
+not a complete room inventory.
+
+`dap status --request <16-hex-id>` also reads retained correlation rows
+for that server request ID, through the admin session. The selector uses
+exactly 16 lowercase hexadecimal characters. This column includes the
+retained window and each row's entry or duty reference. A window change
+between pages produces `unknown`. Without `--request`, status makes no
+correlation read. Status requires a room session and does not fall back
+to signed entry reads.
+
+## Health
+
+`GET /health` returns only `deployment`, `version`, `sessions` and
+`register`. `HEAD /health` returns the same status with no body. Query
+parameters and request bodies are refused. Other methods return 405.
+
+`sessions` is `ok` when the deployment name and session secret pass the
+normal session configuration checks. Otherwise it is `unavailable`.
+The register selector comes from the existing GitHub or Artifacts host
+configuration. No valid selector gives `unconfigured`. Two different
+selectors give `ambiguous`. Two equal selectors use that register.
+
+The internal register probe reads scope metadata, without a scope read
+session, provider call or native turn. It returns `ready` for an active
+register, `absent` for an uncreated scope, `not-ready` for other valid
+metadata, and `unavailable` for an error or malformed metadata. Health
+returns 200 only for `sessions: ok` and `register: ready`. All other
+configuration or probe results return 503.
+
+Each caller waits at most two seconds for the probe. Concurrent callers
+share one physical probe per Worker isolate. A caller timeout keeps that
+probe reserved until it settles, so repeated timeouts do not start more
+probes. A settled result is cached for five seconds. Health does not
+measure provider access, publication readiness or room-wide capacity.
 
 ## The metrics-v1 slot map
 
