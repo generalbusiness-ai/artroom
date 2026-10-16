@@ -266,3 +266,15 @@ checks and one full gate at the frozen Source head remain owed. The
 Browser plugin and `browser` skill are absent; rendered QA will use the
 existing cached Playwright 1.63.0 installation outside the checkout.
 No package probe was installed, and no push or deployment ran.
+
+The first gate attempt at `02213cf9f50a3ceba527760b7eec12e22447142e`
+(tree `a85c8320ac8992eff69f7bfa3eaeebb13d01fc92`) stopped at whitespace:
+the query-wire helper had an extra blank line at EOF, inherited from the
+first preparation checkpoint. No typecheck or test stage ran. The line is
+removed in the corrected Source head. Browser QA at that earlier head
+passes at 1280 × 900 and 390 × 844 with the exact native recorded Page
+assets: nonblank, correct identity, no overlay/overflow, no console errors
+or warnings, filtering without requests, issue open/back, and a scripted
+incomplete directory reply visibly withheld. The first playback fixture
+omitted public brand/fonts; adding the packaged static assets fixed the
+fixture. No native or deployed authority is inferred from playback.

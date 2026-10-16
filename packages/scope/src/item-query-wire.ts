@@ -26,4 +26,3 @@ export function itemQueryWire(request: Pick<Request, "url" | "method" | "body">,
   const encoded = found[2]!;
   return encoded.length <= ITEM_QUERY_ENCODED_CHARS ? { ok: true, encoded } : { ok: false, reason: "too-large" };
 }
-
