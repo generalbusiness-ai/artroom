@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/repository.ts","body":{"commit":"f41ab63c1fce52e0e995440f1b10f6ccf94be598","path":"packages/scope/test/repository.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:03c6ebd64acc0ae2ce149a17a6d843c6d8f1b049","text":"Merge retired a covered predecessor; the successor is at docs/mcp.md."}
