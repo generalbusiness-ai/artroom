@@ -2,9 +2,10 @@
 
 This is the second approved observability stage, under Source child
 `1faf0c5b` and promise `ded09cb2`. It depends on the retain/count Source
-and incorporates the prepared closed-context correction `e90e1599`.
-The first Source review is still pending. No landing, deployment or
-provider operation is claimed here.
+and incorporates the closed-context correction `e90e1599`. The first
+Source is approved and landed at Main `e444edf8`; this branch incorporates
+that exact head. No See landing, deployment or provider operation is
+claimed here.
 
 ## Status
 
@@ -151,7 +152,20 @@ No MCP tool or hidden implementation is claimed.
 The corrected focused native recipe run passes both cases through their
 existing actual MCP room/session paths and labelled host/scheduler ports.
 
-The final frozen gate and exact-head Source review remain pending. The operations
-guide documents the delivered bounds. MCP operational events, deployment
+The final frozen gate at `b29fc99c66a76eee827fae92e97c77b9d77daafa`,
+tree `18127b66fa252e8f087ec01b6ce327535b536749`, passed. Original session
+18514 closed with exit 0: 1,472 Vitest tests passed, 3 skipped, all 16 Node
+checks passed, and all 55 Counting checks passed. Dependencies were already
+verified against the lockfile. Whitespace passed, typechecking took 8.1
+seconds with 27.6 CPU seconds, and tests took 276.4 seconds with 364.4 CPU
+seconds. This was a local macOS run with the existing dependency cache and
+concurrent read-only workroom activity. The full log is
+`/tmp/artroom-observability-see-b29fc99c-gate.log`; phase logs remain in
+`/private/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.znbZqvnYhx`.
+The two earlier failed gates remain failed results at their own heads.
+
+Only this evidence note changes after the passing gate. Exact-head Source
+review remains pending. The operations guide documents the delivered
+bounds. MCP operational events, deployment
 coverage checks, browser telemetry and capacity measurement remain later
 stages. Cloudflare remains held.
