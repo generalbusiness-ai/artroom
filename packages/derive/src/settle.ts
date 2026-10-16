@@ -303,5 +303,6 @@ export function judgeCheckpoint(view: StateView, definition: ValidDefinition, ch
   if (!("scope" in admit)) return admit;
   if (checkpoint.through !== admit.scope.head.seq) return invalid("a checkpoint is through the head it is written on");
   if (checkpoint.state !== stateDigest(view.all())) return invalid("the digest is not the digest of the folded state");
-  return { result: "write", draft: { input: { type: "checkpoint", through: checkpoint.through, state: checkpoint.state }, uses: [], prepared: [], effects: [], sends: [], judgesTime: false } };
+  const judged = { result: "write", draft: { input: { type: "checkpoint", through: checkpoint.through, state: checkpoint.state }, uses: [], prepared: [], effects: [], sends: [], judgesTime: false } } as const;
+  return definition.standing ? withinCounts(view, definition, judged) : judged;
 }

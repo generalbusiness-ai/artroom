@@ -208,10 +208,16 @@ export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
  * not a callback or a new user act. Only destination@3 implements the opener. */
 export type PlatformTimedRule = TimedRule & { opens?: readonly { kind: "reservation-delete" | "mint"; attempts: number }[] };
 
+/** C1: entry room held for the remaining count of one singleton item.
+ * The required mutable integer slot is globally monotone, from zero to
+ * max. Absence reserves the full term; finality does not release it. */
+export interface StandingReservation { item: string; slot: string; entries: number; max: number }
+
 export interface PlatformData extends Omit<DeclaredDefinition, "items" | "acts" | "receives" | "timed"> {
   timed: Record<string, PlatformTimedRule>;
   items: Record<string, PlatformItem>;
   acts: Record<string, PlatformAct>;
   receives: Record<string, PlatformReceive>;
   outcomes: Record<string, OutcomeMark>;
+  standing?: StandingReservation;
 }
