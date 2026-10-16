@@ -16,3 +16,4 @@ export * from "./bounds.ts";
 export * from "./session.ts";
 
 export type * from "./reservation-snapshot.ts";
+export * from "./invitation.ts";

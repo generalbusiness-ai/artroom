@@ -8,9 +8,10 @@
  *   names one. A limit can never use an invitation up, expire it or lock
  *   it: only the commit that admits a join changes an invitation.
  * - **Before the scope.** A request from an address at its limit is
- *   answered `rate-limited` before check 1. Checks 1 and 2, the size and
- *   shape and the signature, need no state and are made here. Nothing of
- *   the scope's state is read for a request that fails either.
+ *   answered `rate-limited` before check 1. Outer size, shape and signing-key verification need no state. Only
+ *   after those checks does exact pinned-cohort selection choose the
+ *   legacy secret form or the new invitation-signature form. Nothing of
+ *   the scope's state is read for a request that fails outer admission.
  * - **What is counted.** For each address, in a window: the joins that
  *   failed at check 1, 2, 3 or 6. A join that is admitted, and one that is
  *   refused at another check, counts nothing.
@@ -33,7 +34,7 @@
  */
 
 import type { Answer, Head } from "@generalbusiness/dap-contract";
-import { canonicalBytes, isSignedIntentShape, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, isSignature, isSignedIntentShape, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { isObject } from "@generalbusiness/dap-derive";
 
 /**
@@ -121,6 +122,8 @@ export interface Served {
   now: number;
   /** The scope's head, for the answer of a join that is refused at check 1 or 2. */
   head: Head;
+  /** Exact pinned-cohort selection, after outer size/shape/signature admission. */
+  invitationProof?: () => boolean;
 }
 
 const refused = (head: Head): Answer => ({ answer: "refused", reason: "bad-intent", judgedAt: head });
@@ -166,8 +169,9 @@ export class JoinLimits {
     const key = addressKey(at.address);
     // The address limit, before check 1.
     if (key !== null && (this.#window(key, at.now)?.failed ?? 0) >= this.#config.failures) return { answer: "unavailable", reason: "rate-limited" };
-    // Check 1: the size and the shape, and a secret of at least 32 bytes. Check 2: the signature of the new key. Neither needs state.
-    if (!this.#sound(signed)) {
+    // Outer size/shape/signature admission precedes exact cohort selection.
+    // Legacy scopes require their secret; the new cohort requires a proof.
+    if (!this.#sound(signed, at.invitationProof)) {
       this.#failed(key, at.now);
       return refused(at.head);
     }
@@ -184,11 +188,12 @@ export class JoinLimits {
     return answer;
   }
 
-  #sound(signed: unknown): boolean {
+  #sound(signed: unknown, invitationProof?: () => boolean): boolean {
     try {
-      if (!isSignedIntentShape(signed) || canonicalBytes(signed).length > this.#config.joinBytes) return false;
+      if (!isSignedIntentShape(signed) || canonicalBytes(signed).length > this.#config.joinBytes || !verifySignedIntent(signed)) return false;
+      if (invitationProof?.() === true) return isSignature(signed.intent.fields["proof"]) && !Object.hasOwn(signed.intent.fields, "secret");
       const secret: unknown = signed.intent.fields["secret"];
-      return typeof secret === "string" && utf8(secret).length >= INVITATION_SECRET_BYTES && verifySignedIntent(signed);
+      return typeof secret === "string" && utf8(secret).length >= INVITATION_SECRET_BYTES;
     } catch {
       return false;   // not values that have canonical bytes
     }

@@ -7,16 +7,16 @@ import type { Receipt, SignedIntent, Summary, Entry, DutyId, Item } from "@gener
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/dap-platform";
-import { Roster, rita, rules } from "../../../packages/platform/test/support.ts";
+import { Roster, rita } from "../../../packages/platform/test/support.ts";
 import { command, enrolAgentKey, issueInvitation, linkOf, memoryStore, type Context, type Config, type Store } from "../src/index.ts";
 
 // Real SDK/envelopes/followReceipt/CLI Store and native M2 rules in memory.
 // Scripted HTTP/session authority/read pages/inbox confirmation; no native session,
 // Durable Object, browser, host, provider or full parent acceptance is proved.
-test("retained native agent opening and key invitation survive loss; independent enrollment Checks without replacement, follows exact native facts and preserves legacy person custody (HTTP and inbox STAND-INs)", async () => {
+test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent opening and key invitation survive loss; independent enrollment Checks without replacement, follows exact native facts and preserves legacy person custody (HTTP and inbox STAND-INs, %s)", async named => {
   const home = await mkdtemp(pathJoin(tmpdir(), "artroom-agent-custody-"));
   try {
-  const m = new Roster().seated(), service = "https://agents.test";
+  const m = new Roster(named).seated(), service = "https://agents.test";
   const directory = { scope: m.office.at.scope, inc: m.office.at.inc, kind: "directory" as const };
   const repository = { directory, membership: m.at, rules: directory.scope, destination: directory.scope };
   const receipts = new Map<string, Receipt>(), sent: SignedIntent[] = [];
@@ -43,11 +43,11 @@ test("retained native agent opening and key invitation survive loss; independent
       const digest = intentDigest(signed.intent);
       let receipt = receipts.get(digest);
       if (!receipt) {
-        const judged = m.submit(signed, { platform: rules, membership: m.at, grants: m.held(signed.intent.actor) });
+        const judged = m.submit(signed, { platform: m.platformRules, membership: m.at, grants: m.held(signed.intent.actor) });
         expect(judged.result, "the package's actual membership rules admit the scripted native input").toBe("write");
         if (judged.result !== "write") throw Error("Model admission refused");
         const entry = m.entries.at(-1)!.entry, fact = m.fact(entry.seq);
-        const accepted: Receipt = { intent: digest, fact, definition: MEMBERSHIP, effects: entry.effects, sends: entry.sends.map((send): DutyId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
+        const accepted: Receipt = { intent: digest, fact, definition: named, effects: entry.effects, sends: entry.sends.map((send): DutyId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
         receipts.set(digest, accepted); receipt = accepted;
       }
       if (signed.intent.kind === lose) { lose = null; throw Error("SCRIPTED lost accepted reply"); }
@@ -71,13 +71,13 @@ test("retained native agent opening and key invitation survive loss; independent
     }
     if (url.includes(directory.scope)) {
       expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
-      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED directory head") }, complete: true, value: { scope: directory, status: "active", definition: "platform:directory@3", time: m.now, counts: [["repository", "ready", 1]], items: [{ id: 0, type: "repository", state: "ready", revision: 1, opened: textDigest("SCRIPTED repository"), attributed: [], parties: {}, values: {}, refs: { membership: m.at, rules: { ...directory, kind: "rules" }, destination: { ...directory, scope: wrongDirectory ? m.at.scope : directory.scope, kind: "destination" } } }] } });
+      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED directory head") }, complete: true, value: { scope: directory, status: "active", definition: named === MEMBERSHIP ? "platform:directory@3" : "platform:directory@9", time: m.now, counts: [["repository", "ready", 1]], items: [{ id: 0, type: "repository", state: "ready", revision: 1, opened: textDigest("SCRIPTED repository"), attributed: [], parties: {}, values: {}, refs: { membership: m.at, rules: { ...directory, kind: "rules" }, destination: { ...directory, scope: wrongDirectory ? m.at.scope : directory.scope, kind: "destination" } } }] } });
     }
     if (path.includes("/entries/")) {
       const seq = Number(path.split("/").at(-1)), sealed = m.entries[seq];
       return reply(sealed ? { ok: true, at: m.head, value: sealed, complete: true } : { ok: false, reason: "not-found" });
     }
-    const value: Summary = { scope: m.at, status: "active", definition: MEMBERSHIP, time: m.now, items: liveItems(), counts: Object.entries(m.definition.declared.items).flatMap(([type, item]) => Object.keys(item.states).map(state => [type, state, m.state.count(type, state)] as const)) };
+    const value: Summary = { scope: m.at, status: "active", definition: named, time: m.now, items: liveItems(), counts: Object.entries(m.definition.declared.items).flatMap(([type, item]) => Object.keys(item.states).map(state => [type, state, m.state.count(type, state)] as const)) };
     return reply({ ok: true, at: m.head, value, complete: true });
   };
   const issuer = fileStore(pathJoin(home, "issuer")), requests: string[] = [];
@@ -176,10 +176,15 @@ test("retained native agent opening and key invitation survive loss; independent
   const personKeep = personStore.keepPrivate; personStore.keepPrivate = async (name, bytes) => { await personKeep(name, bytes); personRequests.push(name); };
   await personStore.keep("founder", rita.secret); await personStore.save({ v: 1, service, key: "founder", repository, handle: "@rita" });
   const person = await issueInvitation({ ...ctx, store: personStore }, { kind: "person", handle: "@visitor", role: "member", hours: 24 }, { mode: "new", operation: "20000000-0000-4000-8000-000000000008", privateRequests: [...personRequests] });
-  expect([person.state, linkOf(person.link!)?.definition, agentKeyInvitationOf(person.link!)]).toEqual(["verified", "platform:membership@2", null]);
+  expect([person.state, linkOf(person.link!)?.definition, agentKeyInvitationOf(person.link!)]).toEqual(["verified", named, null]);
   expect((await command(receiving, ["join", person.link!])).code).toBe(1);
   expect((await receiver.config())!.join!.kind).toBe("enrol");
   expect(sessionRequests > 0 && crossReads > 0).toBe(true);
+  if (named === "platform:membership@6") {
+    expect(JSON.stringify(m.entries)).not.toContain('"secret"');
+    expect(JSON.stringify(m.entries)).not.toContain(agentKeyInvitationOf(link)!.secret);
+    expect(JSON.stringify(m.entries)).not.toContain(linkOf(person.link!)!.secret);
+  }
   for (const folder of ["issuer", "agent"]) {
     for (const part of ["keys", "private"]) for (const filename of await readdir(pathJoin(home, folder, part))) {
       expect(/^[a-z][a-z0-9-]{0,31}\.(key|data)$/.test(filename)).toBe(true);

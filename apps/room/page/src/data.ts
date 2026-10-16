@@ -1,3 +1,4 @@
+import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
 /**
  * The page's data functions: what it reads from a room and the one thing it
  * writes, a signed act. Each takes a `Session`, the scope service's base URL
@@ -195,7 +196,7 @@ function admittedInvitation(session: Pick<Session, "service">, link: NonNullable
     && fullScopeRef(link.repository?.directory) && link.repository.directory.kind === "directory"
     && fullScopeRef(link.repository?.membership) && link.repository.membership.kind === "membership"
     && isScopeId(link.repository?.rules) && isScopeId(link.repository?.destination)
-    && (link.definition === "platform:membership@1" || link.definition === "platform:membership@2")
+    && (link.definition === "platform:membership@1" || link.definition === "platform:membership@2" || link.definition === "platform:membership@6")
     && platform(link.definition)?.data.name === "platform:membership";
 }
 
@@ -228,11 +229,11 @@ export function invitationTarget(service: string, typed: string): Omit<PreparedJ
   if (!link || !admittedInvitation({ service }, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
   return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, definition: link.definition!, handle: link.handle, link: textDigest(canonicalize(link)) };
 }
-/** The signed envelope is private because its fields contain the invitation secret. */
+/** Retain the exact signed request privately; legacy fields contain the invitation secret. */
 export async function prepareJoin(session: Session, typed: string): Promise<PreparedJoin> {
   const target = invitationTarget(session.service, typed), link = linkOf(typed.trim())!;
   const shape = platform(target.definition)!.data as unknown as DefinitionShape;
-  const fields = { invitation: link.invitation, secret: link.secret };
+  const fields = invitationRedemptionFields(target.definition, target.place.membership, link.invitation, keyIdOfSecret(session.secret), link.secret);
   const signing: Signing = session.now ? { now: session.now() } : {};
   const signed = await signedIntent(secretSigner(session.secret), { to: target.place.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
   return { ...target, signed };

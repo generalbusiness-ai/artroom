@@ -1,6 +1,6 @@
 /** The steps every MCP story shares: a W2 marker, one act as a recipe step in either mode, and the founding of a room. */
 import { expect } from "vitest";
-import type { ScopeId } from "@generalbusiness/dap-contract";
+import type { PlatformDefinition, ScopeId } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret } from "@generalbusiness/artroom-bytes";
 import type { Agent, Room } from "./room.ts";
 
@@ -36,8 +36,8 @@ export async function offers(agent: Agent, mode: "default" | "generic", at: { to
 }
 
 /** Create the register and claim a room through the tools: create, room.create, wait, room.seat, room.first-key, wait. */
-export async function founded(room: Room, rita: Agent, mode: "default" | "generic" = "default"): Promise<{ register: ScopeId }> {
-  const installed = await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+export async function founded(room: Room, rita: Agent, mode: "default" | "generic" = "default", definition: PlatformDefinition = "platform:register@3"): Promise<{ register: ScopeId }> {
+  const installed = await rita.ok("create", { definition, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
   expect(installed["answer"]).toBe("accepted");
   const register = installed["scope"] as ScopeId;
   await room.wireRegister(register);

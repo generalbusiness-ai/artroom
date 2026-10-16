@@ -1,7 +1,8 @@
 /**
  * The invitation link that `artroom invite` prints and `artroom join`, the page and the MCP server's `join` read: the
  * service, the repository's scopes, the invitation's number and secret, the handle, and the membership version the
- * invitation is in. The secret is the invitation's, presented once by `join`; it is no signing key.
+ * invitation is in. Legacy cohorts present the invitation secret. Membership@6 treats it as an
+ * invitation signing seed that stays private and creates a key-bound proof.
  */
 import { invitationServiceUrl } from "./invitation-service.ts";
 import type { ScopeId, ScopeRef } from "@generalbusiness/dap-contract";

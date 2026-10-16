@@ -17,13 +17,13 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
-import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
+import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, PlatformDefinition, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, isDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { hashOfBytes, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivered, Item } from "@generalbusiness/dap-derive";
 import { d, keys, type Actor } from "@generalbusiness/dap-derive/testing";
-import { platform } from "@generalbusiness/dap-platform";
-import { officeDefinition } from "@generalbusiness/dap-platform/testing";
+import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
+import { officeDefinitionFor } from "@generalbusiness/dap-platform/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
@@ -111,7 +111,8 @@ export async function settle(...nodes: readonly Platform[]): Promise<void> {
  * Rita's key is the founding key, and sam's the recovery key. `hold`: the sends that transport does not deliver, until the test
  * clears `net.hold`.
  */
-export async function office(hold: ((envelope: Delivered) => boolean) | null = null): Promise<{ O: Platform; M: Platform }> {
+export async function office(hold: ((envelope: Delivered) => boolean) | null = null, named: PlatformDefinition = MEMBERSHIP): Promise<{ O: Platform; M: Platform }> {
+  const officeDefinition = officeDefinitionFor(named);
   net.hold = hold;
   net.deaf = null;
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
+import type { Entry, PlatformDefinition, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { checkOriginal, joinInvitation, originalJoin, type JoinStorage } from "../src/join-custody.ts";
@@ -12,7 +12,7 @@ const directory = ref("directory"), membership = ref("membership");
 const invitation = (n = 1, secret = "TEST invitation secret", targetMembership = membership, handle = "@ada") => "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service: origin, repository: { directory, membership: targetMembership, rules: ref("rules").scope, destination: ref("destination").scope }, invitation: n, secret, handle, definition: "platform:membership@2" })));
 const lock = { run: async <T>(work: () => Promise<T>) => work() };
 const now = () => Date.parse("2026-10-12T00:00:00Z");
-function fixture() {
+function fixture(definition: PlatformDefinition = "platform:membership@2") {
   const values = new Map<string, string>();
   let writes = 0, posts = 0, settles = 0, entries = 0, lost = false, missing = false, badEntry = false, refused = false;
   let signed: SignedIntent | undefined, entry: Entry | undefined, receipt: Receipt | undefined;
@@ -26,7 +26,7 @@ function fixture() {
       signed = (JSON.parse(init!.body!) as { signed: SignedIntent }).signed;
       expect(verifySignedIntent(signed)).toBe(true);
       entry = { v: 1, at: membership, seq: 5, prev: textDigest("TEST previous"), time: "2026-10-12T00:00:00Z", clamped: false, epoch: 0, input: { type: "act", signed, authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
-      receipt = { fact: { at: membership, seq: 5, hash: entryHash(entry) }, definition: "platform:membership@2", intent: intentDigest(signed.intent), effects: [], sends: [], epoch: 0 };
+      receipt = { fact: { at: membership, seq: 5, hash: entryHash(entry) }, definition, intent: intentDigest(signed.intent), effects: [], sends: [], epoch: 0 };
       if (refused) return Response.json({ answer: "refused", reason: "expired", judgedAt: { seq: 0, hash: textDigest("TEST refusal") } });
       if (lost) throw new Error("TEST lost reply");
       return Response.json({ answer: "accepted", receipt });
@@ -163,4 +163,21 @@ test("scripted archived A refusal cannot hide an unknown current B enrollment on
   expect(originalJoin(origin, reloaded)?.status).toBe("unknown");
   expect(f.writes).toBe(writesBefore);
   expect([...f.values.values()][0] === before).toBe(true);
+});
+
+// SCRIPTED service/storage, actual new-cohort proof and retained Page signer.
+test("new-cohort Page custody retains a proof without its invitation seed across lost reply and reload", async () => {
+  const f = fixture("platform:membership@6"), seed = b64url(new Uint8Array(32).fill(82));
+  const link = "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service: origin, repository: { directory, membership, rules: ref("rules").scope, destination: ref("destination").scope }, invitation: 1, secret: seed, handle: "@ada", definition: "platform:membership@6" })));
+  f.lose();
+  const first = await joinInvitation(origin, link, f.storage, { fetch: f.fetch, now, lock });
+  expect(first.status).toBe("unknown");
+  const kept = JSON.parse([...f.values.values()][0]!);
+  expect(Object.keys(kept.prepared.signed.intent.fields).sort()).toEqual(["invitation", "proof"]);
+  expect(JSON.stringify(kept.prepared.signed)).not.toContain(seed);
+  expect(originalJoin(origin, f.storage)?.key).toBe(first.key);
+  const checked = await checkOriginal(origin, f.storage, { fetch: f.fetch, now, lock });
+  expect(checked?.status).toBe("verified");
+  expect(f.counters()).toEqual({ posts: 1, settles: 1, entries: 1 });
+  if (checked?.status === "verified") checked.secret.fill(0);
 });
