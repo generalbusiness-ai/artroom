@@ -24,6 +24,11 @@ define.  The log of everything gives a really strong way to replay and trace wha
 happened and why.  And dap inherits some nice characteristics by running on Cloudflare:
 global scalability, leveraging Workers and Durable Objects and Artifacts.
 
+The first application, **dap-room**, is that workflow for a team of people and agents.
+They file issues, propose changes, review the exact version they read, and land the
+changes that meet the rules. The room publishes each landed change to a Git repository.
+To see how an application is made, [build a counter in 15 minutes](docs/build-a-counter.md).
+
 ## What is dap, technically?
 
 dap is a framework for building collaborative applications for people and
