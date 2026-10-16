@@ -242,3 +242,44 @@ replay interpretation, ordinary issue/change and nested concern native
 journeys, handoff/capacity failures, and operator consumers remain owed.
 This branch has no directory gate or Source approval yet. The new cohort
 is not landed, pushed, deployed or activated on any host.
+
+## Receiver eligibility groundwork
+
+The shared pure selector now returns either the legacy policy or
+partition-v1 with the receiver's exact birth, pin, scope and root. A missing
+or invalid required chain stays unavailable. It reads no producer alias
+and accepts no requested root or truthy origin flag. Distinct root10 and
+partition1 pins are checked as native births. Shared membership6, rules3,
+destination6 and inbox1 establish their actual root through immutable
+native creation, rather than a kind or pin alone. Declared applications
+need their actual partition factory proof; issue and change names need
+their complete native lane or concern chain. No consumer uses this selector
+yet.
+
+The receiver proof reader uses the same total sixteen-call, sixteen-frame
+allowance and deadline. Actual native root, partition, membership, rules,
+destination and Counting reads choose partition-v1 in the first graph.
+The actual new founder inbox needs four native reads. A separate real
+register10/directory9 graph has the same membership6 and inbox1 code pins,
+but their readers choose legacy in two and three reads respectively. The
+two focused native scenarios pass. Scope typechecking passes. The control
+that upgrades a shared membership pin under the wrong actual root fails
+the old-room assertion, and restores the selector.
+
+The first inbox draft required a duplicate directory field that the real
+inbox creation does not carry. Its actual message carries membership in
+the body and domain fields. The corrected selector proves the root from
+the native membership's own accepted root creation, and verifies that
+membership's exact inbox send. It still rejects a contradictory directory
+field if one is present. Both failed inbox draft runs remain retained.
+The first added legacy scenario had an invalid await expression and did
+not start tests; the corrected fixture passes. No authority, native
+creation format or old runtime interpretation changes to satisfy those
+draft corrections.
+
+Remaining integration must select the policy once from immutable receiver
+lineage, verify an empty receiver's actual parent create before bootstrap,
+and keep one total bounded raw-evidence allowance per admission. It must
+retain raw identities and derive labels at use, including result clauses,
+driver reads and mixed replay. Current helpers are isolated groundwork,
+with no global source-name expansion or raw-label cache upgrade.

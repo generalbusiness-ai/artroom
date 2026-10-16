@@ -3,12 +3,13 @@ import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, isPlatformDefinition, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { PARTITION_COHORT as C } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT as C, partitionReceiverPolicy, type PartitionNativeFrame } from "@generalbusiness/dap-platform";
 import { applicationPublicationOrigin } from "@generalbusiness/dap-platform";
 import { recordedMembership, recordedRules } from "../src/authority.ts";
 import { SqliteStore } from "../src/sqlite.ts";
 import { namespace } from "../src/namespace.ts";
-import { partitionProof } from "../src/partition-proof.ts";
+import { partitionProof, receiverPolicyProof } from "../src/partition-proof.ts";
+import { PROOF_BYTE_BOUNDS, proofEntry } from "../src/proof-bytes.ts";
 import { partitionApplicationPublicationOrigin } from "../../platform/src/partition-provenance.ts";
 import { counting } from "../../../apps/counter/definition.ts";
 import { COUNTING_DEFINITION } from "../../../apps/counter/pin.ts";
@@ -29,6 +30,10 @@ test("native root creates its partition with exact confirmed refs and real membe
     expect(await Promise.all(children.map(async child => (await child.summary()).value.definition))).toEqual([C.membership, C.rules, C.destination]);
     const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
     await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
+    const inboxCreate = (await M!.entries())[seat]!.sends.find(send => (send.to as Seed).kind === "inbox");
+    if (!inboxCreate) return expect.fail("native seated member has no inbox create");
+    const inbox = life.platform(scopeIdOf(inboxCreate.to as Seed));
+    await dispatchFixture([M!, inbox], life.wait);
     const refs = { root: await D.at(), membership: await M!.at(), rules: await rules!.at(), destination: await destination!.at() };
     const standing = await M!.stub.observe({ of: refs.membership, key: rita.key });
     expect(standing).toMatchObject({ keyState: "active", memberState: "active", actions: expect.arrayContaining(["issue.open"]) });
@@ -67,6 +72,18 @@ test("native root creates its partition with exact confirmed refs and real membe
     const proof = await life.wait(() => partitionProof(namespace(env.PLATFORM), factRefOf(genesis)));
     expect(proof).toMatchObject({ calls: 8, reservedBytes: 8 * 1024 * 1024 });
     expect(proof?.frames).toHaveLength(8);
+    for (const node of [D, P, ...children, A]) {
+      expect(partitionReceiverPolicy(await node.at(), proof!.frames)).toMatchObject({ mode: "partition-v1", lineage: { at: await node.at(), root: refs.root } });
+      const at = await node.at(), selected = await life.wait(() => receiverPolicyProof(namespace(env.PLATFORM), at));
+      expect(selected?.policy).toMatchObject({ mode: "partition-v1", lineage: { at, root: refs.root } });
+      expect(selected?.proof.calls).toBeLessThanOrEqual(8);
+    }
+    const inboxAt = await inbox.at(), inboxPolicy = await life.wait(() => receiverPolicyProof(namespace(env.PLATFORM), inboxAt));
+    const inboxBirth = await life.wait(() => namespace(env.PLATFORM).births.read(inboxAt, 10000));
+    const inboxEntry = inboxBirth && proofEntry(inboxBirth.proof, inboxBirth.proof.fact, PROOF_BYTE_BOUNDS.body);
+    expect(inboxEntry?.input.type === "genesis" ? inboxEntry.input.message?.body : null).toMatchObject({ membership: refs.membership, fields: { membership: refs.membership } });
+    expect(inboxPolicy?.policy).toMatchObject({ mode: "partition-v1", lineage: { at: inboxAt, root: refs.root } });
+    expect(inboxPolicy?.proof.calls).toBe(4);
     const frames = proof!.frames.map(frame => ({ fact: frame.fact, entry: frame.entry, under: isPlatformDefinition(frame.named) ? platformName(frame.named) : frame.declarationName }));
     expect(partitionApplicationPublicationOrigin(factRefOf(genesis), refs.root, refs.destination, frames)).toBe(true);
     expect(applicationPublicationOrigin(factRefOf(genesis), refs.root, refs.destination, frames)).toBe(false);
@@ -75,5 +92,31 @@ test("native root creates its partition with exact confirmed refs and real membe
     const current = await life.wait(() => partitionProof(namespace(env.PLATFORM), factRefOf(confirmed)));
     expect(current?.source.fact).toEqual(factRefOf(confirmed));
     expect(current?.frames).toHaveLength(8); expect(current?.calls).toBe(9);
+  } finally { life.release(); }
+});
+
+test("the shared membership6 pin keeps legacy receiver policy when its actual native parent is directory9", async () => {
+  const { life, D, children } = await sessionRoom("platform:register@10");
+  try {
+    const M = children[0]!, frames: PartitionNativeFrame[] = [];
+    const births = namespace(env.PLATFORM).births;
+    for (const node of [D, M]) {
+      const at = await node.at(), birth = await life.wait(() => births.read(at, 10000));
+      if (!birth) return expect.fail("actual legacy native birth unavailable");
+      const entry = proofEntry(birth.proof, birth.proof.fact, PROOF_BYTE_BOUNDS.body);
+      if (!entry) return expect.fail("actual native birth does not verify");
+      frames.push({ fact: birth.proof.fact, entry, named: birth.named, declarationName: birth.declarationName, native: birth.native });
+    }
+    expect((await M.summary()).value.definition).toBe(C.membership);
+    expect(partitionReceiverPolicy(await M.at(), frames)).toEqual({ mode: "legacy" });
+    const at = await M.at(), selected = await life.wait(() => receiverPolicyProof(namespace(env.PLATFORM), at));
+    expect(selected?.policy).toEqual({ mode: "legacy" }); expect(selected?.proof.calls).toBe(2);
+    const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
+    const create = (await M.entries())[seat]!.sends.find(send => (send.to as Seed).kind === "inbox");
+    if (!create) return expect.fail("actual legacy member has no inbox create");
+    const inbox = life.platform(scopeIdOf(create.to as Seed));
+    await dispatchFixture([M, inbox], life.wait);
+    const inboxAt = await inbox.at(), oldInbox = await life.wait(() => receiverPolicyProof(namespace(env.PLATFORM), inboxAt));
+    expect(oldInbox?.policy).toEqual({ mode: "legacy" }); expect(oldInbox?.proof.calls).toBe(3);
   } finally { life.release(); }
 });

@@ -3,7 +3,7 @@
 import type { FactRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, same } from "@generalbusiness/dap-derive";
-import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, type PartitionNativeFrame } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
 import type { NativeBirth, NativeBirthSource } from "./native-birth.ts";
 import { readNativeBirth } from "./native-birth.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
@@ -100,7 +100,10 @@ class Collection {
     if (!source) return false;
     const creator = entry.input.seed.creator;
     if (creator.kind === "lane") return this.lane(creator, depth + 1, seen);
-    const part = await this.birth(creator), born = part && proofEntry(part.proof, part.proof.fact, PROOF_BYTE_BOUNDS.body);
+    return this.partition(creator);
+  }
+  async partition(at: ScopeRef): Promise<boolean> {
+    const part = await this.birth(at), born = part && proofEntry(part.proof, part.proof.fact, PROOF_BYTE_BOUNDS.body);
     if (!part?.native || part.named !== PARTITION_COHORT.partition || !born || born.input.type !== "genesis"
       || !isFactRef(born.input.source) || !isScopeRef(born.input.seed.creator) || !same(born.input.source.at, born.input.seed.creator)
       || !born.input.message || !isObject(born.input.message.body) || !isObject(born.input.message.body["fields"])) return false;
@@ -112,6 +115,34 @@ class Collection {
       const sibling = await this.birth(ref); if (!sibling?.native || sibling.named !== pin) return false;
     }
     return true;
+  }
+  async receiver(at: ScopeRef): Promise<RawPartitionFrame | null> {
+    const birth = await this.birth(at), own = birth && this.#frames.get(canonicalize(birth.proof.fact));
+    if (!birth || !own || own.entry.input.type !== "genesis") return null;
+    const born = own.entry.input;
+    if (birth.native) {
+      if (birth.named === PARTITION_COHORT.partition) return await this.partition(at) ? own : null;
+      if (birth.named === PARTITION_COHORT.membership || birth.named === PARTITION_COHORT.rules || birth.named === PARTITION_COHORT.destination) {
+        if (isScopeRef(born.seed.creator) && !await this.birth(born.seed.creator)) return null;
+      } else if (birth.named === PARTITION_COHORT.inbox && isScopeRef(born.seed.creator)) {
+        const parent = await this.birth(born.seed.creator);
+        if (!parent) return null;
+        if (parent.named === PARTITION_COHORT.membership && parent.native) {
+          const entry = proofEntry(parent.proof, parent.proof.fact, PROOF_BYTE_BOUNDS.body);
+          if (!entry || entry.input.type !== "genesis" || !isScopeRef(entry.input.seed.creator)) return null;
+          const root = await this.birth(entry.input.seed.creator);
+          if (!root || root.named === PARTITION_COHORT.directory && (!isFactRef(born.source) || !await this.exact(born.source))) return null;
+        }
+      }
+      return own;
+    }
+    const directory = isObject(born.message?.body) ? born.message.body["directory"] : null;
+    if (!isScopeRef(directory)) return own;
+    const candidate = await this.birth(directory);
+    if (!candidate) return null;
+    // A locator can cheaply establish that no upgrade is requested. A
+    // positive partition pin still needs the entire actual creator chain.
+    return candidate.native && candidate.named === PARTITION_COHORT.partition && !await this.lane(at) ? null : own;
   }
   finish(source: RawPartitionFrame): PartitionProof | null {
     return this.#remaining() > 0 ? { source, frames: [...this.#frames.values()].filter(frame => source.fact.seq === 0 || !same(frame.fact, source.fact)), calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
@@ -127,5 +158,16 @@ export async function partitionProof(ports: PartitionProofPorts, from: FactRef):
     const collection = new Collection(ports);
     const source = await collection.exact(from);
     return source && await collection.lane(from.at) ? collection.finish(source) : null;
+  } catch { return null; }
+}
+
+/** Receiver-local selection, using one total raw evidence allowance. No
+ * producer alias, origin boolean, request flag or caller root selects it. */
+export async function receiverPolicyProof(ports: PartitionProofPorts, at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> {
+  if (!isScopeRef(at)) return null;
+  try {
+    const collection = new Collection(ports), own = await collection.receiver(at), proof = own && collection.finish(own);
+    const policy = proof && partitionReceiverPolicy(at, proof.frames);
+    return policy && proof ? { policy, proof } : null;
   } catch { return null; }
 }

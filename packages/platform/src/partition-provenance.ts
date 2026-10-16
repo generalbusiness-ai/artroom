@@ -208,3 +208,82 @@ export function partitionSourceName(named: Digest, declaredName: string, at: Sco
     return result === null ? null : result.ok ? declaredName : `declared:${declaredName}`;
   } catch { return `declared:${declaredName}`; }
 }
+
+export interface PartitionReceiverLineage {
+  at: ScopeRef;
+  birth: FactRef;
+  named: Digest | PlatformDefinition;
+  root: ScopeRef;
+}
+export type PartitionReceiverPolicy = { mode: "legacy" } | { mode: "partition-v1"; lineage: PartitionReceiverLineage };
+/** Receiver eligibility is separate from a sender's role. Inputs are raw
+ * authenticated native metadata or replay's normally checked runs. A locator
+ * in the creation message supplies no positive eligibility on its own. */
+export function partitionReceiverPolicy(at: ScopeRef, frames: readonly PartitionNativeFrame[]): PartitionReceiverPolicy | null {
+  try {
+    const facts = rawFacts(frames), own = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, at));
+    if (!facts || !own || own.entry.input.type !== "genesis") return null;
+    const born = own.entry.input;
+    if (born.decision !== "applied" || born.inc !== at.inc || scopeIdOf(born.seed) !== at.scope) return null;
+    const selected = (root: ScopeRef): PartitionReceiverPolicy => ({ mode: "partition-v1", lineage: { at, birth: own.fact, named: own.named, root } });
+    const legacy = { mode: "legacy" } as const;
+    if (own.native) {
+      if (own.named === COHORT.directory) return genesis(facts, at, COHORT.directory)?.ok === true ? selected(at) : null;
+      if (own.named === COHORT.partition) {
+        const fields = isObject(born.message?.body) ? born.message.body["fields"] : null;
+        if (!isObject(fields) || !isScopeRef(fields["root"]) || !isScopeRef(fields["destination"])) return null;
+        const room = context(facts, at, fields["root"], fields["destination"]);
+        return room === null ? null : room.ok ? selected(room.value.root) : null;
+      }
+      const ordinal = own.named === COHORT.membership ? 0 : own.named === COHORT.rules ? 1 : own.named === COHORT.destination ? 2 : null;
+      if (ordinal !== null) {
+        if (!isScopeRef(born.seed.creator)) return legacy;
+        const root = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, born.seed.creator));
+        if (!root) return null;
+        if (!root.native || root.named !== COHORT.directory) return legacy;
+        const checked = genesis(facts, root.fact.at, COHORT.directory);
+        if (!checked?.ok || root.entry.input.type !== "genesis" || born.seed.ordinal !== ordinal
+          || born.seed.cause !== seedDigest(root.entry.input.seed) || !same(born.source, root.fact) || born.n === null
+          || !born.message || !isObject(born.message.body) || !isObject(born.message.body["fields"])
+          || !same(born.message.body["fields"]["directory"], root.fact.at)
+          || !sentBy(root.entry, { from: root.fact, n: born.n, to: born.seed, message: born.message })) return null;
+        return selected(root.fact.at);
+      }
+      if (own.named === COHORT.inbox) {
+        if (!isFactRef(born.source) || !isScopeRef(born.seed.creator) || !same(born.source.at, born.seed.creator)) return legacy;
+        const parent = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, born.seed.creator));
+        if (!parent) return null;
+        if (!parent.native || parent.named !== COHORT.membership) return legacy;
+        const policy = partitionReceiverPolicy(parent.fact.at, frames);
+        if (!policy || policy.mode === "legacy") return policy;
+        const creating = frame(facts, born.source);
+        if (!creating || born.n === null || !born.message || !isObject(born.message.body) || !isObject(born.message.body["fields"])
+          || !same(born.message.body["membership"], parent.fact.at)
+          || "directory" in born.message.body && !same(born.message.body["directory"], policy.lineage.root)
+          || !same(born.message.body["fields"]["membership"], parent.fact.at)
+          || !sentBy(creating.entry, { from: born.source, n: born.n, to: born.seed, message: born.message })) return null;
+        return selected(policy.lineage.root);
+      }
+      return legacy;
+    }
+    const directory = isObject(born.message?.body) ? born.message.body["directory"] : null;
+    if (!isScopeRef(directory)) return legacy;
+    const part = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, directory));
+    if (!part) return null;
+    // Refusing an upgrade leaves the existing policy. Only the complete
+    // verified native partition/parent chain can choose partition-v1.
+    if (!part.native || part.named !== COHORT.partition) return legacy;
+    if (!isDigest(own.named)) return null;
+    const fields = part.entry.input.type === "genesis" && isObject(part.entry.input.message?.body) ? part.entry.input.message.body["fields"] : null;
+    if (!isObject(fields) || !isScopeRef(fields["root"]) || !isScopeRef(fields["destination"])) return null;
+    const creating = isFactRef(born.source) ? frame(facts, born.source) : undefined;
+    if (creating?.entry.input.type === "act" && creating.entry.input.signed.intent.kind === "establish-application") {
+      return origin(own.fact, fields["root"], fields["destination"], facts, "application") === true ? selected(fields["root"]) : null;
+    }
+    if (own.declarationName === "issue" || own.declarationName === "change") {
+      const room = nativeLane(own.named, own.declarationName, at, facts, 1, new Set());
+      return room?.ok ? selected(room.value.root) : null;
+    }
+    return null;
+  } catch { return null; }
+}
