@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:92efaf4a2e62be14cc1a0e9903b5b99295a9e2c0","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-observability-retain-count.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9307e8f6191abe3c372061518f02c1c82fe50639","text":"Merge retired a covered predecessor; the successor is at packages/scope/tsconfig.test.json."}
