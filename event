@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ca03df9c01c835465f4ecdefb5f5dc1c375221fd"}
+{"kind":"promise","text":"Accept request git:sha1…34c7def: Land the portable dap clone design (notes/2026-10-15-portable-dap-clone-design.md), revised 16 October against current main: what a dap clone needs to carry com…","body":{"branch":"planner/portable-clone-design-20261015"}}
