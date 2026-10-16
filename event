@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3eca3497d20b02b78b8740abf0d5f461ca631099","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/sqlite.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4b2263d925d9fab8d20e411f2b54e12dda451f63","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-native-archive-pin-metadata.md."}
