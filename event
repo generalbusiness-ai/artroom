@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/src/node.ts","body":{"commit":"7ea9d28a29695f4958f2348645d596e78b19236f","path":"packages/mcp/src/node.ts"}}
+{"kind":"promise","text":"Accept request git:sha1…484dc2a: Hugh, 2026-10-15 22:10 Eastern: the hosted-agent experience is the next product milestone after the NOW work (assert 1c3f1628). Produce the Counter contracts na…","body":{"branch":"planner/hosted-counter-contracts-20261015"}}
