@@ -32,6 +32,9 @@ import { ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import type { Alarm, Clock, Transport } from "./ports.ts";
 import type { Dispatched, Outgoing, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
+import { dutyCorrelation, metric } from "./operational.ts";
+
+interface DispatchCounts { attempted: number; acknowledged: number; diagnosed: number }
 
 /**
  * One alarm for three wakes (section 5.2): the earliest deadline, which the
@@ -113,19 +116,21 @@ export class Dispatcher {
     this.#again = true;
     return (this.#running ??= (async () => {
       let made = 0;
+      const counts: DispatchCounts = { attempted: 0, acknowledged: 0, diagnosed: 0 };
       try {
         while (this.#again) {
           this.#again = false;
-          made += await this.#pass();
+          made += await this.#pass(counts);
         }
       } finally {
         this.#running = null;
       }
+      metric({ kind: "dispatch", place: "dispatch", end: "ok", a: counts.attempted, b: counts.acknowledged, c: counts.diagnosed });
       return made;
     })());
   }
 
-  async #pass(): Promise<number> {
+  async #pass(counts: DispatchCounts): Promise<number> {
     let made = 0;
     for (;;) {
       const now = timeMs(this.#clock.read())!;
@@ -134,8 +139,8 @@ export class Dispatcher {
       for (const duty of due) {
         // The retry policy of section 7.5: so many routing refusals, and a request is given up. The number is never the proof.
         const refused = duty.attempts.filter((a) => ROUTING.includes(a.answer)).length;
-        if (duty.message.class === "request" && refused >= this.#bounds.routingRefusals) await this.#giveUp(duty, now);
-        else await this.#dispatch(duty, now);
+        if (duty.message.class === "request" && refused >= this.#bounds.routingRefusals) await this.#giveUp(duty, now, counts);
+        else await this.#dispatch(duty, now, counts);
         made++;
       }
     }
@@ -150,7 +155,7 @@ export class Dispatcher {
   }
 
   /** One dispatch of one send, with its record before and after. */
-  async #dispatch(duty: Outgoing, now: number): Promise<void> {
+  async #dispatch(duty: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
     const { seq, n } = duty;
     const store = this.#store;
     const at: Timestamp = timeOf(now);
@@ -159,13 +164,19 @@ export class Dispatcher {
     // Section 7.4: the attempt is recorded before it is sent, as unanswered. The alarm is set for its retry before the send
     // leaves, so a scope that stops here is woken and sends again.
     store.attempted(seq, n, logged("none"), next);
+    counts.attempted++;
+    dutyCorrelation(`${seq}.${n}`);
     await this.#wakes.set();
     const scope = store.scope()!;
     const envelope = { to: duty.to, from: { at: scope.at, seq, hash: duty.hash }, n, message: duty.message };
     const answer = await within(() => this.#transport.send(envelope), this.#bounds.dispatchSeconds);
     // No answer in time, or none at all: the record stays as it was written.
     if (answer === LATE || answer === null) return;
-    if (answer.answer === "recorded") return store.acknowledge(seq, n, logged("acknowledged"), answer.fact);
+    if (answer.answer === "recorded") {
+      store.acknowledge(seq, n, logged("acknowledged"), answer.fact);
+      counts.acknowledged++;
+      return;
+    }
     // A routing refusal by the resolver of the name, or an answer that decided nothing. `source-unverified` to a send of this
     // scope's own sealed entry is logged as a retryable answer: it is not a routing refusal, and it recorded nothing.
     const attempts = logged(answer.answer === "routing" ? answer.reason : "retry");
@@ -180,7 +191,7 @@ export class Dispatcher {
    * the request leaves the outgoing sends. Not written now, as when the
    * scope is busy, it is offered again after the drain's retry delay.
    */
-  async #giveUp(duty: Outgoing, now: number): Promise<void> {
+  async #giveUp(duty: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
     const { seq, n } = duty;
     const store = this.#store;
     const bounds = this.#bounds;
@@ -210,5 +221,6 @@ export class Dispatcher {
       written = end.end === "answer" && end.answer;
     }
     if (!written) store.attempted(seq, n, duty.attempts, now + bounds.drainRetrySeconds * 1000);
+    else counts.diagnosed++;
   }
 }

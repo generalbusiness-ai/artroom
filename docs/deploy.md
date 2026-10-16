@@ -39,6 +39,16 @@ or in the command line's config.
 | `publicReads` | Whether the Worker reads repositories with no token. Must be false when `privateRepositories` is true. |
 | `credentialIdentity` | Always `"adapter-attempt"`. |
 
+## Operational bindings
+
+The source configuration prepares `METRICS` for the
+`artroom_metrics_v1` Analytics Engine dataset and `VERSION_METADATA` for
+the Worker version. Console logs use full head sampling; platform
+invocation logs are disabled. These are source settings, not a record
+that an existing Worker has been changed. Preserve each deployment's
+bindings and settings when preparing an authorized release. See the
+[metric slot map and request correlation](operations.md).
+
 ## The order
 
 The host setting pins the register's scope ID, so the setting must name

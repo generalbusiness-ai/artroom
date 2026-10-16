@@ -8,14 +8,17 @@ import { isPage, page } from "./page/route.ts";
 import { isCounting, countingPage } from "../counter/src/counting.ts";
 import { isLending, lendingPage } from "../../examples/lending/worker/route.ts";
 import { isBrand, brand } from "./brand/route.ts";
+import { measuredRequest } from "../../packages/scope/src/operational.ts";
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 export default {
   fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
+    return measuredRequest(request, env, async () => {
     if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
     const hosted = await mcpRoute(request, env);
     if (hosted) return hosted;
     return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    });
   },
 };

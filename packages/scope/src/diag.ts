@@ -27,8 +27,13 @@
  * `String.prototype.length` counts. A cut never splits a surrogate pair.
  */
 
-/** One line of the log. Each member is at most `MAX_FIELD` code units. */
+import { metric, operational } from "./operational.ts";
+import { STEPS } from "./metrics.ts";
+
+/** One line of the log. Each text is at most `MAX_FIELD` code units. */
 export interface Diagnosis {
+  /** Untrusted operational correlation of exact16hex form, when present. */
+  readonly request?: string;
   /** What failed, such as `outside-call-failed`. A fixed word. */
   readonly event: string;
   /** Where, such as `hold@1:mint`. Fixed words of the source. */
@@ -169,11 +174,13 @@ export function diagnosis(event: string, step: string, thrown: unknown): Diagnos
     name = "object";
   }
   const word = (text: string) => bounded(redact(String(text)), MAX_FIELD);
-  return { event: word(event), step: word(step), name };
+  const request = operational()?.identity.request;
+  return { event: word(event), step: word(step), name, ...(request ? { request } : {}) };
 }
 
 /** Send a diagnosis to the sink. It never throws: a log that fails changes nothing that the runtime does. */
 export function report(sink: DiagnosisSink, event: string, step: string, thrown: unknown): void {
+  metric({ kind: "diagnosis", place: (STEPS as readonly string[]).includes(step) ? step : "other", end: "error", reason: event });
   try {
     sink(diagnosis(event, step, thrown));
   } catch {

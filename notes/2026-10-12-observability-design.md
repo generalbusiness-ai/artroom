@@ -83,7 +83,7 @@ keys than a projection of it, and the page has no analytics by design.
 
 ### 4.1 Retain what is already emitted
 
-Add to `packages/scope/wrangler.jsonc` the Workers observability setting,
+Add to `apps/room/wrangler.jsonc` the Workers observability setting,
 enabled, at full head sampling for now, so the diagnoses and site-route
 lines are retained by the platform. One setting; no code. The rate is a
 deployment choice recorded in `docs/deploy.md`.
@@ -112,7 +112,7 @@ a count of the things its kind names, never a rate.
 | blob 1 | kind | the ten kinds below |
 | blob 2 | deployment | the `DEPLOYMENT` setting, already bounded at 128 bytes |
 | blob 3 | version | the Worker version ID from the platform's version metadata binding, or `unknown` |
-| blob 4 | place | the union of: the fixed route names of `worker.ts`'s table (`found`, `acts`, `preparations`, `settle`, `summary`, `items`, `history`, `entries`, `outbox`, `duty`, `log`, `retained`, `sessions`, `stream`, `incidents`, `waiting`, `credential`, `site`, `page`, `health`, `requests`); the operations `alarm`, `dispatch`, `metrics`; the diagnosis steps, which are the fixed words the source emits at its diagnosis sites, enumerated in `metrics.ts` as `STEPS` with a test that every `diagnose(` call site's literal is in it; `mixed` for a merged row whose places differed; and `other` for a step outside `STEPS` |
+| blob 4 | place | the union of: the fixed route names of `worker.ts`'s table (`found`, `acts`, `preparations`, `settle`, `summary`, `items`, `query-items`, `reservation-snapshot`, `history`, `entries`, `outbox`, `duty`, `log`, `retained`, `sessions`, `stream`, `incidents`, `waiting`, `credential`, `site`, `page`, `health`, `requests`); the direct or MCP-backed public RPC places `rpc:found`, `rpc:acts`, `rpc:preparations`; the operations `alarm`, `dispatch`, `metrics`; the diagnosis steps, which are the fixed words the source emits at its diagnosis sites, enumerated in `metrics.ts` as `STEPS` with a test that every `diagnose(` call site's literal is in it; `mixed` for a merged row whose places differed; and `other` for a step outside `STEPS` |
 | blob 5 | end | for `turn`: the native `End` kinds of `turn.ts:94`, `answer`, `idle`, `busy`, `clock-behind`, `unavailable`; for every other kind: `ok`, `error`, `issued`, `refused`, `served`, `unavailable`, `dropped` |
 | blob 6 | reason | the union of `RefusalReason`, `UnavailableReason`, `MismatchReason`, `ReadRefusal`, `SessionRefusal`, the diagnosis events (`outside-call-failed`, `outside-replies-failed`, `outside-recovery-failed`, enumerated as `EVENTS` with the same call-site test), the operator record kinds, the status classes `2xx`, `3xx`, `4xx`, `5xx`, `aggregated` for a merged row whose reasons differed, `summary` for the one terminal row, and `none` |
 | blob 7 | request ID | 16 lowercase hexadecimal characters, server-minted (section 4.4); `mixed` for a merged row whose requests differed; `none` for an alarm |
@@ -135,7 +135,7 @@ number already exists.
 
 | Kind | Where | blob 4 | blob 5 | blob 6 | double 2 | double 3 | double 4 | double 5 | double 6 |
 |---|---|---|---|---|---|---|---|---|---|
-| `turn` | `turn.ts` at the exit of `run` | the operation (`acts`, `preparations`, `found`, `alarm`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer` and the input was public, else `none` |
+| `turn` | `turn.ts` at the exit of `run` | the operation (`acts`, `preparations`, `found`, their `rpc:` places, `alarm` or `dispatch`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer` and the input was public, else `none` |
 | `route` | `worker.ts` `route` | the route name | `ok` for a `2xx` or `3xx`, `refused` for a `4xx`, `error` for a `5xx` | the status class | wall time | 0 | 0 | 0 | 0; blob 9 `turn` or `pre-turn` |
 | `session` | `sessions.ts` | `sessions` | `issued` or `refused` | the `SessionRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
 | `signed-read` | `signed-reads.ts` | the read name | `ok` or `refused` | the `ReadRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
@@ -225,6 +225,7 @@ write time when the groups exceed the write budget. Merging is typed per
 slot: double 1 is the multiplicity, the turns merged; doubles 2 to 5 are
 sums; double 6 is the count of turns with the flag; request and trace
 IDs become `mixed` when they differ; blobs otherwise are the group's.
+Accumulating another event in the same exact group loses no resolution and does not set `groups`. Only coarsening across distinct groups counts as group loss.
 Every sum is checked: a counter that would pass 2^31 minus 1 saturates
 there, sets the `overflow` bit in the summary row and counts its turns
 as critical, so saturation can never hide a `busy` end. Each coarsening
@@ -315,7 +316,10 @@ trace ID or null, time, seq or null, duty or null)`.
 decision: it runs after the sealing transaction has committed and after
 the outbox row is written, in its own statement, with any SQL error
 caught, counted in the invocation's one summary row (the `sidecar` bit
-and the lost rows' counts), and otherwise ignored. A failed, slow, restarted or overflowing sidecar
+and the lost rows' counts), and otherwise ignored. Several missing
+entry-index rows from one turn count as that many lost correlation rows
+but only one affected turn and, when applicable, one critical turn. A
+failed, slow, restarted or overflowing sidecar
 never rolls back, resubmits, replaces or delays an accepted entry or a
 send, and the request's answer is already decided before the write
 begins. The correlation is passed to the turn and the dispatcher as an
@@ -479,6 +483,15 @@ coverage:
   observed, coverage incomplete: <the loss>" (fail); or "no busy
   observed, coverage unknown: sampled window" (fail). It is never stated
   as proof of absence;
+  Only server-owned HTTP ingress context may select those three HTTP places.
+  Direct ScopeService, direct object and MCP-backed calls use the separate
+  `rpc:` places, with the same native end and public answer slots. Caller
+  trace IDs, intents and correlation arguments never select the place.
+  The entered mark is set at the actual `Turns.run` boundary. Missing or
+  failed RPC metadata is unknown, counted through the existing critical
+  loss mechanism, and never evidence of a pre-turn answer. RPC, alarm,
+  dispatch and coarsened `mixed` places cannot balance an HTTP shortfall;
+  insufficient place resolution makes coverage unknown or incomplete.
 - the health check compares the body's `deployment` and `version` with
   the ones just deployed, not only the status code;
 - the output states the weighted event count, the coverage (sum of

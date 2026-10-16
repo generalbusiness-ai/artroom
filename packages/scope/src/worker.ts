@@ -89,6 +89,8 @@ import { NO_OUTSIDE, type Outside } from "./operations.ts";
 import type { NativeItemQuery } from "./item-queries.ts";
 import { admittedRequestUrl, itemQueryWire } from "./item-query-wire.ts";
 import { isSite, site } from "./site/route.ts";
+import { requestQuery, type RequestPage } from "./request-index.ts";
+import { measuredRequest, OBSERVED_METHODS, operational, operationPlace, unknownTurnMark, type MetricEnvironment, type OperationalIdentity, type ObservedMethod } from "./operational.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -97,12 +99,13 @@ import { isSite, site } from "./site/route.ts";
  * the operator sets it, and no file of this repository holds one.
  * `DEPLOYMENT` is the deployment's name, which a session's token names.
  */
-export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
+export interface Env extends GitHubBindings, ArtifactsBindings, MetricEnvironment { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
 /** The two namespaces of the hosted MCP endpoint (`McpRegistry`, `McpAgent`): one registry per repository, one object per agent. */
 export interface McpEnv extends Env { REGISTRIES: DurableObjectNamespace; AGENTS: DurableObjectNamespace }
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
+  observed?(method: ObservedMethod, args: unknown[], identity: OperationalIdentity, httpPublic?: boolean): Promise<{ value: unknown; turn: boolean }>;
   reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
@@ -123,6 +126,7 @@ interface Remote {
   incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
   credential(reader: unknown, handle: string): Promise<Read<ReadCredential>>;
+  requests(reader: unknown, request?: string, trace?: string, cursor?: string): Promise<Read<Pick<RequestPage, "rows" | "window">>>;
 }
 
 const MISSING = { ok: false, reason: "not-found" } as const;
@@ -137,6 +141,7 @@ export interface Api extends ScopeApi {
   waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
   /** A member's read token at a destination, once (I5). */
   credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>>;
+  requests(scope: string, reader: unknown, request?: string, trace?: string, cursor?: string): Promise<Read<Pick<RequestPage, "rows" | "window">>>;
 }
 
 
@@ -146,7 +151,28 @@ export interface Api extends ScopeApi {
  * limits of a join, or null when the caller has none.
  */
 export function api(binding: Binding, address: string | null = null): Api {
-  const at = (scope: string): Remote | null => (isScopeId(scope) ? binding.get(binding.idFromName(scope)) as Remote : null);
+  const at = (scope: string): Remote | null => {
+    if (!isScopeId(scope)) return null;
+    const remote = binding.get(binding.idFromName(scope)) as Remote, context = operational();
+    if (!context) return remote;
+    context.invocation.metrics.scope(scope);
+    return new Proxy(remote, { get(target, key) {
+      if (typeof key !== "string" || !(OBSERVED_METHODS as readonly string[]).includes(key)) return Reflect.get(target, key);
+      return async (...args: unknown[]) => {
+        const httpPublic = context.httpPublic && context.place === operationPlace(key as ObservedMethod) && ["found", "submit", "prepare"].includes(key);
+        if (typeof target.observed !== "function") {
+          if (httpPublic) unknownTurnMark(context);
+          return Reflect.apply(Reflect.get(target, key) as (...args: unknown[]) => unknown, target, args);
+        }
+        try {
+          const reply = await target.observed(key as ObservedMethod, args, context.identity, httpPublic);
+          if (typeof reply?.turn === "boolean") context.turn.entered ||= reply.turn;
+          else if (httpPublic) unknownTurnMark(context);
+          return reply.value;
+        } catch (error) { if (httpPublic) unknownTurnMark(context); throw error; }
+      };
+    } });
+  };
   return {
     /**
      * Section 7.1: the service computes the seed from the signed intent and
@@ -194,6 +220,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
     async reservationSnapshot(scope: string, asked: SignedIntent) { return (await at(scope)?.reservationSnapshot(asked)) ?? null; },
     async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
+    async requests(scope: string, reader: unknown, request?: string, trace?: string, cursor?: string) { return requestQuery(request, trace, cursor) ? (await at(scope)?.requests(reader, request, trace, cursor)) ?? MISSING : MISSING; },
   };
 }
 
@@ -258,7 +285,10 @@ function queryResponse(result: NativeItemQuery): Response {
 }
 
 /** One request to the routes in the table above. */
-export async function route(request: Request, binding: Binding): Promise<Response> {
+export async function route(request: Request, binding: Binding, env: MetricEnvironment = {}): Promise<Response> {
+  return measuredRequest(request, env, () => routedRequest(request, binding));
+}
+async function routedRequest(request: Request, binding: Binding): Promise<Response> {
   if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
   const url = new URL(request.url);
   // Section 5.3: a credential in a URL is refused before anything is routed, and is not used. That does not undo the exposure.
@@ -274,7 +304,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (v !== "v1" || root !== "scopes" || more.length > 0) return json(404, { error: "not-found" });
   // Only a retained input is named by two parts: its kind and its digest.
   if (what === "retained" ? which === undefined || last === undefined : last !== undefined) return json(404, { error: "not-found" });
-  if ((what === "sessions" || what === "stream" || what === "incidents") && (scope === undefined || which !== undefined)) return json(404, { error: "not-found" });
+  if ((what === "sessions" || what === "stream" || what === "incidents" || what === "requests") && (scope === undefined || which !== undefined)) return json(404, { error: "not-found" });
   const reader = request.headers.get("authorization");
   if (what === "query-items") {
     const wire = itemQueryWire(request, scope ?? "");
@@ -286,6 +316,11 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     return queryResponse(await object.queryItems(wire.encoded, reader));
   }
   const cursor = url.searchParams.get("cursor") ?? undefined;
+  const requestId = url.searchParams.get("request") ?? undefined, traceId = url.searchParams.get("trace") ?? undefined;
+  if (what === "requests") {
+    const keys = [...url.searchParams.keys()];
+    if (keys.some(key => !["request", "trace", "cursor"].includes(key)) || new Set(keys).size !== keys.length || !requestQuery(requestId, traceId, cursor)) return read(MISSING);
+  }
   const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "preparations" || what === "settle" || what === "sessions" || what === "reservation-snapshot") && which === undefined);
   if (request.method !== (posts ? "POST" : "GET")) return json(405, { error: "method-not-allowed" });
 
@@ -319,6 +354,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "log" && which === undefined) return read(await scopes.log(scope, reader, cursor));
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
+  if (what === "requests") return read(await scopes.requests(scope, reader, requestId, traceId, cursor));
   if (what === "waiting" && (which === "diagnosed" || which === "unanswered")) return read(await scopes.waiting(scope, reader, which, cursor));
   if (what === "credential" && which !== undefined) {
     // The answer holds a credential: it is marked so that nothing between here and the device stores it.
@@ -463,10 +499,12 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
 /** Generic Scope, Site and MCP dispatch. Application pages and demo offers belong to apps/room. */
 export default {
   fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
+    return measuredRequest(request, env, async () => {
     if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
     const hosted = await mcpRoute(request, env);
     return hosted ?? (isSite(request) ? site(request, env) : route(request, env.SCOPES));
+    });
   },
 };
 

@@ -40,19 +40,28 @@ import { sessionFields, testSessionBypass } from "./session-settings.ts";
 import { DeployedScope, McpAgent, McpRegistry, ScopeService, mcpRoute, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
 import type { HostedAgent } from "@generalbusiness/dap-mcp";
 import { outsideOf, owners, wired } from "./outside.ts";
+import type { MetricEnvironment } from "../src/operational.ts";
 
 export { ScopeObject };
+/** Scripted operational sinks, keyed by physical object for paired deployments. */
+export const metricBindings = new Map<string, MetricEnvironment>();
+/** Test ports for byte-equal native worlds in different physical namespaces. */
+export const metricWiring = new Map<string, () => Partial<NonNullable<Wiring["ports"]>>>();
 
 export class TestScope extends ScopeObject {
+  protected override metricEnvironment(): MetricEnvironment { return metricBindings.get(this.ctx.id.toString()) ?? super.metricEnvironment(); }
   protected override wiring(name: string | undefined): Wiring {
     const c = controls(name ?? "");
-    return { ports: { ...testPorts(c), outside: outsideOf(name ?? ""), owners, ...wired.get(name ?? "")?.() }, bounds: c.bounds, reads: c.reads };
+    return { ports: { ...testPorts(c), outside: outsideOf(name ?? ""), owners, ...wired.get(name ?? "")?.(), ...metricWiring.get(this.ctx.id.toString())?.() }, bounds: c.bounds, reads: c.reads };
   }
 }
+/** Same native code in a second local namespace for byte equality controls. */
+export class MetricControlScope extends TestScope {}
 
 type NetEnv = Env & { NET: DurableObjectNamespace };
 
 export class NetScope extends DeployedScope<NetEnv> {
+  protected override metricEnvironment(): MetricEnvironment { return metricBindings.get(this.ctx.id.toString()) ?? super.metricEnvironment(); }
   protected override scopes() { return this.env.NET; }
   protected override wiring(name: string | undefined): Wiring {
     const deployed = super.wiring(name);
@@ -99,6 +108,7 @@ export const TEST_DEPLOYMENT = "artroom-scope-test";
 type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
 
 export class PlatformScope extends DeployedScope<PlatformEnv> {
+  protected override metricEnvironment(): MetricEnvironment { return metricBindings.get(this.ctx.id.toString()) ?? super.metricEnvironment(); }
   readonly #scheduledCallbacks: Promise<unknown>[];
 
   constructor(ctx: DurableObjectState, env: PlatformEnv) {

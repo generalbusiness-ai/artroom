@@ -5,7 +5,7 @@
   "compilerOptions": {
     "rootDir": "../..",
     "lib": ["ES2022", "ESNext.Disposable"],
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types", "node"],
     "skipLibCheck": true
   },
   "include": ["test/**/*.scope.test.ts", "../scope/test/env.d.ts"]

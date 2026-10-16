@@ -90,6 +90,7 @@ import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/dap-de
 import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
 import { signerOf } from "./entry-signer.ts";
+import { metric } from "./operational.ts";
 
 /** How a reader presents a signed read: the `Authorization` header's value. */
 const SCHEME = "Signed ";
@@ -341,6 +342,11 @@ export function checkLocalSignedRead(config: SignedReading, store: Pick<Store, "
 
 /** The full check, using a resolved root only when local eligibility needs it. */
 export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number; scoped: boolean; whole: boolean } | { refused: false | "clock-behind" } {
+  const answer = checkedRead(config, store, reader, read, arg);
+  metric({ kind: "signed-read", place: read === "entry" ? "entries" : read, end: "key" in answer ? "ok" : "refused", reason: "key" in answer ? "none" : answer.refused || "forbidden" });
+  return answer;
+}
+function checkedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number; scoped: boolean; whole: boolean } | { refused: false | "clock-behind" } {
   const checked = checkLocalSignedRead(config, store, reader, read, arg);
   if ("refused" in checked) { observed(config, reader, "request-refused"); return checked; }
   const { actor, since } = "key" in checked ? { actor: checked.key, since: checked.since } : checked.root;
