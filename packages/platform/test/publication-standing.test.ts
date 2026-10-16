@@ -60,6 +60,14 @@ test("exactly nine distinct provenance keys are complete; ten refuse rather than
   expect(ten.read()).toEqual({ ok: false, reason: "limit" });
   expect(nine.calls).toHaveLength(17); expect(ten.calls).toHaveLength(19);
   expect(nine.calls.every(seq => seq === 5 || seq >= 10 && seq <= 25)).toBe(true);
+  const maximum = fixture(0), shared = keyIdOfSecret(new Uint8Array(32).fill(99));
+  for (let n = 0; n < 32; n++) maximum.add(`check-${n}`, n, shared);
+  expect(maximum.read()).toEqual({ ok: true, keys: [rita.key, shared] });
+  expect(maximum.calls).toHaveLength(65); // bounded own decisions + openings, not a range
+  const over = fixture(0);
+  for (let n = 0; n < 33; n++) over.add(`check-${n}`, n, shared);
+  expect(over.read()).toEqual({ ok: false, reason: "unavailable" });
+  expect(over.calls).toEqual([]);
 });
 
 test("wrong frame, holder, attempt, accepted effect and missing or ambiguous metadata are unavailable, never an empty active set", () => {
