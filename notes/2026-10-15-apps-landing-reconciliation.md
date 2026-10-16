@@ -2,6 +2,12 @@
 
 15 October 2026. Request `5c4da4cc`, promise `350529a1`.
 
+The document correction is tracked separately by Source request `4c8c6377`
+and promise `0f72c350`. The original request asks for evidence and owes no
+Git artifact. Its prepared README pointer alone cannot authorize a merge.
+This successor binds both changed documents to the Source request for
+independent review and local integration.
+
 Local main `0548b726d0a3e17ec171e71d93365d5311f61ccf` contains the
 approved consolidation commit `80976213df684ed6bed200c793e76001eed74b11`.
 Its tree differs from that approved tree in README.md alone. The merge
