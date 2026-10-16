@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…484dc2a: Hugh, 2026-10-15 22:10 Eastern: the hosted-agent experience is the next product milestone after the NOW work (assert 1c3f1628). Produce the Counter contracts na…","body":{"branch":"planner/hosted-counter-contracts-20261015"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:27b1b8b7c7a5ca4881c9b515980616a64f793860","text":"Merge retired a covered predecessor; the successor is at packages/mcp/src/node.ts."}
