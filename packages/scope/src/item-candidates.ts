@@ -22,7 +22,7 @@ const no = (reason: Extract<ItemCandidates, { ok: false }>["reason"]): ItemCandi
  * verified UTF8 Scope backend. A missing primitive/index refuses: there is
  * no record-materializing fallback or migration.
  */
-export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery, allowance: ItemCandidateAllowance): ItemCandidates {
+export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery, allowance: ItemCandidateAllowance, admit: ((candidates: number, metadataBytes: number) => void) | null = null): ItemCandidates {
   if (!query || !name(query.type) || !Array.isArray(query.states) || query.states.length > ITEM_CANDIDATE_BOUNDS.states
     || query.states.some((s, i) => !name(s) || (i > 0 && byteOrder(query.states[i - 1]!, s) >= 0))
     || !(query.after === null || whole(query.after))
@@ -31,11 +31,12 @@ export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery
   if (!whole(rows) || rows < 1 || rows > ITEM_CANDIDATE_BOUNDS.rows || !whole(candidates) || candidates > ITEM_CANDIDATE_BOUNDS.candidates || !whole(metadataBytes) || metadataBytes > ITEM_CANDIDATE_BOUNDS.metadataBytes) return no("too-large");
   if (metadataBytes < 2) return no("too-large");
   // Empty IDs means no items. It must never broaden into a state scan.
-  if (query.states.length === 0 || query.ids?.length === 0) return { ok: true, rows: [], exhausted: true, candidatesRead: 0, metadataBytes: 2 };
+  if (query.states.length === 0 || query.ids?.length === 0) { admit?.(0, 2); return { ok: true, rows: [], exhausted: true, candidatesRead: 0, metadataBytes: 2 }; }
   const maximum = query.ids === undefined ? query.states.length * (rows + 1) : query.ids.filter(id => id > (query.after ?? -1)).length;
   // Admit worst-case metadata and SQL seek counts before any execution.
   // Each {id,bytes} of safe integers costs under64 UTF8 bytes incl comma.
   if (maximum > candidates || 2 + 64 * maximum > metadataBytes) return no("too-large");
+  admit?.(maximum, 2 + 64 * maximum);
   const found: ItemCandidate[] = [];
   let used = 2;
   const take = (selected: Record<string, SqlValue>[], limit: number): boolean => {

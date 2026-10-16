@@ -213,7 +213,7 @@ export interface SentTexts { read(from: FactRef, digest: Digest): Promise<TextRe
 /** `operations` is the read of a scope's outside operations, which the contract does not list (I3 deltas, entry EB9). */
 /** `incidents` and `waiting` are the reads of the operator's record and of the two lists of waiting requests (authority note, section 12, G13 and G17). */
 /** `credential` is the one-time read of a member's read token at a destination (the planner's decision for I5). */
-export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting" | "credential";
+export type ReadName = "summary" | "items" | "history" | "entry" | "outbox" | "operations" | "log" | "retained" | "incidents" | "waiting" | "credential" | "query-items";
 
 /**
  * Who may read. `reader` is whatever the caller presented. The production

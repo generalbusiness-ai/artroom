@@ -4,23 +4,33 @@ import { isScopeRef, same, type Page, type StateView } from "@generalbusiness/da
 import { recordedMembership, repositorySessionBirth } from "./authority.ts";
 import type { Clock } from "./ports.ts";
 import { ReadPreparation, type PreparedRead } from "./read-preparation.ts";
-import { PreparationFlights } from "./preparation-flight.ts";
+import { PreparationFlights, type PreparationRun } from "./preparation-flight.ts";
 import { PreparationBudget, PREPARATION_BOUNDS } from "./preparation-budget.ts";
 import { encodeSessionReference, sessionReferenceReply, SESSION_REFERENCE_BOUNDS as B, type SessionReferenceSource } from "./session-reference.ts";
 import { authenticateSession, sessionClock, type Sessions } from "./sessions.ts";
 
-export type QueryVisibility = "live" | "final" | "mixed";
+export type QueryVisibility = "live" | "final" | "mixed" | "empty";
 export function sessionAllowsVisibility(reads: readonly string[], visibility: QueryVisibility): boolean {
-  return visibility === "live" ? reads.includes("summary") : visibility === "final" ? reads.includes("items") : visibility === "mixed" && reads.includes("summary") && reads.includes("items");
+  return visibility === "empty" ? reads.includes("summary") || reads.includes("items") : visibility === "live" ? reads.includes("summary") : visibility === "final" ? reads.includes("items") : visibility === "mixed" && reads.includes("summary") && reads.includes("items");
 }
+/** Preparation data, not a reusable grant. The owner owes currentness, its synchronous page and fresh final authority. */
+export interface PreparedSessionRead { frame: PreparedRead; membership: ScopeRef; resolvedBirth: boolean; visibility: QueryVisibility }
+export type SessionPreparationResult = { ok: true; prepared: PreparedSessionRead } | { ok: false; reason: "forbidden" | "sessions-unavailable" | "clock-behind" | "unavailable" };
+const refused = (reason: Extract<SessionPreparationResult, { ok: false }>["reason"]): SessionPreparationResult => ({ ok: false, reason });
 
 /** Called after the operation's last bounded storage/support phase. Issued
  * claims stay valid until expiry; there is no current roster/role lookup. */
 export function preparedSessionAllows(config: { sessions(): Sessions | null; clock: Clock }, frame: PreparedRead, reader: unknown, visibility: QueryVisibility, membership: ScopeRef, resolvedBirth = false): boolean {
-  if (!frame.budget.available) return false;
+  return preparedSessionRefusal(config, frame, reader, visibility, membership, resolvedBirth) === null;
+}
+export function preparedSessionRefusal(config: { sessions(): Sessions | null; clock: Clock }, frame: PreparedRead, reader: unknown, visibility: QueryVisibility, membership: ScopeRef, resolvedBirth = false): "unavailable" | "forbidden" | "sessions-unavailable" | "clock-behind" | null {
+  if (!frame.budget.available) return "unavailable";
   const fresh = authenticateSession(() => config.sessions(), reader);
-  return "claims" in fresh && same(fresh.claims.membership, membership) && sessionClock(config, frame.scope, fresh.claims) === null
-    && sessionAllowsVisibility(fresh.claims.reads, visibility) && (!resolvedBirth || fresh.claims.reads.includes("summary"));
+  if (!("claims" in fresh)) return fresh.refused || "forbidden";
+  if (!same(fresh.claims.membership, membership)) return "forbidden";
+  const clock = sessionClock(config, frame.scope, fresh.claims);
+  if (clock !== null) return clock === "clock-behind" ? clock : "forbidden";
+  return sessionAllowsVisibility(fresh.claims.reads, visibility) && (!resolvedBirth || fresh.claims.reads.includes("summary")) ? null : "forbidden";
 }
 
 const freeze = (value: unknown): void => { if (value && typeof value === "object") { for (const child of Object.values(value)) freeze(child); Object.freeze(value); } };
@@ -52,37 +62,55 @@ export class SessionPreparation {
   constructor(readonly preparation: ReadPreparation, readonly sessions: () => Sessions | null, readonly clock: Clock, readonly source: SessionReferenceSource | null = null, readonly flights = new PreparationFlights()) {}
   eligible(reader: unknown, visibility: QueryVisibility): Promise<boolean> {
     return this.flights.run(async run => {
-      if (typeof reader !== "string" || reader.length > 4104) return null;
+      const result = await this.prepare(reader, visibility, run);
+      if (!result.ok) return null;
+      const { prepared } = result;
+      if (!prepared.frame.current() || !run.active()) return null;
+      return preparedSessionAllows(this, prepared.frame, reader, prepared.visibility, prepared.membership, prepared.resolvedBirth) && run.active();
+    }).then(value => value === true);
+  }
+  /** Joins the caller's existing operation. This starts no timer/flight and grants no later read. */
+  async prepare(reader: unknown, visibility: QueryVisibility | ((frame: PreparedRead) => QueryVisibility), run: PreparationRun,
+    budget = new PreparationBudget(PREPARATION_BOUNDS, run.active), beforePeer: (() => void) | null = null): Promise<SessionPreparationResult> {
+      if (typeof reader !== "string" || reader.length > 4104) return refused("forbidden");
       const authentic = authenticateSession(this.sessions, reader);
-      if (!("claims" in authentic) || !sessionAllowsVisibility(authentic.claims.reads, visibility) || !run.active()) return null;
-      const frame = this.preparation.capture(new PreparationBudget(PREPARATION_BOUNDS, run.active));
-      if (!frame || !run.active()) return null;
+      if (!("claims" in authentic)) return refused(authentic.refused || "forbidden");
+      if (!run.active()) return refused("unavailable");
+      if (!sessionAllowsVisibility(authentic.claims.reads, typeof visibility === "function" ? "empty" : visibility)) return refused("forbidden");
+      const frame = this.preparation.capture(budget);
+      if (!frame || !run.active()) return refused("unavailable");
+      const selected = typeof visibility === "function" ? visibility(frame) : visibility;
+      if (!run.active()) return refused("unavailable");
+      if (!sessionAllowsVisibility(authentic.claims.reads, selected)) return refused("forbidden");
       const context = { genesis: () => frame.genesis, state: referenceView(frame) };
       const recorded = frame.scope.at.kind === "membership" ? frame.scope.at : recordedMembership(context, frame.scope.at);
-      if (!recorded || recorded.kind !== "membership" || recorded.scope !== authentic.claims.membership.scope
-        || (recorded.inc !== null && recorded.inc !== authentic.claims.membership.inc) || sessionClock(this, frame.scope, authentic.claims) !== null || !run.active()) return null;
+      if (!recorded || recorded.kind !== "membership") return refused("unavailable");
+      if (recorded.scope !== authentic.claims.membership.scope || (recorded.inc !== null && recorded.inc !== authentic.claims.membership.inc)) return refused("forbidden");
+      const clock = sessionClock(this, frame.scope, authentic.claims);
+      // An ID match with unresolved incarnation is not full affiliation.
+      // Refuse generically before exposing this target's clock state.
+      if (clock !== null) return refused(clock === "clock-behind" && isScopeRef(recorded) ? clock : "forbidden");
+      if (!run.active()) return refused("unavailable");
       let membership: ScopeRef, resolvedBirth = false;
       if (isScopeRef(recorded)) membership = recorded;
       else {
-        if (!this.source || !authentic.claims.reads.includes("summary")) return null;
+        if (!authentic.claims.reads.includes("summary")) return refused("forbidden");
+        if (!this.source) return refused("unavailable");
         const birth = repositorySessionBirth(context, frame.scope.at, recorded);
-        if (!birth || !run.active()) return null;
+        if (!birth || !run.active()) return refused("unavailable");
+        beforePeer?.();
         frame.budget.spend({ calls: 1, metadata: B.request + B.reply }); // one fixed RPC, never another participant/retry
         const request = encodeSessionReference({ v: 1, to: birth.directory, reader, maxBytes: B.reply, milliseconds: run.remaining() });
-        if (!request || !run.active()) return null;
+        if (!request || !run.active()) return refused("unavailable");
         const raw = await this.source.read(birth.directory, request);
-        if (!run.active()) return null; // late task retains its slot but does no more local storage/support
+        if (!run.active()) return refused("unavailable"); // late task retains its slot but does no more local storage/support
         const reply = sessionReferenceReply(raw);
-        if (!reply || !same(reply.directory, birth.directory) || !birth.definitions.includes(reply.definition) || !same(reply.membership, authentic.claims.membership)
+        if (!reply || !same(reply.directory, birth.directory) || !birth.definitions.includes(reply.definition)
           || reply.membership.scope !== recorded.scope || (recorded.inc !== null && reply.membership.inc !== recorded.inc)
-          || (frame.scope.at.kind === "rules" && !same(reply.rules, frame.scope.at))) return null;
+          || (frame.scope.at.kind === "rules" && !same(reply.rules, frame.scope.at))) return refused("unavailable");
+        if (!same(reply.membership, authentic.claims.membership)) return refused("forbidden");
         membership = reply.membership; resolvedBirth = true;
       }
-      // Full unchanged head/incarnation/genesis/status/time and current whole
-      // support justify reusing this operation's native recorded/birth data.
-      // A drift ends the operation; no recapture or hidden retry follows.
-      if (!frame.current() || !run.active()) return null;
-      return preparedSessionAllows(this, frame, reader, visibility, membership, resolvedBirth) && run.active();
-    }).then(value => value === true);
+      return run.active() && frame.budget.available ? { ok: true, prepared: { frame, membership, resolvedBirth, visibility: selected } } : refused("unavailable");
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import type { ScopeApi } from "@generalbusiness/dap-contract";
+import { itemQueryReadFor, readItemQueryParameter, within, LATE } from "@generalbusiness/artroom-bytes";
 import { ANSWERS } from "./answers.ts";
 import { TransportError, type Transport } from "./handle.ts";
 
@@ -41,6 +42,14 @@ export function bindingTransport(service: ServiceBinding): Transport {
     settle: (scope, signed) => call("settle", () => service.settle(scope, signed)),
     summary: (scope, reader) => call("summary", () => service.summary(scope, reader)),
     items: (scope, reader, type, cursor) => call("items", () => service.items(scope, reader, type, cursor)),
+    queryItems: async (scope, reader, encoded) => {
+      const query = readItemQueryParameter(encoded);
+      if (!query || query.scope.scope !== scope) throw new TransportError("invalid bounded item query");
+      const reply = await within(10, () => call("queryItems", () => service.queryItems(scope, reader, encoded)));
+      if (reply === LATE) throw new TransportError("no whole item query within 10 seconds; coverage is incomplete");
+      if (!itemQueryReadFor(reply, query)) throw new TransportError("the reply does not match the bounded item query");
+      return reply;
+    },
     history: (scope, reader, cursor) => call("history", () => service.history(scope, reader, cursor)),
     entry: (scope, reader, seq) => call("entry", () => service.entry(scope, reader, seq)),
     outbox: (scope, reader, cursor) => call("outbox", () => service.outbox(scope, reader, cursor)),

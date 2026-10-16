@@ -5,9 +5,11 @@ import { isObject, same } from "@generalbusiness/dap-derive";
 import type { Sql, SqlValue } from "./sqlite.ts";
 
 export const PROOF_BYTE_BOUNDS = { body: 1024 * 1024, scope: 4096 } as const;
+/** Caller reserves eight conservative calls; the native exact sender executes at most five SQL reads. */
+export const EXACT_PROOF_RECEIVER_BOUNDS = Object.freeze({ sqlCalls: 5, calls: 8, metadata: 32 * 1024, milliseconds: 10_000 });
 export interface ProofBody { fact: FactRef; bytes: string }
 /** Only a trusted native sender can promise admission before materialization. */
-export interface ProofSource { read(fact: FactRef, maxBytes: number): Promise<ProofBody | null> }
+export interface ProofSource { read(fact: FactRef, maxBytes: number, milliseconds?: number): Promise<ProofBody | null> }
 export type ProofRead = { kind: "body"; value: ProofBody } | { kind: "missing" | "unavailable" };
 export interface ProofIdentity { genesis: FactRef; head: Head }
 const integer = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0;

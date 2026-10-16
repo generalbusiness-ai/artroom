@@ -68,9 +68,9 @@
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { CONTROL_BODY_BYTES, HostedAgent, HostedRegistry, controlOf, type AgentPorts, type ControlAnswer, type RegistryPorts } from "@generalbusiness/dap-mcp";
-import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { b64url, parseStrict, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { PROPOSED_BOUNDS, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-contract";
+import type { FactRef, Entry, ItemQueryRead, ItemQueryRefusal, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
+import { b64url, parseStrict, readItemQueryReply, utf8, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/dap-derive";
 import { foundedKind, type Founded } from "./core.ts";
 import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
@@ -86,6 +86,8 @@ import { within } from "./turn.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
+import type { NativeItemQuery } from "./item-queries.ts";
+import { admittedRequestUrl, itemQueryWire } from "./item-query-wire.ts";
 import { isSite, site } from "./site/route.ts";
 
 /**
@@ -114,6 +116,7 @@ interface Remote {
   duty(reader: unknown, duty: DutyId): Promise<Read<Duty>>;
   log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
+  queryItems(encoded: unknown, reader: unknown): Promise<NativeItemQuery>;
   session(asked: unknown): Promise<SessionAnswer>;
   stream(reader: unknown): Promise<Opened | StreamRefusal>;
   release(id: string): Promise<void>;
@@ -170,6 +173,10 @@ export function api(binding: Binding, address: string | null = null): Api {
     async settle(scope: string, signed: SignedIntent): Promise<Settlement> { return (await at(scope)?.settle(signed)) ?? MISSING; },
     async summary(scope: string, reader: unknown): Promise<Read<Summary>> { return (await at(scope)?.summary(reader)) ?? MISSING; },
     async items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return (await at(scope)?.items(reader, type, cursor)) ?? MISSING; },
+    async queryItems(scope: string, reader: unknown, encoded: string): Promise<ItemQueryRead> {
+      const result = await at(scope)?.queryItems(encoded, reader);
+      return result?.ok ? readItemQueryReply(utf8(result.serialized)) ?? { ok: false, reason: "unavailable" } : result ?? { ok: false, reason: "invalid-query" };
+    },
     async history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return (await at(scope)?.history(reader, cursor)) ?? MISSING; },
     async entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return (await at(scope)?.entry(reader, seq)) ?? MISSING; },
     async outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.outbox(reader, cursor)) ?? MISSING; },
@@ -195,7 +202,7 @@ export function api(binding: Binding, address: string | null = null): Api {
 /** The most bytes a request body may have: more than one entry, which is the most an act can become. */
 const BODY_BYTES = 1024 * 1024;
 
-const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 /** The status of an answer to a founding or an act (section 4.2). The body says which. */
 function answered(answer: Founded | Answer, accepted: number): Response {
@@ -240,8 +247,19 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
+const QUERY_STATUS: Record<ItemQueryRefusal, number> = {
+  "invalid-query": 400, "wrong-scope": 409, "invalid-cursor": 400, "stale-cursor": 409, "query-mismatch": 409,
+  "unknown-type": 400, "unknown-state": 400, "query-not-ready": 409, "too-large": 413, "invalid-metadata": 503,
+  "invalid-item": 503, "row-too-large": 413, forbidden: 403, "sessions-unavailable": 503, "clock-behind": 503, unavailable: 503,
+};
+/** Success is the owner's exact canonical full envelope, already byte capped. */
+function queryResponse(result: NativeItemQuery): Response {
+  return new Response(result.ok ? result.serialized : JSON.stringify(result), { status: result.ok ? 200 : QUERY_STATUS[result.reason], headers: { "content-type": "application/json", "cache-control": "no-store" } });
+}
+
 /** One request to the routes in the table above. */
 export async function route(request: Request, binding: Binding): Promise<Response> {
+  if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
   const url = new URL(request.url);
   // Section 5.3: a credential in a URL is refused before anything is routed, and is not used. That does not undo the exposure.
   if (credentialInUrl(url)) return json(400, { error: "credential-in-url" });
@@ -258,6 +276,15 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if (what === "retained" ? which === undefined || last === undefined : last !== undefined) return json(404, { error: "not-found" });
   if ((what === "sessions" || what === "stream" || what === "incidents") && (scope === undefined || which !== undefined)) return json(404, { error: "not-found" });
   const reader = request.headers.get("authorization");
+  if (what === "query-items") {
+    const wire = itemQueryWire(request, scope ?? "");
+    if (!wire.ok) return queryResponse(wire);
+    // Fixed header admission before namespace lookup; decoding, hashing and
+    // all protected work belong to the object's one owned flight.
+    if (typeof reader !== "string" || reader.length > (reader.startsWith("Signed ") ? ITEM_QUERY_WIRE_BOUNDS.signedChars : ITEM_QUERY_WIRE_BOUNDS.sessionChars)) return queryResponse({ ok: false, reason: "forbidden" });
+    const object = binding.get(binding.idFromName(scope!)) as Remote;
+    return queryResponse(await object.queryItems(wire.encoded, reader));
+  }
   const cursor = url.searchParams.get("cursor") ?? undefined;
   const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "preparations" || what === "settle" || what === "sessions" || what === "reservation-snapshot") && which === undefined);
   if (request.method !== (posts ? "POST" : "GET")) return json(405, { error: "method-not-allowed" });
@@ -424,6 +451,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
   summary(scope: string, reader: unknown): Promise<Read<Summary>> { return api(this.scopes()).summary(scope, reader); }
   items(scope: string, reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return api(this.scopes()).items(scope, reader, type, cursor); }
+  queryItems(scope: string, reader: unknown, encoded: string): Promise<ItemQueryRead> { return api(this.scopes()).queryItems(scope, reader, encoded); }
   history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return api(this.scopes()).history(scope, reader, cursor); }
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return api(this.scopes()).entry(scope, reader, seq); }
   outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return api(this.scopes()).outbox(scope, reader, cursor); }
@@ -435,6 +463,7 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
 /** Generic Scope, Site and MCP dispatch. Application pages and demo offers belong to apps/room. */
 export default {
   fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
+    if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
     const hosted = await mcpRoute(request, env);
     return hosted ?? (isSite(request) ? site(request, env) : route(request, env.SCOPES));
@@ -458,6 +487,7 @@ export default {
  * | `POST`, `GET`, `DELETE /mcp` | `Bearer <id>.<secret>` | the agent |
  */
 export async function mcpRoute(request: Request, env: Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response | null> {
+  if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
   const url = new URL(request.url);
   const path = url.pathname;
   if (path !== "/mcp" && !path.startsWith("/mcp/")) return null;

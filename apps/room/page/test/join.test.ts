@@ -114,13 +114,16 @@ test("incomplete projections stay unreadable and a real returned submit answer s
       receipt = { fact: { at: M, seq: 4, hash: textDigest("scripted admitted fact") }, definition: "platform:membership@1", intent: intentDigest(signed.intent), effects: [], sends: [], epoch: 0 };
       return new Response(JSON.stringify({ answer: "accepted", receipt }));
     }
-    if (path.includes("/items/")) {
-      if (path.includes(`${R.scope}/`)) {
+    if (path.endsWith("/query-items")) {
+      const query = bytes.readItemQueryParameter(url.searchParams.get("q"))!;
+      if (query.scope.scope === R.scope) {
         itemReads++;
-        if (mode === "item-refused") return new Response(JSON.stringify({ ok: false, reason: "forbidden" }));
-        if (mode === "item-budget") return read([], false, "more");
+        if (mode === "item-refused") return new Response(bytes.canonicalize({ ok: false, reason: "forbidden" }));
       }
-      return read([]);
+      const incomplete = query.scope.scope === R.scope && mode === "item-budget";
+      const values = incomplete ? [{ ...item(query.type, itemReads), state: query.states[0]! }] : query.scope.scope === G.scope && query.type === "publication" ? [{ ...item("publication", 3, { operation: { at: C, seq: 5, hash: textDigest("scripted merge") } }), state: "queued" }] : [];
+      const next = incomplete ? bytes.encodeItemQueryCursor({ v: 1, scope: query.scope, head, query: bytes.itemQueryDigest(query)!, order: "id-ascending", bounds: (await import("@generalbusiness/dap-contract")).ITEM_QUERY_BOUNDS, limit: query.limit, last: itemReads }) : null;
+      return new Response(bytes.canonicalize({ ok: true, at: head, value: { v: 1, scope: query.scope, query: bytes.itemQueryDigest(query), argument: bytes.itemQueryArgument(query), items: values }, complete: !incomplete, ...(next ? { next } : {}) }));
     }
     if (path.endsWith("/history")) return read([], mode !== "history-incomplete");
     if (mode === "act-refresh" && submits > 0 && path.endsWith(M.scope)) {
@@ -132,7 +135,7 @@ test("incomplete projections stay unreadable and a real returned submit answer s
     const items = scope === M ? [item("roster")] : scope === R ? [item("rules")] : scope === C ? [item("proposal")] : [item("publication", 3, { operation: { at: C, seq: 5, hash: textDigest("scripted merge") } })];
     return read({ scope, status: "active", definition, time: "2026-10-08T12:00:00Z", counts: [], items }, !(scope === G && mode === "destination-incomplete"));
   };
-  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", definitions: new Map([[changeDigest, changeDemo]]) };
+  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", directoryIndex: null, definitions: new Map([[changeDigest, changeDemo]]) };
   // Real signer and HTTP transport, SCRIPTED reads/session refusal. A fixed
   // session handle derives no read key; after renewal is refused a new null
   // handle keeps the real authenticated signed-read fallback.
@@ -155,8 +158,8 @@ test("incomplete projections stay unreadable and a real returned submit answer s
   mode = "item-refused";
   await expect(loadRules(room)).rejects.toThrow("forbidden");
   mode = "item-budget"; itemReads = 0;
-  await expect(loadRules(room)).rejects.toThrow("page budget exhausted");
-  expect(itemReads).toBe(100); // Existing bound, no new quota.
+  await expect(loadRules(room)).rejects.toThrow("incomplete (page-budget)");
+  expect(itemReads).toBe(4); // Explicit finite metadata collection, no old 100-page scan.
   mode = "destination-incomplete";
   await expect(loadChange(room, C.scope)).rejects.toThrow("incomplete summary");
   mode = "history-incomplete";

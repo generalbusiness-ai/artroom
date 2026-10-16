@@ -2,22 +2,27 @@
  * owns its deadline and revalidates its supported frame before entering.
  * It repeats fresh final authentication before releasing these bytes. */
 import { ITEM_QUERY_BOUNDS as B, ITEM_QUERY_ORDER } from "@generalbusiness/dap-contract";
-import type { Digest, Item, ItemQuery, Read, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Item, ItemQuery, ItemQueryRead } from "@generalbusiness/dap-contract";
 import { canonicalize, encodeItemQuery, encodeItemQueryCursor, isItem, itemQueryArgument, itemQueryContinuation, itemQueryDigest, parseStrict, readItemQuery, utf8 } from "@generalbusiness/artroom-bytes";
 import { itemCandidates } from "./item-candidates.ts";
 import type { PreparedRead } from "./read-preparation.ts";
 import type { Sql } from "./sqlite.ts";
 
-interface ItemQueryValue { v: 1; scope: ScopeRef; query: Digest; argument: string; items: readonly Item[] }
-type Envelope = Extract<Read<ItemQueryValue>, { ok: true }>;
+type Envelope = Extract<ItemQueryRead, { ok: true }>;
 type Failure = "invalid-query" | "wrong-scope" | "invalid-cursor" | "stale-cursor" | "query-mismatch" | "unknown-type" | "unknown-state" | "query-not-ready" | "too-large" | "invalid-metadata" | "invalid-item" | "row-too-large" | "unavailable";
 export type ItemQueryPage = { ok: true; serialized: string } | { ok: false; reason: Failure };
+export interface ItemQueryPageWork {
+  /** Conservative candidate/metadata admission before any seek. */
+  candidates(count: number, metadataBytes: number): void;
+  /** The selected prefix and full envelope admission before any body. */
+  bodies(count: number, payloadBytes: number): void;
+}
 const no = (reason: Failure): ItemQueryPage => ({ ok: false, reason });
 
 /** No asynchronous work, Store facade, fallback or standing authority.
  * The full response envelope is capped, not just the item bodies. This
  * function stays off all public dispatch until its caller owns authority. */
-export function itemQueryPage(sql: Pick<Sql, "exec">, frame: Pick<PreparedRead, "scope" | "pinned">, query: ItemQuery, active: () => boolean): ItemQueryPage {
+export function itemQueryPage(sql: Pick<Sql, "exec">, frame: Pick<PreparedRead, "scope" | "pinned">, query: ItemQuery, active: () => boolean, work?: ItemQueryPageWork): ItemQueryPage {
   try {
     if (!active()) return no("unavailable");
     const checked = readItemQuery(encodeItemQuery(query));
@@ -32,7 +37,7 @@ export function itemQueryPage(sql: Pick<Sql, "exec">, frame: Pick<PreparedRead, 
     if (checked.states.some(state => !Object.hasOwn(type.states, state))) return no("unknown-state");
     const digest = itemQueryDigest(checked), argument = itemQueryArgument(checked);
     if (!digest || !argument || !active()) return no("unavailable");
-    const selected = itemCandidates(sql, { type: checked.type, states: checked.states, after: continuation.after, ...(checked.ids === null ? {} : { ids: checked.ids }) }, { rows: checked.limit, candidates: B.candidates, metadataBytes: B.metadataBytes });
+    const selected = itemCandidates(sql, { type: checked.type, states: checked.states, after: continuation.after, ...(checked.ids === null ? {} : { ids: checked.ids }) }, { rows: checked.limit, candidates: B.candidates, metadataBytes: B.metadataBytes }, (count, bytes) => work?.candidates(count, bytes));
     if (!selected.ok) return selected;
     if (!active()) return no("unavailable");
     const envelope = (items: readonly Item[], complete: boolean, last: number | null): Envelope | null => {
@@ -43,6 +48,7 @@ export function itemQueryPage(sql: Pick<Sql, "exec">, frame: Pick<PreparedRead, 
     if (selected.rows.length === 0) {
       const empty = envelope([], true, null);
       const serialized = empty && canonicalize(empty);
+      if (serialized && utf8(serialized).length <= B.payloadBytes) work?.bodies(0, utf8(serialized).length);
       return serialized && utf8(serialized).length <= B.payloadBytes && active() ? { ok: true, serialized } : no("unavailable");
     }
     let count = 0, expectedBytes = 0, sum = 0;
@@ -60,6 +66,7 @@ export function itemQueryPage(sql: Pick<Sql, "exec">, frame: Pick<PreparedRead, 
       if (bytes <= B.payloadBytes) { count = n; expectedBytes = bytes; }
     }
     if (count === 0) return no("row-too-large");
+    work?.bodies(count, expectedBytes);
     const admitted = selected.rows.slice(0, count);
     const items: Item[] = [];
     for (const row of admitted) {
