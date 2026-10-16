@@ -45,8 +45,10 @@ import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
-import { GenesisProofs } from "./genesis-proof.ts";
-import { ProofBytes } from "./proof-bytes.ts";
+import { GenesisProofs, type ProofTimer } from "./genesis-proof.ts";
+import { EXACT_PROOF_RECEIVER_BOUNDS, ProofBytes } from "./proof-bytes.ts";
+import { PreparationFlights } from "./preparation-flight.ts";
+import { ItemQueries } from "./item-queries.ts";
 import { ReadPreparation } from "./read-preparation.ts";
 import { SessionReferences, type SessionReferenceSource } from "./session-reference.ts";
 import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
@@ -56,7 +58,7 @@ import { SessionRequests, Streams, issueSession, type Opened, type Sessions, typ
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading, type SignedReadObserver } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
-import { SqliteStore } from "./sqlite.ts";
+import { SqliteStore, type Sql } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
 import { siteDestination, sitePublication, sitePublishedCommit } from "./site/publication.ts";
 
@@ -98,6 +100,8 @@ export interface Wiring {
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
   sessionReferenceSource?: SessionReferenceSource;
+  /** Internal elapsed-time clock; production uses the shared preparation timer. */
+  queryTimer?: ProofTimer;
   limits?: LimitConfig;
   /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
   signedReadObserver?: SignedReadObserver;
@@ -106,6 +110,9 @@ export interface Wiring {
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #name: ScopeId | null;
   readonly #store: SqliteStore;
+  readonly #readSql: Pick<Sql, "exec">;
+  readonly #queryFlights: PreparationFlights;
+  readonly #itemQueries: ItemQueries;
   readonly #proofBytes: ProofBytes;
   readonly #genesisProofs: GenesisProofs;
   readonly #readPreparation: ReadPreparation;
@@ -143,8 +150,10 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     // Authority note, section 5.4, rule 7: the attempts of one operation are spaced by a backoff, to a cap. The first is due at its
     // entry's time. The texts state no numbers for it: the delays are the dispatcher's (I3 deltas, entry EB8).
     const spacing = (attempt: number) => (attempt < 2 ? 0 : Math.min(bounds.dispatchRetrySeconds * 2 ** Math.min(attempt - 2, 30), bounds.dispatchRetryMaxSeconds) * 1000);
+    this.#readSql = { exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) };
+    this.#queryFlights = new PreparationFlights(wiring.queryTimer);
     const store = new SqliteStore({
-      exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings),
+      ...this.#readSql,
       transaction: (closure) => ctx.storage.transactionSync(closure),
     }, spacing);
     // This object's one alarm. Its handler below starts the alarm's turn and a dispatch pass.
@@ -188,7 +197,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
-    this.#proofBytes = new ProofBytes({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
+    this.#proofBytes = new ProofBytes(this.#readSql);
     this.#genesisProofs = new GenesisProofs(this.#proofBytes, ports.proofs ?? null);
     this.#scope = new Scope(this.#name, store, ports, bounds);
     // A signed read is judged on this scope's clock, within the authority window of an intent (`signed-reads.ts`).
@@ -225,12 +234,15 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#sessions = wiring.sessions ?? (() => null);
     // One bounded immutable-content cache per object. These callbacks are
     // the existing pure whole-support validators, never pinned()/genesis.
-    this.#readPreparation = new ReadPreparation({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, {
+    this.#readPreparation = new ReadPreparation(this.#readSql, {
       policy: () => `native-read-support-v1:${digestBytes(utf8(canonicalize(bounds)))}`,
       declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
     });
     this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);
     this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock, wiring.sessionReferenceSource ?? null);
+    this.#itemQueries = new ItemQueries({ name: this.#name, sql: this.#readSql, preparation: this.#readPreparation,
+      sessionPreparation: this.#sessionPreparation, localSigners: store.localSigners, proofs: ports.proofs ?? null,
+      sessions: this.#sessions, clock: this.#clock, window: bounds.intentLifetimeSeconds, flights: this.#queryFlights });
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
     // Only bounded control initialization happened above. No read runs a
@@ -354,8 +366,21 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   protected genesisEligibility(request: () => { key: import("@generalbusiness/dap-contract").KeyId; since: number } | null) {
     return this.#genesisProofs.eligible(request);
   }
+  /** One owned bounded query; starts no activation turn or legacy read walk. */
+  queryItems(encoded: unknown, reader: unknown) { return this.#itemQueries.read(encoded, reader); }
   /** Exact internal causal-proof bytes. Read-only: deliberately bypasses #first/sourceOrigin. */
-  proofSource(fact: unknown, maxBytes: number) { return this.#proofBytes.exact(fact, maxBytes); }
+  proofSource(fact: unknown, maxBytes: number, milliseconds?: number) {
+    if (milliseconds === undefined) return this.#proofBytes.exact(fact, maxBytes);
+    const began = this.#queryFlights.clock.now(), ends = began + milliseconds;
+    if (!Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isFinite(began) || !Number.isFinite(ends)) return null;
+    const active = () => { const now = this.#queryFlights.clock.now(); return now >= began && now < ends; };
+    let calls = 0;
+    const bytes = new ProofBytes(this.#readSql, () => {
+      if (!active() || ++calls > EXACT_PROOF_RECEIVER_BOUNDS.sqlCalls) throw new Error("proof-unavailable");
+    });
+    const result = bytes.exact(fact, maxBytes);
+    return active() ? result : null;
+  }
   /** Authenticated small directory witness. No HTTP route or activation turn. */
   sessionReference(request: unknown): string | null { return this.#sessionReferences.read(request); }
   /** Future bounded query support only; existing public reads are unchanged. */

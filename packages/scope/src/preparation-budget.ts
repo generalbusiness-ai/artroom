@@ -7,7 +7,7 @@ export class PreparationBudget {
   readonly #left: PreparationCost;
   readonly #active: () => boolean;
   #failed = false;
-  constructor(limits: PreparationCost = PREPARATION_BOUNDS, active: () => boolean = () => true) {
+  constructor(limits: PreparationCost = PREPARATION_BOUNDS, active: () => boolean = () => true, readonly beforeSpend: ((cost: Partial<PreparationCost>) => void) | null = null) {
     for (const key of costs) {
       if (!Number.isSafeInteger(limits[key]) || limits[key] < 0 || limits[key] > PREPARATION_BOUNDS[key]) throw new PreparationUnavailable();
     }
@@ -22,6 +22,7 @@ export class PreparationBudget {
       const n = cost[key] ?? 0;
       if (!Number.isSafeInteger(n) || n < 0 || n > this.#left[key]) this.stop();
     }
+    this.beforeSpend?.(cost);
     for (const key of costs) this.#left[key] -= cost[key] ?? 0;
   }
   get remaining(): PreparationCost { return { ...this.#left }; }

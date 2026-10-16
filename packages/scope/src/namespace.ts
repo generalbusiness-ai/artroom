@@ -37,7 +37,7 @@ export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number, origin?: boolean): Promise<Sourced | null>;
   /** Optional: unsupported native senders never fall back to source(). */
-  proofSource?(fact: FactRef, maxBytes: number): Promise<ProofBody | null>;
+  proofSource?(fact: FactRef, maxBytes: number, milliseconds?: number): Promise<ProofBody | null>;
   /** Optional bounded native directory witness; never fall back to summary. */
   sessionReference?(request: string): Promise<string | null>;
   declared(digest: Digest): Promise<string | null>;
@@ -230,11 +230,14 @@ export function namespace(binding: Binding): { resolver: Resolver; proofs: Proof
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
     proofs: {
-      async read(fact, maxBytes) {
-        if (!isFactRef(fact) || !Number.isSafeInteger(maxBytes) || maxBytes <= 0) return null;
+      async read(fact, maxBytes, milliseconds) {
+        if (!isFactRef(fact) || !Number.isSafeInteger(maxBytes) || maxBytes <= 0
+          || (milliseconds !== undefined && (!Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > 10_000))) return null;
         try {
           const source = peer(fact.at.scope);
-          return typeof source.proofSource === "function" ? await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body)) : null;
+          if (typeof source.proofSource !== "function") return null;
+          return milliseconds === undefined ? await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body))
+            : await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body), milliseconds);
         } catch { return null; }
       },
     },

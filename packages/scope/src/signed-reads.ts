@@ -96,7 +96,7 @@ const SCHEME = "Signed ";
 /** The most characters of a presented value that are looked at. */
 const SIGNED_CHARS = 2048;
 /** The reads that a signed read may name. */
-export const SIGNED_READS: readonly SignedReadName[] = ["summary", "history", "entry", "log", "retained"];
+export const SIGNED_READS: readonly SignedReadName[] = ["summary", "history", "entry", "log", "retained", "query-items"];
 /** The most characters of a signed read's argument: a digest, the longest argument, is 71. */
 const ARG_CHARS = 128;
 
@@ -126,6 +126,12 @@ function openSignedRead(reader: string): SignedRead | null {
   } catch {
     return null;
   }
+}
+/** Pure admission before protected storage. Fresh clock/frame checks still follow at preparation and release. */
+export function scopedSignedRead(reader: unknown, to: ScopeId, read: SignedReadName, arg: string): SignedRead | null {
+  if (typeof reader !== "string" || reader.length > SCHEME.length + SIGNED_CHARS || !presentsSignedRead(reader)) return null;
+  const signed = openSignedRead(reader);
+  return signed && verifySignedRead(signed) && signed.request.to === to && signed.request.read === read && signed.request.arg === arg ? signed : null;
 }
 
 /** The signed entry at the root of a cause chain: its signer, its time, and where it is. */

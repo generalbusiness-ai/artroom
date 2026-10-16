@@ -4,6 +4,7 @@ import type { Item, ItemQuery } from "@generalbusiness/dap-contract";
 import { canonicalize, itemQueryArgument, itemQueryDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { Scope } from "../src/core.ts";
 import { itemQueryPage } from "../src/item-query-page.ts";
+import { ItemQueryBudget } from "../src/item-query-budget.ts";
 import { production } from "../src/ports.ts";
 import { ReadPreparation } from "../src/read-preparation.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
@@ -53,8 +54,12 @@ test("native synchronous pages merge selected states without omissions or duplic
     const frame = frameOf(lane, state), pages = [], measurements = [];
     let query = queryOf(lane);
     for (let n = 0; n < 3; n++) {
-      const watch = watched(state), result = itemQueryPage(watch.sql, frame, query, () => true), read = page(result);
-      pages.push(read); measurements.push(watch.result());
+      const watch = watched(state), budget = new ItemQueryBudget("session", () => true);
+      const result = itemQueryPage(budget.sql("page", watch.sql), frame, query, () => budget.available, {
+        candidates: (count, bytes) => budget.spend("page", { candidates: count, metadata: bytes }),
+        bodies: (count, bytes) => budget.spend("page", { bodies: count, payloadBytes: bytes }),
+      }), read = page(result);
+      pages.push(read); measurements.push({ ...watch.result(), admitted: budget.admitted().total });
       if (read.complete) break;
       query = { ...query, cursor: read.next! };
     }
@@ -76,6 +81,12 @@ test("native synchronous pages merge selected states without omissions or duplic
     expect(measured.candidates).toBeLessThanOrEqual(B.candidates); expect(measured.metadata).toBeLessThanOrEqual(B.metadataBytes);
     expect(measured.rowsRead).toBeLessThanOrEqual(2 * measured.candidates + measured.bodies.length + 16);
     expect(measured.rowsWritten).toBe(0);
+    expect(measured.admitted.calls).toBe(measured.queries.length);
+    expect(measured.admitted.calls).toBeLessThanOrEqual(200);
+    expect(measured.candidates).toBeLessThanOrEqual(measured.admitted.candidates);
+    expect(measured.metadata).toBeLessThanOrEqual(measured.admitted.metadata);
+    expect(measured.admitted.bodies).toBe(measured.bodies.length);
+    expect(measured.admitted.payloadBytes).toBe(utf8(canonicalize(got.pages[n]!)).length);
     expect(measured.plans.every(plan => /SEARCH item USING (INDEX item_by_state|INTEGER PRIMARY KEY)/.test(plan) && !/SCAN|TEMP/i.test(plan))).toBe(true);
   }
   console.log("item-query-native-pages", JSON.stringify(got.measurements.map(({ rowsRead, candidates, metadata, bodies, rowsWritten }) => ({ rowsRead, candidates, metadata, bodies: bodies.length, rowsWritten }))));
