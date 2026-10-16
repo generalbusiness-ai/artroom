@@ -5,6 +5,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { DeclaredDefinition, Digest, Entry, FactRef, PlatformDefinition, Request, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, deliveryCauseDigest, intentDigest, isDigest, isPlatformDefinition, isSeed, messageDigest, platformName, scopeIdOf, seedDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, isFactRef, isObject, isScopeRef, same, sentBy, type Fetched } from "@generalbusiness/dap-derive";
+import { sourceName as legacySourceName } from "./publishing-provenance.ts";
 import { PARTITION_COHORT as COHORT, MAX_GENERATIONS, PARTITION_SPAN } from "./directory-partitions.ts";
 
 /** Producer admission must bound raw bytes before parsing. This pure policy
@@ -109,9 +110,9 @@ function rootContext(facts: readonly Fetched[], partBirth: PartitionCreation, ro
   return { ok: true, value: { root, membership, rules, destination } };
 }
 
-function origin(from: FactRef, root: ScopeRef, destination: ScopeRef, facts: readonly Fetched[], kind: "application" | "change"): boolean | null {
+function origin(from: FactRef, root: ScopeRef, destination: ScopeRef, facts: readonly Fetched[], kind: "application" | "change", total = false): boolean | null {
   try {
-    if (!bounded(facts)) return null;
+    if (!bounded(facts, total)) return null;
     const child = first(facts, from.at);
     if (!child) return null;
     if (!isEntryOf(child.entry, child.fact) || child.entry.prev !== null || child.entry.input.type !== "genesis") return false;
@@ -244,6 +245,15 @@ export interface PartitionReceiverLineage {
   root: ScopeRef;
 }
 export type PartitionReceiverPolicy = { mode: "legacy" } | { mode: "partition-v1"; lineage: PartitionReceiverLineage };
+function rootSiblingCreation(creation: PartitionCreation, ordinal: number, facts: readonly Fetched[], root: Fetched): boolean {
+  const checked = genesis(facts, root.fact.at, COHORT.directory), born = root.entry.input;
+  return checked?.ok === true && born.type === "genesis" && same(creation.seed.creator, root.fact.at) && creation.seed.ordinal === ordinal
+    && creation.seed.cause === seedDigest(born.seed) && same(creation.source, root.fact)
+    && Number.isSafeInteger(creation.n) && creation.n >= 0 && creation.message.class === "request" && creation.message.type === "create"
+    && isObject(creation.message.body) && isObject(creation.message.body["fields"])
+    && same(creation.message.body["fields"]["directory"], root.fact.at)
+    && sentBy(root.entry, { from: creation.source, n: creation.n, to: creation.seed, message: creation.message });
+}
 /** Receiver eligibility is separate from a sender's role. Inputs are raw
  * authenticated native metadata or replay's normally checked runs. A locator
  * in the creation message supplies no positive eligibility on its own. */
@@ -269,12 +279,8 @@ export function partitionReceiverPolicy(at: ScopeRef, frames: readonly Partition
         const root = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, born.seed.creator));
         if (!root) return null;
         if (!root.native || root.named !== COHORT.directory) return legacy;
-        const checked = genesis(facts, root.fact.at, COHORT.directory);
-        if (!checked?.ok || root.entry.input.type !== "genesis" || born.seed.ordinal !== ordinal
-          || born.seed.cause !== seedDigest(root.entry.input.seed) || !same(born.source, root.fact) || born.n === null
-          || !born.message || !isObject(born.message.body) || !isObject(born.message.body["fields"])
-          || !same(born.message.body["fields"]["directory"], root.fact.at)
-          || !sentBy(root.entry, { from: root.fact, n: born.n, to: born.seed, message: born.message })) return null;
+        if (!isFactRef(born.source) || born.n === null || !born.message
+          || !rootSiblingCreation({ seed: born.seed, source: born.source, n: born.n, message: born.message }, ordinal, facts, frame(facts, root.fact)!)) return null;
         return selected(root.fact.at);
       }
       if (own.named === COHORT.inbox) {
@@ -320,7 +326,8 @@ export function partitionReceiverPolicy(at: ScopeRef, frames: readonly Partition
  * genesis exists. Only the exact authenticated parent create selects it. */
 export interface PartitionCreationPolicy {
   mode: "partition-v1";
-  root: ScopeRef;
+  /** The newborn Root has no incarnation yet. Its binding is the seed. */
+  root: ScopeRef | null;
   creation: PartitionCreation;
 }
 export function partitionCreationPolicy(creation: PartitionCreation, frames: readonly PartitionNativeFrame[]): PartitionCreationPolicy | null {
@@ -353,5 +360,91 @@ export function partitionDeclaredCreationPolicy(creation: PartitionCreation, def
     if (definition.name !== "issue" && definition.name !== "change" || definition.genesis !== (definition.name === "issue" ? "file" : "open")) return null;
     room = laneCreation(creation.seed.definition, definition.name, creation, facts, 1, new Set());
     return room?.ok ? { mode: "partition-v1", root: room.value.root, creation } : null;
+  } catch { return null; }
+}
+
+
+export type PartitionCreationSelection = { mode: "legacy" } | PartitionCreationPolicy;
+/** Native bootstrap uses the actual parent code pin and exact create. Root's
+ * own incarnation does not exist yet; no caller-supplied root can replace it.
+ * Normal genesis still proves cause, target address and every domain field. */
+export function partitionNativeCreationPolicy(creation: PartitionCreation, frames: readonly PartitionNativeFrame[]): PartitionCreationSelection | null {
+  try {
+    const facts = rawFacts(frames), seed = creation.seed;
+    if (!facts || !isSeed(seed) || !isPlatformDefinition(seed.definition) || !isScopeRef(seed.creator)
+      || !isFactRef(creation.source) || !same(creation.source.at, seed.creator) || !Number.isSafeInteger(creation.n) || creation.n < 0
+      || creation.message.class !== "request" || creation.message.type !== "create") return null;
+    if (seed.definition === COHORT.partition) return partitionCreationPolicy(creation, frames);
+    const source = frames.find(copy => same(copy.fact, creation.source));
+    if (!source || !sentBy(source.entry, { from: creation.source, n: creation.n, to: seed, message: creation.message })) return null;
+    const selected = (root: ScopeRef | null): PartitionCreationPolicy => ({ mode: "partition-v1", root, creation });
+    const legacy = { mode: "legacy" } as const;
+    if (seed.definition === COHORT.directory) {
+      return seed.kind === "directory" && seed.ordinal === 0 && source.native && source.named === COHORT.register && source.fact.at.kind === "register" ? selected(null) : null;
+    }
+    const ordinal = seed.definition === COHORT.membership ? 0 : seed.definition === COHORT.rules ? 1 : seed.definition === COHORT.destination ? 2 : null;
+    if (ordinal !== null) {
+      if (!source.native || source.named !== COHORT.directory) return seed.definition === COHORT.destination ? null : legacy;
+      return rootSiblingCreation(creation, ordinal, facts, frame(facts, source.fact)!) ? selected(source.fact.at) : null;
+    }
+    if (seed.definition === COHORT.inbox) {
+      const parent = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, seed.creator));
+      if (!parent) return null;
+      if (!parent.native || parent.named !== COHORT.membership) return legacy;
+      const policy = partitionReceiverPolicy(parent.fact.at, frames);
+      if (!policy || policy.mode === "legacy") return policy;
+      const body = creation.message.body;
+      return seed.kind === "inbox" && isObject(body) && isObject(body["fields"])
+        && same(body["membership"], parent.fact.at) && same(body["fields"]["membership"], parent.fact.at)
+        && (!("directory" in body) || same(body["directory"], policy.lineage.root)) ? selected(policy.lineage.root) : null;
+    }
+    return legacy;
+  } catch { return null; }
+}
+
+
+/** Extended receiver policy over raw authenticated metadata, with the same
+ * total decoded-frame limit as receiver selection and foreign fact reads. */
+export function partitionPublicationOrigin(from: FactRef, root: ScopeRef, destination: ScopeRef, kind: "application" | "change", frames: readonly PartitionNativeFrame[]): boolean | null {
+  try {
+    const facts = rawFacts(frames);
+    return facts ? origin(from, root, destination, facts, kind, true) : null;
+  } catch { return false; }
+}
+
+
+/** Reconstruct the unchanged producer policy from this bounded raw operation.
+ * The default Source API is untouched. No retained under label enters the
+ * recursive concern check, and no receiver mode selects a producer identity. */
+export function partitionProducerName(at: ScopeRef, frames: readonly PartitionNativeFrame[]): string | null {
+  try {
+    const facts = rawFacts(frames);
+    if (!facts) return null;
+    const seen = new Set<string>();
+    const name = (scope: ScopeRef, depth: number): string | null => {
+      const own = frames.find(copy => copy.fact.seq === 0 && same(copy.fact.at, scope));
+      if (!own || own.entry.input.type !== "genesis") return null;
+      const direct = legacySourceName(own.named, own.declarationName);
+      if (direct !== null) return direct;
+      const key = canonicalize(scope);
+      if (depth > PARTITION_IDENTITY_BOUNDS.laneDepth || seen.has(key)) return null;
+      seen.add(key);
+      const origin: Fetched[] = [{ fact: own.fact, entry: own.entry, under: own.declarationName }];
+      const from = own.entry.input.source;
+      if (from) {
+        const creating = frame(facts, from);
+        if (!creating) return null;
+        const parentName = name(from.at, depth + 1);
+        if (parentName === null) return null;
+        origin.push({ ...creating, under: parentName });
+        if (parentName === "issue") {
+          const parent = first(facts, from.at);
+          if (!parent) return null;
+          origin.push({ ...parent, under: parentName });
+        }
+      }
+      return legacySourceName(own.named, own.declarationName, origin);
+    };
+    return name(at, 1);
   } catch { return null; }
 }

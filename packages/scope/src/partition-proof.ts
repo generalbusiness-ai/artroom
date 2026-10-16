@@ -1,9 +1,9 @@
 /** Raw immutable partition birth evidence. No frame is a judged `Fetched`
  * identity: receiver policy must validate the complete chain separately. */
-import type { DeclaredDefinition, FactRef, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, definitionDigest, isDigest, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
+import type { DeclaredDefinition, FactRef, PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
+import { canonicalize, definitionDigest, isDigest, isPlatformDefinition, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, same } from "@generalbusiness/dap-derive";
-import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionSourceName, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionSourceName, partitionNativeCreationPolicy, partitionProducerName, type PartitionCreationSelection, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
 import type { NativeBirth, NativeBirthSource } from "./native-birth.ts";
 import { readNativeBirth } from "./native-birth.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
@@ -162,6 +162,7 @@ class Collection {
     // positive partition pin still needs the entire actual creator chain.
     return candidate.native && candidate.named === PARTITION_COHORT.partition && !await this.lane(at) ? null : own;
   }
+  active(): boolean { return this.#remaining() > 0; }
   finish(source: RawPartitionFrame, includeSource = false): PartitionProof | null {
     return this.#remaining() > 0 ? { source, frames: [...this.#frames.values()].filter(frame => includeSource || source.fact.seq === 0 || !same(frame.fact, source.fact)), calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
   }
@@ -180,17 +181,45 @@ export class PartitionProofOperation {
       return source && await this.#collection.lane(from.at) ? this.#collection.finish(source) : null;
     } catch { return null; }
   }
-  /** A complete invalid lineage stays declared. Missing or exhausted proof
-   * stays unavailable. Partial raw frames never confer an identity. */
-  async declaredIdentity(from: FactRef): Promise<{ under: string; proof: PartitionProof } | null> {
-    if (!isFactRef(from) || from.at.kind !== "lane") return null;
+  async raw(from: FactRef): Promise<RawPartitionFrame | null> {
+    try { return await this.#collection.exact(from); } catch { return null; }
+  }
+  /** This selects a bounded read strategy, never an identity policy. The
+   * actual parent send and own declaration still have to prove bootstrap. */
+  async creationCandidate(creation: PartitionCreation): Promise<boolean | null> {
+    try {
+      const named = creation.seed.definition;
+      if ([PARTITION_COHORT.directory, PARTITION_COHORT.partition, PARTITION_COHORT.destination].some(pin => pin === named)) return true;
+      if (named === PARTITION_COHORT.membership || named === PARTITION_COHORT.rules) {
+        const source = await this.#collection.birth(creation.source.at);
+        return source && this.#collection.active() ? source.native && source.named === PARTITION_COHORT.directory : null;
+      }
+      if (named === PARTITION_COHORT.inbox) {
+        const selected = await this.receiver(creation.source.at);
+        return selected ? selected.policy.mode === "partition-v1" : null;
+      }
+      if (isPlatformDefinition(named)) return false;
+      const directory = isObject(creation.message.body) ? creation.message.body["directory"] : null;
+      if (!isScopeRef(directory)) return false;
+      const source = await this.#collection.birth(directory);
+      return source && this.#collection.active() ? source.native && source.named === PARTITION_COHORT.partition : null;
+    } catch { return null; }
+  }
+  /** Both labels come from the same authenticated raw operation. This never
+   * calls the producer's legacy recursive Source convenience endpoint. */
+  async source(from: FactRef): Promise<{ source: RawPartitionFrame; under: string; producer: string; proof: PartitionProof } | null> {
+    if (!isFactRef(from)) return null;
     try {
       const source = await this.#collection.exact(from);
-      if (!source || source.native || !isDigest(source.named)) return null;
-      await this.#collection.lane(from.at);
+      if (!source) return null;
+      if (!source.native && (source.declarationName === "issue" || source.declarationName === "change")) await this.#collection.lane(from.at);
       const proof = this.#collection.finish(source, true);
-      const under = proof && partitionSourceName(source.named, source.declarationName, from.at, proof.frames);
-      return under !== null && proof ? { under, proof } : null;
+      if (!proof) return null;
+      const producer = partitionProducerName(from.at, proof.frames);
+      if (producer === null) return null;
+      const under = !source.native && isDigest(source.named) && (producer === "declared:issue" || producer === "declared:change")
+        ? partitionSourceName(source.named, source.declarationName, from.at, proof.frames) : producer;
+      return under !== null && this.#collection.active() ? { source, under, producer, proof } : null;
     } catch { return null; }
   }
   async receiver(at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> {
@@ -198,7 +227,7 @@ export class PartitionProofOperation {
     try {
       const own = await this.#collection.receiver(at), proof = own && this.#collection.finish(own);
       const policy = proof && partitionReceiverPolicy(at, proof.frames);
-      return policy && proof ? { policy, proof } : null;
+      return policy && proof && this.#collection.active() ? { policy, proof } : null;
     } catch { return null; }
   }
   async creation(creation: PartitionCreation): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
@@ -206,7 +235,27 @@ export class PartitionProofOperation {
       if (!await this.#collection.rootCreation(creation)) return null;
       const source = await this.#collection.exact(creation.source), proof = source && this.#collection.finish(source, true);
       const policy = proof && partitionCreationPolicy(creation, proof.frames);
-      return policy && proof ? { policy, proof } : null;
+      return policy && proof && this.#collection.active() ? { policy, proof } : null;
+    } catch { return null; }
+  }
+  async bootstrap(creation: PartitionCreation, definition: DeclaredDefinition | PlatformDefinition): Promise<{ policy: PartitionCreationSelection; proof: PartitionProof | null } | null> {
+    try {
+      if (typeof definition === "string") {
+        if (!isPlatformDefinition(definition) || definition !== creation.seed.definition) return null;
+        if (definition === PARTITION_COHORT.partition) return this.creation(creation);
+        const source = await this.#collection.exact(creation.source);
+        if (!source) return null;
+        if (definition === PARTITION_COHORT.inbox && !await this.#collection.receiver(creation.source.at)) return null;
+        const proof = this.#collection.finish(source, true), policy = proof && partitionNativeCreationPolicy(creation, proof.frames);
+        return policy && proof && this.#collection.active() ? { policy, proof } : null;
+      }
+      if (definitionDigest(definition) !== creation.seed.definition) return null;
+      const directory = isObject(creation.message.body) ? creation.message.body["directory"] : null;
+      if (!isScopeRef(directory)) return { policy: { mode: "legacy" }, proof: null };
+      const candidate = await this.#collection.birth(directory);
+      if (!candidate) return null;
+      if (!candidate.native || candidate.named !== PARTITION_COHORT.partition) return { policy: { mode: "legacy" }, proof: null };
+      return this.declaredCreation(creation, definition);
     } catch { return null; }
   }
   async declaredCreation(creation: PartitionCreation, definition: DeclaredDefinition): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
@@ -217,7 +266,7 @@ export class PartitionProofOperation {
       // Depth starts at two: the unborn concern is already the first lane.
       if (!source || !(creation.seed.creator.kind === "lane" ? await this.#collection.lane(creation.seed.creator, 2) : await this.#collection.partition(creation.seed.creator))) return null;
       const proof = this.#collection.finish(source, true), policy = proof && partitionDeclaredCreationPolicy(creation, definition, proof.frames);
-      return policy && proof ? { policy, proof } : null;
+      return policy && proof && this.#collection.active() ? { policy, proof } : null;
     } catch { return null; }
   }
 }

@@ -13,7 +13,7 @@ import { DIGESTS, issue } from "../src/index.ts";
 // Actual pinned issue code, native factories, Authority, SQLite and act
 // judgment. sessionRoom's Git host, clock, finite scheduler and inspected
 // setup reads are stand-ins. No publication, hosted capacity or replay claim.
-test("partition issue facts satisfy real block guards while retained producer identities survive a receiver restart", async () => {
+test("partition issue facts and bounded concern births use receiver lineage while producer identities stay declared", async () => {
   const { life, D, children } = await sessionRoom(C.register);
   try {
     const [M, rules] = children;
@@ -57,5 +57,27 @@ test("partition issue facts satisfy real block guards while retained producer id
     const answer = factRefOf((await A.entries())[answered]!);
     expect(await B.act(rita, "release-block", { on: blocked.receipt.fact.seq, expected: await B.expected({ on: blocked.receipt.fact.seq, commitment: offer }), fields: { commitment: offer, answer } })).toMatchObject({ answer: "accepted" });
     expect(await namespace(env.PLATFORM).resolver.read(foreign, 10)).toMatchObject({ under: "declared:issue" });
+    let parent = A;
+    const nodes = [D, P, ...children, A, B];
+    for (let depth = 1; depth <= 4; depth++) {
+      const plan = await parent.did(rita, "open-plan", { expected: await parent.expected({ goal: 0 }) });
+      const concern = await parent.did(rita, "add-concern", { expected: await parent.expected({ plan }), fields: { plan, purpose: "Bounded native lineage", role: "required", title: `Concern ${depth}`, conditions: ["Keep the existing behavior"] } });
+      const created = (await parent.entries())[concern]!.sends.find(send => (send.to as Seed).kind === "lane");
+      if (!created) return expect.fail("actual concern emitted no child create");
+      const child = life.platform(scopeIdOf(created.to as Seed));
+      nodes.push(child);
+      await dispatchFixture(nodes, life.wait);
+      if (depth === 4) {
+        expect(await child.stub.history(reader)).toMatchObject({ ok: false, reason: "not-found" });
+        expect((await parent.item(concern)).state).toBe("creating");
+        break;
+      }
+      expect((await child.summary()).value.status).toBe("active");
+      const birth = (await child.entries())[0]!;
+      expect(birth.input).toMatchObject({ type: "genesis", decision: "applied", source: factRefOf((await parent.entries())[concern]!), message: { body: { directory: await P.at(), membership: await M!.at() } } });
+      expect(await namespace(env.PLATFORM).resolver.read(factRefOf(birth), 10)).toMatchObject({ under: "declared:issue" });
+      expect((await parent.item(concern)).state).toBe("created");
+      parent = child;
+    }
   } finally { life.release(); }
 });

@@ -73,11 +73,13 @@ test("one operation shares concurrent receiver and source evidence without multi
 test("receiver interpretation promotes a proved lane while retention and a later producer read keep its original alias", async () => {
   // RPC and storage maps are stand-ins. This protects the interpretation /
   // retention boundary, not native execution or handler authorization.
-  const sample = protocol(), resolver = { read: async () => ({ entry: sample.fixture.genesis, under: "declared:change" }) };
+  const sample = protocol(); let producerCalls = 0;
+  const resolver = { read: async () => { producerCalls++; return { entry: sample.fixture.genesis, under: "declared:change" }; } };
   const reader = await ReceiverReads.open({ ...sample.ports, resolver }, sample.fixture.partition);
   expect(reader).not.toBeNull();
   const fetched = await fetchFacts(reader!, PROPOSED_BOUNDS, [sample.fixture.from]);
   expect(fetched?.[0]?.under).toBe("change");
+  expect(producerCalls).toBe(0);
   expect(sample.calls).toHaveLength(8);
   const uses = [{ fact: sample.fixture.from, content: digestBytes(utf8(canonicalize(sample.fixture.genesis))) }];
   const saved = used({ uses }, fetched!);
@@ -86,7 +88,9 @@ test("receiver interpretation promotes a proved lane while retention and a later
   expect(retained[0]?.under).toBe("declared:change");
   expect((await reader!.retained(retained))?.[0]?.under).toBe("change");
   expect(retained[0]?.under).toBe("declared:change");
+  expect(producerCalls).toBe(0);
   expect((await fetchFacts(resolver, PROPOSED_BOUNDS, [sample.fixture.from]))?.[0]?.under).toBe("declared:change");
+  expect(producerCalls).toBe(1);
   sample.advance(B.milliseconds + 1);
   expect(await reader!.retained(retained)).toBeNull();
   expect(sample.calls).toHaveLength(8);

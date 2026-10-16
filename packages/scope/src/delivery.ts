@@ -22,12 +22,14 @@
  * duty.
  */
 
-import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
-import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict, platformName } from "@generalbusiness/artroom-bytes";
+import type { Bounds, Digest, Entry, FactRef, Incarnation, PlatformDefinition, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
+import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, isSeed, parseStrict, platformName } from "@generalbusiness/artroom-bytes";
 import { applicationPublicationOrigin, publishingLaneAffiliation } from "@generalbusiness/dap-platform";
 import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { NO_INCARNATION, Observes, Received, ownOf, retainedFacts, snapshotsOf, used, valuesOf, type Scope } from "./core.ts";
+import { carryProducerName } from "./receiver-facts.ts";
+import { ReceiverReads } from "./receiver-reads.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";
 import type { Retained, Store } from "./store.ts";
@@ -41,10 +43,10 @@ export class Deliveries {
   readonly #name: ScopeId | null;
   readonly #scope: Scope;
   readonly #store: Store;
-  readonly #ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities" | "clock">;
+  readonly #ports: Pick<Ports, "resolver" | "proofs" | "births" | "definitions" | "texts" | "random" | "capabilities" | "clock">;
   readonly #bounds: Bounds;
 
-  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "definitions" | "texts" | "random" | "capabilities" | "clock">, bounds: Bounds) {
+  constructor(name: ScopeId | null, scope: Scope, store: Store, ports: Pick<Ports, "resolver" | "proofs" | "births" | "definitions" | "texts" | "random" | "capabilities" | "clock">, bounds: Bounds) {
     this.#name = name;
     this.#scope = scope;
     this.#store = store;
@@ -134,13 +136,23 @@ export class Deliveries {
       && message.class === "request" && message.type === "tell" && isObject(message.body) && message.body["message"] === "reserve";
     const file = ["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(receiving?.named ?? "") && message.class === "request" && message.type === "tell"
       && isObject(message.body) && message.body["message"] === "publish-file";
-    const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
+    const known = store.decided(from.at, from.seq, delivered.n) !== null;
+    const creates = message.class === "request" && message.type === "create" && !isScopeRef(delivered.to);
+    if (creates && !isSeed(delivered.to)) return UNVERIFIED;
+    let reader = !known && message.class !== "control" && receiving ? await this.#scope.receiverReads() : null;
+    if (!known && message.class !== "control" && receiving && !reader) return retry("dependency-unavailable");
+    // An empty new receiver collects raw bytes before interpreting a name.
+    // A locator selects this read strategy only; bootstrap below must prove
+    // the actual native parent create before any label reaches a judge.
+    const probe = !receiving && creates && message.class === "request" ? await ReceiverReads.probeCreation(this.#ports, { seed: delivered.to as Seed, source: from, n: delivered.n, message }) : undefined;
+    if (probe === null) return retry("dependency-unavailable");
+    const read = probe?.source ? { entry: probe.source, under: "" }
+      : await within(() => (reader ?? this.#ports.resolver).read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
     if (read === LATE || read === null) return retry("dependency-unavailable");
     if (!("entry" in read) || !isEntryOf(read.entry, from)) return UNVERIFIED;
-    const source: Fetched = { fact: from, entry: read.entry, under: read.under };
+    let source: Fetched = carryProducerName({ fact: from, entry: read.entry, under: read.under }, read);
 
-    // An empty store: only a creation reaches it, and it needs the definition its seed names.
-    const creates = message.class === "request" && message.type === "create" && !isScopeRef(delivered.to);
+    // The definition is read only after authenticating the source bytes.
     const declared = this.#scope.pinned() || !creates ? null : await this.#declared(delivered.to as Seed);
     if (typeof declared === "string") return retry(declared);
     const founding = declared;
@@ -159,12 +171,21 @@ export class Deliveries {
     // cannot hide it. The judge still makes every check in that order, and gives the answer. A recorded decision stays recorded, so
     // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
     // which reads a creation's texts, is not taken.
-    const known = store.decided(from.at, from.seq, delivered.n) !== null;
+    if (!known && message.class !== "control") {
+      reader ??= !pinned && founding && message.class === "request" && message.type === "create"
+        ? await ReceiverReads.forCreation(this.#ports, { seed: delivered.to as Seed, source: from, n: delivered.n, message }, isPlatformDefinition((delivered.to as Seed).definition) ? (delivered.to as Seed).definition as PlatformDefinition : founding.valid.declared, probe?.operation)
+        : await this.#scope.receiverReads();
+      if (!reader) return retry("dependency-unavailable");
+      const named = probe?.source ? await reader.read(from, bounds.fetchSeconds) : source;
+      if (named === null || !("entry" in named)) return retry("dependency-unavailable");
+      source = carryProducerName({ fact: from, entry: named.entry, under: named.under }, named);
+    }
+    const resolver = reader ?? this.#ports.resolver;
     if (file && !known) {
       const directory = store.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
       const destination = store.scope()?.at;
       if (!isScopeRef(directory) || !destination) return retry("dependency-unavailable");
-      const native = applicationPublicationOrigin(from, directory, destination, read.origin ?? []);
+      const native = reader?.mode === "partition-v1" ? await reader.publication(from, directory, destination, "application") : applicationPublicationOrigin(from, directory, destination, read.origin ?? []);
       if (native === null) return retry("dependency-unavailable");
       if (!native) return UNVERIFIED;
     }
@@ -175,8 +196,10 @@ export class Deliveries {
     if (reserve && !known && source.under === "change") {
       const directory = store.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
       const destination = store.scope()?.at;
-      if (!isScopeRef(directory) || !destination || !read.origin) return retry("dependency-unavailable");
-      if (!publishingLaneAffiliation(from, directory, destination, read.origin)) return UNVERIFIED;
+      if (!isScopeRef(directory) || !destination) return retry("dependency-unavailable");
+      const native = reader?.mode === "partition-v1" ? await reader.publication(from, directory, destination, "change") : read.origin ? publishingLaneAffiliation(from, directory, destination, read.origin) : null;
+      if (native === null) return retry("dependency-unavailable");
+      if (!native) return UNVERIFIED;
     }
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
@@ -185,18 +208,21 @@ export class Deliveries {
       const fields = given ? readFields(act.fields, given, bounds) : null;
       // The scope has no genesis yet, so no fact can name it: every fact a creation names is foreign.
       const named = fields?.ok ? factsNamed(act.fields, fields.fields, null) : [];
-      const fetched = named.length > bounds.usesPerEntry ? null : await fetchFacts(this.#ports.resolver, bounds, named);
+      const fetched = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
     } else if (message.class === "result" && isObject(message.of) && isFactRef(message.of.from)) {
       const kept = store.stored(message.of.from.seq);
       origin = kept ? JSON.parse(kept.bytes) as Entry : null;
-      facts = origin ? retainedFacts(store, origin) : [];
+      const retained = origin ? retainedFacts(store, origin) : [];
+      const interpreted = reader ? await reader.retained(retained) : retained;
+      if (!interpreted) return retry("dependency-unavailable");
+      facts = interpreted;
     } else if (!known && pinned?.definition && (message.class === "request" || message.class === "advisory")) {
       // Section 6.4: the foreign entries that the declared fields of the message name. More than one entry may use are not fetched:
       // the judge refuses that message, `bad-field`, before it reads any.
       const wanted = messageFacts(store, pinned.definition, message, from, bounds, source.under);
-      const fetched = wanted.length >= bounds.usesPerEntry ? [] : await fetchFacts(this.#ports.resolver, bounds, wanted);
+      const fetched = wanted.length >= bounds.usesPerEntry ? [] : await fetchFacts(resolver, bounds, wanted);
       if (!fetched) return retry("dependency-unavailable");
       facts = fetched;
       carried = messageTexts(pinned.definition, message, from, source.under);
@@ -245,7 +271,7 @@ export class Deliveries {
               retain.push(...founding.children);
             }
             return {
-              verdict: "write", draft: judged.draft, retain,
+              verdict: "write", draft: judged.draft, facts: [source, ...facts], retain,
               sealed: ({ entry, hash }) => { rows.sealed({ entry, hash }); return { answer: "recorded", fact: { at: entry.at, seq: entry.seq, hash } }; },
               // An entry that cannot be written now is not a decision: the sender keeps the duty.
               unfit: () => retry("unavailable"), full: () => retry("scope-full"),

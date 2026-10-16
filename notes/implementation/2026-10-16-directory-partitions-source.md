@@ -399,3 +399,54 @@ remain retained.
 Delivery/bootstrap, result clauses, driver reads and replay still use their
 older interpretation until their next integration steps. This partial local
 branch is not ready for Source approval, landing or host activation.
+
+## Delivery, bootstrap and bounded producer reconstruction
+
+Delivery now selects the actual receiving scope's reader before a new
+message's source is interpreted. New-mode source, handler facts and reused
+result-clause facts share one raw proof operation. Known decisions and
+confirmation controls keep their existing source check and early answer.
+Transient interpreted facts also reach the fold; retained entry bytes and
+producer aliases remain unchanged. New-mode file and change admission
+checks the verified partition/root/destination chain; the old destination
+paths keep their existing validators.
+
+Empty receivers probe only to choose how to read source bytes. A directory
+locator grants no role. The same operation then proves the actual native
+parent create and receiver declaration before a label reaches its judge.
+Root10 bootstrap binds the actual register11 create and its target seed;
+its root reference stays null until genesis mints an incarnation. M6/R3/D6
+bind Root10's exact genesis send. Inbox1 proves membership's actual root
+and inbox send. Older shared-pin births choose legacy from their actual
+parent. Partition bootstrap still needs the five accepted Root/sibling
+frames. Declared bootstrap checks its actual factory or concern chain.
+No fictitious accepted child is used.
+
+New-mode reads no longer call the legacy recursive `source()` convenience
+endpoint. `partitionProducerName` reconstructs its unchanged producer
+policy from bounded raw metadata; only an independently eligible receiver
+may apply the partition extension. Producer and receiver names therefore
+share the one sixteen-call/frame allowance and deadline. The deadline is
+checked again after pure policy work. The focused read witness observes
+zero legacy resolver calls in the new reader, unchanged producer aliases
+in storage, and one ordinary call when it separately exercises the legacy
+resolver. The default Source API and its boolean three-frame origin reply
+are unchanged.
+
+The actual native issue journey now creates three successive concerns
+through production sends, genesis, authority, confirmation and result
+clauses. The next child has no genesis and its parent's concern remains
+creating. Increasing the shared depth limit to five produces that extra
+child; the unchanged no-history assertion fails, then the control restores
+the limit. Its first draft expected `unavailable` for the empty history;
+the actual existing read contract answers `not-found`. That failed run is
+retained, and the corrected native case passes.
+
+After bounded raw-source integration, eleven focused platform/native/read
+cases pass. Following the final source-assignment cleanup, the seven
+native/read cases pass. Nine focused legacy producer, application-origin,
+file-publication and name-imitation cases also pass. Platform, scope and
+lane typechecks pass. No whole gate or directory Source review has run.
+The native nested journey does not establish fulfilment, mixed replay,
+publication completion, handoff/capacity or hosted coverage. Driver and
+per-receiving-run replay integration remain next.
