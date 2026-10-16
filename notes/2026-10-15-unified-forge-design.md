@@ -4,7 +4,10 @@
 
 Request `a1889c73`, planner promise `39439c9d`.
 Source inventory: main `40e37d8537aad5eecf8066fd426ae49842766526`.
-This note replaces the earlier unlanded discussion draft of the same name.
+This note replaces the earlier unlanded discussion draft of the same file
+(request `f088256e`, branch `planner/forge-design-20261015` at `6f68b77c`).
+Section 7 carries forward that draft's product shape, so the draft branch
+can be retired.
 It incorporates the forge research (`dbf2ccc4`) and navigation and
 visualization research (`8ba14e34`).
 Section 5 adds evidence and example charts from the project's own gitseq
@@ -646,7 +649,150 @@ Simple vocabulary does not mean one universal status. A promise can be
 fulfilled, a check can pass, and publication can remain unknown. Show
 those meanings at the relevant home, with a compact summary elsewhere.
 
-## 7. Specific next steps and review gates
+## 7. Product shape carried from the discussion draft
+
+The earlier discussion draft described the product; sections 1 to 6
+describe the platform it needs. This section keeps what the draft argued
+and those sections do not already state. It is input to the design work
+in section 8, not a feature selection, and commissions no implementation.
+
+### 7.1 Where each fact lives
+
+Section 2 gives each fact one canonical home. The last two rows are
+candidate extensions under section 4.8, not current capabilities.
+
+| Record | What it owns |
+|---|---|
+| Issue and related work | Purpose, conditions, discussion, undertakings, plans, concerns, and reports |
+| Change version | Exact proposed content, base, and selected contributions |
+| Review or check | A judgment or execution result about an exact subject under stated requirements |
+| Publication | An intended repository update, its attempt, and its confirmed or unresolved outcome |
+| Possible deployment | Environment, artifact, promotion decision, provider operation, and outcome |
+| Possible observation | Evidence about an environment or release at a stated time |
+
+### 7.2 Three ways into the same work
+
+Three entry points can share the canonical record pages and the
+navigation context of section 4.1. Each carries a different risk.
+
+| Entry point | Question it answers | Main difficulty | Depends on |
+|---|---|---|---|
+| Personal workbench | What needs me now? Promises made, reviews requested, decisions needed, failures, and operations awaiting confirmation | Attention must be explainable: assignment, unread activity, an obligation, and permission to act mean different things. The workbench must not become a second source of work state | 4.3 across rooms; 4.6; no added authority (section 1) |
+| Issue or goal | Is the desired outcome on its way, and what supports it? | Density: an issue with several parallel changes must stay readable, and maintenance must stay possible without inventing an issue | 4.2; 4.4 |
+| Repository or environment | What is this source or running version, what did automation do, and which work produced it? | Fragmentation: separate code, issue, automation, and deployment destinations make people rebuild context at every step | 4.5; 4.8 |
+
+The draft preferred to combine the three around shared records, and to
+test the primary journeys before choosing a default landing page or
+navigation labels. Section 8's first prototype starts from an issue.
+
+### 7.3 The capability map remains open
+
+These areas define what to assess, not a release checklist. Section 3
+says which have foundations; section 5 orders the design.
+
+| Area | Capabilities to assess |
+|---|---|
+| Arrival and continuation | Room and repository discovery, switching, personal attention, and unfinished work |
+| Coordination | Issues, conditions, commitments, plans, concerns, reports, and related changes |
+| Source | Refs, commit railway, commit detail, full trees, file history, search, blame, and stable links |
+| Comparison and review | Explicit endpoints, changed files, unified and split diffs, discussions, version comparison, requirements, and judgments |
+| Validation and automation | Triggers, jobs, execution attempts, logs, evidence, artifacts, and qualifying results |
+| Delivery | Builds, previews, release artifacts, environments, promotion, rollback, and observed health |
+| Administration | Participants, effective authority, rules, integrations, synchronization, and recovery |
+
+Browser editing and runnable development are separate scope choices. A
+browser that reads a hosted branch has no checkout, index, terminal, or
+build environment; GitHub documents the same separation for its
+[browser editor](https://docs.github.com/en/codespaces/the-githubdev-web-based-editor).
+This note selects neither.
+
+### 7.4 Automation has three responsibilities
+
+Moving work now done by Git hooks and GitHub Actions workflows into dap
+needs the three contracts that section 4.8 names:
+
+- **Guards** (section 4.8's admission rules) decide whether an act takes
+  effect, using only evidence available at that decision.
+- **Triggered work** follows an act that has taken effect, and may
+  request a job or send a native message. It cannot reverse the act, just
+  as a Git `post-receive` hook cannot undo what `pre-receive` accepted
+  ([Git hooks](https://git-scm.com/docs/githooks)).
+- **External operations** change something at a provider. Their outcome
+  must be established independently of the request.
+
+Triggers can be collaboration facts as well as Git events: a commitment
+accepted, a report accepted, a version proposed, a review requested, a
+check completed, or a publication confirmed. Each automation names its
+source fact, definition, authority, and exact inputs. A job record links
+the request to the execution attempt, runner, configuration, logs,
+artifact identities, and result. A runner could be a local agent, an
+existing service, or a new hosted runtime; its evidence needs a trust
+contract before it can satisfy a native requirement. The interface must
+distinguish a new check run from recovery of the same unknown operation.
+Cancelling a process does not undo a provider change already submitted.
+
+**What exists today** (read from source at this branch's base, `1a596d50`):
+native guards, messages that the receiving scope verifies before judging,
+and timed rules for deadlines ([architecture](../docs/architecture.md)).
+In the [change definition](../apps/room/lanes/src/change.ts),
+`request-check` records a job that names the manifest, tree,
+configuration, check name, and a 30-minute deadline, and sends nothing:
+recording a job does not start a runner. The
+[checker service](../packages/checkers/src/service.ts) defines the runner
+interface but has no adapter for a real runner. General scheduling,
+external operations for applications, and deployment effects remain
+separate work.
+
+### 7.5 Deployment uses the same record model
+
+Sections 4.6 and 4.8 separate approval, deployment success, and health.
+The draft added:
+
+- On the current hosting provider, a code version captures code and
+  configuration; stored data stays outside it. Rolling back code does not
+  reverse a data migration. A rollback is a new authorized move to a
+  compatible earlier version, and the failed deployment keeps its history.
+- Contracts still needed beyond section 4.8: environment ownership,
+  credentials, concurrency, cancellation, reconciliation with the
+  provider, and rollback compatibility.
+- Repository-backed [Pages](../docs/pages.md) publish files; they are not
+  deployment management.
+
+### 7.6 Depth stays approachable
+
+Beyond the pattern in section 2 and the conditions in section 6:
+
+- Show useful content first; keep advanced evidence behind disclosure.
+- On desktop, compare linked panes that leave room for code. The
+  surrounding interface reflows when enlarged, even where a code
+  comparison keeps a two-dimensional layout.
+- A Git graph also needs a readable commit list and parent navigation.
+  The railway follows recorded parents: commit dates do not decide its
+  shape, and a drawn track is not a permanent branch identity.
+- Railway lines need no decorative branch colours. Garnet keeps its brand
+  meaning of refusal and removal.
+
+### 7.7 Questions still open
+
+Sections 5 and 8 settle the draft's first-journey question. Still open:
+
+1. How do room, repository, personal work, and environment contexts
+   relate? Section 1 settles only that a workbench gains no authority.
+2. Which hook responsibilities become guards, native messages, or
+   executable jobs?
+3. Which runners and external observations may supply evidence that
+   satisfies a native requirement?
+4. Does deployment management cover applications hosted through dap, dap
+   itself, or both? Its task flows add promotion or rollback with revoked
+   authority, missing evidence, or incompatible state.
+5. Which operations must work entirely inside dap, and where is an
+   explicit handoff to another tool acceptable?
+
+For questions 2 and 3, the [GitHub import design](2026-10-15-github-repository-import.md)
+treats an imported assignee as an external reference, not a native
+promise. An imported passing check is not automatically native evidence.
+
+## 8. Specific next steps and review gates
 
 These are design deliverables to commission separately. Owners name roles;
 this table does not create new builder promises. The requester assigns
@@ -702,7 +848,7 @@ screen reader, touch,
 enlarged text, zoom, and reduced motion. Decide task-success thresholds
 before the comparative study; this note claims no completed usability test.
 
-## 8. Research basis and scope of adoption
+## 9. Research basis and scope of adoption
 
 Research covered official GitHub/GitLab and local-client documentation,
 native dap source, mobile navigation patterns, visualization research,
