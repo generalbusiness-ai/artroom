@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/worker.ts","body":{"commit":"aeebc18cb7ff41c0b2743e737ebef41b39220324","path":"packages/scope/test/worker.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0184394206a76e15556794b85aca37bf9c78bcbb","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-16-observability-see.md."}
