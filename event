@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-16-repo-in-ai-mvp-plan.md","body":{"commit":"3267fbbe7634601d2a83e099da17d38d3a331b72","path":"notes/2026-10-16-repo-in-ai-mvp-plan.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a7ea5bd88496ccd8351484530964b3b670374745","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-repo-in-ai-mvp-plan.md."}
