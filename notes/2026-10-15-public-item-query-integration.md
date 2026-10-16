@@ -338,3 +338,19 @@ while the MCP inventory scope decision is pending. It is preparation,
 with the failed gate retained and no replacement gate, final approval or
 local-main activation claimed. The separate A1c archive preparation in
 request `02252148` does not change this query branch.
+
+Checker's preliminary reading `2bdcd73d` found the analogous session
+privacy issue: an unresolved membership incarnation was treated as enough
+affiliation to disclose `clock-behind`. Session preparation now refuses
+generically at that early boundary. A native rules child with its genuine
+unresolved birth reference checks same-ID/wrong-incarnation and matching
+sessions, a valid-clock birth-resolution control, and explicit known-full
+reference controls. Clock faults and the known-reference row are labelled
+fixture inputs. Only the fully matching known reference receives the
+clock-specific refusal; the valid unresolved case resolves one directory
+and succeeds. Ten focused query/session cases pass. Removing only the
+full-reference condition exposes the clock reason in both unresolved
+cases and fails by assertion. The restored session-preparation SHA-256 is
+`6b0a300d96168e3c622f752a85a67547427fce86062a85eb190abc51274cb4d5`.
+This correction precedes the final frozen gate; preliminary reading is
+not final Source approval.

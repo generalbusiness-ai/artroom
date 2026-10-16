@@ -87,7 +87,9 @@ export class SessionPreparation {
       if (!recorded || recorded.kind !== "membership") return refused("unavailable");
       if (recorded.scope !== authentic.claims.membership.scope || (recorded.inc !== null && recorded.inc !== authentic.claims.membership.inc)) return refused("forbidden");
       const clock = sessionClock(this, frame.scope, authentic.claims);
-      if (clock !== null) return refused(clock === "clock-behind" ? clock : "forbidden");
+      // An ID match with unresolved incarnation is not full affiliation.
+      // Refuse generically before exposing this target's clock state.
+      if (clock !== null) return refused(clock === "clock-behind" && isScopeRef(recorded) ? clock : "forbidden");
       if (!run.active()) return refused("unavailable");
       let membership: ScopeRef, resolvedBirth = false;
       if (isScopeRef(recorded)) membership = recorded;

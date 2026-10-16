@@ -7,6 +7,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { ItemQuery, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, encodeItemQueryParameter, itemQueryArgument, newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
 import { secretSigner, signedReader } from "@generalbusiness/artroom-client";
+import { timeOf } from "@generalbusiness/dap-derive";
 import { Scope } from "../src/core.ts";
 import { ItemQueries } from "../src/item-queries.ts";
 import { production } from "../src/ports.ts";
@@ -103,6 +104,42 @@ test("native signed query hides a clock fault after causal bodies from an unrela
       { ok: false, reason: "forbidden" }, { ok: false, reason: "clock-behind" },
     ]);
     for (const observation of observations) expect(observation.faults).toBeGreaterThan(0);
+  } finally { f.life.release(); }
+});
+
+test("native unresolved-birth session query hides target clock state until full membership affiliation", async () => {
+  const f = await sessionRoom();
+  try {
+    const child = f.children[1]!;
+    const observations = await f.life.wait(() => runInDurableObject(child.object, async (_instance, state) => {
+      const store = new SqliteStore({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
+      const current = net.clock.now, scope = store.scope()!, subject = "query-clock-private-fixture";
+      expect(store.incarnations(f.membership.scope)).toEqual([]);
+      const results = [];
+      try {
+        for (const mode of ["unresolved-wrong", "unresolved-match", "unresolved-valid", "known-wrong", "known-match"] as const) {
+          // The histories and birth reference are genuine. This observed
+          // incarnation and the clock faults are explicit storage inputs.
+          if (mode.startsWith("known")) store.putObserved({ of: f.membership, subject, seq: 0 });
+          net.clock.now = mode === "unresolved-valid" ? current : timeOf(Date.parse(scope.time) - 1);
+          const membership = mode.endsWith("wrong") ? { ...f.membership, inc: newIncarnation(new Uint8Array(16).fill(9)) } : f.membership;
+          const reader = readerOf(mintSession(f.sessions, { ...f.claims, membership, reads: ["summary", "items"] }));
+          let peers = 0;
+          const native = sessionReferencesIn(env.PLATFORM), timer = new Timer();
+          const query = owner(child.name, state, f, { async read(directory, request) { peers++; return native.read(directory, request); } }, timer);
+          const result = await query.queries.read(encodeItemQueryParameter(queryOf(f))!, reader); await timer.finished.promise;
+          results.push({ mode, result, peers });
+        }
+      } finally {
+        net.clock.now = current;
+        state.storage.sql.exec("DELETE FROM folded WHERE kind='observed' AND key=?", canonicalize([f.membership.scope, f.membership.inc, subject]));
+      }
+      return results;
+    }));
+    expect(observations.map(observation => observation.result.ok ? "ok" : observation.result.reason)).toEqual([
+      "forbidden", "forbidden", "ok", "forbidden", "clock-behind",
+    ]);
+    expect(observations.map(observation => observation.peers)).toEqual([0, 0, 1, 0, 0]);
   } finally { f.life.release(); }
 });
 
