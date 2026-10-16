@@ -49,7 +49,14 @@ GET at `200` instead of `404`. Removing the write queue from final removal
 allows the gated late write to recreate the stored row. Each fails the
 corresponding assertion. No mutation sweep has run.
 
-The candidate will run its one gate before review. Its exact head, tree
-and terminal result will accompany the final artifact. Dependencies use
-the unchanged pinned lock and normal pool preparation. No GitHub push
-or Cloudflare deployment runs here.
+The gate passes at `ae88678fd5e0537f08dbf421e8d350d80fe5e76f`, tree
+`2499bd42523fc20e834e848bba4bb70ed3f5e130`, with no changed files.
+Whitespace exits 0 in 0.1 seconds, typecheck exits 0 in 8.8 seconds, and
+tests exit 0 in 218.6 seconds: 1,337 Vitest tests pass with 3 skipped,
+followed by 16 Node and 55 Counter browser module checks passing.
+
+This reporting successor changes only this note. Its source, tests,
+generated assets, manifests and lock remain equal to that passing gate
+head. It does not repeat the gate. Dependencies use the unchanged pinned
+lock and normal pool preparation. No GitHub push or Cloudflare deployment
+runs here.
