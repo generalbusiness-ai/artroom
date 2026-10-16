@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-directory-partitions.md","body":{"commit":"108aee7e8ddd83c476abd6932c97ee111bad2a1f","path":"notes/2026-10-15-directory-partitions.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0f7936d8696925b65be7db678bd4f3d82a4d3f47","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-directory-partitions.md."}
