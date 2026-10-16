@@ -57,3 +57,16 @@ No private cohort is newly certified. No history, foreign copied-entry
 body, custom-value body or detached text is exported. No push or deployment
 ran. Completed manifests, Git layout/writer and clone/replay witnesses
 remain separate work.
+
+The branch now composes local main `60ab711f`, preserving C1 and both
+accepted concise proposals. The export conflict was resolved by retaining
+standing, created-definition and retained-plan exports together.
+
+A private pass budget now admits the agreed aggregate entry/attempt/node,
+SQL-call, projected-metadata and input-work limits, without reset or top-up.
+Native calls reserve metadata plus input work before execution; repeated
+parsing/hashing still needs its own reservation at the consumer. One
+original deadline fences awaited values and later SQL/cache continuation.
+Pure fake-SQL/clock tests establish these budget mechanics, not a measured
+native inventory bound. Sixty-seven selected byte/consumer/replay/budget
+cases pass; native preflight and full per-consumer selection remain owed.
