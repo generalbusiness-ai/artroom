@@ -18,6 +18,7 @@ import { canonicalize, isDigest, isScopeRef, parseStrict } from "@generalbusines
 import { isObject, MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import { ARCHIVE_PIN_KEY, archivePinBytes } from "./archive-pin.ts";
 import { LocalSigners, SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
@@ -388,6 +389,8 @@ export class SqliteStore implements Store {
 
   append(entry: Entry, hash: Digest, bytes: string, size: number): void {
     this.#run("INSERT INTO entry (seq, hash, time, bytes, size) VALUES (?, ?, ?, ?, ?)", entry.seq, hash, entry.time, bytes, size);
+    const pin = archivePinBytes(entry, hash);
+    if (pin !== null) this.#run("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", ARCHIVE_PIN_KEY, pin);
     this.localSigners.appended(entry, hash);
     for (const send of entry.sends) {
       // A new send is due at once: its first attempt may start at its entry's time.
