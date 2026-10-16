@@ -20,7 +20,8 @@ export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.
  * pins or select a receiver's identity policy. Lineage admission is separate. */
 import { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
 export { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
-export { PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionSourceName, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionNativeCreationPolicy, partitionPublicationOrigin, partitionProducerName, type PartitionCreationSelection, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverLineage, type PartitionReceiverPolicy } from "./partition-provenance.ts";
+import { PARTITION_IDENTITY_POLICY } from "./partition-provenance.ts";
+export { PARTITION_IDENTITY_POLICY, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionSourceName, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionNativeCreationPolicy, partitionPublicationOrigin, partitionProducerName, type PartitionCreationSelection, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverLineage, type PartitionReceiverPolicy } from "./partition-provenance.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";
@@ -72,6 +73,7 @@ export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
   readonly sourceName?: typeof sourceName;
+  readonly receiverIdentity?: typeof PARTITION_IDENTITY_POLICY;
   /** New destination admission/replay policy; old platform versions retain their original identities. */
   readonly applicationPublicationOrigin?: typeof applicationPublicationOrigin;
   /**
@@ -171,7 +173,7 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
 };
 
 /** Stable native code objects with the same source policy for runtime and replay. */
-export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName }]));
+export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName, receiverIdentity: PARTITION_IDENTITY_POLICY }]));
 
 /** Existing default founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {

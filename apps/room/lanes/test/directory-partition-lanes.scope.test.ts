@@ -6,14 +6,16 @@ import { ReadPreparation } from "../../../../packages/scope/src/read-preparation
 import { expect, test } from "vitest";
 import type { Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { PARTITION_COHORT as C, partitionSourceName, partitionReceiverPolicy, partitionDeclaredCreationPolicy } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT as C, partitionSourceName, partitionReceiverPolicy, partitionDeclaredCreationPolicy, platform } from "@generalbusiness/dap-platform";
 import { proofEntry, PROOF_BYTE_BOUNDS } from "../../../../packages/scope/src/proof-bytes.ts";
 import { namespace } from "../../../../packages/scope/src/namespace.ts";
 import { env } from "cloudflare:workers";
 import { PartitionProofOperation } from "../../../../packages/scope/src/partition-proof.ts";
 import { sessionRoom, sessionRepository } from "../../../../packages/scope/test/support/session-room.ts";
 import { dispatchFixture } from "../../../../packages/scope/test/support/native-fixture-lifetime.ts";
-import { rita, type Platform } from "../../../../packages/scope/test/repository.ts";
+import { httpSource, verify, type HistorySource } from "@generalbusiness/artroom-replay";
+import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
+import { routed, rita, type Platform } from "../../../../packages/scope/test/repository.ts";
 import { reader } from "../../../../packages/scope/test/support.ts";
 import { DIGESTS, issue } from "../src/index.ts";
 
@@ -133,9 +135,37 @@ test("partition issue facts and bounded concern births use receiver lineage whil
     const other = await combined.source(factRefOf((await B.entries())[extraAsk]!));
     expect(other).toMatchObject({ under: "issue", producer: "declared:issue", proof: { calls: 17, reads: 17, totalFrames: 17, pending: 0 } });
     expect(other?.proof.frames).toHaveLength(9);
+    const negativeReplay = await verify(httpSource("https://scopes.test", { fetch: routed, reader }), { mode: "replay", scope: P.name, head: (await P.summary()).at, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+    expect(negativeReplay, canonicalize(negativeReplay)).toMatchObject({ report: { result: "consistent" } });
   } finally { life.release(); }
 });
 
+
+async function preparedIssue(life: Awaited<ReturnType<typeof sessionRoom>>["life"], { D, children }: { D: Platform; children: Platform[] }) {
+  const [M, rules] = children;
+  const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
+  await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
+  const bytes = canonicalize(issue);
+  expect(await rules!.stub.submit(await rules!.intent(rita, "activate", { fields: { digest: DIGESTS.issue, name: issue.name } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
+  let P = D;
+  const pin = (await D.summary()).value.definition;
+  if (pin === C.directory) {
+    const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
+    const create = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === C.partition);
+    if (!create) return expect.fail("actual root emitted no partition");
+    P = life.platform(scopeIdOf(create.to as Seed));
+    await dispatchFixture([D, P, ...children], life.wait);
+  } else expect(pin).toBe("platform:directory@9");
+  const openedIssue = await P.stub.submit(await P.intent(rita, "open-issue", { expected: await P.expected({ repository: 0 }), fields: { definition: DIGESTS.issue, title: "Cross-root issue", conditions: ["Keep the existing relationship"] } }), [], { values: [bytes] });
+  expect(openedIssue).toMatchObject({ answer: "accepted" });
+  if (openedIssue.answer !== "accepted") return expect.fail("actual issue was not opened");
+  const send = (await P.entries())[openedIssue.receipt.fact.seq]!.sends.find(send => (send.to as Seed).kind === "lane");
+  if (!send) return expect.fail("actual partition emitted no issue");
+  const I = life.platform(scopeIdOf(send.to as Seed));
+  await dispatchFixture([D, P, I, ...children], life.wait);
+  expect((await I.summary()).value.status).toBe("active");
+  return { D, P, I, M: M! };
+}
 
 // Both repositories and lanes are real and use the same native namespace.
 // The shared fixture owns the clock, scheduler, setup inspector and register
@@ -144,28 +174,7 @@ test("two native partition roots keep cross-room block and restart release with 
   const first = await sessionRoom(C.register), { life } = first;
   try {
     const second = await sessionRepository(life, C.register);
-    const prepare = async ({ D, children }: { D: Platform; children: Platform[] }) => {
-      const [M, rules] = children;
-      const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
-      await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
-      const bytes = canonicalize(issue);
-      expect(await rules!.stub.submit(await rules!.intent(rita, "activate", { fields: { digest: DIGESTS.issue, name: issue.name } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
-      const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
-      const create = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === C.partition);
-      if (!create) return expect.fail("actual root emitted no partition");
-      const P = life.platform(scopeIdOf(create.to as Seed));
-      await dispatchFixture([D, P, ...children], life.wait);
-      const openedIssue = await P.stub.submit(await P.intent(rita, "open-issue", { expected: await P.expected({ repository: 0 }), fields: { definition: DIGESTS.issue, title: "Cross-root issue", conditions: ["Keep the existing relationship"] } }), [], { values: [bytes] });
-      expect(openedIssue).toMatchObject({ answer: "accepted" });
-      if (openedIssue.answer !== "accepted") return expect.fail("actual issue was not opened");
-      const send = (await P.entries())[openedIssue.receipt.fact.seq]!.sends.find(send => (send.to as Seed).kind === "lane");
-      if (!send) return expect.fail("actual partition emitted no issue");
-      const I = life.platform(scopeIdOf(send.to as Seed));
-      await dispatchFixture([D, P, I, ...children], life.wait);
-      expect((await I.summary()).value.status).toBe("active");
-      return { D, P, I, M: M! };
-    };
-    const A = await prepare(first), B = await prepare(second);
+    const A = await preparedIssue(life, first), B = await preparedIssue(life, second);
     const asked = await A.I.did(rita, "ask", { fields: { addressee: { membership: await A.M.at(), member: "@rita" }, question: "May another room depend on this answer?" } });
     const foreign = factRefOf((await A.I.entries())[asked]!);
     const offered = await B.I.did(rita, "offer", { expected: await B.I.expected({ goal: 0 }) });
@@ -190,6 +199,24 @@ test("two native partition roots keep cross-room block and restart release with 
     expect(await B.I.act(rita, "release-block", { on: blocked.receipt.fact.seq, expected: await B.I.expected({ on: blocked.receipt.fact.seq, commitment: offered }), fields: { commitment: offered, answer: factRefOf((await A.I.entries())[answered]!) } })).toMatchObject({ answer: "accepted" });
     expect(calls).toHaveLength(17);
     expect(await actual.resolver.read(foreign, 10)).toMatchObject({ under: "declared:issue" });
+    const replayed = await verify(httpSource("https://scopes.test", { fetch: routed, reader }), { mode: "replay", scope: B.I.name, head: (await B.I.summary()).at, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+    expect(replayed, canonicalize(replayed)).toMatchObject({ report: { result: "consistent" } });
+    // Only retained metadata is altered by this transport stand-in. Neither
+    // native history nor hashed entry bytes change; an alias cannot select
+    // receiver meaning or replace the unchanged producer identity.
+    const source = httpSource("https://scopes.test", { fetch: routed, reader });
+    const wrongAlias: HistorySource = { page: (...args) => source.page(...args), retained: async (...args) => {
+      const got = await source.retained(...args);
+      return got.ok && args[0] === B.I.name && args[2] === use.content ? { ...got, input: { ...got.input, under: "issue" } } : got;
+    } };
+    const aliasReplay = await verify(wrongAlias, { mode: "replay", scope: B.I.name, head: (await B.I.summary()).at, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+    expect(aliasReplay).toMatchObject({ report: { result: "mismatch" }, why: "the retained source alias differs from its unchanged producer policy" });
+    const roots = await B.D.entries();
+    const hiddenRoot: HistorySource = { page: (scope, from, allow) => scope === B.D.name ? Promise.resolve({ ok: false, reason: "native root withheld by fixture" }) : source.page(scope, from, allow), retained: (...args) => source.retained(...args) };
+    const anchoredRoot = await verify(hiddenRoot, { mode: "replay", scope: B.I.name, head: (await B.I.summary()).at, platform, grants: "proven", anchors: roots.map(entry => ({ scope: B.D.name, seq: entry.seq, hash: factRefOf(entry).hash })), capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+    expect(anchoredRoot, canonicalize(anchoredRoot)).toMatchObject({ report: { result: "incomplete" } });
+    expect(anchoredRoot.report.dependencies.anchored).toBeGreaterThan(0);
+    expect(anchoredRoot.report.coverage.some(covered => covered.scope.scope === B.D.name)).toBe(false);
     const deepen = async (room: typeof A) => {
       let current = room.I;
       const nodes = [room.D, room.P, room.M, current];
@@ -215,5 +242,55 @@ test("two native partition roots keep cross-room block and restart release with 
     expect(separate).toMatchObject({ under: "issue", producer: "declared:issue", proof: { calls: 29, reads: 29, totalFrames: 29, pending: 0 } });
     expect(separate?.proof.frames).toHaveLength(15);
     expect(physical).toHaveLength(29); expect(new Set(physical).size).toBe(29);
+    const deepOffer = await deepestB.did(rita, "offer", { expected: await deepestB.expected({ goal: 0 }) });
+    await deepestB.did(rita, "accept", { on: deepOffer, expected: await deepestB.expected({ on: deepOffer }), fields: { terms: factRefOf((await deepestB.entries())[0]!) } });
+    life.wire(deepestB.name, () => ({
+      births: { read: (at, ms, max) => { physical.push(`birth:${canonicalize(at)}`); return actual.births.read(at, ms, max); } },
+      proofs: { read: (fact, max, ms) => { physical.push(`fact:${canonicalize(fact)}`); return actual.proofs.read(fact, max, ms); } },
+    }));
+    await deepestB.restart(); physical.length = 0;
+    expect(await deepestB.act(rita, "block", { expected: await deepestB.expected({ commitment: deepOffer }), fields: { commitment: deepOffer, on: factRefOf((await deepestA.entries())[deepAsk]!) } })).toMatchObject({ answer: "accepted" });
+    expect(physical).toHaveLength(29); expect(new Set(physical).size).toBe(29);
+    const deepReplay = await verify(httpSource("https://scopes.test", { fetch: routed, reader }), { mode: "replay", scope: deepestB.name, head: (await deepestB.summary()).at, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+    expect(deepReplay, canonicalize(deepReplay)).toMatchObject({ report: { result: "consistent" } });
+  } finally { life.release(); }
+// This owns two repositories, six concern creates and several full causal
+// replays. Its fixture deadline is separate from each ten-second admission.
+}, 60_000);
+
+
+test("mixed native cohorts keep old receiver meaning and replay each target from its own pin", async () => {
+  const current = await sessionRoom(C.register), { life } = current;
+  try {
+    const previous = await sessionRepository(life, "platform:register@10");
+    const fresh = await preparedIssue(life, current), old = await preparedIssue(life, previous);
+    const ask = async (room: typeof fresh) => {
+      const seq = await room.I.did(rita, "ask", { fields: { addressee: { membership: await room.M.at(), member: "@rita" }, question: "Mixed native cohorts" } });
+      return factRefOf((await room.I.entries())[seq]!);
+    };
+    const freshFact = await ask(fresh), oldFact = await ask(old);
+    const ready = async (room: typeof fresh) => {
+      const offer = await room.I.did(rita, "offer", { expected: await room.I.expected({ goal: 0 }) });
+      await room.I.did(rita, "accept", { on: offer, expected: await room.I.expected({ on: offer }), fields: { terms: factRefOf((await room.I.entries())[0]!) } });
+      return offer;
+    };
+    const freshOffer = await ready(fresh), oldOffer = await ready(old);
+    const raw = namespace(env.PLATFORM);
+    expect(await raw.resolver.read(freshFact, 10)).toMatchObject({ under: "declared:issue" });
+    expect(await raw.resolver.read(oldFact, 10)).toMatchObject({ under: "issue" });
+    const freshReader = await ReceiverReads.open(raw, await fresh.I.at()), oldReader = await ReceiverReads.open(raw, await old.I.at());
+    expect(freshReader?.mode).toBe("partition-v1"); expect(oldReader?.mode).toBe("legacy");
+    expect(await freshReader!.read(oldFact, 10)).toMatchObject({ under: "issue" });
+    expect(await oldReader!.read(freshFact, 10)).toMatchObject({ under: "declared:issue" });
+    expect(await fresh.I.act(rita, "block", { expected: await fresh.I.expected({ commitment: freshOffer }), fields: { commitment: freshOffer, on: oldFact } })).toMatchObject({ answer: "accepted" });
+    const denied = await old.I.act(rita, "block", { expected: await old.I.expected({ commitment: oldOffer }), fields: { commitment: oldOffer, on: freshFact } });
+    expect(denied, canonicalize(denied)).toMatchObject({ answer: "refused" });
+    // Starting at either cohort loads native code in a different order. The
+    // same pure identity capability is available beside every supplied pin;
+    // the actual receiving birth, not that order, selects its interpretation.
+    for (const node of [old.I, fresh.I]) {
+      const replayed = await verify(httpSource("https://scopes.test", { fetch: routed, reader }), { mode: "replay", scope: node.name, head: (await node.summary()).at, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE });
+      expect(replayed, canonicalize(replayed)).toMatchObject({ report: { result: "consistent" } });
+    }
   } finally { life.release(); }
 });

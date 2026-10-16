@@ -42,11 +42,12 @@ import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId
 import { rawRetainedJSON, domainRetainedJSON, canonicalize, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   actValueDependencies, observedValueDependencies, detachedTextDependencies, outcomeValueDependencies, outcomeSnapshotDependencies, requiredDependency, textDependency, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, observedName, headsOf, highestHead, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, windowOf,
+  judgeDiagnosis, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, sentBy, validateDefinition, windowOf,
 } from "@generalbusiness/dap-derive";
 import type { DependencyOrigin, RequiredDependency, ActJudgment, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/dap-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
+import { IdentityEvidence, type IdentityFrame, type ReceiverIdentityCode } from "./identity.ts";
 import { View } from "./view.ts";
 
 /**
@@ -113,6 +114,8 @@ export interface Options {
    * With none, a reserved declared source remains incomplete.
    */
   sourceName?: Coded["sourceName"];
+  /** Pure native identity capability; each receiving run proves its own mode. */
+  receiverIdentity?: ReceiverIdentityCode;
   /**
    * How a recorded grant that holds no freshness proof is read. Such a
    * grant is no grant, and an entry that holds one is no entry (section
@@ -136,6 +139,7 @@ export interface Options {
  * history (section 16.1, "Replay").
  */
 export interface Coded {
+  receiverIdentity?: ReceiverIdentityCode;
   data: PlatformData;
   rules: Rules;
   observed?: ((state: StateView, asked: ObservationRequest) => unknown) | undefined;
@@ -390,6 +394,7 @@ class Verifier {
   readonly #owners: Owners | undefined;
   readonly #platform: Options["platform"];
   #sourceName: Coded["sourceName"];
+  #receiverIdentity: ReceiverIdentityCode | undefined;
   #applicationPublicationOrigin: Coded["applicationPublicationOrigin"];
   readonly #grants: "proven" | "as-recorded";
   readonly #runs = new Map<ScopeId, Run>();
@@ -430,6 +435,7 @@ class Verifier {
     this.#owners = options.owners;
     this.#platform = options.platform;
     this.#sourceName = options.sourceName;
+    this.#receiverIdentity = options.receiverIdentity;
     this.#grants = options.grants ?? "proven";
   }
 
@@ -759,6 +765,10 @@ class Verifier {
     if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     const lacks = checked.definition.marks.find((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null);
     if (lacks) throw new Stop("unsupported-definition", `the pinned definition ${named} has the mark ${lacks.code} at ${lacks.path}, and this replay has no rule of that name for that place`, where);
+    if (supplied.receiverIdentity) {
+      if (this.#receiverIdentity && this.#receiverIdentity !== supplied.receiverIdentity) throw new Stop("unsupported-definition", "the supplied native versions disagree on their receiver-identity code", where);
+      this.#receiverIdentity = supplied.receiverIdentity;
+    }
     if (supplied.sourceName) {
       if (this.#sourceName && this.#sourceName !== supplied.sourceName) throw new Stop("unsupported-definition", "the supplied native versions disagree on their source-identity policy", where);
       this.#sourceName = supplied.sourceName;
@@ -1145,8 +1155,50 @@ class Verifier {
     return identity;
   }
 
+  /** Native identity metadata is available only after the ordinary causal
+   * replay has checked the pin and this exact frame. Anchors alone supply no
+   * code or birth authority. A sealed prefix remains usable during recursion. */
+  async #identityFrame(at: ScopeRef, where: FactRef, depth: number, from?: FactRef): Promise<IdentityFrame | null> {
+    if (depth >= this.#limits.depth) throw new Stop("incomplete", "the identity proof reached the foreign-depth limit", where);
+    const opened = this.#runs.get(at.scope) ?? await this.#open(at.scope);
+    if (typeof opened === "string") return null;
+    await this.#advance(opened, from?.seq ?? 0, depth + 1, from ? { hash: from.hash, user: where } : undefined);
+    const copy = opened.sealed[from?.seq ?? 0];
+    if (!copy || !opened.at || !sameScope(opened.at, at) || !opened.definition || !opened.named || from && copy.hash !== from.hash) return null;
+    return { fact: { at: opened.at, seq: copy.entry.seq, hash: copy.hash }, entry: copy.entry, named: opened.named, declarationName: opened.definition.declared.name, native: isPlatformDefinition(opened.named) && opened.platform?.named === opened.named };
+  }
+
+  async #receiverEvidence(run: Run, entry: Entry, where: FactRef, depth: number): Promise<{ mode: "legacy" | "partition-v1"; evidence: IdentityEvidence } | null> {
+    const code = this.#receiverIdentity;
+    if (!code) return null;
+    const evidence = new IdentityEvidence(code, {
+      birth: at => this.#identityFrame(at, where, depth),
+      fact: fact => this.#identityFrame(fact.at, where, depth, fact),
+    });
+    const input = entry.input, born = input.type === "genesis" ? input : run.sealed[0]?.entry.input;
+    const candidate = isPlatformDefinition(run.named)
+      ? [code.cohort.directory, code.cohort.partition, code.cohort.membership, code.cohort.rules, code.cohort.destination, code.cohort.inbox].some(pin => pin === run.named)
+      : born?.type === "genesis" && isObject(born.message?.body) && isScopeRef(born.message.body["directory"]);
+    if (!candidate) return { mode: "legacy", evidence };
+    // Own genesis does not exist as an accepted fact yet: select bootstrap
+    // solely from the actual parent create and the validated own definition.
+    const selected = input.type === "genesis"
+      ? input.source && input.n !== null && input.message
+        ? await evidence.bootstrap({ seed: input.seed, source: input.source, n: input.n, message: input.message }, isPlatformDefinition(run.named) ? run.named : run.definition!.declared)
+        : { mode: "legacy" as const }
+      : await evidence.receiver(entry.at);
+    if (!selected) throw new Stop("incomplete", "the receiving scope's required native birth proof is unavailable", where);
+    return { ...selected, evidence };
+  }
+
   /** Origin facts come from checked histories, never from a retained alias or synthetic registration. */
-  async #applicationOrigin(from: FactRef, directory: ScopeRef, destination: ScopeRef, where: FactRef, depth: number): Promise<void> {
+  async #applicationOrigin(from: FactRef, directory: ScopeRef, destination: ScopeRef, where: FactRef, depth: number, identity?: IdentityEvidence, kind: "application" | "change" = "application"): Promise<void> {
+    if (identity) {
+      const valid = await identity.publication(from, directory, destination, kind);
+      if (valid === null) throw new Stop("incomplete", "the publication source lacks its required native factory proof", where);
+      if (!valid) throw new Stop("mismatch", "the publication source is no native lane of this room and destination", where);
+      return;
+    }
     if (!this.#applicationPublicationOrigin) throw new Stop("unsupported-definition", "the destination version supplies no application publication policy", where);
     await this.#prove(from, where, depth);
     const source = this.#runs.get(from.at.scope);
@@ -1190,16 +1242,34 @@ class Verifier {
 
     // Section 9.4: a retained copy lets this judgment be derived again. It does not show that the source admitted the entry.
     const foreign = [...entry.uses.map((use) => use.fact), ...(input.type === "delivery" ? [input.from] : []), ...(input.type === "genesis" && input.source ? [input.source] : [])];
-    for (const fact of foreign) {
+    const distinctForeign = [...new Map(foreign.map(fact => [canonicalize(fact), fact])).values()];
+    const proved = new Map<string, "replayed" | "anchored">();
+    for (const fact of distinctForeign) {
       if (!isFactRef(fact)) throw mismatch("a reference is not a fact reference");
-      const how = await this.#prove(fact, where, depth);
-      // Historical judgments keep their original facts and effects. Authenticate
-      // retained aliases from already checked sender/creator histories; do not
-      // add origin facts to the judgment. An anchor keeps its explicit trust.
-      if (how === "replayed") {
+      proved.set(canonicalize(fact), await this.#prove(fact, where, depth));
+    }
+    const identity = await this.#receiverEvidence(run, entry, where, depth);
+    for (const fact of distinctForeign) {
+      const copies = facts.filter(copy => same(copy.fact, fact));
+      if (identity?.mode === "partition-v1") {
+        const selected = await identity.evidence.name(fact);
+        if (!selected) throw new Stop("incomplete", "the source's bounded native identity proof is unavailable", where);
+        for (const copy of copies) {
+          if (copy.under !== selected.producer) throw mismatch("the retained source alias differs from its unchanged producer policy");
+          if (copy.entry.input.type === "genesis" && copy.entry.input.decision !== "applied") {
+            const born = copy.entry.input;
+            const delivered = input.type === "delivery" && input.message.class === "result" ? input : null;
+            const message = delivered?.message;
+            if (born.decision !== "refused" || !delivered || message?.class !== "result" || !same(fact, delivered.from)
+              || !same(born.seed.creator, entry.at) || !isFactRef(born.source) || !isObject(message.of) || !isFactRef(message.of.from) || !isLocalId(message.of.n) || !same(message.of.from, born.source) || message.of.n !== born.n
+              || message.outcome !== "refused" || !sentBy(copy.entry, { to: entry.at, from: delivered.from, n: delivered.n, message })) throw mismatch("a refused genesis is not positive source evidence");
+            copy.under = "";
+          } else copy.under = selected.under;
+        }
+      } else if (proved.get(canonicalize(fact)) === "replayed") {
         const source = this.#runs.get(fact.at.scope)!;
         const pinned = this.#sourceIdentity(source, where);
-        for (const copy of facts) if (copy.fact.hash === fact.hash && copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
+        for (const copy of copies) if (copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
       }
     }
 
@@ -1311,11 +1381,17 @@ class Verifier {
         // The address is the one the sender wrote: the source entry's send at that ordinal.
         const to = source?.entry.sends.find((send) => send.n === input.n)?.to;
         if (!source || to === undefined) throw mismatch("the source entry holds no send at that ordinal");
-        if (["platform:destination@4", "platform:destination@5"].includes(run.named ?? "") && input.message.class === "request" && input.message.type === "tell"
+        if (["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(run.named ?? "") && input.message.class === "request" && input.message.type === "tell"
           && isObject(input.message.body) && input.message.body["message"] === "publish-file") {
           const directory = state.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
           if (!isScopeRef(directory) || !run.at) throw mismatch("the destination records no full Directory reference");
-          await this.#applicationOrigin(input.from, directory, run.at, where, depth);
+          await this.#applicationOrigin(input.from, directory, run.at, where, depth, identity?.mode === "partition-v1" ? identity.evidence : undefined);
+        }
+        if (identity?.mode === "partition-v1" && run.named === "platform:destination@6" && source.under === "change"
+          && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "reserve") {
+          const directory = state.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
+          if (!isScopeRef(directory) || !run.at) throw mismatch("the destination records no full Directory reference");
+          await this.#applicationOrigin(input.from, directory, run.at, where, depth, identity.evidence, "change");
         }
         const origin = input.message.class === "result" && isObject(input.message.of) && isObject(input.message.of.from) ? sealed(input.message.of.from.seq) : null;
         // Sections 4.1 and 16.1: a delivery of a result may retain observations, each of the ten-second kind. Each is derived again,
@@ -1372,9 +1448,10 @@ class Verifier {
         // `unsupported-definition` at that entry, and never `consistent`.
         if (!owners?.rules(owner, kind)) throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
         const valueOwner = owners.rules(owner, kind);
-        const publication = ["platform:destination@4", "platform:destination@5"].includes(run.named ?? "") && operation ? valueOwner?.publicationOrigin?.(state, operation, reading.own!) : null;
+        const publication = ["platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(run.named ?? "") && operation ? valueOwner?.publicationOrigin?.(state, operation, reading.own!) : null;
         if (publication === false) throw mismatch("the operation has malformed publication provenance");
-        if (publication && publication.mode === "application") await this.#applicationOrigin(publication.from, publication.directory, publication.destination, where, depth);
+        if (publication && publication.mode === "application") await this.#applicationOrigin(publication.from, publication.directory, publication.destination, where, depth, identity?.mode === "partition-v1" ? identity.evidence : undefined);
+        else if (publication && identity?.mode === "partition-v1") await this.#applicationOrigin(publication.from, publication.directory, publication.destination, where, depth, identity.evidence, "change");
         if (valueOwner?.values !== undefined && valueOwner.valueDomains === undefined) throw new Stop("unsupported-definition", "the outcome owner has a value reader but no static domain declaration for this pinned version and kind", where);
         this.#trusts.add("outcomes");
         await this.#snapshots(run, input, owners, owner, kind, where);
@@ -1419,7 +1496,7 @@ class Verifier {
     }
     if (canonicalize(derived) !== bytes) throw mismatch("the recorded entry is not the one derived again");
     applyEntry(state, definition, entry, hash, foldInputs);
-    if (input.type === "delivery" && input.message.class === "request") run.foldInputs.set(entry.seq, foldInputs);
+    if (input.type === "delivery" && input.message.class === "request" || identity?.mode === "partition-v1" && facts.length > 0) run.foldInputs.set(entry.seq, foldInputs);
     if (!fits(state, definition, bounds, input, judged.draft.settles, ownersOf(definition, run.platform, this.#owners))) throw mismatch("the taking or new-work entry exceeds the budget of used plus reserved entries");
     // Section 16.1: this entry is now the latest that retains each of its reads, in its grant and in `observed`. A preparation retains one in its grant,
     // and an outcome and a delivery of a result in `observed` alone.

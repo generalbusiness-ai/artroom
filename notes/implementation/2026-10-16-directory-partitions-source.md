@@ -567,3 +567,65 @@ generic return type now preserve the unique timeout sentinel. This is a fixture 
 Runtime memory measurement, mixed-cohort replay and the other unfinished
 Source obligations remain owed. No gate or Source review has run for this
 unfinished branch, and no provider operation has run.
+
+
+## Causal replay uses the receiving scope's identity policy
+
+Native code now supplies one pure receiver-identity capability beside every
+pinned version. Its availability is common; it is not a global current
+receiver mode. Replay derives each mode from that entry's actual receiving
+birth and factory chain. During genesis it uses the actual parent create
+and validated own definition, without inventing an accepted own genesis.
+Native metadata comes only from normally replayed code and causal entries;
+an anchor alone does not attest native code or a birth. Known older native
+pins retain their legacy path. The existing producer SourceName callback,
+old literals, defaults and newest pins are unchanged.
+
+Each receiving entry owns one raw collection of at most thirty-two checked
+frames/reads; each policy question sees a separate sixteen-frame view.
+Normal causal replay additionally owes its existing whole-traversal scope,
+entry, byte and depth limits. These decoded-evidence reads are not runtime
+RPC counters or replacements for the bounded history-source reader. No
+new package or dependency was installed.
+
+For partition receivers replay first checks each retained alias against the
+unchanged producer policy, then changes only the transient judgment facts.
+The fold keeps those same transient facts when needed; retained bytes and
+aliases are unchanged. A refused genesis supplies only the exact negative
+creator result, with its actual source, ordinal, incarnation and send, and
+has no positive semantic source label. Publication checks for D6 use the
+full chain for application or change provenance; old D4/D5 branches retain
+the original origin helper. Full new-cohort change/publication journeys
+remain owed, so those guards are not yet claimed as native witnesses.
+
+Actual native cross-root block/release replay passes without anchors. The
+parent's real refused-child result also replays without anchors. A retained
+alias transport alteration is rejected; withholding the actual native root
+while anchoring all its entries remains incomplete rather than attesting a
+native birth. The transport alterations are labelled stand-ins; native
+histories and entry bytes are unchanged. Mixed native Root9 and partition
+cohorts demonstrate that the new receiver accepts a legitimate old issue,
+while the old receiver keeps the new issue's declared identity and refuses
+the relation. Replay of each target, starting from either cohort, passes.
+The fifty-three existing verifier cases pass as a focused regression run.
+
+The two disjoint depth-four chains now also make an actual native block
+admission with twenty-nine distinct physical reads, then replay that deep
+receiver without anchors. The expanded three-journey native file passes.
+It owns two repositories, six concern creates and several full causal
+replays. Its first expanded run hit Vitest's default five-second test
+limit; the test now has a finite sixty-second fixture deadline. Every
+production proof admission retains its original ten-second deadline, and
+no assertion or production bound changed for the fixture timeout.
+
+The first causal replay attempt wrongly interpreted a source twice because
+it appeared in both uses and the delivery envelope. Distinct exact fact
+references now share one interpretation; that original mismatch remains
+retained. Removing receiver relabeling fails the legitimate cross-root
+replay. Removing the producer-alias comparison makes the forged alias pass
+and fails its unchanged negative assertion. Both controls distinguish and
+restore the file. Platform, replay and lane typechecks pass. The total-
+budget checkpoint is local commit `376d7ec4b`; this replay phase is another
+unfinished local checkpoint, with no gate, Source review or provider action.
+Runtime memory, ordinary change relations, concern fulfilment, completed
+publication, factory capacity and the remaining consumer audit remain owed.

@@ -448,3 +448,15 @@ export function partitionProducerName(at: ScopeRef, frames: readonly PartitionNa
     return name(at, 1);
   } catch { return null; }
 }
+
+
+/** One supplied pure capability, never a global current receiver mode. Old
+ * native versions expose it too so callback load order cannot select policy. */
+export const PARTITION_IDENTITY_POLICY = Object.freeze({
+  version: 1 as const, cohort: COHORT,
+  bounds: { ...PARTITION_IDENTITY_BOUNDS, entryBytes: PARTITION_BASE_PROOF_BOUNDS.entryBytes },
+  receiver: partitionReceiverPolicy,
+  creation: (creation: PartitionCreation, definition: DeclaredDefinition | PlatformDefinition, frames: readonly PartitionNativeFrame[]) => typeof definition === "string"
+    ? partitionNativeCreationPolicy(creation, frames) : partitionDeclaredCreationPolicy(creation, definition, frames),
+  producer: partitionProducerName, source: partitionSourceName, publication: partitionPublicationOrigin,
+});
