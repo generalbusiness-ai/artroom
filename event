@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will perform the final exact-head retained-key review at573c3b42/tree4f72c380, primary e3363695 first, all eight corrected bindings and full two-test/report delta. Assess failed original gate and bounded successor checks without rerunning the whole suite or native producers.","body":{"request":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f3e40d235a1c5ecc36e23ce1b1c670e5ab3df4d4"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:78127fe677b5a0829f0d3463d915a0cfde6e88b8"}
