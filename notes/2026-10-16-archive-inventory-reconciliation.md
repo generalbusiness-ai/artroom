@@ -93,9 +93,9 @@ admission remain required before any export.
 
 Checker report `78127fe6` settles the technical boundary below. The
 companion amendment to section 15.3 records its distinct replay and archive
-purposes and the native declaration-reference grammar. Both remain a
-proposed documentation successor for planner to adopt before dependent
-inventory Source; this note is not a statement that they have landed.
+purposes and the native declaration-reference grammar. Planner `191d8dec` adopts both as the design basis for inventory Source.
+They remain subject to checker design approval and local merge before
+dependent inventory Source lands.
 
 Use a shared, bounded dependency selection interface at the consumers
 above, with the local full scope, input variant, entry position, kind,
@@ -123,8 +123,9 @@ enforced in Source, with no complete prefix result on exhaustion.
 Checker also found that the native producer stores definition-domain
 values as `definition`, while replay observation/evidence consumers request
 `value`. Separate Source child `a1622876` corrects that prerequisite with
-native service/replay witnesses. It is not an inventory implementation or
-an export permission.
+native service/replay witnesses. Checker `8550dadd` approved the corrected
+candidate `573c3b42`, now on local main through `77e570a1`. This prerequisite
+is not an inventory implementation or export permission.
 
 The next implementation must witness a selected cutoff followed by a turn
 that retains another input: rebuilding the selected manifest reads only
@@ -137,3 +138,18 @@ clone progress remain separate slices.
 This preparation is based on source inspection. No test or gate result is
 claimed for an inventory implementation, and no exporter exists in this
 slice. No push or deployment ran.
+
+
+Checker changes `af382b54` correct two contract details. The outcome and
+delivery rows now include their definition-domain root keys as
+`replay-required`; their extra static children remain `archive-closure`.
+A fixed cutoff excludes dependencies named only after it, rather than
+excluding bytes that happen to become available later.
+
+A finite two-step witness is owed to inventory Source: first select a
+cutoff whose root statically names an unused child with unavailable bytes.
+Ordinary replay can remain consistent, but the archive manifest is
+incomplete. Then make precisely that immutable child's bytes available.
+The same cutoff can now complete without reading later entries, scanning
+store inventory, or selecting an unrelated later input. This is a design
+counterexample, not an executed archive witness.

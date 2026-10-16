@@ -1508,10 +1508,14 @@ direct `source.retained` call) is listed here by input variant:
 | Any that records `prepared` | The input of each rule evaluated | `rule` |
 | `act` | The value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains (`#hand`, line 1048) | `value`, `definition` |
 | `timed` | As `prepared` above | `rule` |
-| `outcome` | The snapshots of staged refs its evidence names under its owner's `retains`, and the snapshot its ancestry record names (`#snapshots`, lines 1094 to 1127, called at 1372): each is retained before the entry that names it, and a later act's `ancestry` guard reads it; the values its evidence names under its owner declaration, by domain and digest (line 1388); and the values its recorded observations name (`#hand`) | `snapshot`, `value` |
-| `delivery` | The values the observations of a result's clause name, under the definition's retained domains (`#hand`, called at line 1322 for an observing definition) | `value` |
+| `outcome` | The snapshots of staged refs its evidence names under its owner's `retains`, and the snapshot its ancestry record names (`#snapshots`, lines 1094 to 1127, called at 1372): each is retained before the entry that names it, and a later act's `ancestry` guard reads it; the values its evidence names under its owner declaration, by domain and digest (line 1388); and the values its recorded observations name (`#hand`) | `snapshot`, `value`, `definition` |
+| `delivery` | The values the observations of a result's clause name, under the definition's retained domains (`#hand`, called at line 1322 for an observing definition) | `value`, `definition` |
 | `genesis`, `diagnosis`, `preparation`, `checkpoint` | No additional retained consumer beyond the shared rows | |
 | Any | A detached text | `text`: never archived (15.1, point 4) |
+
+Typed definition-domain roots are themselves `replay-required` inputs
+under the native `definition` retained key, with no value-domain component.
+Their additional static children belong to `archive-closure`.
 
 The declaration closure uses the native `creates()` grammar in
 `packages/scope/src/definitions.ts`: digest-valued `create.definition`
@@ -1536,8 +1540,12 @@ verdict and does not derive an ancestry walk again.
 An archived foreign entry brings in nothing further, since its own inputs
 belong to its own scope's archive. A retained input
 is immutable by digest and an entry by position, so the selection is a
-pure function of the cutoff. An input that a later turn retains belongs
-to an entry past the cutoff and is not in the set. The kinds and domains
+pure function of the cutoff and its named dependencies. Inputs named
+only by entries after the cutoff are excluded. Later availability of an
+already named root or closure child can complete the same fixed cutoff;
+it changes neither the selected entries nor the dependency rule. Do not
+read later entries or retained-store inventory to discover more roots.
+The kinds and domains
 left out (`text`, and any domain J2 excludes) are listed in the pass's
 manifest as omissions by kind, domain and digest, so a reader of the
 archive can tell "left out by rule" from "missing". A1 keeps this table
@@ -1696,7 +1704,7 @@ that is busy with turns archives later; it never refuses a turn in order
 to archive.
 
 **What a turn after Mark changes.** Nothing in the outstanding commit.
-Entries past the cutoff and inputs they retain wait for the next pass.
+Entries past the cutoff and inputs named only by them wait for the next pass.
 A3 witnesses this: with a commit marked and its parent still not updated
 on the host, a turn retains a new input; the resend after a restart is
 the identical commit, and the next pass archives the new entry and its
