@@ -236,8 +236,11 @@ creates. The manifest records initial and final heads of the root and of
 every partition. A partition's index can be marked incomplete after a
 `dropped` advisory, so index rows never prove completeness. Discovery
 follows creation records. The current `roomScopes` routine
-(`commands.ts:1152`) reads every row and every lane summary; it is a useful
-reference, not a completeness certificate.
+(`commands.ts:1152-1175`) reads the directory summary once to find the
+register, then walks each discovered scope's history pages, follows the
+creation sends it finds and deduplicates the child scope IDs. It does not
+list lane rows or read lane summaries. It is the existing foundation for
+discovery, not a captured-head or causal-closure certificate.
 
 A refused creation differs from a created scope whose history is
 unavailable. Partitions and lanes in `creating`, `refused` or
