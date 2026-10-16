@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:af7604a78ee7e7f78aa2cd0be5008b910b647322"}
+{"kind":"artifact","text":"scripts/active-source.test.mjs at exact 522a439f00cf28e1e17d9100d583992455ffe04c on planner/notes-sweep-20261016, under promise git:sha1…6e518f8 on request git:sha1…980cf09","body":{"commit":"522a439f00cf28e1e17d9100d583992455ffe04c","path":"scripts/active-source.test.mjs"}}
