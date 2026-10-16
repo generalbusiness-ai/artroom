@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-hosted-counter-contracts.md","body":{"commit":"5cfbaae712063ed351fe1b2ce457240a7ffb9a13","path":"notes/2026-10-15-hosted-counter-contracts.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a0a0e18012a2d763a2e152b9121c8040a53e1c43","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-hosted-counter-contracts.md."}
