@@ -303,8 +303,12 @@ rule, `destination.ts:780-830`, `:1870-1902`). It adds no separate token
 or custody mechanism.
 
 - *Discriminator.* It applies only to a confirmed `mint` whose served
-  write (`servedBy`) is a `push`, and whose target publication is not
-  closed. For every other served write (`first-head`, `receipt`,
+  write (`servedBy`) is an undecided `push` attempt, and whose target is
+  a regular review-backed `publication` that is not closed. Automatic
+  `file-publication` keeps its separate authority journey and is outside
+  this guarantee; its `reservedAt` does not supply human reservation keys.
+  Closed targets and already decided attempts retain late-token cleanup.
+  For every other served write (`first-head`, `receipt`,
   `reservation-stage`, `reservation-delete`) the rule names no key, so no
   read is made and the mint behaves as today. Revoked or unavailable
   standing therefore never holds back a receipt or cleanup that finishes
@@ -313,8 +317,15 @@ or custody mechanism.
 - *The read.* The `mint` outcome kind gains the row
   `{ of: "key", from: "rule", max: 9, window: 10, use: "once", without: "wait" }`,
   the form `judge` uses (`destination.ts:465-471`). The rule names the
-  keys that the reservation entry observed: the merger's key and the keys
-  behind counted verdicts or the deciding result, at most 9.
+  complete distinct set of merger and counted approving-verdict keys,
+  plus actual signers of the current required check generations. The
+  original reservation alone is insufficient: reservation-tree checks
+  are accepted later. The explicit `@5` cohort retains bounded native
+  signer/job/result/accepted-decision provenance in its existing passes
+  slot, replacing it when a generation is fenced. It verifies exact own
+  records, operations, attempts, holders and membership incarnation,
+  without scanning history. More than nine distinct keys is unavailable;
+  it never drops a key to fit the row.
 - *Every key active.* The outcome derives as today: `token` set, and
   `publishing` for a reserved push.
 - *A key revoked or compromised.* The outcome sets `aborting` and does
@@ -324,6 +335,16 @@ or custody mechanism.
 - *The read cannot be made.* The outcome entry is not written. The mint
   has no outcome, so the push request is not sent and the publication
   waits. Other writes, with their own mints, continue.
+  Unknown, missing, ambiguous or wrong-incarnation standing is not an
+  inactive-key verdict and must not manufacture an abort outcome.
+
+The mint-opened deciding read has an explicit `@5` route through the exact
+confirmed mint outcome, served push and common publication holder. Its own
+opening must contain this read and this target's aborting effect. It then
+uses the existing `seenDecides` result, including discovery of an already
+effective integration. It does not infer cancellation from an absent or
+unprovable ref. Automatic file publication needs a separate reviewed
+freshness contract before a later cohort can claim this guarantee for it.
 
 **D1's declared closure** (verified in D1's own review, before partition
 Source):
@@ -337,9 +358,11 @@ Source):
 The outcome entry is a settling entry, so the branch must draw only on
 what the holder reserved. The full-destination witness checks that.
 
-**What is guaranteed.** At the entry that records a push attempt's mint
-outcome, every key behind the publication was active in a read at most
-10 seconds old. The later send is bounded only by `allowed()` and by the
+**What is guaranteed.** At the `@5` entry that installs a regular
+review-backed push attempt's minted credential, every counted key was
+active in a native read less than 10 seconds old. An inactive set instead
+records the confirmed mint with abort/revocation, without installing it.
+The later send is bounded only by `allowed()` and by the
 minted credential's lifetime. This is freshness at that entry, not a
 fence at send time and not immediate cessation of publication after a
 revocation.
