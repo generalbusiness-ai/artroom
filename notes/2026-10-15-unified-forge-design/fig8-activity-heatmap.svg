@@ -3,7 +3,7 @@
 <desc id="d">Three small-multiple heatmaps, one per actor: rows are days, columns are hours (US Eastern), shade is the number of coordination events.</desc>
 <rect width="860" height="350" fill="#F6F4EE"/>
 <text x="24.0" y="30.0" font-size="16" fill="#23251D" text-anchor="start" font-weight="600">When each actor acts: 7,955 coordination events by day and hour (US Eastern)</text>
-<text x="24.0" y="50.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Excludes artifact statements and their supersessions. One shared shade scale; blank cells had no events.</text>
+<text x="24.0" y="50.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Excludes artifact statements and their supersessions. One shared shade scale; a blank cell means no recorded event.</text>
 <text x="50.0" y="78.0" font-size="12" fill="#2a78d6" text-anchor="start" font-weight="600">planner  2,904</text>
 <text x="44.0" y="99.0" font-size="9" fill="#66655A" text-anchor="end" font-weight="normal">1</text>
 <rect x="50.0" y="90.0" width="8.5" height="11.0" fill="#EEEBE3" stroke="none" stroke-width="0" fill-opacity="1"/>

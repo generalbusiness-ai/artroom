@@ -355,7 +355,8 @@ comes from the fold at the head; a *derived* duration is a difference of
 recorded event times; a *reconstruction* estimates a past state from event
 times and the current fold. Three keys sign events: planner (also the
 operator), builder and checker. Hugh's own acts are not separable from
-the planner's.
+the planner's. The rules behind each number are in "How the numbers were
+taken" at the end of this subsection.
 
 Terms. A *work request* is addressed to the builder or planner (813
 effective). A *review request* is addressed to the checker (716). The fold
@@ -430,7 +431,8 @@ good at trend and bad at naming the items behind it.
 ![Cumulative distributions of stage durations on a log time axis](2026-10-15-unified-forge-design/fig5-duration-distributions.svg)
 
 *Figure 5. Cumulative distributions of six intervals on a log time axis,
-with median and 90th percentile marked (derived).*
+with median and 90th percentile marked (derived). Values under 1 minute
+are drawn at the first tick, labelled ≤1 min.*
 
 | Interval (derived) | n | Median | 90th percentile | Max |
 |---|---:|---:|---:|---:|
@@ -450,38 +452,45 @@ Review rounds are matrix-shaped. Each review request received at most one
 verdict; a new round is a new review request at a new head. Of 202 landed
 requests, 93 needed one review request, 45 needed two, 30 three, 32
 four or more (maximum 16), and 2 had none traced. 118 landed with no
-changes requested; 20 had three or more. In first rounds, 146 of 298 verdicts requested changes. 179
-review requests were cancelled after a changes-requested verdict, so
-"cancelled" alone misstates what happened.
+changes requested; 20 had three or more. In first rounds, 146 of 298
+verdicts requested changes. 179 review requests were cancelled after a
+changes-requested verdict, so "cancelled" alone misstates what happened.
 
 ![Treemap of artifact statements by area, shaded by review requests](2026-10-15-unified-forge-design/fig6-code-atlas.svg)
 
 *Figure 6. Code atlas: treemap of 13,407 artifact statements by area
-(2,044 distinct paths, 52 areas), shaded by review requests citing each
-area (observed).* `packages/room` has the most artifacts (1,915) but 87
+(2,044 distinct paths, 52 areas), shaded by the distinct review requests
+citing each area (observed). The cell for the 28 smallest areas counts
+each review request once (147), not a sum over its areas.* `packages/room` has the most artifacts (1,915) but 87
 review requests; `notes` has 951 artifacts and 416 review requests, 174
 with changes requested. Activity is not one quantity: an atlas must name
 its metric. 336 of 590 artifact-backed review requests span more than one
 area, which supports a change-by-area matrix. The treemap is good for
 proportion and bad for stable position; a code hierarchy keeps positions.
 
-![Swimlane provenance trace of one landed request](2026-10-15-unified-forge-design/fig7-provenance-swimlane.svg)
+![Lifecycle pattern of 202 landed work requests](2026-10-15-unified-forge-design/fig7-landed-lifecycle.svg)
 
-*Figure 7. Provenance trace for **Explain why this version is blocked or
-running**: one landed request (`10fcfe4e`) in actor lanes, with recorded
-rests-on links (observed).* It had 12 artifacts at four heads, four
-review requests, two changes requested, and landed after 5.9 hours. The
-trace explains this one case well. It would not scale to the whole room:
-the largest landing receipt is cited by 1,545 later events. Focused
-expansion is required, as the note says.
+*Figure 7. Lifecycle pattern for **Explain why this version is blocked or
+running**, aggregated over all 202 landed work requests: time from the
+request to the first event of each stage (10th to 90th percentile,
+quartiles, median; derived), who signs that event (observed), and the
+review rounds per request (observed).* No single case is shown. The
+median request gets its first promise in about a minute, its first
+artifact in 36 minutes, a first verdict in 1.4 hours, and lands in 3.0
+hours. The builder promised 85% of landed requests; the planner promised
+the rest, which were addressed to it. The pattern gives the context for one case;
+it does not explain any case. That still needs a focused provenance trace
+of real records under the reader's authority. Such a trace must expand on
+demand: the largest landing receipt here is cited by 1,545 later events.
 
 ![Heatmaps of coordination events by day and hour for each actor](2026-10-15-unified-forge-design/fig8-activity-heatmap.svg)
 
 *Figure 8. Coordination events (excluding artifact statements and their
 supersessions) by day and hour, one heatmap per actor (observed, US
-Eastern).* Each actor acts in all 24 hours, and 7 October is nearly idle.
-The view is cheap and shows handoff gaps, but it answers no question in
-section 5. It should not take priority.
+Eastern).* Each actor acts in all 24 hours; 7 October is the quietest day.
+A blank cell means no recorded event in that hour; it is not proof of
+idle time or a handoff gap. The view is cheap, but it answers no question
+in section 5. It should not take priority.
 
 **Attention and residue.** Re-applying the status view's lane rules at
 the head gives these rows (observed):
@@ -493,9 +502,9 @@ the head gives these rows (observed):
 | Checker | 318 | 0 | 0 | 69 | 19 | 230 |
 
 One reneged row each for planner and builder is not in a column.
-Cancelled commitments are 47% to 72% of the listed rows. Work requests also form a graph, not a tree:
-443 of 813 cite another work request, 118 cite more than one, and chains
-reach depth 10. 296 neither cite nor are cited by another request. 616 of
+Cancelled commitments are 47% to 72% of the listed rows. Work requests
+also form a graph, not a tree: 443 of 813 cite another work request, 118
+cite more than one, and chains reach depth 10. 296 neither cite nor are cited by another request. 616 of
 1,531 commitments carry the stale qualifier, 531 of them closed. These
 are the items that must not disappear for lack of a ribbon; lists and
 matrices must show them first.
@@ -521,11 +530,88 @@ tasks. First, **Find work missing implementation or evidence** over the
 77 promised without artifacts, 3 landed without a traced verdict, and 296
 unlinked. Compare direct lists, Figure 2 and Figure 1. Second, **Explain
 why this request needed several review rounds** for any of the 32 landed
-requests with four or more review requests. Compare a trace like Figure 7,
-a requirements table and an event timeline. A prototype that passes on
+requests with four or more review requests. Compare a focused provenance
+trace, a requirements table and an event timeline, each read against the
+pattern in Figure 7. A prototype that passes on
 this fixture is still a prototype, not delivered capability. The export
 holds event IDs and paths but no text. Sharing it as a fixture needs the
 review that section 4.4 requires; this note commissions none.
+
+#### How the numbers were taken
+
+*Populations.* All 42,878 events, including 39 the fold judged
+non-effective, appear only in the event-class table. Of 1,540 request
+statements, 1,529 are effective: 813 work requests (addressed to the
+builder or planner) and 716 review requests (addressed to the checker).
+The fold projects 1,531 commitment rows. They cover the same 1,529
+requests: two requests have two rows each, one per promise. Totals over
+all commitments count rows. Per-request figures use one row per request,
+the last in fold order. Figures 1 to 3, the review rounds, Figure 7 and
+the structure counts use work requests. Figure 4, the age row of Figure 5
+and the attention table use all commitments.
+
+*Closure.* A commitment is closed when the fold's status is satisfied,
+cancelled or withdrawn. The fold's `terminal` field splits satisfied into
+landed (203 rows; 202 work requests) and reported (682). The close time
+is the landing receipt for landed work, the report for other satisfied
+work, and the earliest effective supersession of the request for
+cancelled or withdrawn work. Every closed row has a close time.
+
+*Stages and traversal.* Stages follow recorded rests-on links one hop at
+a time: request ← promise ← artifact ← review request ← verdict. Promised
+means an effective promise rests on the request. Artifacts are statements
+resting directly on such a promise; artifacts that rest on a landing
+receipt are excluded. A review request counts for a work request when it
+rests on one of those artifacts or directly on the request. Review
+requests are deduplicated per work request as a set. 26 review requests
+cite artifacts of two work requests and count for both; 63 reach no work
+request. A verdict is a report with a `verdict` field resting on a review
+request; each review request has at most one. This includes six builder
+self-review verdicts of "complete". Approved means at least one traced
+verdict is "approved". Landed and closed-by-report come from the fold.
+Stages are separate flags, not a sequence. Figure 1B restricts layers 1
+to 4 to work requests. Layer 5 covers all 198 landing receipts, using
+each receipt's recorded approval. Layer 6 covers every commitment that
+names a landing receipt.
+
+*Durations.* A duration is a difference of recorded event times, so it is
+derived. Quantiles use the nearest rank with no interpolation: the value
+at sorted position round(q × (n − 1)). The rows of Figure 5 are as
+follows:
+
+- Request to first promise: the earliest promise, for 620 work requests
+  with one.
+- Promise to first artifact: the earliest directly resting artifact, for
+  each of 315 promises with one.
+- Review request to verdict: the single verdict of each of 529 review
+  requests that have one.
+- Approval to landing receipt: 188 receipts that name an approval; 10
+  receipts that name none are excluded.
+- Request to landed: 202 landed work requests, ending at the receipt.
+- Age: all 248 unclosed commitments, measured to the last event at the
+  head.
+
+Figure 7 measures each stage from the request to that stage's first
+event, across landed work requests. Stages a request never reached are
+left out, so n is 196 to 202.
+
+*Observed and reconstructed.* Counts of statuses, the stale qualifier,
+verdicts, links, areas and events are observed at the head. The state
+series in Figure 4 is reconstructed every 3 hours from 1 October 00:00
+UTC. The last sample, at 16 October 00:00 UTC, falls before the head,
+so it shows 1,279 closed against 1,283. The rule is: closed if the close
+time has passed; otherwise promised if the promise time has passed;
+otherwise unclaimed. The fold reports staleness, performer and waiting
+party only at the head, so no figure shows them at past times. The
+attention table re-applies the status view's lane rules at the head. In
+those rules, cancelled rows are not terminal and so stay listed. Figure 8
+counts coordination events in US Eastern daylight time (UTC−4).
+
+*Code areas.* An area is the first two path segments under `packages/`,
+`apps/` or `plans/`, otherwise the first segment; single-segment paths
+are "root files". A review request counts once per area it cites. The
+cell for the smaller areas counts distinct review requests across those
+areas.
 
 ## 6. Consistency, simplicity, and accessibility are acceptance conditions
 
