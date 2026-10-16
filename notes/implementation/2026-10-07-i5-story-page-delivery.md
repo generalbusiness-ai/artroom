@@ -14,7 +14,7 @@ The brief held a second task, "a one-file change, proposed from the
 command line ...". That work (`artroom edit`, `propose-file`, the
 destination's publication of a one-file change on both hosts, its test
 `packages/lanes/test/edit.scope.test.ts`, and its note
-`notes/implementation/2026-10-07-i5-edit-page-delivery.md`) is already on the demo base
+`notes/2026-10-07-i5-edit-page-delivery.md`) is already on the demo base
 [code]. I did not build it again. This branch uses it: the page's story
 runs `artroom edit` and shows what it made.
 

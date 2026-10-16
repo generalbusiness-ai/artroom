@@ -343,7 +343,7 @@ declared definition. The client still derives no judgment.
 | `docs/testing.md` | The runner list, with the lane package's projects. |
 | `packages/lanes/README.md`, new; the guides of `contract`, `bytes`, `derive`, `scope`, `replay` and `client` | Each lists what its package gained. |
 | `spikes/parked/README.md` | Section 5. |
-| `notes/implementation/2026-10-05-i2-contract-deltas.md`, `notes/implementation/2026-10-05-i2-delivery.md`, new | The dated source choices, and the delivery note. |
+| `notes/2026-10-05-i2-contract-deltas.md`, `notes/2026-10-05-i2-delivery.md`, new | The dated source choices, and the delivery note. |
 
 `docs/protocol.md` and `docs/policy-pack.md` stay inactive and unedited.
 I6 owns them. The delivery note lists the sections that I2's forms
@@ -517,7 +517,7 @@ moves to section 7.3, and steps 1 to 10, 12 and 14 still stand.
 | 15 | The shared graph fixture, the scripted peers, and the test Worker that the lane package loads. The cost of the second project is measured once. | `packages/lanes/test/support/graph.ts`, `vitest.scope.config.ts`, `wrangler.test.jsonc`; `scope/src/testing.ts`, `scope/package.json` | T1 passes on the fixture. | After steps 11 and 13 |
 | 16 | The scenarios T1 to T9. Three workers: T1, T4 and T6 on one lane; T2, T5, T7 and T9 across scopes; T3 and T8 with the stand-ins. | `packages/lanes/test/*.scope.test.ts`, `capacity.test.ts` | The tests themselves. For each new guard of a scenario, one control with `scripts/control.mjs`. | Parallel group D. M3: the reachable rows run on real storage. |
 | 17 | Removal and guides. Two workers: the ledger and the parked files; the guides and the generated reference. | Sections 4.5 and 5 | The pin test covers the reference's stamp. The check of active files passes. | Parallel group C |
-| 18 | Measurement, the deltas note and the delivery note. The gate, once. Review of the complete source. | `notes/implementation/2026-10-05-i2-contract-deltas.md`, `notes/implementation/2026-10-05-i2-delivery.md` | `npm run gate`; `scripts/measure-tests.sh`. | M4: the reviewed base. |
+| 18 | Measurement, the deltas note and the delivery note. The gate, once. Review of the complete source. | `notes/2026-10-05-i2-contract-deltas.md`, `notes/2026-10-05-i2-delivery.md` | `npm run gate`; `scripts/measure-tests.sh`. | M4: the reviewed base. |
 
 Parallel groups, in short: A is steps 4 to 8. B is step 12, beside
 everything from step 2 on. C is steps 14 and 17. D is the three parts of

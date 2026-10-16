@@ -18,8 +18,8 @@ The same brief also named two other tasks: the issue commands with
 delivered at the base head: their commits are in its history
 (`1cc7a56`, `20a610e`, `f459e97`, `2440fe0` for the issues; `1eb9436`,
 `4015c34`, `fa4aa0f`, `7974d8f` for the edit) and their notes are
-`notes/implementation/2026-10-07-i5-issues-delivery.md` and
-`notes/implementation/2026-10-07-i5-edit-page-delivery.md` [code]. This branch does not
+`notes/2026-10-07-i5-issues-delivery.md` and
+`notes/2026-10-07-i5-edit-page-delivery.md` [code]. This branch does not
 build them again and changes nothing of the command line or the lanes.
 The known failure of `packages/cli/test/story.scope.test.ts` that the
 brief named was not touched; section 4 says that it passed in this

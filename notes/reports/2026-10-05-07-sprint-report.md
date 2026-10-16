@@ -229,7 +229,7 @@ Object storage, a fixed clock and fixed incarnations. Source: main at
 
 ```sh
 npm ci
-node notes/reports/2026-10-05-07-i1-story/run.mjs
+node notes/2026-10-05-07-i1-story/run.mjs
 ```
 
 A person founds a desk by a signed intent. The desk creates a ticket,

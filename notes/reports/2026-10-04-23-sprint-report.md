@@ -269,8 +269,8 @@ flowchart LR
 
 At hugh's request this evening, two Claude cloud sessions (claude-opus-5-5)
 each cloned main at `4a7a13a1` from GitHub and wrote a review, landed as
-`notes/reviews/2026-10-04-security-review.md` and
-`notes/reviews/2026-10-04-layering-review.md`. Neither changes
+`notes/cloud-reviews/2026-10-04-security-review.md` and
+`notes/cloud-reviews/2026-10-04-layering-review.md`. Neither changes
 source. The security review found no High finding: no signature forgery,
 no way to act as another actor or skip an admission step, no lane token
 that reaches `main` or the log. Its seven Medium findings are access that
@@ -287,7 +287,7 @@ real money; they are not repeated until hugh asks. Hugh's instruction at
 20:29: the findings are not urgent but are to be addressed next sprint;
 request `76e36a35` to builder asked for a disposition of every finding; builder
 delivered it the same evening and it is on main as
-`notes/reviews/2026-10-05-review-dispositions.md` (64 rows: 59 agree, 5 partly;
+`notes/2026-10-05-review-dispositions.md` (64 rows: 59 agree, 5 partly;
 43 answered by a named design section or by I1 source, 16 owed in design
 this sprint, 5 proposed fixes on the current product, 3 accepted). The five fixes were
 then built, reviewed by the checker (approval `796aa899`) and landed on
@@ -400,7 +400,7 @@ workroom under the cadence act `c514748f`.
   repository (P0-1), and reconciles the R0 ledger rows that the sprint 1
   landing made stale.
 - **07:00 report.** A person's story on the kept room (already landed as
-  `notes/reports/2026-10-05-07-person-journey.md`: two people, a review-gated
+  `notes/2026-10-05-07-person-journey.md`: two people, a review-gated
   landing, attention and explain, a declared act from a person's seat),
   plus whatever lands above. The report names the build each story runs on.
 - **Not this sprint.** No cloud review sessions (hugh: costly, only on

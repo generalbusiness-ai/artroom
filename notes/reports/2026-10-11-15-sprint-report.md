@@ -86,7 +86,7 @@ so capture is off the critical path.
 
 ## For Hugh
 
-1. The practice script lands tonight at `notes/reports/2026-10-11-practice-script.md`
+1. The practice script lands tonight at `notes/2026-10-11-practice-script.md`
    on main. Monday is the rehearsal day; Tuesday the recording.
 2. Confirm the lead phrase: "dap is a programmable, general-purpose
    coordination fabric", with plan 028's framework sentence as its

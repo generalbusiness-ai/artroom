@@ -2528,7 +2528,7 @@ The fork read token in `pinObjects` (request `02836f9a`). `MintLedger`'s behavio
 
 ## Live propose 503 after lanes B and C (request df6ff8d3)
 
-Status: DONE, pending checker exact-head review. Gitseq request `df6ff8d3` (planner to builder), branch `request/live503`, cut from main `d3f7d3a8`, whose source equals `965c911a`. The head for review is the commit that carries this section. Main `b44601dd` (row writes `58a2f0a0`, the declared-acts note) was merged in afterwards. Only `notes/implementation/2026-10-01-deploy-spike.md` conflicted, and both sides' sections are kept. The merge touches none of this fix's files. The spike still runs the build of `0753d7de`, which does not have the row-write changes.
+Status: DONE, pending checker exact-head review. Gitseq request `df6ff8d3` (planner to builder), branch `request/live503`, cut from main `d3f7d3a8`, whose source equals `965c911a`. The head for review is the commit that carries this section. Main `b44601dd` (row writes `58a2f0a0`, the declared-acts note) was merged in afterwards. Only `notes/2026-10-01-deploy-spike.md` conflicted, and both sides' sections are kept. The merge touches none of this fix's files. The spike still runs the build of `0753d7de`, which does not have the row-write changes.
 
 **The defect.** After the spike was redeployed from main `965c911a` (Room version `5ad0e3f2`), every `propose` failed in under a second with 503 `unavailable`, "The repository could not be read. Nothing was recorded; retry with the same idempotency key." The log was never published either. Reproduced at 03:03 UTC on `5ad0e3f2`: the full smoke failed 12 steps, the same 12 as the planner's run (all four proposes, the landings after them, and both log publications and verifications). Cleanup was `ok`.
 

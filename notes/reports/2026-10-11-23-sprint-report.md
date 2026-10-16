@@ -83,7 +83,7 @@ Eastern); the plans carry the corrected times.
 
 ## For Hugh
 
-1. Rehearse Monday from `notes/reports/2026-10-11-practice-script.md` on main.
+1. Rehearse Monday from `notes/2026-10-11-practice-script.md` on main.
    The branded room page, Counter and jam are deployed now. The Counter
    candidate with the new Join flow is due on the isolated host Monday
    afternoon; until then the deployed Counter has the current Connect

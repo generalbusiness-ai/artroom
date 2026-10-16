@@ -130,7 +130,7 @@ note after these edits (1,366 lines).
    Nothing open.
 9. **Stage 0 deployment evidence.** Answered by `fceb27d0`. Done: the
    note says a main source file alone proves no deployment, keeps
-   `notes/implementation/2026-10-02-mcp-stage0.md` as a separate dated report with its pins and
+   `notes/2026-10-02-mcp-stage0.md` as a separate dated report with its pins and
    limits, and says it neither approves the current candidate nor proves
    the broader cold-agent and runtime conditions (189-195; rows at 171
    and 1105). No rerun is commissioned. Still open: the original
@@ -229,7 +229,7 @@ grep -o '`[A-Za-z0-9_./-]*/[A-Za-z0-9_./*<>-]*`' notes/2026-10-01-mcp-plan.md | 
 
 Result of the path check. In the worktree: `docs/protocol.md`,
 `notes/2026-10-01-docs-plan.md`, `notes/2026-10-01-jam-room.md`,
-`notes/implementation/2026-10-02-mcp-stage0.md`, `packages/client/src/room.ts`,
+`notes/2026-10-02-mcp-stage0.md`, `packages/client/src/room.ts`,
 `packages/contract/src/transports.ts`, `packages/mcp` (and `README.md`,
 `src`, `src/run.ts`, `src/server.ts`, `src/worker.ts`, `test`),
 `packages/room/src/mcp.ts`, `plans/README.md`. Not files in the worktree,

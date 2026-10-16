@@ -380,7 +380,7 @@ meaning remain unchanged. Add focused controls only for actual changed
 boundaries, through the owners above. Do not run a field-by-field mutation
 sweep, fresh baseline, install or broad runtime gate for this dated note.
 
-Planner changes are confined to this file and `notes/plans/README.md`. Verify
+Planner changes are confined to this file and `plans/README.md`. Verify
 whitespace with `git diff --check`; freeze the full UTF-8 bytes under the
 own live promise; compare the attached bytes against this file; publish
 one evidence-only primary and a no-Git independent review request. If a

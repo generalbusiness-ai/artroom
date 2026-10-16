@@ -49,7 +49,7 @@ their own amounts without adding the holder's separately owned sends.
 
 The exact changed frontier is:
 
-- `notes/implementation/2026-10-06-capacity-s3-delivery.md` (primary delivery note)
+- `notes/2026-10-06-capacity-s3-delivery.md` (primary delivery note)
 - `packages/derive/src/validate/context.ts`
 - `packages/derive/src/validate/handlers.ts`
 - `packages/derive/src/validate/capacity.ts`

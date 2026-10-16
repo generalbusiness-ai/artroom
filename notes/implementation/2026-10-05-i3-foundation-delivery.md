@@ -457,7 +457,7 @@ elapsed and 18.3 s CPU. It printed 340 tests passed in vitest and 5 in Node's
 runner. One observed run, on a shared machine with other sessions active
 (load averages 4.72, 4.16 and 3.74 just before it), with a warm package
 cache. The three tests added are the 3 more than section 7 states. The pins
-test passed in that run, and `node notes/reports/2026-10-05-07-i1-story/run.mjs`
+test passed in that run, and `node notes/2026-10-05-07-i1-story/run.mjs`
 exits 0. The commit that adds this section changes notes only. The source and
 the tests are unchanged from the gated head: `packages` is the tree
 `8282a39a14dd4cb2d7baa51d314e5ea73f89c4fa` at both.
