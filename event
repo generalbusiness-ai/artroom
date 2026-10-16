@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at docs/write-an-application.md","body":{"commit":"693e8f679a2bbc98fa0b2e48657e99d6bc4156a3","path":"docs/write-an-application.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:07c39fb681240d81b32508420b0c2e8993f8e5ef","text":"Merge retired a covered predecessor; the successor is at docs/build-a-counter.md."}
