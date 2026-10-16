@@ -6,12 +6,12 @@ Branch `claude/issue-edit-page-commands-65qhn7` (the brief's
 working alone in a cloud container, with no workroom, no deployment
 credentials and no network beyond GitHub and the npm registry. Plan 019's
 GitHub-shaped story for the middle of the demo script
-(`notes/2026-10-07-demo-script-draft.md` on `origin/main`, shots 8 to 12).
+(`notes/reports/2026-10-07-demo-script-draft.md` on `origin/main`, shots 8 to 12).
 Nothing here is deployed. No gitseq request was filed: this container has
 no workroom.
 
 The brief also carried the task "edit a page". At `13ae305` that task is
-already delivered and merged (`notes/2026-10-07-i5-edit-page-delivery.md`),
+already delivered and merged (`notes/implementation/2026-10-07-i5-edit-page-delivery.md`),
 so this branch builds on it and does not redo it.
 
 Each claim is labelled: **[code]** read from code, **[run]** confirmed by a

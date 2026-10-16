@@ -279,7 +279,7 @@ count into invented token or push charges.
 
 | ID | Reproducible evidence and current interpretation | Result / owner |
 |---|---|---|
-| COST-01 | Historical `room/core.ts:1517-1524,1599,1713` and `notes/2026-10-01-deploy-spike.md:267` show checkpoint publication feedback; current `core.ts:1660-1704` ignores a checkpoint-only suffix | 3da landed; retain independent verification; teardown remains in `14edad4c` |
+| COST-01 | Historical `room/core.ts:1517-1524,1599,1713` and `notes/implementation/2026-10-01-deploy-spike.md:267` show checkpoint publication feedback; current `core.ts:1660-1704` ignores a checkpoint-only suffix | 3da landed; retain independent verification; teardown remains in `14edad4c` |
 | COST-02 | Current founding routes/name/registry paths in SEC-03/06; first commit is direct smart HTTP | Full D1-dependent gate in `214ddbfe`; quantify actual exposure |
 | COST-03 | Current `git/publisher/container.ts:147-153` starts without explicit runtime instance; checker `sandbox.ts:136` already chooses standard-1 | Explicit supported Publisher lite/timeout in `d687ef51` |
 | COST-04 | Current `room/jobs.ts:477-486` marks a returned refusal done, but thrown error catch re-owes at 30 s; `checker.ts:93-99,201-205` throws retryable=false for oversized output | Typed retry policy/cap/backoff/attention in `ea7716c0` |
@@ -359,7 +359,7 @@ a symbol/file is dead; no item is deleted merely because its old count grew.
 | CRUFT-08 | Historical package README total 4,372 lines, Room 1,719 with 23 delta sections;27 review-ID test files | Current-state references + changelogs, behavior test names retaining review IDs |
 | CRUFT-09 | Historical 68 tracked result files; two logbig fixtures consumed at `git/test/push-outcome.test.ts:41-42` | Move fixtures to their consumer; enumerate and reproducibly archive only unreferenced results, preserving audit/provider/history inputs |
 | CRUFT-10 | `spikes/room-core`, `spikes/sandbox-git`, `spikes/pi-durable` READMEs/locks/pins | Superseded status+archive tags, re-pin or explicitly freeze pi spike; production pi-durable remains separate full scope |
-| CRUFT-11 | Historical notes links in `notes/2026-10-02-mcp-stage0.md:3`, `2026-10-01-pi-durable.md:9`, plan runtime-profile reference, carry delivery notes | Status index/link check, current main destinations and preserved history |
+| CRUFT-11 | Historical notes links in `notes/implementation/2026-10-02-mcp-stage0.md:3`, `2026-10-01-pi-durable.md:9`, plan runtime-profile reference, carry delivery notes | Status index/link check, current main destinations and preserved history |
 | CRUFT-12 | Current `git/package.json:14-17`: test only node test/*.test.ts, workers/log suites separate | Root test gate actually runs git DO and pushlog suites |
 
 `166e80e3` keeps all six original hygiene groups, current protocol rules,

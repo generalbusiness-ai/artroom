@@ -1,14 +1,14 @@
 # I3: the review of the earlier checker service, runner and signer
 
 Written 2026-10-05, with step 25 of the I3 plan
-(`notes/2026-10-05-i3-implementation-plan.md`, sections 6.3 and 8.4). A
+(`notes/implementation/2026-10-05-i3-implementation-plan.md`, sections 6.3 and 8.4). A
 parked file moves only after a written review of it. This note is that
 review for the earlier checkers package, the earlier Room's jobs module and
 the earlier contract's checker types, in the pattern of
-`notes/2026-10-05-i3-git-review.md`.
+`notes/reviews/2026-10-05-i3-git-review.md`.
 
 "The authority note" is revision 24 at `d5616522b`, adopted. "The deltas" is
-`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
+`notes/implementation/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
 as they were at `e87645962`. Line numbers are each file's own.
 
 No file moved as it was. The successor is the package
@@ -28,7 +28,7 @@ gateway of `packages/git`. Section 7 says what is built and what is not.
 | `checkers/src/container.ts` | 61 | In full. Removed. |
 | `checkers/src/checkers.ts`, `index.ts` | 53, 21 | In full. Removed. |
 | `checkers/src/llm.ts` | 131 | In full. Removed. |
-| `checkers/src/snapshot-commit.ts` | 70 | Reviewed and removed at step 24 (`notes/2026-10-05-i3-snapshot-review.md`). |
+| `checkers/src/snapshot-commit.ts` | 70 | Reviewed and removed at step 24 (`notes/reviews/2026-10-05-i3-snapshot-review.md`). |
 | `room/src/jobs.ts` | 517 | In full, at the lines. Removed. |
 | `contract/src/checker.ts` | 128 | In full. Removed. |
 | `checkers/wrangler.jsonc`, `container/Dockerfile`, `container/image.sh`, `config/*.json`, `package.json` | 49, 4, 22, 16, 27 | In full. Removed. |

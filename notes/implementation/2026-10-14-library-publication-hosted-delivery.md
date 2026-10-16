@@ -231,7 +231,7 @@ and both browser Check recoveries remain preserved.
 
 Before final delivery, bind the remaining original provisioning, browser,
 publication, and public-history proofs, and record each of the six outputs separately.
-The [runbook](../examples/lending/runbook.md) gives the current procedure and
+The [runbook](../../examples/lending/runbook.md) gives the current procedure and
 preserves the earlier rehearsal facts with the planner's tense correction. No production code, test,
 build, gate, provider, or browser action was performed for this draft.
 

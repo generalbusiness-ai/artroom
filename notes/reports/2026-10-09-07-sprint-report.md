@@ -36,11 +36,11 @@ flowchart LR
   O --> S["Open the latest published page"]
 ```
 
-![Page v2 Issues view showing the recorded closed issue](2026-10-09-demo-captures/room.png)
+![Page v2 Issues view showing the recorded closed issue](../implementation/2026-10-09-demo-captures/room.png)
 
 *Retained Page v2 rehearsal view at source `efb5c56d`, using recorded
 answers. It shows the presentation, not a new hosted-provider run or the
-later source guards. [Capture details and six views](2026-10-09-demo-captures/README.md).*
+later source guards. [Capture details and six views](../implementation/2026-10-09-demo-captures/README.md).*
 
 The landed Page also fences an uncertain submission against another
 signature and keeps returned answers associated with their original
@@ -80,7 +80,7 @@ The planner has now resolved its three pending owner matters: authenticated
 snapshot reads must retain the ordinary history-floor protection; the
 narrow Page compatibility repair belongs in the manifest review; and the
 next final gate follows actual scoped corrections, with no competing gate
-or blind suite repetition. [Current delivery](2026-10-08-manifest-tree-delivery.md)
+or blind suite repetition. [Current delivery](../implementation/2026-10-08-manifest-tree-delivery.md)
 remains on its development branch until those requirements are met.
 
 Selected Site publication, Markdown completeness, paced recording and

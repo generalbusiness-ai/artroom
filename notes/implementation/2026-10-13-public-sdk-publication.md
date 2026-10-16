@@ -30,7 +30,7 @@ The ordered package set is:
 Derive includes `.`, `./rule`, and `./testing`. Bytes includes its opt-in,
 types-only `./web` declaration. Platform publishes its production root.
 Replay publishes its portable library, without a command-line executable.
-The [public SDK guide](../docs/public-sdk-release.md) describes these boundaries.
+The [public SDK guide](../../docs/public-sdk-release.md) describes these boundaries.
 
 ## Native capture and staged validation
 

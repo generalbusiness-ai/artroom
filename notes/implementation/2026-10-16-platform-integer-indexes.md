@@ -32,7 +32,7 @@ future platform cohort that uses it must have its own immutable supported
 name/version. This slice changes no existing platform data or pins and
 activates no new directory or partition. C1 standing reservations, A1
 dropped advisories and D1 destination key standing remain separate
-prerequisites of the [partition design](2026-10-15-directory-partitions.md#10-prerequisites-owed).
+prerequisites of the [partition design](../2026-10-15-directory-partitions.md#10-prerequisites-owed).
 
 ## Implementation and witnesses
 

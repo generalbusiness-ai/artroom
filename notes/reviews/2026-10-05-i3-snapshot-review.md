@@ -1,15 +1,15 @@
 # I3: the review of the earlier snapshot code
 
 Written 2026-10-05, with step 24 of the I3 plan
-(`notes/2026-10-05-i3-implementation-plan.md`, section 8.4). A parked file
+(`notes/implementation/2026-10-05-i3-implementation-plan.md`, section 8.4). A parked file
 moves only after a written review of it. This note is that review for the
 three earlier snapshot files, in the pattern of
-`notes/2026-10-05-i3-git-review.md`.
+`notes/reviews/2026-10-05-i3-git-review.md`.
 
 "The authority note" is revision 24 at `d5616522b`, adopted. "The deltas" is
-`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
+`notes/implementation/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
 as they were at `e87645962`. "The host review" is
-`notes/2026-10-05-i3-host-review.md`.
+`notes/reviews/2026-10-05-i3-host-review.md`.
 
 No file moved as it was. Three parked files are removed:
 `checkers/src/snapshot-commit.ts`, `room/src/snapshot.ts` and
@@ -26,7 +26,7 @@ built and what is not.
 | `room/src/snapshot.ts` | 57 | In full, at the lines. Removed. |
 | `git/src/snapshot/repos.ts` | 512 | In full, at the lines. Removed. |
 | The earlier snapshot commands `listTree` and `writeSnapshot` of the publisher's `gitops.ts`, which step 21 removed | 95 | In full, from Git history at `5e5583e74`, lines 446 to 507. The ledger of `spikes/parked/README.md` gave them to this step. |
-| `checkers/src/runner.ts`, lines 93 to 106: how a runner checked a snapshot that it had fetched | 14 | In full. The file is reviewed whole in `notes/2026-10-05-i3-checkers-review.md`. |
+| `checkers/src/runner.ts`, lines 93 to 106: how a runner checked a snapshot that it had fetched | 14 | In full. The file is reviewed whole in `notes/reviews/2026-10-05-i3-checkers-review.md`. |
 | `git/test/snapshots.test.ts` | 679 | The test names only. It tests `repos.ts` against a fake of the earlier host. It stays, unrun, as other parked tests of removed files do. |
 | The host review, fault A3 | | In full. It is the fault that this step must not carry. |
 

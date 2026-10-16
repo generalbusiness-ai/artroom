@@ -2,7 +2,7 @@
 
 Use this shot list for Monday 12 October's rehearsal and Tuesday 13
 October's recording. The freeze is Monday at 23:00 Eastern. The cut runs
-6:40, under seven minutes. This script follows [plan 030](../plans/030-2026-10-11-demo-plan-to-the-14th.md)
+6:40, under seven minutes. This script follows [plan 030](../../plans/030-2026-10-11-demo-plan-to-the-14th.md)
 and supersedes the recording order in the 7 October draft.
 
 Commands below use today's executable, `artroom`. The rename changes that
@@ -256,7 +256,7 @@ or human collaboration as events that happened in this procedural clip.
   on GitHub, with its initial commit and published changes.
 - **Do:** open the URL printed by this GitHub-backed take's clone.
 - **Appears:** **to be confirmed:** today's fresh rehearsal's repository
-  and commits. The [8 October GitHub transcript](2026-10-08-demo-github-transcript.md)
+  and commits. The [8 October GitHub transcript](../implementation/2026-10-08-demo-github-transcript.md)
   observed all 26 shots, but is evidence for that earlier room.
 - **Say:** “The same record can run with GitHub as its repository host.
   The room still applies the team's rules.”
@@ -399,7 +399,7 @@ That section is retained by reference without additions.
 ## Evidence used for this script
 
 The older exact command lines come from the corrected 7 October script
-and the 8 October GitHub transcript. The [9 October capture provenance](2026-10-09-demo-captures/README.md)
+and the 8 October GitHub transcript. The [9 October capture provenance](../implementation/2026-10-09-demo-captures/README.md)
 identifies recorded test answers and keeps them separate from hosted
 outcomes. Today's Core publication is retained in gitseq assertion
 `74f8ee25360d5ce3dfc5c246c04760d1d38c6e02`: the independent native read

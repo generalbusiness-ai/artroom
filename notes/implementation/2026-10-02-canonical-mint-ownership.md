@@ -1,7 +1,7 @@
 # Canonical token mints: who owns each token
 
 2026-10-02. Gitseq request `10fcfe4e` (builder), from checker audit handoff
-`9f2d8808` ([plans/README.md](../plans/README.md), "Canonical mint
+`9f2d8808` ([plans/README.md](../../plans/README.md), "Canonical mint
 ownership"). Branch `request/mint-ownership`, cut from main `3ac55e96`.
 Revision 2 answers checker report `9ff903ab`; revision 3 answers the
 checker's two follow-up points on it (landing token IDs, and check jobs'
@@ -16,7 +16,7 @@ numbers are as at this revision's head. Of the cited files, only
 This is a design for review. It changes no source code. Approving it
 authorizes no live operation and no implementation: lanes A, B and C below
 each get their own gitseq request after approval, with their own decision
-provenance. The normative text is [docs/protocol.md](../docs/protocol.md)
+provenance. The normative text is [docs/protocol.md](../../docs/protocol.md)
 section 32 (R-MINT-1 to R-MINT-7).
 
 ## Summary
@@ -80,7 +80,7 @@ of what the code reads, not a description of the provider.
 | Property | Binding page | REST page | This repository |
 |---|---|---|---|
 | Create takes | `createToken(scope?, ttl?)` | `repo`, `scope`, `ttl` (60 s to 1 year) | The same |
-| Create answers | `plaintext` and `expiresAt` are named; an ID is not | `id`, `plaintext`, `scope`, `expires_at` | The code reads `id` from the binding, and the live spike revoked a lane token by its recorded ID (`notes/2026-10-01-deploy-spike.md`, step 9) |
+| Create answers | `plaintext` and `expiresAt` are named; an ID is not | `id`, `plaintext`, `scope`, `expires_at` | The code reads `id` from the binding, and the live spike revoked a lane token by its recorded ID (`notes/implementation/2026-10-01-deploy-spike.md`, step 9) |
 | A listing gives | `total` and `tokens`; no record fields named, and no creation time | `id`, `scope`, `state`, `created_at`, `expires_at`; filter by `state`; paged, 100 at most | `completeInventory` (plan 001) checks `id`, `scope`, `state`, `expiresAt` and `total` |
 | Revoke | `revokeToken(tokenOrId)`, a boolean | by ID | By ID; by text in `snapshot/repos.ts:341–344` |
 | Errors that mean nothing changed | Not documented | Not documented | `REFUSED_UNCHANGED` (`artifacts.ts:95`), from lane B's review |

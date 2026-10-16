@@ -167,5 +167,5 @@ snapshots. The CLI command line does not expose issuance; the page does.
 - The directory pairs are a table in the CLI; a new cohort needs a row.
 - Not shown: enrolment through MCP's `join` tool, which calls the same
   function; and an agent's act on the commitments Counter after
-  enrolment, which `notes/2026-10-13-counter-target100-cli-identities.md`
+  enrolment, which `notes/implementation/2026-10-13-counter-target100-cli-identities.md`
   records from the Counter session's route.

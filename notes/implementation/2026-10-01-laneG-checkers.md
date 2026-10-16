@@ -11,7 +11,7 @@ and its deployment deleted. The stand-in ledger moved from `src/ledger.ts` to
 `test/ledger.ts`. `test/harness-alarm.test.ts`, which tested only the
 harness's Durable Object, was deleted. The revision-3 snapshot ledger upgrade
 (review 13b98054 below) and its tests were removed with the spike's state.
-See [notes/2026-10-01-deploy-spike.md](2026-10-01-deploy-spike.md).
+See [notes/implementation/2026-10-01-deploy-spike.md](2026-10-01-deploy-spike.md).
 
 ## What was built
 

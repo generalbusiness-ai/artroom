@@ -12,7 +12,7 @@ the run's own and differ on every run.
 Shot 13 was separately corrected from the live GitHub run on 2026-10-08,
 started at 23:45:20.994Z with runner source `705cb8d7`. All 26 runner
 shots matched. Its complete observed lines are retained in
-[the GitHub transcript](2026-10-08-demo-github-transcript.md). The earlier
+[the GitHub transcript](../implementation/2026-10-08-demo-github-transcript.md). The earlier
 own-host observations in shots 3 to 12 keep their original subject.
 
 2026-10-07. A shot list for the recording of plan 024 (gate of Monday
@@ -27,7 +27,7 @@ sprint reports of 2026-10-06 23:00, 2026-10-07 07:00 and 2026-10-07
 `docs/hosts.md`, `docs/pages.md`, `docs/deploy.md`, the lane wiring
 delivery note and the lane scenario tests
 (`packages/lanes/test/wiring.scope.test.ts`, `story.scope.test.ts`); at
-`b6a9c0b6`, `notes/2026-10-01-deploy-spike.md`. I could not find a document on any
+`b6a9c0b6`, `notes/implementation/2026-10-01-deploy-spike.md`. I could not find a document on any
 branch named for the developer onboarding positioning; the opening below
 uses plan 019, the nouns, verbs and invariants of plan 025, and the phrase
 "you write the record, the room runs it" as given in the brief.
@@ -273,12 +273,12 @@ eight letters in the captions, as the command line prints them in full.
   1 issues, 0 open.
   ```
 
-- **Picture**: [issue.png](2026-10-09-demo-captures/issue.png) shows the
-  closed issue; [change-published.png](2026-10-09-demo-captures/change-published.png)
+- **Picture**: [issue.png](../implementation/2026-10-09-demo-captures/issue.png) shows the
+  closed issue; [change-published.png](../implementation/2026-10-09-demo-captures/change-published.png)
   shows the merged `guide/start.md` change, its exact source preview and
-  explicitly latest page link. [room.png](2026-10-09-demo-captures/room.png)
+  explicitly latest page link. [room.png](../implementation/2026-10-09-demo-captures/room.png)
   uses the All filter to show the recorded closed issue. These v2 captures
-  use the test Worker's recorded rehearsal answers; [their provenance](2026-10-09-demo-captures/README.md)
+  use the test Worker's recorded rehearsal answers; [their provenance](../implementation/2026-10-09-demo-captures/README.md)
   is separate from the earlier hosted command observations.
 - **Said**: "Una opens an issue. Paul takes it and edits a page in an
   open folder. The room publishes the page and closes the issue."
@@ -298,7 +298,7 @@ eight letters in the captions, as the command line prints them in full.
   A new ETag whose first part is the new commit (`docs/pages.md`,
   "Caching"), and the front page listing `guide/`, are not read by the
   runner; confirm in the browser.
-- **Picture**: [site-page.png](2026-10-09-demo-captures/site-page.png),
+- **Picture**: [site-page.png](../implementation/2026-10-09-demo-captures/site-page.png),
   the latest page as the Site route renders it.
 - **Said**: "The page is live, from the commit the room just published."
 
@@ -330,7 +330,7 @@ eight letters in the captions, as the command line prints them in full.
   ../outside.md --file start.md`, which exits 1 and prints
   `Not published: the merge sc_<refused>:6 is refused, path-invalid. ...`
   after its `Proposed` line.
-- **Picture**: [change-refused.png](2026-10-09-demo-captures/change-refused.png),
+- **Picture**: [change-refused.png](../implementation/2026-10-09-demo-captures/change-refused.png),
   the `../outside.md` change's Invalid path screen, with no ordinary merge
   control. There is no capture of the `AGENTS.md` change while refused.
 - **Said**: "Now Paul touches the instructions the agents follow. A
@@ -370,7 +370,7 @@ eight letters in the captions, as the command line prints them in full.
   Shows: "Ask before you push."
   ```
 
-- **Picture**: [rules.png](2026-10-09-demo-captures/rules.png), the
+- **Picture**: [rules.png](../implementation/2026-10-09-demo-captures/rules.png), the
   controller's editable review requirements. The capture checks a change
   confirmation and cancellation without submitting another publication.
 - **Said**: "The rules scope's controller approves, and the same change
@@ -497,7 +497,7 @@ down a level.
 | The new model on the deployment at all | The whole middle from the old spike, below; the opening and close as written, minus shot 13. |
 | The jam clip | Cut shot 14. |
 
-The old spike at `b6a9c0b6` (`notes/2026-10-01-deploy-spike.md` there) runs at its
+The old spike at `b6a9c0b6` (`notes/implementation/2026-10-01-deploy-spike.md` there) runs at its
 own address on the hosting's own Git service. Its smoke run,
 `node packages/room/measure/spike-smoke.mjs`, recorded on 2026-10-02:
 founding a room (200, 2.3 s); a lane that claims `docs/**` and

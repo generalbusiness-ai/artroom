@@ -3,7 +3,7 @@
 This amendment continues request `934bb6c95f5d0863ce147c165686d29a864bbeda`
 and promise `6ed433cb4c0b43acd3a55bc62e2e40df2e944498`. It preserves the
 full Counter demo scope and the historical failures in
-`notes/2026-10-12-counter-demo-delivery.md`.
+`notes/implementation/2026-10-12-counter-demo-delivery.md`.
 The checked repair subject is `37e0a50628ff412344c94d5a20408f49e6877f1a`,
 tree `0ec2eb6ec7e3f26f2660c98a06c13f11fcff3403`.
 

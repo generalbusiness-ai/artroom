@@ -437,7 +437,7 @@ cleanup duties that respect those guards.
 [Plan 029](../plans/029-2026-10-11-artifacts-forks.md) is the starting point,
 but requires revision before implementation. Its immediate-deletion wording
 and readiness probe do not match this lifecycle or the observed API. The
-[fork measurement](2026-10-13-fork-cost-measurement.md) observed readiness
+[fork measurement](implementation/2026-10-13-fork-cost-measurement.md) observed readiness
 through successful access and found no status in `info`. Its small run is
 neither a provisioning SLA nor a measurement of large-fork storage cost.
 

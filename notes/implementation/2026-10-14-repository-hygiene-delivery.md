@@ -5,7 +5,7 @@ Builder promise: `f4a5cfd065cf9b78b0fc3d44beb26d8a1afe5a2c`.
 Both use the workroom prefix
 `git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:`.
 
-This candidate adds runtime dependency attributions to [NOTICE](../NOTICE),
+This candidate adds runtime dependency attributions to [NOTICE](../../NOTICE),
 moves the inactive archive to [spikes/parked](../spikes/parked/README.md),
 and dates six early notes by their first addition to Git. It removes the
 twelve `.keep-i5-*` placeholders and `notes/.gitkeep`. Active references and
@@ -81,7 +81,7 @@ donor's bytes, modes, ownership and inode identities. No package was installed,
 and no application module was imported during preparation.
 
 Root ran the single ordinary `npm run gate` required by
-[docs/testing.md](../docs/testing.md) at commit
+[docs/testing.md](../../docs/testing.md) at commit
 `09ed389510971df71adc50f62ecc35a9fd2f978c`, tree
 `febf9114cc6d8fb78365b46b5be2e68a4c5c4500`. The public result records exit 0
 and 206.007 seconds elapsed. Whitespace, typecheck and test each exited 0;

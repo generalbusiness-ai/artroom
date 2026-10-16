@@ -3,7 +3,7 @@
 Written 2026-10-05, with the steps of I2 (request `efb4e323`), for
 independent design review. The scope and replay contract, revision 11, at
 `996c3e58`, is "the contract". Section numbers are its own. "The plan" is
-`notes/2026-10-05-i2-implementation-plan.md`, and a row number is a row of
+`notes/implementation/2026-10-05-i2-implementation-plan.md`, and a row number is a row of
 its section 2.
 
 Each entry is a place where the contract is silent or needs a concrete
@@ -12,7 +12,7 @@ implemented. An entry stays open until the contract's owner accepts it,
 changes it or removes it. Where a row needed a decision that the contract
 does not make, the source fails closed, and the entry says so.
 
-The form follows `notes/2026-10-04-i1-contract-deltas.md`. Entries are
+The form follows `notes/implementation/2026-10-04-i1-contract-deltas.md`. Entries are
 numbered D1, D2 and so on. The plan named D1 to D6 before any source
 changed. Each entry has the date it was written.
 

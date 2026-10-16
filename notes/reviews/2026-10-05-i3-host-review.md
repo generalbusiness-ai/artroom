@@ -1,14 +1,14 @@
 # I3: the review of the earlier mint ledger, host adapter and diagnoses
 
 Written 2026-10-05, with steps 19 and 20 of the I3 plan
-(`notes/2026-10-05-i3-implementation-plan.md`, section 8.3). A parked file
+(`notes/implementation/2026-10-05-i3-implementation-plan.md`, section 8.3). A parked file
 moves only after a written review of it. This note is that review for the
 earlier mint ledger, the earlier host adapter and the earlier diagnoses,
-in the pattern of `notes/2026-10-05-i3-git-review.md`.
+in the pattern of `notes/reviews/2026-10-05-i3-git-review.md`.
 
 "The authority note" is revision 21 at `f9ec25e4`, adopted. "The proof
 plan" is revision 9 at `85be9f0b`, adopted. "The deltas" is
-`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
+`notes/implementation/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
 as they were at `4f771d901`. "Rule n" is a ledger rule of the authority
 note's section 5.4.
 

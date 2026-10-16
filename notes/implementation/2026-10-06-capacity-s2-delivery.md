@@ -36,7 +36,7 @@ of canonical retained sizes, deployment budgets or adopted new numbers.
 
 The exact changed frontier is:
 
-- `notes/2026-10-06-capacity-s2-delivery.md` (primary delivery note)
+- `notes/implementation/2026-10-06-capacity-s2-delivery.md` (primary delivery note)
 - `packages/derive/src/held.ts`
 - `packages/derive/src/markers.ts`
 - `packages/derive/src/validate/capacity.ts`

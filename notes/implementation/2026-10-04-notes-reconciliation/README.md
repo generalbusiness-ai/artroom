@@ -10,10 +10,10 @@ decision.
 
 | Note | Brought from | Clarification (planner's file, with its recorded SHA-256) | Checklist |
 |---|---|---|---|
-| [2026-10-01-wake-and-schedule.md](../2026-10-01-wake-and-schedule.md) | `request/wake-and-schedule` at `337a449d` | `plans/008-2026-10-03-wake-and-schedule-clarification.md`, 26,682 bytes, `bb4eedbd29bae8834a903471c144dded1a32f8dc7e440edda32382ecd073facc` | [wake.md](wake.md) |
-| [2026-10-01-mcp-plan.md](../2026-10-01-mcp-plan.md) | `request/mcp-plan` at `b5add513` | `plans/009-2026-10-03-mcp-clarification.md`, 35,977 bytes, `c5bd4fbe66c424e12db24a34baeaa4bad15495adf423412ce1ba8108fc0e7343` | [mcp.md](mcp.md) |
-| [2026-10-01-research-jj.md](../2026-10-01-research-jj.md) | `request/research-jj` at `b3050dc6` | `plans/011-2026-10-04-jj-clarification.md`, 25,637 bytes, `cd74665c0e516d30edfdc078d18f2410574d8ec2f6a221d383c62ab175e3139b` | [jj.md](jj.md) |
-| [2026-10-02-collections-of-rooms.md](../2026-10-02-collections-of-rooms.md) | `request/collections-note` at `5b579511` | `plans/012-2026-10-04-collections-clarification.md`, 89,844 bytes, `7d621bc99d44d8c0b12aa540dc259a814926f0a31f8f1fd816222c3062883cbd` | [collections.md](collections.md) |
+| [2026-10-01-wake-and-schedule.md](../../2026-10-01-wake-and-schedule.md) | `request/wake-and-schedule` at `337a449d` | `plans/008-2026-10-03-wake-and-schedule-clarification.md`, 26,682 bytes, `bb4eedbd29bae8834a903471c144dded1a32f8dc7e440edda32382ecd073facc` | [wake.md](wake.md) |
+| [2026-10-01-mcp-plan.md](../../2026-10-01-mcp-plan.md) | `request/mcp-plan` at `b5add513` | `plans/009-2026-10-03-mcp-clarification.md`, 35,977 bytes, `c5bd4fbe66c424e12db24a34baeaa4bad15495adf423412ce1ba8108fc0e7343` | [mcp.md](mcp.md) |
+| [2026-10-01-research-jj.md](../../2026-10-01-research-jj.md) | `request/research-jj` at `b3050dc6` | `plans/011-2026-10-04-jj-clarification.md`, 25,637 bytes, `cd74665c0e516d30edfdc078d18f2410574d8ec2f6a221d383c62ab175e3139b` | [jj.md](jj.md) |
+| [2026-10-02-collections-of-rooms.md](../../2026-10-02-collections-of-rooms.md) | `request/collections-note` at `5b579511` | `plans/012-2026-10-04-collections-clarification.md`, 89,844 bytes, `7d621bc99d44d8c0b12aa540dc259a814926f0a31f8f1fd816222c3062883cbd` | [collections.md](collections.md) |
 
 The clarification files are the planner's. They are in the planner's
 checkout and in the workroom's artifacts, not on this branch. Each note

@@ -1,6 +1,6 @@
 # Fork cost measurement, 13 October 2026
 
-Request `d055b98f`, promise `063fb9f5`, [plan 029, item 0](../plans/029-2026-10-11-artifacts-forks.md#0-the-cost-measurement-first).
+Request `d055b98f`, promise `063fb9f5`, [plan 029, item 0](../../plans/029-2026-10-11-artifacts-forks.md#0-the-cost-measurement-first).
 
 Cloudflare Artifacts created one scratch repository and one fork in
 `artroom-demo`. The fork accepted one further commit. All three write

@@ -2,7 +2,7 @@
 
 - Branch: `review/cloud-2026-10-04-security`
 - Reviewed head: `4a7a13a11313e7c26a21e5735d3d1c0df269b291` (`origin/main` at the start of the review)
-- Connectivity check: an empty `notes/cloud-reviews/.keep` was committed and pushed with
+- Connectivity check: an empty `notes/reviews/.keep` was committed and pushed with
   `git push -u origin review/cloud-2026-10-04-security`. The push succeeded with no error.
 
 ## How to read the labels

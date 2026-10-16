@@ -180,7 +180,7 @@ What to look for:
   contract's time text (`2026-10-07T13:15:00.000Z` becomes
   `2026-10-07T13:15:00Z`). [code]
 - The remote URL form `https://<host>/git/<namespace>/<name>.git` is from
-  earlier live output recorded in `notes/2026-10-04-23-spike-journey.md`
+  earlier live output recorded in `notes/reports/2026-10-04-23-spike-journey.md`
   [code]. The `Bearer` header is from `spikes/parked/git/src/first-commit.ts`
   [code]; whether the service accepts it today is [inferred].
 - The repository's ID is its name: the binding's create answer gives

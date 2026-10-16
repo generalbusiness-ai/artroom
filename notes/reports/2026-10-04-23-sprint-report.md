@@ -4,11 +4,11 @@ Sprints are eight hours long and end at 07:00, 15:00 and 23:00 Eastern.
 Each one ends with a report on main that tells a user's story about
 capability that is on main and works, and says what did not land. This
 report covers 15:00 to 23:00 Eastern today. The baseline is
-`notes/2026-10-04-15-sprint-report.md` at main `e6e67828`. Main at the
+`notes/reports/2026-10-04-15-sprint-report.md` at main `e6e67828`. Main at the
 boundary is `b2a0bb12`.
 
 Everything marked "observed run" is quoted from
-`notes/2026-10-04-23-spike-journey.md`, builder's record of a run made
+`notes/reports/2026-10-04-23-spike-journey.md`, builder's record of a run made
 between 16:17 and 16:23 Eastern against the deployed spike. Commit sizes and
 times are read from the git history with `git log` and `git diff --stat`.
 The gate result and the workroom events are builder's and the planner's
@@ -37,7 +37,7 @@ tool-recorded merge commits `08c6a0fa` to `b6a9c0b6` under route act
 landed head passed with 2,055 tests (builder's run, as reported). The spike
 was redeployed from `b6a9c0b6`, the release packed as `0.1.0-dev.1` (six
 tarballs; 55 release checks passed; nothing published), and builder's
-journey landed as `notes/2026-10-04-23-spike-journey.md` at `9d8e61e9`.
+journey landed as `notes/reports/2026-10-04-23-spike-journey.md` at `9d8e61e9`.
 
 ## An agent's story
 
@@ -269,8 +269,8 @@ flowchart LR
 
 At hugh's request this evening, two Claude cloud sessions (claude-opus-5-5)
 each cloned main at `4a7a13a1` from GitHub and wrote a review, landed as
-`notes/cloud-reviews/2026-10-04-security-review.md` and
-`notes/cloud-reviews/2026-10-04-layering-review.md`. Neither changes
+`notes/reviews/2026-10-04-security-review.md` and
+`notes/reviews/2026-10-04-layering-review.md`. Neither changes
 source. The security review found no High finding: no signature forgery,
 no way to act as another actor or skip an admission step, no lane token
 that reaches `main` or the log. Its seven Medium findings are access that
@@ -287,7 +287,7 @@ real money; they are not repeated until hugh asks. Hugh's instruction at
 20:29: the findings are not urgent but are to be addressed next sprint;
 request `76e36a35` to builder asked for a disposition of every finding; builder
 delivered it the same evening and it is on main as
-`notes/2026-10-05-review-dispositions.md` (64 rows: 59 agree, 5 partly;
+`notes/reviews/2026-10-05-review-dispositions.md` (64 rows: 59 agree, 5 partly;
 43 answered by a named design section or by I1 source, 16 owed in design
 this sprint, 5 proposed fixes on the current product, 3 accepted). The five fixes were
 then built, reviewed by the checker (approval `796aa899`) and landed on
@@ -392,7 +392,7 @@ workroom under the cadence act `c514748f`.
   I1 lands, the earlier-model packages are parked with a ledger (planner
   decision `bf0e8954`); main then builds the new packages only, and the
   spike keeps the `b6a9c0b6` build.
-- **The 16 owed review rows** of `notes/2026-10-05-review-dispositions.md`
+- **The 16 owed review rows** of `notes/reviews/2026-10-05-review-dispositions.md`
   land in the authority note, the proof plan and I1 this sprint, each
   revision named to the planner. The five-fix batch is already on main.
 - **E1 duties.** The inventory is ratified and clarified for the checker;
@@ -400,7 +400,7 @@ workroom under the cadence act `c514748f`.
   repository (P0-1), and reconciles the R0 ledger rows that the sprint 1
   landing made stale.
 - **07:00 report.** A person's story on the kept room (already landed as
-  `notes/2026-10-05-07-person-journey.md`: two people, a review-gated
+  `notes/reports/2026-10-05-07-person-journey.md`: two people, a review-gated
   landing, attention and explain, a declared act from a person's seat),
   plus whatever lands above. The report names the build each story runs on.
 - **Not this sprint.** No cloud review sessions (hugh: costly, only on

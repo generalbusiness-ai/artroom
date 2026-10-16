@@ -2,7 +2,7 @@
 
 This is A1b, child `16f047f3`, promise `79ea38d4`, under Priority 1
 request `e871ba09`. It implements two internal layout helpers from the
-[durability design](2026-10-09-shared-language-volatile-acts.md#154-layout).
+[durability design](../2026-10-09-shared-language-volatile-acts.md#154-layout).
 It follows the landed [path grammar](2026-10-15-archive-path-grammar.md).
 
 `archiveSegments` takes an already selected contiguous cohort, beginning
@@ -19,7 +19,7 @@ Grouping does not prove that a canonical object is an entry.
 Up to 4,096 names stay directly in that directory. Larger sets split by
 successive groups of three decimal digits for segment names, or two hex
 digits for retained digests, following
-[R-LOG-19](../docs/protocol.md#304-the-object-bound-and-directory-fan-out-r-log-19).
+[R-LOG-19](../../docs/protocol.md#304-the-object-bound-and-directory-fan-out-r-log-19).
 The original name stays at the leaf. Input order does not affect output.
 Duplicate, alternate or path-shaped names refuse. Each retained kind and
 value domain needs its own call; domain encoding remains A1a's job.

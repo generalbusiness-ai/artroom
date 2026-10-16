@@ -4,10 +4,10 @@ Written 2026-10-05 on branch `request/review-dispositions`, cut from main
 `22b593c7`. This note changes no source. It disposes of every finding of two
 independent reviews of main at `4a7a13a1`:
 
-- `notes/cloud-reviews/2026-10-04-security-review.md`: M1 to M7, L1 to L14
+- `notes/reviews/2026-10-04-security-review.md`: M1 to M7, L1 to L14
   and ten Info items. This note calls the Info items Info 1 to Info 10,
   because I1, I2 and I3 are also the names of deliveries.
-- `notes/cloud-reviews/2026-10-04-layering-review.md`: sections 2, 3 and 6.
+- `notes/reviews/2026-10-04-layering-review.md`: sections 2, 3 and 6.
 
 ## What was read
 
@@ -24,7 +24,7 @@ independent reviews of main at `4a7a13a1`:
 | Authority note | `notes/2026-10-04-authority-effects-and-publication.md`, adopted revision 9 | `8b8f946d` |
 | Proof plan | `notes/2026-10-04-proof-and-test-economy.md`, adopted revision 8 | `c3e699a6` |
 | Lane forms | `notes/2026-10-04-lane-forms-and-browser-flow.md`, adopted revision 12 | `03cb4ee5` |
-| I1 plan | `notes/2026-10-04-i1-implementation-plan.md`, with the I1 source and `spikes/parked/README.md` | `3ed99af5` |
+| I1 plan | `notes/implementation/2026-10-04-i1-implementation-plan.md`, with the I1 source and `spikes/parked/README.md` | `3ed99af5` |
 
 Revision 9 of the scope contract was being written and was not read.
 For the corrections of section 7, the proof plan's main note and its

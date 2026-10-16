@@ -1,7 +1,7 @@
 # I3: the review of the retained Git code
 
 Written 2026-10-05, with steps 17 and 21 of the I3 plan
-(`notes/2026-10-05-i3-implementation-plan.md`, section 8.3). The I3
+(`notes/implementation/2026-10-05-i3-implementation-plan.md`, section 8.3). The I3
 commission says: "Retained runner/Git readers require review including
 checked parent/object types and safe object-ID arguments." This note is
 that review for the Git reader, the Git commands, the push outcome and the

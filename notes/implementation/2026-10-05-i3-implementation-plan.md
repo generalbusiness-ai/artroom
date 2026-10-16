@@ -161,7 +161,7 @@ neither.
 | The marks: rows I3-1 to I3-11 of the contract's section 11.13 | How a platform rule joins its row. The types of platform data, with a mark at seven places. The validator reads the marks. A rule has the kind of its mark's place and is given six things. The judges run a rule at the check of its mark's place. A rule at `grant` that passes records an empty authority. A scope whose every rule is supplied runs every row, and one that lacks a rule runs nothing. The verifier runs the same rules. A grant's `within` is `{ membership }`. The fold holds the highest head for each subject. The inbox's rule `notice-source` (P22) is written, and its data writes no effect on `source`. This is the step that "no step owns", below. It was written before the two revisions were adopted. | `f4ec55017` to `57d79f478`; the deltas EJ1 to EJ15 |
 | The repairs of the checker's five component findings (reports `92fa170a` and `f55ad7d0`) | The driver walks every parked attempt after a restart. A late answer is kept until the scope has judged it. Every outcome's evidence has a basis and a body. A gateway grant has one lifecycle across calls that overlap. The ancestry check is shown by its read's own answer. Three wording points. | `8aaa17973`, `481f440f9`, `293ea8e7d`, `bbff23788`, `c798917aa`, `3d06620be`; the deltas EK1 to EK5 |
 
-Finding E10, recorded in `notes/2026-10-05-i3-contract-deltas.md`: the
+Finding E10, recorded in `notes/implementation/2026-10-05-i3-contract-deltas.md`: the
 inbox needs one platform rule, P22, for a notice's `source`. The note
 gives that field as a record of four values, and the commit would refuse
 the fact reference that the row writes. The plan's earlier statement that
@@ -268,7 +268,7 @@ changed. Its row for step 16, "Waiting", was true then and is no longer:
 the first row below replaces it. Milestone F is the head `783be9a07` of
 `request/i3-authority-effects`. Each step below was built on a branch of
 its own and merged into `request/i3-m2`. The delivery note of this second
-milestone, `notes/2026-10-05-i3-second-milestone-delivery.md`, has the
+milestone, `notes/implementation/2026-10-05-i3-second-milestone-delivery.md`, has the
 witnesses, the limits and the one table of the adopted designs. The deltas
 note, sections 14 to 25, has every question.
 
@@ -307,7 +307,7 @@ rows below replace them. The second milestone is the head that landed on
 `origin/main` as `48a2b2851`. Each part below was built on a branch of
 its own, or on `request/i3-m3` itself, and is merged there. The delivery
 note of this third milestone,
-`notes/2026-10-06-i3-third-milestone-delivery.md`, has the witnesses,
+`notes/implementation/2026-10-06-i3-third-milestone-delivery.md`, has the witnesses,
 the limits and the one table of the adopted designs. The deltas note,
 sections 26 and 28 to 31, has every question. Its section 27 is the
 second milestone's repairs, which are landed.

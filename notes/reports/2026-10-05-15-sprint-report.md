@@ -41,7 +41,7 @@ runs: 282 vitest and 3 node tests at `b57e8774` (7.7 s), 285 and 3 at
 
 ## A developer's story of the two lane definitions
 
-Source: `docs/lanes.md`, `notes/2026-10-05-i2-delivery.md` and
+Source: `docs/lanes.md`, `notes/implementation/2026-10-05-i2-delivery.md` and
 `packages/lanes`, at `c373f078`.
 
 **What the two definitions declare.** A lane is a scope of the kind
@@ -163,7 +163,7 @@ Both digests and byte counts equal the delivery note's. `git status
 | I2 base milestone: the lane forms as data | `b57e8774`, 10:34 (merge of `77555943`) | `packages/lanes` with `issue` and `change` pinned by digest; 38 contract forms across the six packages; `declaredHandle`; ten scenarios; the genesis records its act kind; `docs/lanes.md`, `docs/lanes-reference.md`, the delivery note and the 185-entry deltas note |
 | I2 review repairs DR1 to DR15 | `3199a6e7` to `77555943`, 08:04 to 09:35, inside `b57e8774` | A `__proto__` item type reserves nothing; a fact inside a record travels whole; a repeat is answered before any fetch; replay settles every owed text with its depth counted from the target; a reply deeper than 64 levels is no answer; a foreign entry's field is read as its bytes hold it |
 | Test economy (request `520ebceb`, approval `d195bf21`) | `06381163`, 10:57 | No test of `client`, `replay` or `scope` waits on the wall clock; the reply table runs once; the scope gate is two promises. Tests and test support only |
-| Scope test cost (request `e064933f`, approval `87121e83`) | `d6faca83`, 11:24 | Replay, founding, texts and lane test T9 read histories through the route function in the test's isolate; `notes/2026-10-05-scope-test-cost.md` holds the measurements |
+| Scope test cost (request `e064933f`, approval `87121e83`) | `d6faca83`, 11:24 | Replay, founding, texts and lane test T9 read histories through the route function in the test's isolate; `notes/implementation/2026-10-05-scope-test-cost.md` holds the measurements |
 | Test run shape (approval `a1d8e770`) | `c373f078`, 13:00 | The Node projects of the root vitest run go at the same time; `scope` keeps its own turn. One file, no test changed |
 | Plan 016, repository extents acceptance story | `872d2537` (13:39 Eastern, after this report's story was drafted) | The demo's acceptance target for three named extents, a mixed change needing both reviewers, a rules change only the rules scope's controller lands, and an infrastructure landing as an effect with recovery |
 
@@ -236,7 +236,7 @@ flowchart LR
   request (external identity binding, login entry, SCIM later) went to
   the second planner.
 - **Builder's test-cost finding, stated plainly**
-  (`notes/2026-10-05-scope-test-cost.md`, builder's observations): the `scope` project is about three quarters of test
+  (`notes/implementation/2026-10-05-scope-test-cost.md`, builder's observations): the `scope` project is about three quarters of test
   time; the product's cost per act is flat in history length; a call
   through the Worker's entrypoint in the test pool slows as a run makes
   more of them, which is the DK11 slowdown, not the product. In-isolate

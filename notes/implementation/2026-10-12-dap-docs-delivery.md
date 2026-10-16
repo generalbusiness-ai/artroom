@@ -304,7 +304,7 @@ gate was not run again.
    `dap-contract`, and that replay also depends on the stored entries and
    retained inputs it reads.
 5. **Two repairs.** `docs/deploy.md` now links
-   [The page](../apps/room/docs/page.md) where it named `docs/page.md`.
+   [The page](../../apps/room/docs/page.md) where it named `docs/page.md`.
    `docs/cli.md` spells the merge command `dap merge`, as the rest of the
    page does, and the page links the transition section.
 

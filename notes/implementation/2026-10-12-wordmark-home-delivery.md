@@ -152,6 +152,6 @@ and readbacks, remain owed there. This clarification changes only this note
 after `88499305489ccf8041f93c68335f24a8adcf7406`.
 
 The external Jam commit's four changed paths are `README.md`,
-`notes/2026-10-12-wordmark-home-delivery.md`, `page/index.html` and
+`notes/implementation/2026-10-12-wordmark-home-delivery.md`, `page/index.html` and
 `test/original-demo.test.ts`. These correct the last two path labels in the
 earlier Core reporting annotation; the Jam head and tree are unchanged.

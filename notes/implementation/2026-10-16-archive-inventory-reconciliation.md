@@ -7,7 +7,7 @@ implementation boundary before the manifest and layout are built. It
 enables no archive and certifies no definition for export.
 
 The adopted contract is
-[section 15.3](2026-10-09-shared-language-volatile-acts.md#153-what-is-archived).
+[section 15.3](../2026-10-09-shared-language-volatile-acts.md#153-what-is-archived).
 An archive selects a fixed entry cutoff and the immutable inputs those
 entries name. It never enumerates the retained store as it stands later.
 The existing path and segment helpers do not perform that selection.

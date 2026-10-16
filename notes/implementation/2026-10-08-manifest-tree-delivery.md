@@ -39,7 +39,7 @@ gate or deployment has run. Planner `561fce0b` adds the bounded one-file LIST1
 editor freeze step and verified frozen-source preview; both are now composed
 through `520383b4` and `caa40c9a`. Material source is frozen with generated
 assets `f3202602`; current delivery and final affected capture evidence follow
-in `notes/2026-10-09-page-tasks-delivery.md`. The next single coordinated gate
+in `notes/implementation/2026-10-09-page-tasks-delivery.md`. The next single coordinated gate
 will bind the complete committed candidate, not an earlier partial head.
 
 That gate ran at `1d7fa27359e25ad1cc5acd7f772fa3343555bc5a` and failed:

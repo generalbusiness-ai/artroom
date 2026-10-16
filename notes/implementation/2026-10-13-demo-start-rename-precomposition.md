@@ -93,7 +93,7 @@ Executable checks name generated head
 `6703c87ad5afc7467cd62fe93a22d986b970fd3e`.
 Root must verify that the final reporting commit changes only this note before
 filing. The primary reporting artifact is this file,
-`notes/2026-10-13-demo-start-rename-precomposition.md`: publish it last in the
+`notes/implementation/2026-10-13-demo-start-rename-precomposition.md`: publish it last in the
 35-artifact batch and name its confirmed native artifact first in review.
 
 Authored composition `c85cc8f71c144fd74c848c085ad929ea6fb8fd40` preserves

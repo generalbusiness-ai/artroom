@@ -12,7 +12,7 @@ Every claim has one of these labels:
 
 - **[code]**: I read it in the source.
 - **[cmd]**: I confirmed it by running a command. The scripts used are in
-  `notes/cloud-reviews/scripts/`. Run them from the repository root.
+  `notes/reviews/scripts/`. Run them from the repository root.
 - **[inferred]**: my judgement from the evidence. It was not tested.
 
 ## Summary

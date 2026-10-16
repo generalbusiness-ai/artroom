@@ -105,7 +105,7 @@ All consistent: 12 scopes.
 ```
 
 The same 26 shots through GitHub (builder, 19:49, transcript in
-`notes/2026-10-08-demo-github-transcript.md`): the two-step install,
+`notes/implementation/2026-10-08-demo-github-transcript.md`): the two-step install,
 the register pinned by the planner within the plan's window, the
 repository created in the organization, the clone from GitHub by the
 room's read token, the same publication, refusal, approval and merge,

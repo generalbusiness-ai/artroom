@@ -213,12 +213,12 @@ controls for them, except the three of step 15 that section 6 reports.
 | 9b, 9e | The destination as data, with eight rules at its acts and handlers. A confirmation opens attempt 1 of each operation that the genesis holds | `platform/src/destination.ts`; `derive/src/{delivery,ledger}.ts` | `--project platform destination` (8) | 1: the first held opening left out (entry ER12) |
 | 9f | Nothing | None | None | None |
 | 22 | The replay derives a preparation, an outcome and the checks of an ancestry record | `replay/src/verify.ts` | `--project replay verify` (38): witness 18.4, T24 | 5, from entries EU2, EU3, EU4 (two) and EU6 |
-| 19, 20 | The host port, the token driver, diagnoses and the redactor | `git/src/host.ts`; `scope/src/{diag,operations}.ts` | `--project git host` (4); `--project scope tokens` (1), T19; `--project scope redaction` (2), T14 | 15, in `notes/2026-10-05-i3-host-review.md`, section 6. One was first inconclusive and was run again after the test was strengthened |
+| 19, 20 | The host port, the token driver, diagnoses and the redactor | `git/src/host.ts`; `scope/src/{diag,operations}.ts` | `--project git host` (4); `--project scope tokens` (1), T19; `--project scope redaction` (2), T14 | 15, in `notes/reviews/2026-10-05-i3-host-review.md`, section 6. One was first inconclusive and was run again after the test was strengthened |
 | 15 | Read sessions, the serving limits of a join, the operator's record | `scope/src/{sessions,limits,operator,reads}.ts`; `client/src/session.ts`; `contract/src/session.ts`; `bytes/src/{session,hash}.ts` | `--project scope sessions` (3), T15, T42 and the snapshot read; `limits` (2), T39; `operator` (2), T41 | None recorded by the step. 3 run for this note (section 6) |
 | Rows I3-31 to I3-38 | A list bound of 64; several send marks with `always`; a value place in platform data; the retained kind `value`; what a retry rule is given; the bound on a rule's message. Membership's last three rules | `contract/src/{bounds,platform,read}.ts`; `derive/src/{marks,sends,judge}.ts` and the validator; `platform/src/{membership,register,directory}.ts`; `replay/src/verify.ts` | `--project derive validate` (57), witness 18.44; `forms-marks`, witness 18.45; `--project replay verify`, case 8; `--project lanes` (3), case 7 | 6: three for I3-34, one for I3-33, one each for I3-35 and I3-38 |
 | Extents, request `42de9e34` | Judgments over data: the first three extents, `classify`, `judgeExtents` | `platform/src/extents.ts` | `--project platform extents` (8) | 3, for the planner's decision on a link that leaves the tree. None recorded for the first commit |
-| 24 | The step `job-read`, a job's read token, the files and the commit of a snapshot | `derive/src/capability/gitread.ts`; `contract/src/capability.ts`; `git/src/{host,snapshot}.ts` | `--project derive forms-prepare`, the last two tests; `--project git snapshot` (4); `--project git host`, second test | 6, in `notes/2026-10-05-i3-snapshot-review.md`, section 5 |
-| 25 | The package `packages/checkers`: origin read, configuration, outcome, store, signer, service, the runner's checkout, the runner's boundary | `checkers/src/*`; one statement of `git/src/gateway.ts` | `--project checkers service` (7), T35; `--project checkers runner` (4), T36; `--project scope checks` (1), T34 | 12, in `notes/2026-10-05-i3-checkers-review.md`, section 8 |
+| 24 | The step `job-read`, a job's read token, the files and the commit of a snapshot | `derive/src/capability/gitread.ts`; `contract/src/capability.ts`; `git/src/{host,snapshot}.ts` | `--project derive forms-prepare`, the last two tests; `--project git snapshot` (4); `--project git host`, second test | 6, in `notes/reviews/2026-10-05-i3-snapshot-review.md`, section 5 |
+| 25 | The package `packages/checkers`: origin read, configuration, outcome, store, signer, service, the runner's checkout, the runner's boundary | `checkers/src/*`; one statement of `git/src/gateway.ts` | `--project checkers service` (7), T35; `--project checkers runner` (4), T36; `--project scope checks` (1), T34 | 12, in `notes/reviews/2026-10-05-i3-checkers-review.md`, section 8 |
 
 The counts of this column sum to 58 recorded controls (55 by the steps
 and 3 for this note), all of which distinguished. The sum is by hand.
@@ -508,10 +508,10 @@ Each removal followed a written review.
 
 | Step | Removed | Files | The review that preceded it |
 |---|---|---|---|
-| 15 | `room/src/requests.ts`, `room/src/ratelimit.ts` | 2 | `notes/2026-10-05-i3-limits-review.md` |
-| 19, 20 | `git/src/mints.ts`, `room/src/artifacts.ts`, `room/src/diag.ts` | 3 | `notes/2026-10-05-i3-host-review.md` |
-| 24 | `checkers/src/snapshot-commit.ts`, `room/src/snapshot.ts`, `git/src/snapshot/repos.ts` | 3 | `notes/2026-10-05-i3-snapshot-review.md` |
-| 25 | `checkers/`, less its retained paths (32 files); `room/src/jobs.ts`; `contract/src/checker.ts` | 34 | `notes/2026-10-05-i3-checkers-review.md` |
+| 15 | `room/src/requests.ts`, `room/src/ratelimit.ts` | 2 | `notes/reviews/2026-10-05-i3-limits-review.md` |
+| 19, 20 | `git/src/mints.ts`, `room/src/artifacts.ts`, `room/src/diag.ts` | 3 | `notes/reviews/2026-10-05-i3-host-review.md` |
+| 24 | `checkers/src/snapshot-commit.ts`, `room/src/snapshot.ts`, `git/src/snapshot/repos.ts` | 3 | `notes/reviews/2026-10-05-i3-snapshot-review.md` |
+| 25 | `checkers/`, less its retained paths (32 files); `room/src/jobs.ts`; `contract/src/checker.ts` | 34 | `notes/reviews/2026-10-05-i3-checkers-review.md` |
 
 The parked tests of the removed files stay, unrun, and still import
 them. Step 31 reconciles the directory.
@@ -1007,7 +1007,7 @@ is by reading.
 
 **The merge.** `origin/main` moved to `c0500c315` after milestone F
 landed in `b452882f8`. I merged it at `082efdf21`. It brought two
-documents, `notes/2026-10-05-23-sprint-report.md` and
+documents, `notes/reports/2026-10-05-23-sprint-report.md` and
 `plans/021-2026-10-05-jam-as-the-late-night-meme.md`, and no source:
 `git rev-parse HEAD:packages` was `166c2676af34078b14c654151c36fd6c0cc9bd63`
 before the merge and after it (run).

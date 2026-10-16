@@ -1,7 +1,7 @@
 # I3: the review of the parked limiter and requests code
 
 Written 2026-10-05, with step 15 of the I3 plan
-(`notes/2026-10-05-i3-implementation-plan.md`, sections 6.1 and 8). The
+(`notes/implementation/2026-10-05-i3-implementation-plan.md`, sections 6.1 and 8). The
 plan keeps the parked rate limiter "after review", and section 11.1 of the
 authority note says what that review must find: "the module must not count
 before a signature, and must not share one table". This note is that
@@ -11,7 +11,7 @@ replaces.
 "The authority note" is revision 21 at `f9ec25e4`. "The contract" is the
 scope contract at revision 16, `54420b41`. "The proof plan" is revision 9
 at `85be9f0b`. "The dispositions" is
-`notes/2026-10-05-review-dispositions.md`. Parked paths are under
+`notes/reviews/2026-10-05-review-dispositions.md`. Parked paths are under
 `spikes/parked/room/src/`, as they were at `4f771d901`. New paths are under
 `packages/`.
 

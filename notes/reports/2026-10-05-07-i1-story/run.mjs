@@ -1,6 +1,6 @@
 // The I1 story: one observed run of the scope substrate, in one Node process.
 //
-//   node notes/2026-10-05-07-i1-story/run.mjs
+//   node notes/reports/2026-10-05-07-i1-story/run.mjs
 //
 // It drives the real code of the six packages: the Worker's routes and the scope's
 // object class (packages/scope), the client's HTTP transport and handle

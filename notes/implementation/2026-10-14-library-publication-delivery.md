@@ -1,7 +1,7 @@
 # Library publication: Source delivery candidate
 
 14 October 2026. This implements the approved
-[Publication from a fold, Draft 5](2026-10-13-fold-publication.md) under
+[Publication from a fold, Draft 5](../2026-10-13-fold-publication.md) under
 full request `ebda829b`, promise `23fed5e2`. It is a Source candidate.
 The final combined gate passed once, as recorded below. Source review and
 landing, and real hosted library acceptance remain owed.

@@ -8,7 +8,7 @@ credentials and no network beyond GitHub and the npm registry. Nothing
 here is deployed.
 
 The brief also carried the earlier task "edit a page". That work is
-already at the base: `notes/2026-10-07-i5-edit-page-delivery.md` and
+already at the base: `notes/implementation/2026-10-07-i5-edit-page-delivery.md` and
 `packages/lanes/test/edit.scope.test.ts` are on `13ae305` **[run]**
 (`git ls-tree`). This branch builds the pin-before-install task only.
 

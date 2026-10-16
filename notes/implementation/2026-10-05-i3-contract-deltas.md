@@ -4,13 +4,13 @@ Written 2026-10-05, with the steps of I3 (request `c75205df` for the
 scope contract; the successor of request `406983fe` for the authority
 note). "The contract" is the scope and replay contract at `53f0e183`.
 "The authority note" is revision 16 at `7bc60cf6`. Section numbers are
-their own. "The plan" is `notes/2026-10-05-i3-implementation-plan.md`.
+their own. "The plan" is `notes/implementation/2026-10-05-i3-implementation-plan.md`.
 
 Each entry is a place where the two notes differ, or state no member that
 a type needs, and what the source holds instead. Nothing here is adopted by
 being written. The source holds the narrowest type that fits both texts. An
 entry stays open until its owner accepts it, changes it or removes it. The
-form follows `notes/2026-10-05-i2-contract-deltas.md`. Entries are
+form follows `notes/implementation/2026-10-05-i2-contract-deltas.md`. Entries are
 numbered E1, E2 and so on, in the order they were written.
 
 ## 1. Step 1: the types
@@ -178,7 +178,7 @@ counts is partial.
 Written 2026-10-05, by the worker of steps 17 and 21. Entries have the
 prefix EG. "Revision 18" is the authority note at `99bc48e8`, adopted, and
 section numbers are its own. "The review" is
-`notes/2026-10-05-i3-git-review.md`. The source is `packages/git`. Nothing
+`notes/reviews/2026-10-05-i3-git-review.md`. The source is `packages/git`. Nothing
 here changes the bytes of an entry, a state digest or a pinned digest: the
 package writes no entry.
 
@@ -857,7 +857,7 @@ Written 2026-10-05, by the worker of those steps. Entries have the prefix
 ET. The adopted designs are the scope contract's revision 16 at `54420b41`
 and the authority note's revision 21 at `f9ec25e4`, read from those
 commits. Section numbers are the authority note's. "The review" is
-`notes/2026-10-05-i3-host-review.md`.
+`notes/reviews/2026-10-05-i3-host-review.md`.
 
 `packages/git/src/host.ts` holds `GitHost`, the host's two calls for a
 token, and `TokenDriver`, the port that gives the scope's ledger one answer
@@ -906,7 +906,7 @@ Step 15 builds rows 9, 25, 29 and 31 of the plan's section 3.2: read
 sessions bound to one repository (`scope/src/sessions.ts`,
 `client/src/session.ts`), the serving limits of a join after a review of
 the parked limiter (`scope/src/limits.ts`;
-`notes/2026-10-05-i3-limits-review.md`), and the operator's record with
+`notes/reviews/2026-10-05-i3-limits-review.md`), and the operator's record with
 the two lists of requests that wait (`scope/src/operator.ts`, three reads
 in `scope/src/reads.ts`). `spikes/parked/room/src/requests.ts` and `ratelimit.ts`
 are deleted. The adopted texts are the authority note at revision 21
@@ -1165,7 +1165,7 @@ capability's table (`packages/contract/src/capability.ts`), the second
 owner to the token driver (`packages/git/src/host.ts`), and the files and
 the commit of a snapshot (`packages/git/src/snapshot.ts`). The review of
 the three parked snapshot files is
-`notes/2026-10-05-i3-snapshot-review.md`. No lane definition changes, and
+`notes/reviews/2026-10-05-i3-snapshot-review.md`. No lane definition changes, and
 neither pinned digest moves. An entry changes its bytes only where a scope
 seals a `job-read` preparation, which no scope did before.
 
@@ -1198,7 +1198,7 @@ the same text at revision 24 as at revision 21.
 The step adds the package `packages/checkers`, and removes the earlier
 checkers package but its retained paths, the earlier Room's jobs module and
 the earlier contract's checker types, after their review
-(`notes/2026-10-05-i3-checkers-review.md`). A new workspace package needs
+(`notes/reviews/2026-10-05-i3-checkers-review.md`). A new workspace package needs
 an entry in the lockfile, as the Git package did at step 17. That entry is
 a commit of its own: the workspace link and the package's block, and no new
 external dependency. No entry of any scope changes its bytes, and neither
@@ -1368,13 +1368,13 @@ host of the witness is a stand-in. The gate was not run.
 
 Numbered 2026-10-06, at the merge of the third milestone: the second
 milestone's delivery note,
-`notes/2026-10-05-i3-second-milestone-delivery.md`, cites these entries
+`notes/implementation/2026-10-05-i3-second-milestone-delivery.md`, cites these entries
 as section 26 of its own branch, where section 26 here (entries EY) was
 not present.
 
 Written 2026-10-05, on `request/i3-m2`, after the review at head
 `d0354e266`. The repairs and their witnesses are in
-`notes/2026-10-05-i3-second-milestone-delivery.md`, section 13. This
+`notes/implementation/2026-10-05-i3-second-milestone-delivery.md`, section 13. This
 section holds what the repairs and their sweeps found and did not change,
 each with its owner. No entry of any scope changes its bytes, and neither
 pinned digest moves.

@@ -3,7 +3,7 @@
 Request: cut test overhead. This note measures the `scope` project (the
 workerd pool, real Durable Objects with SQLite storage, and the ten lane
 scenarios), finds the cause of the slowdown that entry DK11 of
-`notes/2026-10-05-i2-contract-deltas.md` names, and records what was
+`notes/implementation/2026-10-05-i2-contract-deltas.md` names, and records what was
 changed.
 
 How each figure was taken is stated beside it. Unless said otherwise: one

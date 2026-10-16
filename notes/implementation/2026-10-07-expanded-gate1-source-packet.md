@@ -47,8 +47,8 @@ M	docs/cli.md
 M	docs/deploy.md
 M	docs/lanes.md
 M	docs/scopes.md
-A	notes/2026-10-07-15-sprint-report.md
-M	notes/2026-10-07-expanded-gate1-source-packet.md
+A	notes/reports/2026-10-07-15-sprint-report.md
+M	notes/implementation/2026-10-07-expanded-gate1-source-packet.md
 M	packages/cli/src/commands.ts
 M	packages/cli/src/files.ts
 M	packages/cli/src/store.ts
@@ -83,7 +83,7 @@ historical; new deployed replay, if run, is separately recorded.
 | Previously reviewed component tree | `50203f58b3ee41224fd9fdb444bbaf43531863a1` |
 
 The only gated-source-to-snapshot change is the added
-`notes/2026-10-07-expanded-gate1-delivery.md`. Source and tests are unchanged.
+`notes/implementation/2026-10-07-expanded-gate1-delivery.md`. Source and tests are unchanged.
 The complete native snapshot comparison has **122 changed tracked paths**.
 This packet, and any later delivery/live-witness edits, are outside that
 snapshot and must be named by the filing's exact candidate head. At packet
@@ -110,15 +110,15 @@ For a deletion, the table gives the old blob and marks the candidate absent.
 - The original GitHub component, including signed reads, CLI claim/bootstrap
   and real lane wiring, is frozen at `a4e3dbd19`. Its earlier gated source
   and complete inventory are in
-  `notes/2026-10-07-demo-git-host-source-packet.md`; its implementation and
+  `notes/implementation/2026-10-07-demo-git-host-source-packet.md`; its implementation and
   component live evidence are in the corresponding delivery and witness notes.
 - Cloud live operations are delivered at `31cd35577`, with their own
-  attribution in `notes/2026-10-07-i5-live-ops-delivery.md`. Merge
+  attribution in `notes/implementation/2026-10-07-i5-live-ops-delivery.md`. Merge
   `03425641f` integrates those changes and the builder's exact claim recovery,
   causal read admission, retained resource hash and verified destination
   session repairs. The claim test exercises the actual Worker routes.
 - Cloud own-host source is delivered at `c7955c39`, described in
-  `notes/2026-10-07-i5-own-host-delivery.md`. The isolated builder repair
+  `notes/implementation/2026-10-07-i5-own-host-delivery.md`. The isolated builder repair
   `a7a52112a` checks namespace, creation identity, plaintext custody, token
   scope and reported expiry. Merge `61bb2e140` integrates it with live
   operations. Shared host wiring also changes the GitHub wiring and provider.
@@ -168,9 +168,9 @@ A	docs/hosts.md
 M	docs/lanes.md
 M	docs/scopes.md
 A	notes/.keep-i5-own-host
-A	notes/2026-10-07-expanded-gate1-delivery.md
-A	notes/2026-10-07-i5-live-ops-delivery.md
-A	notes/2026-10-07-i5-own-host-delivery.md
+A	notes/implementation/2026-10-07-expanded-gate1-delivery.md
+A	notes/implementation/2026-10-07-i5-live-ops-delivery.md
+A	notes/implementation/2026-10-07-i5-own-host-delivery.md
 M	packages/bytes/src/session.ts
 M	packages/cli/src/commands.ts
 M	packages/cli/src/line.ts
@@ -275,7 +275,7 @@ clone from `dfaa5395` (`73507add`); own-host founding and authenticated clone
 from integration `714afda4` (`b00cde62`); and the first empty-tree site
 response after the framing repair (`60ce7f0f`). None reproduces the exact
 combined gated source above. The separately prepared
-`notes/2026-10-07-expanded-gate1-live-witness.md` now records an exact
+`notes/implementation/2026-10-07-expanded-gate1-live-witness.md` now records an exact
 combined-source run at notes-only successor `3c5b117918206f20047111916399a58b6894101c`:
 Worker source deployment `a9419198-1212-45dc-9ae9-f2d2b92047be`, an isolated
 own-host install/claim, six authenticated replays with exit 0 and consistent
@@ -382,16 +382,16 @@ plan. The packet being written is not part of the earlier snapshot.
 | A | `notes/.keep-i5-client` | `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | A | `notes/.keep-i5-lane-wiring` | `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | A | `notes/.keep-i5-own-host` | `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
-| A | `notes/2026-10-07-demo-git-host-delivery.md` | `a3d5279e5c6dd52b820a86ac527c3f9a9e27bc44` | 19731 | `1226b642601fce80541ccbbbf919e3b1ddfaf0ce5eaa58fcdfa3c68ab3ffa85e` |
-| A | `notes/2026-10-07-demo-git-host-live-witness.md` | `049fac12eb962bfdd5255df796312eb7ef617687` | 4267 | `4e555a2f01d3ac696a059152e2327f3e201624d18ae2325c71152e74191483ca` |
-| A | `notes/2026-10-07-demo-git-host-source-packet.md` | `1082f61f72e77c39d9efdc51f0021d5822fe0730` | 17612 | `fd48252b77d5583b2126bf57b7312a52b31c3808d6da787367028533ce7cc3eb` |
-| A | `notes/2026-10-07-expanded-gate1-delivery.md` | `3fb42dfbd5750405f6ea482a98ec9fe75993ac76` | 8289 | `2cf8a7e5113d52a1d8b3ece45cde8b1f5ee88ad9234b9e7f25dd76041c95f5a1` |
-| A | `notes/2026-10-07-i5-claim-live-delivery.md` | `f7d623211b5fba1e06c943530c1bcb459363a6fe` | 12803 | `5735d88d46e742f386e9734b88cc0db0e857c323f1ed99c718345a0d54b6136a` |
-| A | `notes/2026-10-07-i5-client-delivery.md` | `ed18ca8b732b07939def4efffc734ffdcacac07c` | 12591 | `bfd3665f384603a46ed33538bf8540909cd60a62e1abee72c4d1c6226f71d1c5` |
-| A | `notes/2026-10-07-i5-lane-wiring-delivery.md` | `815307aeccebbdfd760fda1a3e2ee4cb9817c2f4` | 22820 | `f43d9dfef9d519a839b56174cbaf66848905149568d691d365cbd07f8ee903cf` |
-| A | `notes/2026-10-07-i5-live-ops-delivery.md` | `651df74b308ac781985655fc46441c1824b18208` | 16560 | `3c43eff04cce152ffd0677a8ced1983a544ed482ca728507ace6553646d7ef6d` |
-| A | `notes/2026-10-07-i5-own-host-delivery.md` | `2092ba817d8e2616cc176caaf15a8b3bbf42ebcc` | 13355 | `0222cb36983ccfc4ee2e9bf87f18f1f9bcf7d6a0451e51f5502946c082e85fad` |
-| A | `notes/2026-10-07-i5-signed-read-delivery.md` | `98e60d38b22ab1563b23e688896df74bc89cc2d2` | 13632 | `61ebcc2c7a099c015ee3521fb4016520d1877f07b5eefc9e4182c4239b70efea` |
+| A | `notes/implementation/2026-10-07-demo-git-host-delivery.md` | `a3d5279e5c6dd52b820a86ac527c3f9a9e27bc44` | 19731 | `1226b642601fce80541ccbbbf919e3b1ddfaf0ce5eaa58fcdfa3c68ab3ffa85e` |
+| A | `notes/implementation/2026-10-07-demo-git-host-live-witness.md` | `049fac12eb962bfdd5255df796312eb7ef617687` | 4267 | `4e555a2f01d3ac696a059152e2327f3e201624d18ae2325c71152e74191483ca` |
+| A | `notes/implementation/2026-10-07-demo-git-host-source-packet.md` | `1082f61f72e77c39d9efdc51f0021d5822fe0730` | 17612 | `fd48252b77d5583b2126bf57b7312a52b31c3808d6da787367028533ce7cc3eb` |
+| A | `notes/implementation/2026-10-07-expanded-gate1-delivery.md` | `3fb42dfbd5750405f6ea482a98ec9fe75993ac76` | 8289 | `2cf8a7e5113d52a1d8b3ece45cde8b1f5ee88ad9234b9e7f25dd76041c95f5a1` |
+| A | `notes/implementation/2026-10-07-i5-claim-live-delivery.md` | `f7d623211b5fba1e06c943530c1bcb459363a6fe` | 12803 | `5735d88d46e742f386e9734b88cc0db0e857c323f1ed99c718345a0d54b6136a` |
+| A | `notes/implementation/2026-10-07-i5-client-delivery.md` | `ed18ca8b732b07939def4efffc734ffdcacac07c` | 12591 | `bfd3665f384603a46ed33538bf8540909cd60a62e1abee72c4d1c6226f71d1c5` |
+| A | `notes/implementation/2026-10-07-i5-lane-wiring-delivery.md` | `815307aeccebbdfd760fda1a3e2ee4cb9817c2f4` | 22820 | `f43d9dfef9d519a839b56174cbaf66848905149568d691d365cbd07f8ee903cf` |
+| A | `notes/implementation/2026-10-07-i5-live-ops-delivery.md` | `651df74b308ac781985655fc46441c1824b18208` | 16560 | `3c43eff04cce152ffd0677a8ced1983a544ed482ca728507ace6553646d7ef6d` |
+| A | `notes/implementation/2026-10-07-i5-own-host-delivery.md` | `2092ba817d8e2616cc176caaf15a8b3bbf42ebcc` | 13355 | `0222cb36983ccfc4ee2e9bf87f18f1f9bcf7d6a0451e51f5502946c082e85fad` |
+| A | `notes/implementation/2026-10-07-i5-signed-read-delivery.md` | `98e60d38b22ab1563b23e688896df74bc89cc2d2` | 13632 | `61ebcc2c7a099c015ee3521fb4016520d1877f07b5eefc9e4182c4239b70efea` |
 | M | `package-lock.json` | `7e6e3a01844fe2d01718f26d17701619056b97e1` | 126500 | `bd4d9ed101dff266d71008f8a9ac42257093065ab5079cd399e004e40ae3162d` |
 | M | `packages/bytes/src/session.ts` | `ddcbfef1b75c16827b9942550311e3e04873f675` | 2764 | `f597fe0f8f22af880cf3abba800f0e23b36870f424c081da6765c3473a2f9ae1` |
 | A | `packages/cli/README.md` | `ca5d26320773d8b53da7dfcb12b4a04f2fce66ab` | 1203 | `f9ff4809a86a31578594f0f68d703a0975e00a1a95fe62ae2ba420d531de5ce8` |

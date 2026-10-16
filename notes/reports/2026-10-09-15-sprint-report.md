@@ -21,7 +21,7 @@ leave it running, and return on another device to watch, steer and review.
 Today's work advances its proposal and observation parts. Durable hosted
 workspaces and device continuity still have their own unfinished contracts
 and implementation; this sprint does not deliver that whole journey.
-The [connected-story task map](../plans/023-2026-10-06-connected-story-current-tasks.md)
+The [connected-story task map](../../plans/023-2026-10-06-connected-story-current-tasks.md)
 retains the complete workspace, browser and device acceptance requirements.
 
 ```mermaid
@@ -36,12 +36,12 @@ flowchart LR
   D["Return on another device"] -. "Identity and hosted workspace work remains" .-> O
 ```
 
-![Published Page v2 Issues view](2026-10-09-demo-captures/room.png)
+![Published Page v2 Issues view](../implementation/2026-10-09-demo-captures/room.png)
 
 *Retained recorded rehearsal at `efb5c56d`, preceding today's unlanded
 repairs. This shows the Page presentation. It is not a new hosted run,
 native admission proof or counting-app screenshot.
-[Capture provenance](2026-10-09-demo-captures/README.md).*
+[Capture provenance](../implementation/2026-10-09-demo-captures/README.md).*
 
 ## Published results
 
@@ -110,12 +110,12 @@ that successor still needs independent review and integration. Browser-stage wor
 frozen prototype and passing corrected fake cancellation flow; actual
 audio, enrollment and hosted acceptance remain later, explicit steps.
 
-![Counting stage prototype with three agent cards](2026-10-09-counting-stage-captures/desktop-initial.png)
+![Counting stage prototype with three agent cards](../implementation/2026-10-09-counting-stage-captures/desktop-initial.png)
 
 *U1 simulated preview associated by builder with source `6291c6e3`.
 Transport, session, scope, speech and clock are fake; no actual audio was
 attempted. The image shows presentation, not native or hosted count proof.
-[Exact capture provenance and coverage](2026-10-09-counting-stage-captures/README.md).*
+[Exact capture provenance and coverage](../implementation/2026-10-09-counting-stage-captures/README.md).*
 
 **Live developer interface.** Planner has filed the complete dated design
 at `726474e3` for independent review. It selects one application handle and callback observation,
