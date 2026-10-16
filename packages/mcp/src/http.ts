@@ -39,6 +39,8 @@ import { LEGACY, MODERN, PROTOCOL_META, SESSION_FULL, UNSUPPORTED_VERSION, Wire,
 export const HEADER_MISMATCH = -32020;
 /** The most 2025-11-25 sessions one server holds; a 17th `initialize` ends the oldest. */
 export const SESSIONS_MOST = 16;
+/** Legacy HTTP sessions expire after 30 minutes without a client request, checked on the next authenticated legacy request. */
+export const SESSION_IDLE_MS = 30 * 60 * 1000;
 /** The most open streams one server holds, legacy streams and modern listens together; a 5th is refused `409`. */
 export const STREAMS_MOST = 4;
 export const SERVED: readonly string[] = [MODERN, LEGACY];
@@ -49,7 +51,7 @@ export const CAPABILITIES_BYTES = 16 * 1024;
 export class SessionFull extends Error { constructor() { super("No room for another session."); this.name = "SessionFull"; } }
 
 /** A 2025-11-25 session as it is persisted: what survives eviction. Its open stream does not. */
-export interface SessionRow { id: string; version: string | null; initialized: boolean; capabilities: Record<string, unknown>; listed: Digest | null; created: number }
+export interface SessionRow { id: string; version: string | null; initialized: boolean; capabilities: Record<string, unknown>; listed: Digest | null; created: number; lastActive?: number }
 
 export interface HttpPort {
   wire: Wire;
@@ -59,7 +61,7 @@ export interface HttpPort {
   authorized(authorization: string | null): boolean | Promise<boolean>;
   /** A fresh session ID. */
   mintSession(): string;
-  /** Called with a session's row after a change that must survive eviction: issue, initialization, a listing. Awaited before the response. */
+  /** Called with a session's row after issue, initialization, a listing or client activity. Awaited before the response. */
   persist?(row: SessionRow): void | Promise<void>;
   /** Called when a session ends. */
   remove?(id: string): void | Promise<void>;
@@ -90,7 +92,7 @@ export function decodeName(value: string): string | null {
 }
 
 export const rowOf = (session: LegacySession): SessionRow =>
-  ({ id: session.id!, version: session.version, initialized: session.initialized, capabilities: session.capabilities, listed: session.listed, created: session.created });
+  ({ id: session.id!, version: session.version, initialized: session.initialized, capabilities: session.capabilities, listed: session.listed, created: session.created, lastActive: session.lastActive });
 
 type Body = { status: "ok"; value: unknown } | { status: "too-large" } | { status: "parse" };
 
@@ -108,11 +110,48 @@ export class McpHttp {
   readonly #listens = new Map<object, { end: (final: boolean) => void }>();
   /** How many openings of a session's stream are pending: the session keeps its slot until the last of them exits with no stream. */
   readonly #pending = new Map<LegacySession, number>();
+  // Prospective Wire markers and activity updates share the last committed row, not the possibly older live markers.
+  readonly #rows = new WeakMap<LegacySession, SessionRow>();
+  // Removal follows in-flight writes; once ended, queued updates skip the write. Weak keys retain no ended-session registry.
+  readonly #writes = new WeakMap<LegacySession, Promise<void>>();
   constructor(readonly port: HttpPort) {
     // Issuance persists a new session; an update persists only a session that is still live. One that ended while its request
     // was pending (deleted, evicted, retired, or discarded with its layer) is never written again: an ended session's row stays
     // gone, and a restart restores nothing of it.
-    port.wire.hooks.changed = (session, next) => (session.id === null || session.ended ? undefined : port.persist?.(rowOf({ ...session, ...next })));
+    port.wire.hooks.changed = (session, next) => this.#persist(session, next);
+  }
+
+  #queue(session: LegacySession, work: () => void | Promise<void>): Promise<void> {
+    const pending = (this.#writes.get(session) ?? Promise.resolve()).then(work);
+    this.#writes.set(session, pending.catch(() => {}));
+    return pending;
+  }
+
+  #persist(session: LegacySession, next: Partial<SessionRow> = {}): Promise<void> {
+    if (session.id === null || session.ended) return Promise.resolve();
+    return this.#queue(session, async () => {
+      if (session.ended) return;
+      const previous = this.#rows.get(session) ?? rowOf(session);
+      const row = { ...previous, ...next };
+      row.lastActive = Math.max(previous.lastActive ?? previous.created, row.lastActive ?? row.created);
+      await this.port.persist?.(row);
+      this.#rows.set(session, row);
+    });
+  }
+
+  async #touch(session: LegacySession): Promise<boolean> {
+    const lastActive = Math.max(session.lastActive, this.port.now?.() ?? Date.now());
+    if (lastActive !== session.lastActive) await this.#persist(session, { lastActive });
+    if (session.ended) return false;
+    session.lastActive = Math.max(session.lastActive, lastActive);
+    return true;
+  }
+
+  async #expire(): Promise<void> {
+    const now = this.port.now?.() ?? Date.now();
+    for (const session of [...this.sessions.values()]) {
+      if (now - session.lastActive >= SESSION_IDLE_MS) await this.#end(session, true);
+    }
   }
 
   /** How many streams are open: legacy streams and modern listens together. */
@@ -127,6 +166,8 @@ export class McpHttp {
       session.capabilities = row.capabilities;
       session.listed = row.listed;
       session.created = row.created;
+      session.lastActive = row.lastActive ?? row.created;
+      this.#rows.set(session, { ...row, lastActive: session.lastActive });
       this.sessions.set(row.id, session);
       if (session.initialized) this.port.wire.watchLegacy(session);
     }
@@ -143,8 +184,10 @@ export class McpHttp {
       if (header !== null && !SERVED.includes(header)) return json(400, rpcError(null, -32600, "MCP-Protocol-Version is not a served revision."));
       if (header === MODERN) return notAllowed();
       if (sessionId === null) return header === LEGACY ? json(400, rpcError(null, -32600, "Mcp-Session-Id is required.")) : notAllowed();
+      await this.#expire();
       const session = this.sessions.get(sessionId);
       if (!session) return bare(404);
+      if (method === "GET" && !(await this.#touch(session))) return bare(404);
       return method === "GET" ? this.#stream(session, request.signal) : this.#end(session, true);
     }
     if (method !== "POST") return notAllowed();
@@ -216,6 +259,7 @@ export class McpHttp {
 
   async #legacy(m: Message, notification: boolean, sessionId: string | null): Promise<Response> {
     const id = m.id ?? null;
+    await this.#expire();
     let session: LegacySession;
     let issued: string | null = null;
     if (m.method === "initialize" && !notification) {
@@ -224,11 +268,13 @@ export class McpHttp {
       issued = this.port.mintSession();
       session = newSession(issued);
       session.created = this.port.now?.() ?? Date.now();
+      session.lastActive = session.created;
     } else {
       if (sessionId === null) return json(400, rpcError(id, -32600, "Mcp-Session-Id is required."));
       const found = this.sessions.get(sessionId);
       if (!found) return bare(404);
       session = found;
+      if (!(await this.#touch(session))) return bare(404);
     }
     const response = await this.port.wire.handle(m, session, (out) => session.stream?.send(out));
     if (issued) {
@@ -336,7 +382,7 @@ export class McpHttp {
     this.port.wire.endLegacy(session);
     if (stream) stream.close(final);
     if (!this.#pending.has(session)) this.#open.delete(session);   // a pending opening of it exits 404 and releases the slot then
-    if (session.id !== null) { this.sessions.delete(session.id); await this.port.remove?.(session.id); }
+    if (session.id !== null) { this.sessions.delete(session.id); await this.#queue(session, () => this.port.remove?.(session.id!)); }
     return bare(200);
   }
 
