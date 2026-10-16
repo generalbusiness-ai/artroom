@@ -359,3 +359,43 @@ the operation deadline. Persisting the receiver label instead fails this
 case; the control restores the source. No production admission calls
 `ReceiverReads` yet, so delivery, act, result, driver and replay integration
 remain owed.
+
+## Act fact reads use the receiver policy
+
+An act that needs foreign facts now opens one receiver read operation from
+its own admitted pin and genesis. Known older native pins and declarations
+without a directory locator retain the legacy path. Shared/new candidates
+need the bounded native proof ports; absent proof does not select a new
+mode. Accepted repeats and acts without foreign facts open no identity
+operation. Producer defaults and global source callbacks remain unchanged.
+The turn may receive the same transient interpreted facts for its fold,
+while retained rows keep the producer aliases. Those facts are restricted
+to the entry's actual uses before the fold reads them.
+
+The new native lane scenario creates two actual pinned issue lanes through
+the partition, with real membership authority. One issue accepts a block
+on the other's actual ask, retaining its exact bytes under
+`declared:issue`. After a receiver restart it accepts the matching foreign
+answer and releases that block. Ordinary producer reads stay declared.
+The Git host, clock, finite scheduler and inspected setup reads keep the
+existing fixture boundaries; this is no replay or publication witness.
+The native case passes. Bypassing the receiver reader refuses the block,
+and the unchanged acceptance assertion fails. The control restores the
+reader. Scope and lane typechecks pass; the focused turn and collector
+cases pass. No directory gate has run.
+
+The first draft used an empty required conditions list, which the existing
+`slotOf` contract treats as unset; the real genesis correctly refused it.
+The corrected fixture uses a nonempty condition. A weak first assertion
+only reached `terms-differ`, which does not inspect the fact's identity.
+Its bypass control survived. That assertion was replaced by the successful
+block and release journey above; only the latter's distinguishing control
+supports identity admission. Initial typechecking also exposed a narrow
+literal-array `includes` type; the closed selector now compares its exact
+pins with `some`. An incorrect lane workspace probe ran no compiler; the
+correct pinned workspace typecheck passes. All failed and survived logs
+remain retained.
+
+Delivery/bootstrap, result clauses, driver reads and replay still use their
+older interpretation until their next integration steps. This partial local
+branch is not ready for Source approval, landing or host activation.
