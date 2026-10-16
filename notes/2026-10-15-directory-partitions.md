@@ -10,6 +10,10 @@ decision `c9a2c676` ("Directory lifetime"). Read against main
 because builder Source `8e957b54` takes register `@10`, membership `@6`
 and directory `@9`. Section 12 maps each finding to its answer.
 
+**Draft 3** answers checker review of Draft 2 at `267b5904`: finding F7
+(compromise relays must not be expendable), the preconditions of Q11, and
+the operator's one-shot resend. It adds section 4.10 and prerequisite D1.
+
 ## 1. Problem
 
 A room has one directory scope. It opens every lane, numbers it, and keeps
@@ -68,9 +72,14 @@ several scopes does not help if one root scope still records each update.
 7. Point reads use declared indexes: generation to partition, number to
    row, and lane to row. Each is one key lookup. Nothing walks a list.
 8. Authority uses existing grants and guards. No new membership version.
-9. Three contract additions are owed before the Source that needs each:
-   C1, a standing reservation (root); C2, `int` as an indexed type; A1,
-   the `dropped` answer for a full partition's index handler (section 10).
+9. Four prerequisites are owed before the Source that needs each: C1, a
+   standing reservation (root); C2, `int` as an indexed type; D1, a
+   destination version that reads key standing before each push (section
+   4.10); A1, the `dropped` answer for a full partition's index handler
+   (section 10).
+10. The `compromised` relay through the root stays capacity-limited. It
+   becomes an accelerator. D1 is the guarantee that a revoked key stops
+   publication (F7).
 
 ## 4. Protocol
 
@@ -222,8 +231,26 @@ answered by a routing refusal, and `delivery-unavailable` otherwise.
 
 | Send | `undelivered` | `delivery-unavailable` |
 |---|---|---|
-| Root `create-partition` | Clause sets `undelivered`. No later dispatch is made, and a late result is ignored (`derive/src/delivery.ts:283-284`). Every attempt was refused before any child decided it, so no child exists. P1 is free; the next `open-partition` opens a new generation with a new seed. | No clause runs. The item stays `creating`; P1 blocks a new generation. The request is sent again unchanged, by retry policy or operator instruction (contract revision 11, section 7.4, "After `delivery-unavailable`"). The seed, cause and child are the same. A late authentic result is recorded by its clause. |
+| Root `create-partition` | Clause sets `undelivered`. No later dispatch is made, and a late result is ignored (`derive/src/delivery.ts:283-284`). Under the preconditions below, no attempt reached a judgment, so this send created no child. P1 is free; the next `open-partition` opens a new generation with a new seed. | No clause runs. The item stays `creating`; P1 blocks a new generation. It is not proof that no child exists. The operator may send the same envelope again with the explicit one-shot `sendAgain` (`scope/src/operator.ts:160-195`); no automatic retry is designed after this finding (contract revision 11, section 7.4, "After `delivery-unavailable`"). The seed, cause and child are the same. A late authentic result is recorded by its clause. |
 | Partition `seal` tell | Clause sets `sealUndelivered`. Every attempt was a routing refusal from the root's own reference, so a new tell would be refused too. The room cannot grow; this is a fault of the deployment, shown on the partition. | Sent again unchanged, as for the root. The root decides it once; a repeat is answered from its deciding entry with no new entry. |
+
+**Preconditions of the `undelivered` row** (checker, Q11). They hold for
+the one-namespace resolver and a correctly addressed `create`:
+
+- every attempt is logged before it leaves, so the log is complete
+  (`outbox.ts`, `sendAgain` likewise);
+- the resolver decides a routing refusal before any judgment
+  (`ScopeObject.deliver`), with a stable namespace identity;
+- for a `create` whose name is its seed's digest, `routed` returns no
+  refusal, whether the scope exists (also after a refused genesis) or the
+  store is empty (`scope/src/namespace.ts:92-102`).
+
+So for the root's own correctly built `create`, `undelivered` signals a
+fault: a misaddressed envelope or a changed namespace. A misaddressed
+envelope can be refused while some other child exists, and an unavailable
+or unreachable service proves nothing. The design treats only the
+complete, all-routing-refused log of this one send as ending its
+generation, and reports the fault on the item.
 
 A second `applied` result in another incarnation of the same seed runs the
 `conflict` clause (`derive/src/delivery.ts:285-290`). It sets the flag and
@@ -242,6 +269,53 @@ keeps the first `scope`. So there are never two live successors.
 
 Without A1, an `index` that does not fit gets `retry("scope-full")`, as
 today. A1 (section 10) replaces that only when the refusal is permanent.
+
+### 4.10 A revoked key and publication (F7)
+
+Today a key revoked as compromised reaches the destination only through
+the root: membership tells the root (`membership.ts:512`), which tells the
+destination (`directory.ts:344-362`). The destination's `abort-if-behind`
+then sets `aborting`, revokes a live token and opens the deciding read
+(`destination.ts:439-457`, `:1729-1766`). The push rule reads `aborting`
+and makes no fresh membership read (`destination.ts:1934-1964`). Under
+C1, unrelated traffic can fill the root outside its reservation. The
+relay then waits at membership, and publication would continue.
+
+**D1, the guarantee.** A new destination version, pinned by the partition
+cohort, adds observation rows to the `mint` outcome kind, as `judge`
+already has them (`destination.ts:465-471`):
+`{ of: "key", from: "rule", max: 9, window: 10, use: "once", without: "wait" }`.
+The rule names the keys behind the publication: those the reservation
+entry observed (the merger's key and the keys behind counted verdicts or
+the deciding result), at most 9. A push request is sent only after its
+mint has an outcome (`destination.ts:1944-1947`), so every push attempt
+is gated by that outcome entry.
+
+- Every key is active in the read: the entry is as today.
+- A key is revoked or compromised: the entry sets `aborting`, revokes the
+  token it minted and opens the deciding read, as `abort-if-behind` does.
+  No push request leaves for that attempt.
+- The read cannot be made: the entry is not written (`without: "wait"`).
+  The mint has no outcome, so no push request leaves. Publication waits.
+
+The read is bounded: at most 9 key observations, each one membership read
+under the observation limits the destination already uses. It adds no
+operation and changes no custody: tokens, receipts and the deciding read
+work as now.
+
+**What is guaranteed without the relay.** No push request leaves unless
+the entry that recorded its mint's outcome also recorded every key behind
+the publication as active, from a read at most 10 seconds old when that
+entry was written. A revocation that a membership read can see stops the
+next attempt. The time from that entry to the send is not bounded here;
+the minted token's own lifetime limits it. Not guaranteed without the relay: early revocation of a
+token minted before the revocation, the recall of a push already sent,
+and an abort while no attempt is due. The relay, when it arrives, still
+does these.
+
+The fallback named by the planner, a bounded relay reservation for lanes
+with reserved, publishing or unresolved work, is not taken, because D1's
+read is bounded and fits current custody (Q10).
 
 ## 5. Reads (F5)
 
@@ -279,7 +353,7 @@ snapshot.
 | Root commits, crashes before the `create` leaves | The `create` is in the outbox. | The alarm dispatches it. |
 | The `create` arrives twice | A repeat, answered from the genesis (`derive/src/genesis.ts:110-113`). | One successor. |
 | Successor refused, or `undelivered` | Item final; P1 free. | `open-partition` for a new generation. |
-| Successor `delivery-unavailable` | Item `creating`, with its diagnosis. | Pending; recovery is a resend of the same `create`. |
+| Successor `delivery-unavailable` | Item `creating`, with its diagnosis. | Pending, shown with its diagnosis. Recovery is the operator's one-shot `sendAgain` of the same `create`. |
 | Two members sign `seal` | Serial turns; the flag is set once. | The second is refused `partition-sealed`. |
 | `open-partition` races a `seal` | Serial turns; P1 holds. | One live partition. |
 | A stale client | Its opening act is refused `partition-sealed`. | It reads the root again. |
@@ -299,7 +373,9 @@ at most 3 per generation, because each failed creation ends its
 generation, and C1 reserves 3 for each. So all handoff history, success
 and failure, fits in 3,000 entries reserved from the start. The rest of
 the budget, less the founding entries and `owed`, takes other new work:
-`compromised` relays (2 entries each), refused or foreign requests (1
+`compromised` relays (the root's deciding entry, then the destination's
+result, with a diagnosis first if that is lost), refused or foreign
+requests (1
 each), `conflict` results (1 each), import retries and checkpoints. These
 are capacity-limited. When the rest is spent they are refused
 `scope-full`: a request stays pending at its sender, and a result is sent
@@ -312,6 +388,10 @@ the `seal` until it is used. Then `scope-full`, or A1.
 
 ## 8. What stays unchanged
 
+- Security behavior is not unchanged. In a new room the `compromised`
+  relay can wait behind unrelated root traffic, and D1 (section 4.10)
+  is what stops publication for a revoked key. Rooms of old cohorts keep
+  their current relay and push behavior.
 - Rooms on `platform:directory@1` to `@9`, and their registers and
   cohorts. They keep the interim behavior that `c9a2c676` chose:
   `scope-full` with reserved settlement entries (request `cc570904` and
@@ -339,13 +419,15 @@ path, as the existing budget witnesses use.
 | P1 | Interleave `seal` and `open-partition`; at every root head at most one item is `creating` or `active`. | Remove the P1 guard |
 | Unique numbers | Issues and post-seal concerns in two generations; no number repeats. | Drop the base offset |
 | Authority | `open-partition` without `issue.open`, an early `seal`, and a `seal` from a foreign directory-kind scope are refused. The partition's refs equal the root's. Root and partition consumers are told apart (Q6, Q7). | |
+| F7: revoked key behind a held publication | Fill unrelated root traffic to the new-work boundary, so the `compromised` relay is refused. Hold a publication in `reserved`; revoke, as compromised, the merger's key. The next mint outcome observes the key, sets `aborting`, revokes the token and opens the deciding read; no push request leaves. Repeat across a restart before and after that entry. Also: the membership read cannot be made, and the entry waits with no push. | Remove D1's observation: the push is sent |
 | Old pins | Existing `@1` to `@9` witnesses replay unchanged. | |
 | A1, when built | Only a permanently full partition answers `dropped`; the lane stops sending; no partition entry; the reader marks the partition incomplete. | Drop on a transient refusal |
 
-## 10. Contract additions owed
+## 10. Prerequisites owed
 
-Each needs its own reviewed contract revision before the Source that uses
-it. Partitions without A1 keep today's resends.
+Each needs its own reviewed contract or definition revision before the
+Source that uses it. Partitions need C1, C2 and D1 first. Without A1 they
+keep today's resends.
 
 - **C1, standing reservation.** A platform definition may declare
   `entries × (max − count)` from a count slot of its one item, added to
@@ -353,6 +435,8 @@ it. Partitions without A1 keep today's resends.
 - **C2, `int` indexed type.** Add `int` to the seven indexed types
   (`derive/src/binding.ts:38`, section 17.2a). The key is the canonical
   decimal text. Fixed and required, as for the others.
+- **D1, push-time key standing.** A new destination version (section
+  4.10), with its own review, pinned by the partition cohort.
 - **A1, dropped index.** A platform `advisory` handler may declare
   `full: "drop"`. The receiver first verifies the source, the send, the
   address and the handler, as today. It answers `dropped` only when the
@@ -388,13 +472,20 @@ review `e8416df9`.
   It is tuning only; F1's reservation is the guarantee.
 - **Q9.** The GitHub importer follows the same protocol, including
   `partition-full`, `seal` and every failure case of section 4.8.
-- **Q10 (new, for checker).** Should the root also reserve room for
-  `compromised` relays, so that foreign traffic cannot delay them? The
-  proposal is no: they are capacity-limited like other new work, and a
-  refused relay stays pending at membership.
-- **Q11 (new, for checker).** Confirm that a routing refusal is never the
-  answer for a `create` whose seed's scope exists. Section 4.8 rests on
-  it.
+- **Q10.** Changed after checker finding F7. The relay is not reserved,
+  and is not the safety path. The primary guarantee is D1: each push
+  attempt is gated by a fresh, bounded read of the standing of every key
+  behind the publication, and fails closed (section 4.10). The relay stays
+  capacity-limited and only speeds up the abort. The fallback, a bounded
+  relay reservation for lanes with held publications, is not needed,
+  because the read is bounded and reuses the destination's existing
+  observation rows.
+- **Q11.** The checker confirmed it only for the one-namespace resolver
+  and a correctly addressed `create`. Section 4.8 now states those
+  preconditions, not a universal transport claim.
+- **Q6, Q7 (unchanged).** In the first Source, builder's source search
+  and the real Authority witness; nothing is inferred from kind
+  `directory` alone.
 
 ## 12. Findings of review `e8416df9`
 
@@ -405,4 +496,6 @@ review `e8416df9`.
 | F3 | `undelivered` ends the generation; `delivery-unavailable` stays pending and is resent unchanged; `conflict` only sets a flag (4.2, 4.8). Two witnesses. |
 | F4 | Successful work ≤ 2 per generation; all handoff history ≤ 3 per generation under C1; other control traffic is capacity-limited (4.7, 7). |
 | F5 | Lookups by generation, number and lane seed, each one key seek, with no walk fallback (4.3, 5); C2. |
-| F6 | No completion time is claimed; the pending conditions are stated (6). |
+| F6 | No completion time is claimed; the pending conditions are stated (6). The resend after `delivery-unavailable` is the operator's explicit one-shot `sendAgain`. |
+| F7 | D1 gates every push attempt on a fresh read of key standing and fails closed; the relay is an accelerator, capacity-limited (4.10, 7, Q10). Witness F7. |
+| Q11 | Preconditions stated: one-namespace resolver, correctly addressed `create`, complete attempt log (4.8). |
