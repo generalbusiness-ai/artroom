@@ -90,6 +90,7 @@ function location(request: Request): { place: string; scope: string | null } {
     const place = route === "outbox" && parts[5] ? "duty" : ["acts", "preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "history", "entries", "outbox", "log", "retained", "sessions", "stream", "incidents", "waiting", "requests", "credential"].includes(route) ? route : "other";
     return { place, scope };
   }
+  if (parts[1] === "health" && parts.length === 2) return { place: "health", scope: null };
   if (parts[1] === "site") return { place: "site", scope: isScopeId(parts[2]) ? parts[2] : null };
   if (["page", "brand", "counting", "lending"].includes(parts[1] ?? "")) return { place: "page", scope: null };
   return { place: "other", scope: null };

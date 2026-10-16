@@ -36,6 +36,11 @@ interface Configuration {
 interface Cleanup { name: string; token: GitHubInstallationToken }
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 const secret = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_.-]{1,4096}$/.test(value);
+/** The same nonsecret host selector used by the production wiring. */
+export function gitHubRegisterScope(raw: unknown): ScopeId | null {
+  try { return configuration(typeof raw === "string" ? raw : undefined)?.registerScope ?? null; }
+  catch { return null; }
+}
 function configuration(raw: string | undefined): Configuration | null {
   if (!raw || raw.length > 4096) return null;
   const value = exact(parseStrict(raw), ["issuer", "installationId", "account", "maxBytes", "registerScope", "privateRepositories", "publicReads", "credentialIdentity"]);
