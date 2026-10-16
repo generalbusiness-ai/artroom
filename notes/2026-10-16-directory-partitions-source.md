@@ -90,3 +90,31 @@ replay selection, real Authority/capacity/handoff witnesses and operator
 consumers are unfinished. The separate A1 dropped-advisory contract is
 not included. No production capacity claim follows from a smaller test
 maximum.
+
+## Receiver policy reconciliation
+
+Technical advice `a1405c8f` is adopted. The producer's default native
+name stays unchanged. New code collects a closed bounded raw proof view;
+each receiver derives identity from its own exact code and verified birth
+lineage. That distinction also applies to core foreign fact reads,
+received handlers, retained facts, caches and replay, including the
+bootstrap of an empty concern. Membership6 alone cannot select the new
+room policy, because the old invitation-key cohort already uses it.
+
+The first pure direct-birth proof draft typechecks. Its eight frames
+cover a directly partition-created application or change and the actual
+root/sibling birth context. The draft is not installed on a consumer and
+has no positive native factory witness yet. Its collection limits remain
+to be implemented and verified before any resource guarantee is claimed.
+It assumes authenticated native Source frames or normally checked replay
+runs. Hash-valid arbitrary entries are insufficient.
+
+Eight frames do not cover nested issue concerns. Each concern needs its
+exact parent creation and inherited context, with bounded validation of
+the parent lineage. A total frame, work, depth, byte and deadline budget
+must cover the entire chain. Missing or exhausted evidence stays
+unresolved; a parent label cannot substitute for the proof. Existing
+legacy receivers keep their original fact, handler, close, pin-confirm
+and unpin interpretation. New-policy labels cannot leak through caches
+or retained metadata into those receivers. Those authority-sensitive
+collection and consumer changes remain unfinished.
