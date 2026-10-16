@@ -7,6 +7,8 @@ import { operationId, snapshotInput, snapshotRead, stagedRefName, timeMs } from 
 import { isAnswer } from "../src/operations.ts";
 import { ScopeObject, SqliteStore, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
 import { variant } from "@generalbusiness/dap-derive/testing";
+import type { MetricPoint } from "../src/metrics.ts";
+import { metricBindings } from "./worker.ts";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { open } from "./operation-opening.ts";
@@ -71,8 +73,11 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     const held = await surface(s).operations(reader, undefined, true);
     expect([(await s.head()).seq, out.sent.length, held.ok && held.value.map((o) => [o.operation.id, o.state, outcomes(o)])]).toEqual([3, 2, [[op, "unknown", [["unknown at 2"], ["confirmed at 3"]]]]]);
 
+    const metrics: MetricPoint[] = [];
+    metricBindings.set(s.object.id.toString(), { DEPLOYMENT: "late-outcome-metrics-test", METRICS: { writeDataPoint: p => metrics.push(structuredClone(p)) } });
     // That request's own late answer settles it: one more outcome. The `unknown` entry stays as it was written.
     expect(await late(s, out, op, 1, own("c1"))).toMatchObject({ recorded: "written", fact: { seq: 4 } });
+    expect(metrics.some(p => p.blobs[0] === "turn" && p.blobs[3] === "dispatch" && p.blobs[4] === "answer" && p.blobs[8] === "none" && p.doubles[5] === 1)).toBe(true);
     const settled = await seen(s, op);
     expect([settled.state, outcomes(settled), (await s.sealed(2))[0]]).toEqual(["settled", [["unknown at 2", "confirmed at 4"], ["confirmed at 3"]], unknown]);
     // The same answer again, another answer of that attempt, and an answer to an attempt that was never sent: each writes nothing.

@@ -24,7 +24,7 @@ import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, Rule
 import { ownOf, retainedFacts, snapshotsOf } from "./core.ts";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
-import { entryCorrelation, inOperation, metric, operational } from "./operational.ts";
+import { entryCorrelation, inOperation, measured, metric, operational, type Operational } from "./operational.ts";
 
 // ---------------------------------------------------------------- step 1: before the turn
 
@@ -160,6 +160,9 @@ export class Turns {
    * changes nothing: the entry is sealed.
    */
   #sealed: (() => void) | null = null;
+  #measurement: (() => Operational) | null = null;
+  /** An independent late callback has no caller context to inherit. */
+  measureWith(context: () => Operational): void { this.#measurement = context; }
   onSealed(told: () => void): void { this.#sealed = told; }
 
   /** Run `commit`, one transaction, and tell the listener if the head moved. A transaction that throws committed nothing, and tells nothing. */
@@ -184,7 +187,9 @@ export class Turns {
    * definition is.
    */
   async run<A>(waiting: Waiting<A> | null, founding?: ValidDefinition): Promise<End<A>> {
-    const context = operational(), started = performance.now();
+    const current = operational();
+    if (!current && this.#measurement) return measured(this.#measurement(), () => this.run(waiting, founding));
+    const context = current, started = performance.now();
     if (context) context.turn.entered = true;
     const turn: Counts = { attempts: 0, restarts: 0, timed: 0, wrote: false, last: null };
     const failures = { count: 0 };

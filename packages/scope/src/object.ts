@@ -230,6 +230,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
     // Every commit that seals an entry is followed at once, whoever asked for its turn: a pass in the background and a late answer
     // of an outside operation write their entries in no caller's request, and nothing guarantees an alarm after the last of them.
+    this.#scope.turns.measureWith(() => this.#context("dispatch"));
     this.#scope.turns.onSealed(() => {
       this.#operations.committed();
       this.#followed();
