@@ -8,7 +8,7 @@ implementation remain builder work.
 
 Reviewed the complete Draft 3 at
 `90b91f3152960746d166e61e12858181ba700bb9`,
-`notes/implementation/2026-10-04-carry-pass-amendment.md`: 23,570 UTF-8 bytes,
+`notes/2026-10-04-carry-pass-amendment.md`: 23,570 UTF-8 bytes,
 348 lines, SHA256
 `2c74ded975a3d3518b7e47055ccd8b294fc75001cbc680c21c64fb0537a201d5`.
 Also reread the complete 014 review and the relevant current protocol

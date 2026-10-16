@@ -6,7 +6,7 @@
 artifact or landing. This saved review is planning evidence, not a
 protocol amendment, source approval or runtime reproduction.
 
-Reviewed complete proposal: `notes/implementation/2026-10-04-carry-pass-amendment.md` at
+Reviewed complete proposal: `notes/2026-10-04-carry-pass-amendment.md` at
 `077bf24a736bdaae4dd4abe5f449a79fa58c57e8`, 16,328 UTF-8 bytes,
 256 lines, SHA256
 `8d2ade4b7ea46d238d4b1b086860d1256b49d65288567c2c414da9e59a601f0c`.

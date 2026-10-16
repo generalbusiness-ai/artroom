@@ -52,7 +52,7 @@ These are repository excerpts, not inferred behavior:
 - `packages/cli/src/commands.ts:344`: `if (config.repository) return usage(\`A repository is claimed here already: directory ${config.repository.directory.scope}.\`);`
 - `315785966:packages/cli/src/commands.ts:856`: "default 1, from 1 to 24" for clone token hours; `:901–902` saves only `remote`, then calls Git with `headerEnv(authorization(repository, value.token))`.
 - `315785966:packages/cli/src/commands.ts:1066`: `run artroom merge ${lane} again only after artroom log ${lane} shows the merge ${seq} ended.`
-- `notes/reports/2026-10-07-23-sprint-report.md:64–66`: "The member's path, edit, issues, the page and the planned install are not on main."
+- `notes/2026-10-07-23-sprint-report.md:64–66`: "The member's path, edit, issues, the page and the planned install are not on main."
 
 **Count unit:** six command invocations, not six shell tokens or six unique verb families: (1) install --plan, (2) install --planned, (3) claim, (4) act publish, (5) act activate issue, (6) act activate change; plus one out-of-band Worker-setting intervention. This ends at application readiness, before invitations, clones, issue creation or any content publication. The observed setup shots run from 03:07:42.287Z to the end of change activation (03:08:13.835Z by start 03:08:12.535Z + 1.3s), approximately 31.5 seconds including the operator wait; the user still has not completed a useful issue/change. This is the transcript's runner clock, not a measured cold-user study. [Source](/Users/hughpyle/tmp/artroom-rehearsal-1/transcript.md:3); [Source](/Users/hughpyle/tmp/artroom-rehearsal-1/transcript.md:70)
 

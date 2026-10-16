@@ -313,7 +313,7 @@ script 0.48 s wall (zsh `time`), exit 0, 70 lines, SHA-256 beginning
 | I1, the scope substrate: `contract`, `bytes`, `derive`, `scope`, `replay`, `client` | `f1c456ce` (merge of `a3e5a77e`) | A developer can found a directory scope, act on it with signed intents, compose scopes that deliver to each other, read them through bounded reads, and replay a history independently to a report that names what it trusts |
 | Three review repairs of the I1 head | `34d3b656`, `ebad6f0c`, `a3e5a77e` | A client's transport reads a reply as raw bytes up to 4 MiB; an intent's actor and signature are read by their guards; the bounded reader stops with its exchange |
 | `spikes/parked/` with `spikes/parked/README.md` | in `f1c456ce` | A dated ledger of each earlier module: its successor delivery, what may be kept after review, and what removal is owed |
-| `docs/scopes.md` and `notes/implementation/2026-10-05-i1-delivery.md` | in `f1c456ce` | A guide to the six packages, and the witness test for each acceptance point of the request |
+| `docs/scopes.md` and `notes/2026-10-05-i1-delivery.md` | in `f1c456ce` | A guide to the six packages, and the witness test for each acceptance point of the request |
 | I1 story, note and script | `e3b98861`, `6b863c51` | One reproducible run of the substrate, under a second, with its limits stated |
 | Person journey note | `4a7a13a1` (16:40 EDT on 2026-10-04, before this sprint) | The person's story above, with the helper commands it needed |
 | Active-source test reads tracked files only | `c9a16778` (merge of `df788167`, 04:41 EDT) | `npm test` passes again in a checkout that once built the parked packages; reviewed by the planner in the checker's absence (verdict `92072db3`), ratified by builder |

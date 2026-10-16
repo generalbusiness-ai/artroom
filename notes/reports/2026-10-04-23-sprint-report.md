@@ -4,7 +4,7 @@ Sprints are eight hours long and end at 07:00, 15:00 and 23:00 Eastern.
 Each one ends with a report on main that tells a user's story about
 capability that is on main and works, and says what did not land. This
 report covers 15:00 to 23:00 Eastern today. The baseline is
-`notes/reports/2026-10-04-15-sprint-report.md` at main `e6e67828`. Main at the
+`notes/2026-10-04-15-sprint-report.md` at main `e6e67828`. Main at the
 boundary is `b2a0bb12`.
 
 Everything marked "observed run" is quoted from
@@ -37,7 +37,7 @@ tool-recorded merge commits `08c6a0fa` to `b6a9c0b6` under route act
 landed head passed with 2,055 tests (builder's run, as reported). The spike
 was redeployed from `b6a9c0b6`, the release packed as `0.1.0-dev.1` (six
 tarballs; 55 release checks passed; nothing published), and builder's
-journey landed as `notes/reports/2026-10-04-23-spike-journey.md` at `9d8e61e9`.
+journey landed as `notes/2026-10-04-23-spike-journey.md` at `9d8e61e9`.
 
 ## An agent's story
 

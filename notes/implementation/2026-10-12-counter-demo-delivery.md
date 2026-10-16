@@ -3,7 +3,7 @@
 Composition candidate: `6f2bde6d8ba259d00c1e863c1a0e5593aa1f4bc2`.
 Counter source and assets equal visual head
 `a4b1d7f1529aba6cc0f9c206d515478a984e13d7`; composition adds only the
-planner sprint report, `notes/reports/2026-10-11-23-sprint-report.md`.
+planner sprint report, `notes/2026-10-11-23-sprint-report.md`.
 Request `934bb6c95f5d0863ce147c165686d29a864bbeda`, promise
 `6ed433cb4c0b43acd3a55bc62e2e40df2e944498`.
 Adopted mockups and settlements: `a463ba0`.

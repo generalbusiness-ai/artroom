@@ -24,7 +24,7 @@ independent reviews of main at `4a7a13a1`:
 | Authority note | `notes/2026-10-04-authority-effects-and-publication.md`, adopted revision 9 | `8b8f946d` |
 | Proof plan | `notes/2026-10-04-proof-and-test-economy.md`, adopted revision 8 | `c3e699a6` |
 | Lane forms | `notes/2026-10-04-lane-forms-and-browser-flow.md`, adopted revision 12 | `03cb4ee5` |
-| I1 plan | `notes/implementation/2026-10-04-i1-implementation-plan.md`, with the I1 source and `spikes/parked/README.md` | `3ed99af5` |
+| I1 plan | `notes/2026-10-04-i1-implementation-plan.md`, with the I1 source and `spikes/parked/README.md` | `3ed99af5` |
 
 Revision 9 of the scope contract was being written and was not read.
 For the corrections of section 7, the proof plan's main note and its

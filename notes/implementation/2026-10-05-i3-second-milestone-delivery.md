@@ -1007,7 +1007,7 @@ is by reading.
 
 **The merge.** `origin/main` moved to `c0500c315` after milestone F
 landed in `b452882f8`. I merged it at `082efdf21`. It brought two
-documents, `notes/reports/2026-10-05-23-sprint-report.md` and
+documents, `notes/2026-10-05-23-sprint-report.md` and
 `plans/021-2026-10-05-jam-as-the-late-night-meme.md`, and no source:
 `git rev-parse HEAD:packages` was `166c2676af34078b14c654151c36fd6c0cc9bd63`
 before the merge and after it (run).

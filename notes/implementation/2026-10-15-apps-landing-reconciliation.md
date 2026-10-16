@@ -27,7 +27,7 @@ tree. No application source, test, asset, manifest, or lockfile changes.
 Run these commands in the prepared checkout:
 
 ```sh
-git diff --exit-code 80976213df684ed6bed200c793e76001eed74b11 HEAD -- . ':!README.md' ':!notes/implementation/2026-10-15-apps-landing-reconciliation.md'
+git diff --exit-code 80976213df684ed6bed200c793e76001eed74b11 HEAD -- . ':!README.md' ':!notes/2026-10-15-apps-landing-reconciliation.md'
 git diff --exit-code a86b8fdaf427f08f4d2927a7a817792896c40c93 HEAD -- README.md
 git merge-base --is-ancestor a86b8fdaf427f08f4d2927a7a817792896c40c93 HEAD
 git diff --check 0548b726d0a3e17ec171e71d93365d5311f61ccf HEAD

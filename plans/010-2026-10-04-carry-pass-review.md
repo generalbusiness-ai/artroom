@@ -7,7 +7,7 @@ This live request owes a decision with reasons, no Git artifact or landing.
 It replaces `795d0ad4`, retired by `7a792d51`; the earlier delivery
 `2f9952c3` was ineffective because that request inherited a landing duty.
 
-Reviewed proposal: `notes/implementation/2026-10-04-carry-pass-amendment.md` at
+Reviewed proposal: `notes/2026-10-04-carry-pass-amendment.md` at
 `b008a326486bb823823a71ecd4778a734c609d7a`, 8,726 UTF-8 bytes,
 153 lines, SHA256
 `5c0fd23de05d9be49addb06409216e0975aaa60d868240c8682aa1c81a8c47b2`.

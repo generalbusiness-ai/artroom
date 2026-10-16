@@ -10,8 +10,8 @@ No gitseq request was filed: this container has no workroom.
 
 The brief carried three tasks. Two of them, the issue commands with
 `--closes` and `verify --all`, and edit a page, are already delivered and
-merged at `67fe67f9` (`notes/implementation/2026-10-07-i5-issues-delivery.md`,
-`notes/implementation/2026-10-07-i5-edit-page-delivery.md`), so this branch builds on
+merged at `67fe67f9` (`notes/2026-10-07-i5-issues-delivery.md`,
+`notes/2026-10-07-i5-edit-page-delivery.md`), so this branch builds on
 them and does not redo them. This note is the third: the demo runner.
 
 Each claim is labelled: **[code]** read from code, **[run]** confirmed by a
