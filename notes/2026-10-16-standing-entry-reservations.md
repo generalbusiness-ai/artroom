@@ -109,3 +109,20 @@ No mutation sweep ran. A frozen gate and final Source review follow the
 complete local-main composition and normal asset producers.
 
 No GitHub push, Cloudflare deployment, provider action or export ran.
+
+## Frozen composition
+
+C1 preparation `e8964037` composes the approved archive design on
+`c3efd0d9` and public-query candidate `757ec063`, both without conflict.
+These are inherited prerequisites, not new C1 implementation claims.
+The query's local-main merge is completing normal durable succession
+separately. All 75 focused cases pass again after this composition.
+
+The extracted item-effects block is byte-identical to its original in
+`f56204f9` after trimming surrounding blank lines; that compared block's
+SHA-256 is
+`c04e61d18ef46f71c1839de91ca0407c7abb83f44b01032bb2fec5f139945785`.
+The normal Page and Counting asset producers run on the composed Source.
+Only the Page asset module changes: its JavaScript includes the new
+standing declaration validator. Counting output remains unchanged. This
+slice makes no rendered-layout or deployed-browser claim.
