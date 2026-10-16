@@ -136,3 +136,53 @@ neither typechecking nor tests ran. The wrapper is
 this failed gate. The compared trimmed interpreter block, runtime behavior,
 tests and generated assets are unchanged. The corrected head gets its own
 gate; the stopped run is not a pass.
+
+## Corrected gate and bounded Counting completion
+
+The corrected clean Source head is
+`7b62ad2da04b11902a0db59cded4fe98afc4fc45`, tree
+`aa01dcf21e1308317f487be5004bf4e70f305c48`. Its original gate process
+closed with exit 1. Installation was skipped against the matching adopted
+lock stamp. Whitespace passed (0.1 seconds elapsed / 0.1 CPU) and
+typechecking passed (8.0 / 25.9). The test stage exited 1 (590.4 / 331.4):
+all 1,384 Vitest tests passed, three skipped, and all 16 Node checks passed.
+The Counting client child stalled; the remaining Counting tests continued
+when that single identified child was terminated with SIGTERM. The
+Counting runner reports 51 passed plus one failed test-file process. This
+is a failed gate, not a whole-gate pass.
+
+A bounded diagnostic runs that exact generated client test file with a
+30-second test timeout. All nine cases pass, exit 0, in 588.8 milliseconds.
+The original stalled process had waited for more than five minutes with
+negligible CPU use and no network socket. No whole suite was rerun. The
+51 original Counting passes and nine focused passes cover exactly the
+same 55 distinct case names as the successful query gate: none missing or
+extra. The intermittent wait remains unexplained; the diagnostic does not
+establish its cause.
+
+All four generated Counting test outputs are byte-identical to the
+successful query gate's outputs. Their SHA-256 hashes are:
+
+| Generated test | SHA-256 |
+|---|---|
+| client | `7949b03068d55e2b083c5fa9a26fc4504a5eca49825e7f30cf0ffeace46e5cd5` |
+| voice-controller | `9c1c69517cef23d4b379869faa510bb3022163b90a3d755918182f42bb65c49c` |
+| app | `bef7b612878b2ccaa9e50cbb65136db9f06c8b2ed4e60b994e004f48570e1f3a` |
+| device-key | `148a63bcce4d4c001959e71b5a15df2dda395d67f361b3ab50192eae8b42cad9` |
+
+The wrapper is `/tmp/artroom-c1-7b62ad2d-gate.log`, with private raw stage
+directory `tmp.doHzMp05IG`. The focused diagnostic is
+`/tmp/artroom-c1-counting-client-diagnostic.log`. Counting's generated
+current-output directory is `artroom-counting-node-GoVKGu`; the successful
+query comparison is `artroom-counting-node-xg2mVr`. Only closed public test
+metadata is offered to review; private raw logs receive no general read
+grant.
+
+This reporting-only successor changes this note alone. Source, tests and
+generated assets remain byte-identical to `7b62ad2d`. Final review must
+assess the failed gate together with this exact bounded completion, rather
+than infer a full rerun or erase the stalled test. Local query main
+`cf07ac85` contains the approved query and archive notes; C1 differs from
+it in exactly its 17 authored paths. Main merge accounting still completes
+through the original gitseq process; no repeated merge, push or deployment
+is authorized by these test results.
