@@ -664,6 +664,8 @@ unknown and partial results keep those labels. Admin sessions can read
 waiting lists and incidents. Correlation rows are read only with the
 explicit request selector. See [Status reads](operations.md#status-reads)
 for the columns, bounds and permission rules.
+Status exits 0 when it produces a report, including a report with unknown
+or partial columns. Failure to obtain a room session exits 1.
 
 Before it reads, the command asks the repository's membership scope for a
 read session, signed by its key. If membership gives none (a service with

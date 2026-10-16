@@ -46,7 +46,13 @@ describe("the artroom command on real scopes with the real read sessions. The Gi
 });
 
 async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
-  const fetch = ((url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init))) as unknown as Fetch;
+  let lastActRequest: string | null = null, correlationReads = 0;
+  const fetch = (async (url: string, init?: RequestInit) => {
+    if (new URL(url).pathname.endsWith("/requests")) correlationReads++;
+    const response = await lifetime.wait(() => routed(url, init));
+    if (new URL(url).pathname.endsWith("/acts")) lastActRequest = response.headers.get("dap-request-id");
+    return response;
+  }) as unknown as Fetch;
   const now = lifetime.now;
   const node = lifetime.platform;
   let register: Platform | null = null;
@@ -237,6 +243,8 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   lifetime.setHold(envelope => envelope.message.class === "request" && envelope.message.type === "create" && "kind" in envelope.to && envelope.to.kind === "inbox");
   const queuedMember = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@status-check", "--set", "kind=checker");
   expect(queuedMember.code, queuedMember.lines.join("\n")).toBe(0);
+  const queuedRequest = lastActRequest;
+  expect(queuedRequest).toMatch(/^[0-9a-f]{16}$/);
   await dispatchFixture([M], lifetime.wait);
   const queuedEntry = Number(/:(\d+),/.exec(queuedMember.lines[0]!)![1]);
   const membershipAt = await M.at();
@@ -244,10 +252,17 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
     const record = new OperatorRecord({ exec: (query, ...args) => state.storage.sql.exec(query, ...args) }, { read: () => timeOf(now()) }, () => membershipAt);
     expect(record.found("bad-input", [{ entry: queuedEntry }])).toBe(true);
   }));
+  const beforeCorrelationReads = correlationReads;
   const pendingStatus = await run(rita, "status", "membership");
   expect(pendingStatus.code, pendingStatus.lines.join("\n")).toBe(0);
   expect(pendingStatus.lines.some(line => line.includes("outbox: 1 requests without a result"))).toBe(true);
   expect(pendingStatus.lines.some(line => line.includes("incidents: 1; at entry"))).toBe(true);
+  expect(correlationReads).toBe(beforeCorrelationReads);
+  const correlatedStatus = await run(rita, "status", "membership", "--request", queuedRequest!);
+  expect(correlatedStatus.code, correlatedStatus.lines.join("\n")).toBe(0);
+  expect(correlationReads).toBe(beforeCorrelationReads + 1);
+  const requestRows = correlatedStatus.lines.filter(line => line.startsWith("    {")).map(line => JSON.parse(line));
+  expect(requestRows.some(row => row.request === queuedRequest && row.seq === queuedEntry)).toBe(true);
   lifetime.setHold(() => false);
 
   // What stays forbidden: a key of another register, which signed nothing in this one and holds no session of this repository.
