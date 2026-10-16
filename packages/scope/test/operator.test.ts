@@ -4,6 +4,8 @@ import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Delivered } from "@generalbusiness/dap-derive";
 import { incidentsOf, type Incident, type Resent } from "../src/index.ts";
 import { desk, later, net, settle, ticket, una, type Node } from "./net.ts";
+import type { MetricPoint } from "../src/metrics.ts";
+import { metricBindings } from "./worker.ts";
 import { reader } from "./support.ts";
 
 // The plan's T41 (authority note, section 12, G13 and G17; the contract's section 7.4). Real scopes in the namespace `NET`, with the test
@@ -31,6 +33,8 @@ describe("the operator's record and the requests that wait (authority note, sect
   test("T41: the two lists are bounded reads of the scope's own sends, and nothing is inferred from either; an instruction to send again dispatches the same envelope once, writes no entry and no second diagnosis, and is written to the operator's record, which no judgment reads", async () => {
     const D = await desk();
     const S = await ticket(D, "S");
+    const metrics: MetricPoint[] = [];
+    metricBindings.set(S.object.id.toString(), { DEPLOYMENT: "operator-metrics-test", METRICS: { writeDataPoint: p => metrics.push(structuredClone(p)) } });
     // A request to an incarnation that the desk does not have: every attempt is refused, and it ends `undelivered`. It waits in no list.
     const lost = { ...(await D.at()), inc: (await S.at()).inc };
     const refused = await S.did(una, "ask", { fields: { desk: lost } });
@@ -67,6 +71,8 @@ describe("the operator's record and the requests that wait (authority note, sect
       .toEqual([[before.summary.at, before.summary.value.items], before.entries, before.row.diagnosis, null, before.row.attempts.length + 1, 1, [duty(diagnosed)]]);
     // It is written to the operator's record, with the scope and the duty, and nothing else.
     expect(await recorded(S)).toEqual([{ kind: "sent-again", refs: [{ duty: duty(diagnosed) }], scope: await S.at() }]);
+
+    expect(metrics.filter(p => p.blobs[0] === "incident" && p.blobs[5] === "sent-again").map(p => p.doubles)).toEqual([[1, 0, 1, 0, 0, 0]]);
 
     // A request that is in neither list is not sent again: one that was settled `undelivered`, one that no entry sent, and a value that is no duty ID.
     expect([await surface(S).resend(duty(refused)), await surface(S).resend("999.0"), await surface(S).resend({ duty: 1 }), sent.length, (await recorded(S)).length])

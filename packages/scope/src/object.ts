@@ -63,6 +63,8 @@ import { LATE, within } from "./turn.ts";
 import { SqliteStore, type Sql } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
 import { siteDestination, sitePublication, sitePublishedCommit } from "./site/publication.ts";
+import { RequestIndex, requestQuery } from "./request-index.ts";
+import { background, inOperation, measured, measuredSync, metric, OBSERVED_METHODS, operational, operationContext, operationPlace, type MetricEnvironment, type OperationalIdentity, type ObservedMethod } from "./operational.ts";
 
 /**
  * What a deployment gives a scope in place of a default. `authority`: the
@@ -136,6 +138,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #limits: JoinLimits;
   readonly #sessions: () => Sessions | null;
   readonly #requests: SessionRequests;
+  readonly #requestIndex: RequestIndex;
   /** The roots of this scope's cause chains, each found once (`signed-reads.ts`). */
   readonly #chains: Chains;
   readonly #signed: SignedReading;
@@ -214,7 +217,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     });
     this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains, ...(wiring.signedReadObserver ? { observe: wiring.signedReadObserver } : {}) };
     this.#readers = ports.readers;
-    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners());
+    this.#requestIndex = new RequestIndex(this.#readSql);
+    this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners(), { index: this.#requestIndex, now: () => Date.now() });
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
     this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
@@ -228,6 +232,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
     // Every commit that seals an entry is followed at once, whoever asked for its turn: a pass in the background and a late answer
     // of an outside operation write their entries in no caller's request, and nothing guarantees an alarm after the last of them.
+    this.#scope.turns.measureWith(() => this.#context("dispatch"));
     this.#scope.turns.onSealed(() => {
       this.#operations.committed();
       this.#followed();
@@ -263,6 +268,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * while the object is constructed.
    */
   protected wiring(_name: string | undefined): Wiring { return {}; }
+  /** Optional operational binding; it is never a native authority port. */
+  protected metricEnvironment(): MetricEnvironment { return this.env as MetricEnvironment; }
 
   /**
    * After a call that may have committed: a dispatch pass that the caller
@@ -274,8 +281,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   #sent<A>(answer: A): A {
     this.#fresh = false;
     this.#followed();
-    if (this.#dispatcher) this.ctx.waitUntil(this.#dispatcher.run().catch(() => 0));
-    this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+    if (this.#dispatcher) this.ctx.waitUntil(background("dispatch", () => this.#dispatcher!.run()).catch(() => 0));
+    this.ctx.waitUntil(background("dispatch", () => this.#operations.run()).catch(() => 0));
     return answer;
   }
 
@@ -289,11 +296,11 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   #first(): void {
     if (!this.#fresh) {
-      if (this.#operations.reaccepted()) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+      if (this.#operations.reaccepted()) this.ctx.waitUntil(background("dispatch", () => this.#invoke("dispatch", () => this.#operations.run())).catch(() => 0));
       return;
     }
     this.#fresh = false;
-    if (this.#store.parked(null, 1).length > 0) this.ctx.waitUntil(this.#operations.run().catch(() => 0));
+    if (this.#store.parked(null, 1).length > 0) this.ctx.waitUntil(background("dispatch", () => this.#invoke("dispatch", () => this.#operations.run())).catch(() => 0));
   }
 
   /**
@@ -311,31 +318,65 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     } catch { /* a notice or a stream line was lost, and no fact */ }
   }
 
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#sent(await this.#scope.found(founding, definition, definitions, beside)); }
+  #context(place: string, identity: OperationalIdentity = { request: null, trace: null }) {
+    const context = operationContext(this.metricEnvironment(), this.#name, place, identity, {
+      recordEntry: seq => context.identity.request === null || this.#requestIndex.record(context.identity.request, context.identity.trace, Date.now(), seq, null),
+      recordDuty: duty => context.identity.request === null || this.#requestIndex.record(context.identity.request, context.identity.trace, Date.now(), null, duty),
+    });
+    return context;
+  }
+  #invoke<A>(place: string, work: () => Promise<A>, identity?: OperationalIdentity): Promise<A> {
+    const parent = operational();
+    if (parent) return parent.place === place ? work() : inOperation({ ...parent, place, turn: { entered: false, known: true }, httpPublic: false }, work);
+    return measured(this.#context(place, identity), work);
+  }
+  #invokeSync<A>(place: string, work: () => A): A {
+    const parent = operational();
+    if (parent) return parent.place === place ? work() : inOperation({ ...parent, place, turn: { entered: false, known: true }, httpPublic: false }, work);
+    return measuredSync(this.#context(place), work);
+  }
+  #publicInvoke<A>(place: "found" | "acts" | "preparations", work: () => Promise<A>): Promise<A> {
+    return operational() ? work() : this.#invoke(`rpc:${place}`, work);
+  }
+  /** The native answer travels untouched beside one operational turn flag. */
+  async observed(method: ObservedMethod, args: unknown[], identity: OperationalIdentity, httpPublic = false): Promise<{ value: unknown; turn: boolean }> {
+    if (!(OBSERVED_METHODS as readonly string[]).includes(method) || !Array.isArray(args) || args.length > 5) throw Error("Unknown operational route");
+    const base = operationPlace(method), isPublic = ["found", "submit", "prepare"].includes(method);
+    const context = this.#context(isPublic && httpPublic !== true ? `rpc:${base}` : base, identity);
+    const call = this[method] as (...args: unknown[]) => unknown;
+    const value = await measured(context, async () => call.apply(this, args));
+    return { value, turn: context.turn.entered };
+  }
+
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#publicInvoke("found", async () => this.#sent(await this.#scope.found(founding, definition, definitions, beside))); }
   /**
    * `address`: the caller's address as the Worker's route had it, or null. Only the serving limits of a join read it (`limits.ts`):
    * at a membership scope a join is served through them, and no other act and no other scope is.
    */
   async submit(signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}, address: unknown = null): Promise<Answer> {
+    return this.#publicInvoke("acts", async () => {
     const scope = this.#store.scope();
     const judged = () => this.#scope.submit(signed, grants, beside);
     if (scope?.at.kind !== "membership" || !isJoin(signed)) return this.#sent(await judged());
     return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head, invitationProof: () => this.#scope.pinned()?.named === "platform:membership@6" }, signed, judged));
+    });
   }
   /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
-  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }
+  async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#publicInvoke("preparations", async () => this.#sent(await this.#scope.prepare(signed, grants, capability, step))); }
   settle(signed: SignedIntent): Settlement { this.#first(); return this.#scope.settle(signed); }
-  checkpoint(): Promise<Checkpointed> { this.#first(); return this.#scope.checkpoint(); }
+  checkpoint(): Promise<Checkpointed> { return this.#invoke("dispatch", () => { this.#first(); return this.#scope.checkpoint(); }); }
 
   /**
    * One delivery from another scope (section 7.4). The resolver of this
    * name answers first, from the scope's record alone: a refusal there
    * reached no judgment and recorded nothing.
    */
-  async deliver(envelope: Delivered): Promise<Delivery> {
+  async deliver(envelope: Delivered, identity?: OperationalIdentity): Promise<Delivery> {
+    return this.#invoke("dispatch", async () => {
     const refusal = routed(this.#name, this.#store.scope(), envelope);
     if (refusal) return { answer: "routing", reason: refusal };
     return this.#sent(await this.#deliveries.deliver(envelope));
+    }, identity);
   }
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
   async source(seq: number, origin = false): Promise<Sourced | null> {
@@ -370,6 +411,13 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** One owned bounded query; starts no activation turn or legacy read walk. */
   queryItems(encoded: unknown, reader: unknown) { return this.#itemQueries.read(encoded, reader); }
+  /** Admission of identifiers precedes authority and storage work. */
+  async requests(reader: unknown, request?: string, trace?: string, cursor?: string) {
+    const query = requestQuery(request, trace, cursor);
+    if (!query) return { ok: false, reason: "not-found" } as const;
+    await this.#readers.prepare?.(reader, "requests");
+    return this.#reads.requests(reader, query);
+  }
   /** Exact internal causal-proof bytes. Read-only: deliberately bypasses #first/sourceOrigin. */
   proofSource(fact: unknown, maxBytes: number, milliseconds?: number) {
     if (milliseconds === undefined) return this.#proofBytes.exact(fact, maxBytes);
@@ -419,24 +467,41 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * A read session, for a device that asks with a signed request (authority note, section 3.9). Only an active membership scope
    * answers one, from its head and its own clock. It is an answer and no entry: nothing is written.
    */
-  session(asked: unknown): SessionAnswer { this.#first(); return issueSession({ sessions: this.#sessions(), clock: this.#clock, requests: this.#requests }, this.#store, this.#scope.pinned(), asked); }
+  session(asked: unknown): SessionAnswer { return this.#invokeSync("sessions", () => {
+    this.#first();
+    const answer = issueSession({ sessions: this.#sessions(), clock: this.#clock, requests: this.#requests }, this.#store, this.#scope.pinned(), asked);
+    metric({ kind: "session", place: "sessions", end: answer.ok ? "issued" : "refused", reason: answer.ok ? "none" : answer.reason });
+    return answer;
+  }); }
   /** A stream of this scope's head, for a read session that may read the summary; or why none is opened (`sessions.ts`, `Streams`). */
-  async stream(reader: unknown): Promise<Opened | StreamRefusal> { this.#first(); await this.#prepared(reader, "summary"); return this.#streams.open(reader); }
+  async stream(reader: unknown): Promise<Opened | StreamRefusal> { return this.#invoke("stream", async () => {
+    this.#first(); await this.#prepared(reader, "summary"); const answer = this.#streams.open(reader);
+    const streams = this.#streams.counts();
+    metric({ kind: "stream", place: "stream", end: "ok", a: streams.open, b: streams.released });
+    return answer;
+  }); }
   /** The reader of the stream with that ID went away. Its subscription is released at once. */
-  release(id: unknown): void { this.#streams.release(id); }
+  release(id: unknown): void { this.#invokeSync("stream", () => {
+    this.#streams.release(id); const streams = this.#streams.counts();
+    metric({ kind: "stream", place: "stream", end: "ok", a: streams.open, b: streams.released });
+  }); }
   /** The streams open now and the subscriptions released in this run, and the windows and waiting joins of the serving limits. Counts only. */
-  serving(): { streams: { open: number; released: number }; limits: { windows: number; waiting: number } } { return { streams: this.#streams.counts(), limits: this.#limits.counts() }; }
+  serving(): { streams: { open: number; released: number }; limits: { windows: number; waiting: number } } { return this.#invokeSync("stream", () => {
+    const streams = this.#streams.counts();
+    metric({ kind: "stream", place: "stream", end: "ok", a: streams.open, b: streams.released });
+    return { streams, limits: this.#limits.counts() };
+  }); }
   /**
    * The operator's instruction to send one waiting request again, by its duty ID (authority note, section 12, G17; `operator.ts`).
    * It has no route: who an operator is, and how one is authenticated, is the installation design's. It is reached over the
    * namespace binding, as `dispatch` is.
    */
-  resend(duty: unknown): Promise<Resent> { this.#first(); return sendAgain(this.#store, this.#transport, this.#clock, this.#record, duty, this.#seconds); }
+  resend(duty: unknown): Promise<Resent> { return this.#invoke("dispatch", () => { this.#first(); return sendAgain(this.#store, this.#transport, this.#clock, this.#record, duty, this.#seconds); }); }
 
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
-  dispatch(): Promise<number> { this.#first(); return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
+  dispatch(): Promise<number> { return this.#invoke("dispatch", () => { this.#first(); return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }); }
   /** A pass of the operations driver now, or the one in flight. Resolves when it ends, with the number of requests it sent and outcomes it offered. */
-  effect(): Promise<number> { this.#fresh = false; return this.#operations.run(); }
+  effect(): Promise<number> { return this.#invoke("dispatch", () => { this.#fresh = false; return this.#operations.run(); }); }
   #maintenanceAt() {
     let now = Date.now();
     try { now = Math.max(now, timeMs(this.#clock.read()) ?? now); } catch { /* scheduler retry grants no authority */ }
@@ -444,6 +509,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** The alarm: a turn with no waiting input, at the earliest deadline (section 5.2), then a dispatch pass, then a pass of the operations driver. */
   override async alarm(): Promise<void> {
+    return this.#invoke("alarm", async () => {
     this.#fresh = false;
     try {
       // One synchronous bounded quantum gets a turn before potentially
@@ -457,6 +523,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       await this.effect();
       this.#followed();
     } finally { await this.#wakes.set(); }
+    });
   }
 
   /**
@@ -490,18 +557,18 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     if (!presentsSignedRead(reader)) await this.#readers.prepare?.(reader, read);
   }
 
-  async summary(reader: unknown): Promise<Read<Summary>> { this.#first(); await this.#prepared(reader, "summary"); await this.#rooted(reader, "summary", "summary"); return this.#reads.summary(reader); }
-  async items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { this.#first(); await this.#prepared(reader, "items"); return this.#reads.items(reader, type, cursor); }
-  async history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { this.#first(); await this.#prepared(reader, "history"); await this.#rooted(reader, "history", cursor ?? "0"); return this.#reads.history(reader, cursor); }
-  async entry(reader: unknown, seq: number): Promise<Read<Sealed>> { this.#first(); await this.#prepared(reader, "entry"); await this.#rooted(reader, "entry", String(seq)); return this.#reads.entry(reader, seq); }
-  async outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.outbox(reader, cursor); }
-  async duty(reader: unknown, duty: DutyId): Promise<Read<Duty>> { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.duty(reader, duty); }
-  async operations(reader: unknown, cursor?: Cursor, open = false): Promise<Read<readonly OperationStatus[]>> { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operations(reader, cursor, open); }
-  async operation(reader: unknown, operation: OperationId): Promise<Read<OperationStatus>> { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operation(reader, operation); }
-  async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { this.#first(); await this.#prepared(reader, "log"); await this.#rooted(reader, "log", cursor ?? "0"); return this.#reads.log(reader, cursor); }
-  async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }
-  async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
-  async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
+  async summary(reader: unknown): Promise<Read<Summary>> { return this.#invoke("summary", async () => { this.#first(); await this.#prepared(reader, "summary"); await this.#rooted(reader, "summary", "summary"); return this.#reads.summary(reader); }); }
+  async items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return this.#invoke("items", async () => { this.#first(); await this.#prepared(reader, "items"); return this.#reads.items(reader, type, cursor); }); }
+  async history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return this.#invoke("history", async () => { this.#first(); await this.#prepared(reader, "history"); await this.#rooted(reader, "history", cursor ?? "0"); return this.#reads.history(reader, cursor); }); }
+  async entry(reader: unknown, seq: number): Promise<Read<Sealed>> { return this.#invoke("entries", async () => { this.#first(); await this.#prepared(reader, "entry"); await this.#rooted(reader, "entry", String(seq)); return this.#reads.entry(reader, seq); }); }
+  async outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return this.#invoke("outbox", async () => { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.outbox(reader, cursor); }); }
+  async duty(reader: unknown, duty: DutyId): Promise<Read<Duty>> { return this.#invoke("duty", async () => { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.duty(reader, duty); }); }
+  async operations(reader: unknown, cursor?: Cursor, open = false): Promise<Read<readonly OperationStatus[]>> { return this.#invoke("operations", async () => { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operations(reader, cursor, open); }); }
+  async operation(reader: unknown, operation: OperationId): Promise<Read<OperationStatus>> { return this.#invoke("operations", async () => { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operation(reader, operation); }); }
+  async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return this.#invoke("log", async () => { this.#first(); await this.#prepared(reader, "log"); await this.#rooted(reader, "log", cursor ?? "0"); return this.#reads.log(reader, cursor); }); }
+  async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return this.#invoke("retained", async () => { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }); }
+  async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return this.#invoke("incidents", async () => { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }); }
+  async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return this.#invoke("waiting", async () => { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }); }
 
   /** Internal namespace read of one exact job's current state. */
   async jobState(fact: import("@generalbusiness/dap-contract").FactRef): Promise<{ state: string; decidedBy: import("@generalbusiness/dap-contract").FactRef | null } | null> {

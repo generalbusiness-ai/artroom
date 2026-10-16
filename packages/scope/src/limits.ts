@@ -30,12 +30,13 @@
  * nothing is recorded and no key is used up.
  *
  * It replaces the parked `room/src/ratelimit.ts`, after the review in
- * `notes/2026-10-05-i3-limits-review.md`.
+ * `notes/reviews/2026-10-05-i3-limits-review.md`.
  */
 
 import type { Answer, Head } from "@generalbusiness/dap-contract";
 import { canonicalBytes, isSignature, isSignedIntentShape, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { isObject } from "@generalbusiness/dap-derive";
+import { metric } from "./operational.ts";
 
 /**
  * The window, the two bounds, the limit of one address and the most bytes of
@@ -166,6 +167,13 @@ export class JoinLimits {
    * checks 1 and 2 and is inside the bound on waiting secret checks.
    */
   async serve(at: Served, signed: unknown, submit: () => Promise<Answer>): Promise<Answer> {
+    let served = false;
+    const answer = await this.#serve(at, signed, () => { served = true; return submit(); });
+    const reason = !served && answer.answer === "unavailable" && ["rate-limited", "busy"].includes(answer.reason) ? answer.reason : "none";
+    metric({ kind: "join", place: "acts", end: served ? "served" : answer.answer === "unavailable" ? "unavailable" : "refused", reason, a: this.#windows.size, b: this.#waiting });
+    return answer;
+  }
+  async #serve(at: Served, signed: unknown, submit: () => Promise<Answer>): Promise<Answer> {
     const key = addressKey(at.address);
     // The address limit, before check 1.
     if (key !== null && (this.#window(key, at.now)?.failed ?? 0) >= this.#config.failures) return { answer: "unavailable", reason: "rate-limited" };

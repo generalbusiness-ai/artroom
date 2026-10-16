@@ -1,6 +1,6 @@
 # The page
 
-The page uses the accepted [v2 design](../../../plans/027-artroom-usability/v2/design-review.md)
+The page uses the accepted [v2 design](../../../notes/plans/027-artroom-usability/v2/design-review.md)
 for the demo story. It
 runs in a browser. It reads a room over the scope service's HTTP routes,
 and it signs acts with a key that the browser keeps. It judges nothing:

@@ -11,7 +11,7 @@ row of both definitions in tables. That file is generated from the data.
 
 The design note "Lane forms and browser flow", revision 14, at `4b3bf5da`,
 is the authority for every row. Where it or the scope contract was silent,
-`notes/2026-10-05-i2-contract-deltas.md` records what was implemented and
+`notes/implementation/2026-10-05-i2-contract-deltas.md` records what was implemented and
 why. Nothing in that note is adopted by being built.
 
 ## A lane is a definition
@@ -246,7 +246,7 @@ The `change` rows marked "i5 edit" in `change.ts` add the act
 `propose-file`, a one-file version of a change, and the manifest's slots
 `path`, `digest` and `size`; a manifest's integration commit and tree are
 optional. They are no rows of an adopted lane forms revision.
-`notes/2026-10-07-i5-edit-page-delivery.md` lists them.
+`notes/implementation/2026-10-07-i5-edit-page-delivery.md` lists them.
 
 A digest is `definitionDigest` of the bytes package: SHA-256 over the tag
 `artroom-definition-1`, a newline and the canonical JSON of the whole
@@ -387,7 +387,7 @@ two capacity scenarios.
 
 One run of the ten scenarios T1 to T9 writes 21 of the 50 act kinds of `issue` and
 12 of the 52 of `change` as they then were, and runs 2 of 7 and 2 of 4 handlers (counted by
-a script over one run; `notes/2026-10-05-i2-contract-deltas.md`, section
+a script over one run; `notes/implementation/2026-10-05-i2-contract-deltas.md`, section
 20, lists them). The counts are the same after I3 step 16. Of those rows,
 these now run on the capability's code: `report` of `issue`, and
 `propose-manifest` and the handler `publication` of `change`, with
@@ -449,4 +449,4 @@ decide is in the data as the lane forms state it.
 | The rows themselves | `apps/room/lanes/src` |
 | The package's exports and scripts | `apps/room/lanes/README.md` |
 | What each form means | [scopes.md](../../../docs/scopes.md), "Definitions are data" and "Composition" |
-| The source choices behind the forms | `notes/2026-10-05-i2-contract-deltas.md` |
+| The source choices behind the forms | `notes/implementation/2026-10-05-i2-contract-deltas.md` |

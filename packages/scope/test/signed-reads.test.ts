@@ -19,7 +19,8 @@ import { foundingPublication } from "./publication.ts";
 import { Platform, rita, routed, settle } from "./repository.ts";
 import { beginSessionChild, beginSessionFixture, type SessionOwner } from "./session-settings.ts";
 import { reader } from "./support.ts";
-import { TEST_DEPLOYMENT, platformNet } from "./worker.ts";
+import type { MetricPoint } from "../src/metrics.ts";
+import { TEST_DEPLOYMENT, metricBindings, platformNet } from "./worker.ts";
 
 const { paul, vic } = keys;
 const SERVICE = "https://scopes.test";
@@ -125,6 +126,8 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     onTestFinished(owner.close);
     net.hold = net.deaf = null;
     const R = await installed(paul);
+    const metrics: MetricPoint[] = [];
+    metricBindings.set(R.object.id.toString(), { DEPLOYMENT: "signed-read-metrics-test", METRICS: { writeDataPoint: p => metrics.push(structuredClone(p)) } });
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: keys.sam.key } });
     expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 1 } } });
 
@@ -133,6 +136,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     // The recent install signer reads the whole register, including another key's claim.
     const summary = await get(owner, R.name, await signed(paul, R.name, "summary", "summary"));
     expect([summary.status, (summary.body.value as { scope: { kind: string } }).scope.kind]).toEqual([200, "register"]);
+    expect(metrics.some(p => p.blobs[0] === "signed-read" && p.blobs[3] === "summary" && p.blobs[4] === "ok")).toBe(true);
     const mine = await get(owner, `${R.name}/history`, await signed(paul, R.name, "history", "0"));
     expect([mine.status, seqs(mine.body)]).toEqual([200, [0, 1]]);
     expect((await get(owner, `${R.name}/entries/0`, await signed(paul, R.name, "entry", "0"))).status).toBe(200);

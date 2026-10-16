@@ -3,7 +3,7 @@
  *
  * Everything of Artroom that touches a Git repository or a Git host (I3
  * plan, section 3.1). It runs outside a scope's commit. The review that each retained part passed is
- * `notes/2026-10-05-i3-git-review.md`.
+ * `notes/reviews/2026-10-05-i3-git-review.md`.
  *
  * `./node` has the one module that needs Node: `nodeExec`.
  * `./http`, `./http-read` and `./github` use Web APIs and also run in Workers.

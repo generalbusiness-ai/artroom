@@ -2,7 +2,7 @@
  * The `git` program, as this package runs it, and a repository on disk as a
  * source for the reader. It is the reviewed successor of the earlier
  * publisher's command runner and of the earlier log's command-line reader
- * (`notes/2026-10-05-i3-git-review.md`).
+ * (`notes/reviews/2026-10-05-i3-git-review.md`).
  *
  * Every invocation:
  *

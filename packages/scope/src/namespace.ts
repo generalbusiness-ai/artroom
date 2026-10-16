@@ -29,13 +29,14 @@ import { EXACT_PROOF_RECEIVER_BOUNDS, PROOF_BYTE_BOUNDS, type ProofBody, type Pr
 import type { Store } from "./store.ts";
 import { encodeSessionReference, sessionReferenceRequest, SESSION_REFERENCE_BOUNDS, type SessionReferenceSource } from "./session-reference.ts";
 import { readNativeBirth, type NativeBirth, type NativeBirthSource } from "./native-birth.ts";
+import { operational, type OperationalIdentity } from "./operational.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null; origin?: readonly { fact: FactRef; under: string; bytes: string }[] }
 
 /** The five calls one scope's object takes from another's. `observe` is asked of a membership scope or of a rules scope. */
 export interface Peer {
-  deliver(envelope: Delivered): Promise<Delivery>;
+  deliver(envelope: Delivered, identity?: OperationalIdentity): Promise<Delivery>;
   source(seq: number, origin?: boolean): Promise<Sourced | null>;
   /** Optional: unsupported native senders never fall back to source(). */
   proofSource?(fact: FactRef, maxBytes: number, milliseconds?: number): Promise<ProofBody | null>;
@@ -285,7 +286,7 @@ export function namespace(binding: Binding): { resolver: Resolver; proofs: Proof
         // An address that names nothing reaches no resolver, so it is no routing refusal: the attempt is unanswered.
         if (!name) return null;
         try {
-          return await peer(name).deliver(envelope);
+          return await peer(name).deliver(envelope, operational()?.identity);
         } catch {
           return null;
         }

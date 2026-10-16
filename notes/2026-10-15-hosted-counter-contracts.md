@@ -538,7 +538,7 @@ act.
 Durable inputs are the team and Counter journals. The only cursors are
 the last examined heads. Each advances only after the decision taken at
 that head is stored. Plan 007's rule applies here: a cursor never passes
-an unsaved input (`plans/007-2026-10-03-attention-runtime-handoff.md:19-25`).
+an unsaved input (`notes/plans/007-2026-10-03-attention-runtime-handoff.md:19-25`).
 Every member reads the whole Counter, so the visibility case reduces to
 a new read at the next head after a role or control change.
 

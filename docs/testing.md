@@ -22,9 +22,9 @@ A test does not earn its place when it:
   line.
 
 Each witness that the scope contract names, and each row of
-[notes/2026-10-04-i1-contract-deltas.md](../notes/2026-10-04-i1-contract-deltas.md)
+[notes/implementation/2026-10-04-i1-contract-deltas.md](../notes/implementation/2026-10-04-i1-contract-deltas.md)
 or of
-[notes/2026-10-05-i2-contract-deltas.md](../notes/2026-10-05-i2-contract-deltas.md)
+[notes/implementation/2026-10-05-i2-contract-deltas.md](../notes/implementation/2026-10-05-i2-contract-deltas.md)
 that names one, is an invariant with a stated expected result. Before you
 remove or merge a test, check the cases it witnessed, and name the test
 that witnesses each one afterwards.
@@ -224,7 +224,7 @@ so. Such a test shows what the driver and a scope do with a host's
 answers, and where a plaintext is. It shows nothing about a real host, a
 gateway, a fork or a push. The sealed entries of
 `packages/git/test/host.test.ts` are made by hand, and no scope judged
-them (`notes/2026-10-05-i3-contract-deltas.md`, entry ET12).
+them (`notes/implementation/2026-10-05-i3-contract-deltas.md`, entry ET12).
 
 A replay of a journal that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
@@ -514,7 +514,7 @@ own operations, `api` of `@generalbusiness/artroom-scope/worker`, in the
 test's isolate. A few acts go over the Worker's HTTP routes, where the
 scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has
-made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
+made (observed; `notes/implementation/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
 The Node `lanes` project checks the definitions and the scripted CLI proposal
 outcomes in `apps/room/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
@@ -571,7 +571,7 @@ check, and consider deleting the guard.
 
 ## The invariant map
 
-[plans/test-invariants.md](../plans/test-invariants.md) maps the earlier
+[notes/plans/test-invariants.md](../notes/plans/test-invariants.md) maps the earlier
 model's tests, which are removed. It is the proof plan's to replace. Until
 then each test's name states its invariant, and the two deltas notes name
 the witness of each decision.

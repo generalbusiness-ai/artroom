@@ -3,7 +3,7 @@
  * plan, key O15): commits with their tree and parents, trees, blobs, refs,
  * the snapshot of the staged refs, and the closure of a commit, object by
  * object. It is the reviewed successor of the earlier log's reader. The
- * review is `notes/2026-10-05-i3-git-review.md`.
+ * review is `notes/reviews/2026-10-05-i3-git-review.md`.
  *
  * Nothing that a source returns is taken on its word:
  *

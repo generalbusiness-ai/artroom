@@ -24,6 +24,7 @@ import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, Rule
 import { ownOf, retainedFacts, snapshotsOf } from "./core.ts";
 import type { Ports, Resolver } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
+import { entryCorrelation, inOperation, measured, metric, operational, type Operational } from "./operational.ts";
 
 // ---------------------------------------------------------------- step 1: before the turn
 
@@ -113,6 +114,7 @@ class Unfit extends Error {
 interface Counts {
   attempts: number;   // timed attempts used (step 7)
   restarts: number;   // stopped commits of the waiting input (step 7)
+  timed: number;      // timed entries actually committed, apart from attempts
   wrote: boolean;
   last: Reading | null;   // the turn's latest clock reading
 }
@@ -158,6 +160,9 @@ export class Turns {
    * changes nothing: the entry is sealed.
    */
   #sealed: (() => void) | null = null;
+  #measurement: (() => Operational) | null = null;
+  /** Independent callbacks need a context when their caller's is absent or closed. */
+  measureWith(context: () => Operational): void { this.#measurement = context; }
   onSealed(told: () => void): void { this.#sealed = told; }
 
   /** Run `commit`, one transaction, and tell the listener if the head moved. A transaction that throws committed nothing, and tells nothing. */
@@ -165,7 +170,9 @@ export class Turns {
     const at = (): number | null => this.#store.scope()?.head.seq ?? null;
     const before = at();
     const done = commit();
-    if (this.#sealed && at() !== before) {
+    const after = this.#sealed || operational() ? at() : before;
+    if (after !== null && after !== before) entryCorrelation(after);
+    if (this.#sealed && after !== before) {
       try {
         this.#sealed();
       } catch { /* a notice was lost, and no fact */ }
@@ -180,7 +187,19 @@ export class Turns {
    * definition is.
    */
   async run<A>(waiting: Waiting<A> | null, founding?: ValidDefinition): Promise<End<A>> {
-    const turn: Counts = { attempts: 0, restarts: 0, wrote: false, last: null };
+    const current = operational();
+    if (!current && this.#measurement) return measured(this.#measurement(), () => this.run(waiting, founding));
+    const context = current, started = performance.now();
+    if (context) context.turn.entered = true;
+    const turn: Counts = { attempts: 0, restarts: 0, timed: 0, wrote: false, last: null };
+    const failures = { count: 0 };
+    const end = await (context ? inOperation({ ...context, entryFailures: failures }, () => this.#run(waiting, founding, turn)) : this.#run(waiting, founding, turn));
+    if (failures.count) context!.invocation.metrics.sidecar(true, ["busy", "clock-behind", "unavailable"].includes(end.end), failures.count);
+    const answer = end.end === "answer" && ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations"].includes(context?.place ?? "") && end.answer !== null && typeof end.answer === "object" ? end.answer as { answer?: unknown; reason?: unknown } : null;
+    metric({ kind: "turn", place: context?.place ?? "alarm", end: end.end, answer: typeof answer?.answer === "string" ? answer.answer : "none", reason: typeof answer?.reason === "string" ? answer.reason : "none", duration: Math.max(0, Math.floor(performance.now() - started)), a: turn.restarts, b: turn.attempts, c: turn.timed, flag: turn.wrote ? 1 : 0 });
+    return end;
+  }
+  async #run<A>(waiting: Waiting<A> | null, founding: ValidDefinition | undefined, turn: Counts): Promise<End<A>> {
     let resume: Attempt | null = null;
     for (;;) {
       const attempt: Attempt | null = resume;
@@ -244,6 +263,7 @@ export class Turns {
       if (scope.head.seq + 1 >= this.#bounds.scopeEntries) return { end: "unavailable" };
       turn.attempts++;
       const done = this.#commitTimed(definition, turn, due, scope.head);
+      if (done === "written") turn.timed++;
       if (done === "clock-behind") return { end: "clock-behind" };
       // The validator bounds a timed entry's size, so this is a fault: a definition validated under larger bounds. The transition
       // stays due and is never passed over. The turn ends, nothing more is written, and the alarm is set again.

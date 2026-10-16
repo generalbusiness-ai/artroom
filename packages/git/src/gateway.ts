@@ -2,7 +2,7 @@
  * The gateway (authority note, sections 5.3, 6.1 and 6.6, step 3): the one
  * place that holds a token's plaintext, and the one thing that sends a
  * request to the Git host for a holder. It is the reviewed successor of the
- * earlier publisher's ref fence (`notes/2026-10-05-i3-git-review.md`,
+ * earlier publisher's ref fence (`notes/reviews/2026-10-05-i3-git-review.md`,
  * section 5).
  *
  * **One grant for an attempt** (section 6.1): this repository, this ref,

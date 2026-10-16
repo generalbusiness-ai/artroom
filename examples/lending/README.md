@@ -21,7 +21,7 @@ blobs, and receipt bytes. The curated public history is published at commit
 `14401f8bd851ce525ac1526ed57d2bceaf36d360`; its index, raw companions,
 and current shelf pages passed anonymous readback. Homepage publication
 `89750` and the original gate at `f33a7d7f` completed. The
-[completion note](../../notes/2026-10-14-library-publication-completion.md)
+[completion note](../../notes/implementation/2026-10-14-library-publication-completion.md)
 keeps that gate separate from the later MCP composition. The journal and
 staff-control follow-up still awaits its own validation, gate, and deployment.
 These are machine-operated browser profiles, not a human or separate

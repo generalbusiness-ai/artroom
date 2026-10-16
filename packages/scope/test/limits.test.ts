@@ -5,7 +5,8 @@ import { d } from "@generalbusiness/dap-derive/testing";
 import { JoinLimits, addressKey, isJoin, type LimitConfig } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { office, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
-import { platformNet } from "./worker.ts";
+import type { MetricPoint } from "../src/metrics.ts";
+import { metricBindings, platformNet } from "./worker.ts";
 
 // The plan's T39 (authority note, section 3.6, "The limits"; review rows M3 and M4; the proof plan's row for O10). The numbers are FIXTURE
 // VALUES: no adopted text proposes one.
@@ -90,6 +91,8 @@ describe("serving limits of a join (authority note, section 3.6; `limits.ts`)", 
     platformNet.limits = { ...FIXTURE, failures: 2 };
     try {
       const { M: scope } = await office();
+      const metrics: MetricPoint[] = [];
+      metricBindings.set(scope.object.id.toString(), { DEPLOYMENT: "join-metrics-test", METRICS: { writeDataPoint: p => metrics.push(structuredClone(p)) } });
       const seat = await scope.did(rita, "seat", { expected: { roster: 1 } });
       await scope.did(rita, "first-key", { fields: { member: seat }, expected: await scope.expected({ roster: 0, member: seat }) });
       // Finish the earlier seat's inbox creation before pinning the head around rejected join requests.
@@ -112,6 +115,11 @@ describe("serving limits of a join (authority note, section 3.6; `limits.ts`)", 
       // The limited address is still limited for a join, and an admin's invitation from it is admitted: only a join is counted or bounded.
       const again = await scope.intent(rita, "invite-member", { fields: { handle: "@vera", role: "member", inviteHash: textDigest(`${SECRET}2`), inviteEnds: soon(3600) } });
       expect([await post(scope, await forged(), "198.51.100.7"), await post(scope, again, "198.51.100.7")]).toEqual([[503, "rate-limited"], [200, "accepted"]]);
+      const joins = metrics.filter(p => p.blobs[0] === "join");
+      expect(joins.map(p => [p.blobs[4], p.blobs[5]])).toEqual([["refused", "none"], ["refused", "none"], ["unavailable", "rate-limited"], ["served", "none"], ["unavailable", "rate-limited"]]);
+      expect(joins.filter(p => p.blobs[5] === "rate-limited").map(p => p.doubles)).toEqual([[1, 0, 1, 0, 0, 0], [1, 0, 1, 0, 0, 0]]);
+      expect(JSON.stringify(metrics)).not.toContain(SECRET);
+      expect(JSON.stringify(metrics)).not.toContain("198.51.100.7");
     } finally {
       platformNet.limits = null;
     }

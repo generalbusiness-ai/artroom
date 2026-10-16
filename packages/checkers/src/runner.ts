@@ -1,7 +1,7 @@
 /**
  * The runner's checkout, and the steps of one run (authority note, sections
  * 3.11 and 11; proof plan, key O15). It is the reviewed successor of the
- * earlier runner (`notes/2026-10-05-i3-checkers-review.md`, section 2).
+ * earlier runner (`notes/reviews/2026-10-05-i3-checkers-review.md`, section 2).
  *
  * **The checkout checks the commit, its tree and its parents against the
  * job, before anything of the tree runs.** The earlier checkout compared the

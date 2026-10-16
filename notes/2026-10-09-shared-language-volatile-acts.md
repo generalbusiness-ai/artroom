@@ -1273,7 +1273,7 @@ guarantees. The older deployed spike's simple acts were about 68–73ms p50,
 production commitment barrier. The 8 October rehearsal's comment 0.6s,
 assignment 0.5s, merge 3.6s and full edit/link/publication 8.5s were individual whole
 workflows, not isolated provider writes or a controlled comparison with this
-source. See [spike limits](2026-10-01-spike-room-core.md); retained rehearsal
+source. See [spike limits](implementation/2026-10-01-spike-room-core.md); retained rehearsal
 transcript is external evidence. This amendment runs no new measurements.
 
 | Phase and dependency | Exact bounded work scope | Completion evidence |

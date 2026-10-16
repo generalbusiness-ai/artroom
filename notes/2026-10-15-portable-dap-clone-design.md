@@ -60,12 +60,12 @@ Builder request `e871ba09` holds the work as slices A0 to A5. Landed so far:
 
 | Slice | Landed | Note |
 |---|---|---|
-| A0a, recorded level in the declaration | `e987350d3` | [Recorded durability declaration](2026-10-15-durability-recorded-declaration.md) |
-| A1a, archive path grammar | `74384558f` | [Archive path grammar](2026-10-15-archive-path-grammar.md) |
-| A1b, segment grouping and directory sharding | `bc95110e1` | [Segment grouping](2026-10-15-archive-segment-grouping.md) |
-| A1c preparation, selection contract | `c3efd0d9d` (with `17be8b9b1`, `1815b3dd2`) | [Section 15.3](2026-10-09-shared-language-volatile-acts.md#153-what-is-archived) and [inventory reconciliation](2026-10-16-archive-inventory-reconciliation.md) |
-| Definition-domain retained key (A1c prerequisite) | `77e570a1a` | [Retained key](2026-10-16-definition-domain-retained-key.md) |
-| Invitation-key membership and v1 export admission | `f41ab63c1` | [Invitation-key membership](2026-10-15-invitation-key-membership.md) |
+| A0a, recorded level in the declaration | `e987350d3` | [Recorded durability declaration](implementation/2026-10-15-durability-recorded-declaration.md) |
+| A1a, archive path grammar | `74384558f` | [Archive path grammar](implementation/2026-10-15-archive-path-grammar.md) |
+| A1b, segment grouping and directory sharding | `bc95110e1` | [Segment grouping](implementation/2026-10-15-archive-segment-grouping.md) |
+| A1c preparation, selection contract | `c3efd0d9d` (with `17be8b9b1`, `1815b3dd2`) | [Section 15.3](2026-10-09-shared-language-volatile-acts.md#153-what-is-archived) and [inventory reconciliation](implementation/2026-10-16-archive-inventory-reconciliation.md) |
+| Definition-domain retained key (A1c prerequisite) | `77e570a1a` | [Retained key](implementation/2026-10-16-definition-domain-retained-key.md) |
+| Invitation-key membership and v1 export admission | `f41ab63c1` | [Invitation-key membership](implementation/2026-10-15-invitation-key-membership.md) |
 
 The archive helpers are internal and have no runtime caller
 (`packages/git/src/journal-path.ts:7` names the ref prefix). No archive is
@@ -265,7 +265,7 @@ and an unavailable dependency is never silently anchored.
 
 The per-scope rules are now authoritative in
 [section 15.3](2026-10-09-shared-language-volatile-acts.md#153-what-is-archived)
-and the [inventory reconciliation](2026-10-16-archive-inventory-reconciliation.md):
+and the [inventory reconciliation](implementation/2026-10-16-archive-inventory-reconciliation.md):
 a fixed cutoff; a shared, bounded selection interface at every verifier
 consumer; `replay-required` separate from `archive-closure`; declaration
 closure by the native `creates()` grammar

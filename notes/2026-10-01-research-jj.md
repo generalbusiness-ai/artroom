@@ -6,7 +6,7 @@ Artroom?
 
 **Revised 2026-10-04** under request `50d7806a`. This note is reconciled
 with the reviewed clarification
-`plans/011-2026-10-04-jj-clarification.md` (section 9 gives its
+`notes/plans/011-2026-10-04-jj-clarification.md` (section 9 gives its
 identity). The clarification answers changes review `6649bb50` of the
 first version of this note. Corrected passages are rewritten in place.
 The first version stays readable at commit

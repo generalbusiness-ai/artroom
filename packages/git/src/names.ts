@@ -5,7 +5,7 @@
  * refusal never holds the value: a value may be another party's text, or a
  * URL that carries a credential (authority note, section 5.3).
  *
- * The review of the earlier code is `notes/2026-10-05-i3-git-review.md`. It
+ * The review of the earlier code is `notes/reviews/2026-10-05-i3-git-review.md`. It
  * says, check by check, what each function here refuses and why.
  */
 

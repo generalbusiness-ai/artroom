@@ -15,7 +15,7 @@
  *
  * What the profile leaves out is not refused by any rule: a room that wants
  * more acts activates the full definition, and its directory creates lanes
- * under that digest. `notes/2026-10-07-i5-lane-wiring-delivery.md`, section
+ * under that digest. `notes/implementation/2026-10-07-i5-lane-wiring-delivery.md`, section
  * 3, maps each act of the full definitions to "in profile" or "rules can add".
  */
 
