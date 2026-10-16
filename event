@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bf175549c5f695291b2804389e7fc54d0185520a","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-invitation-key-membership.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c036fedb06eb1ab40d76cb211b6431401b982847","text":"Merge retired a covered predecessor; the successor is at packages/client/src/agent-key-invitation.ts."}
