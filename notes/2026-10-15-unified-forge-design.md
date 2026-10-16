@@ -473,7 +473,8 @@ proportion and bad for stable position; a code hierarchy keeps positions.
 *Figure 7. Lifecycle pattern for **Explain why this version is blocked or
 running**, aggregated over all 202 landed work requests: time from the
 request to the first event of each stage (10th to 90th percentile,
-quartiles, median; derived), who signs that event (observed), and the
+quartiles, median; derived), who signs that event, as counts for every
+signer (observed), and the
 review rounds per request (observed).* No single case is shown. The
 median request gets its first promise in about a minute, its first
 artifact in 36 minutes, a first verdict in 1.4 hours, and lands in 3.0
@@ -575,9 +576,11 @@ each receipt's recorded approval. Layer 6 covers every commitment that
 names a landing receipt.
 
 *Durations.* A duration is a difference of recorded event times, so it is
-derived. Quantiles use the nearest rank with no interpolation: the value
-at sorted position round(q × (n − 1)). The rows of Figure 5 are as
-follows:
+derived. Quantiles use a nearest-index rule, not the ceil(n × q) nearest
+rank, and do not interpolate. The value is the one at 0-based sorted
+index round(q × (n − 1)). The rounding sends an exact half to the even
+integer. So for an even n, the median is whichever middle value has the
+even index. The rows of Figure 5 are as follows:
 
 - Request to first promise: the earliest promise, for 620 work requests
   with one.
