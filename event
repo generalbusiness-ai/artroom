@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:619a160d60c4141f68ec1d3651452ad55c614d33","text":"Merge retired a covered predecessor; the successor is at apps/counter/browser-build/counting.js."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:67413244b0f95537da23218f6514305f1300feb3","text":"Merge retired a covered predecessor; the successor is at apps/room/page/test/room-initialization.test.ts."}
