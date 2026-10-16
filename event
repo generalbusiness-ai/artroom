@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-unified-forge-design.md","body":{"commit":"7bca56e3bba3c267f0b0d22c06052c2cf1eb13d3","path":"notes/2026-10-15-unified-forge-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:629f9ddef40ea88e2c7de2f28aa0ea253ce78cb5","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-unified-forge-design.md."}
