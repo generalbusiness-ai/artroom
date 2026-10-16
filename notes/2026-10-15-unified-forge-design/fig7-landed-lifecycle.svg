@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="540" viewBox="0 0 860 540" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Lifecycle pattern of landed work requests</title>
+<desc id="d">Aggregate of 202 landed work requests: for each stage, the spread of time since the request (10th to 90th percentile, quartiles, median) and who signs it; below, review requests and changes-requested verdicts per request.</desc>
+<rect width="860" height="540" fill="#F6F4EE"/>
+<text x="24.0" y="30.0" font-size="16" fill="#23251D" text-anchor="start" font-weight="600">Lifecycle pattern of 202 landed work requests (aggregate, no single case)</text>
+<text x="24.0" y="50.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Time since the work request, log scale. Thin bar: 10th to 90th percentile. Thick bar: quartiles. Dot: median.</text>
+<line x1="190.0" y1="82.0" x2="190.0" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="190.0" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">≤1 min</text>
+<line x1="284.9" y1="82.0" x2="284.9" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="284.9" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">10 min</text>
+<line x1="358.8" y1="82.0" x2="358.8" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="358.8" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">1 h</text>
+<line x1="432.6" y1="82.0" x2="432.6" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="432.6" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">6 h</text>
+<line x1="489.8" y1="82.0" x2="489.8" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="489.8" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">1 day</text>
+<line x1="570.0" y1="82.0" x2="570.0" y2="286.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="570.0" y="300.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">≥1 week</text>
+<text x="600.0" y="76.0" font-size="10" fill="#66655A" text-anchor="start" font-weight="normal">n     signed by (counts)</text>
+<text x="178.0" y="96.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">First promise</text>
+<line x1="190.0" y1="92.0" x2="348.5" y2="92.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="190.0" y="87.0" width="73.7" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="190.0" cy="92.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="190.0" y="83.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">1 min</text>
+<text x="600.0" y="96.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">202</text>
+<text x="632.0" y="96.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">builder 172, planner 30</text>
+<text x="178.0" y="130.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">First artifact</text>
+<line x1="236.2" y1="126.0" x2="449.8" y2="126.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="292.8" y="121.0" width="102.1" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="337.2" cy="126.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="337.2" y="117.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">36 min</text>
+<text x="600.0" y="130.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">202</text>
+<text x="632.0" y="130.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">builder 172, planner 30</text>
+<text x="178.0" y="164.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">First review request</text>
+<line x1="251.2" y1="160.0" x2="447.6" y2="160.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="296.7" y="155.0" width="101.2" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="341.5" cy="160.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="341.5" y="151.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">39 min</text>
+<text x="600.0" y="164.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">200</text>
+<text x="632.0" y="164.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">builder 164, planner 29, checker 7</text>
+<text x="178.0" y="198.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">First verdict</text>
+<line x1="310.5" y1="194.0" x2="464.1" y2="194.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="339.3" y="189.0" width="80.5" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="373.2" cy="194.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="373.2" y="185.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">1.4 h</text>
+<text x="600.0" y="198.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">199</text>
+<text x="632.0" y="198.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">checker 199</text>
+<text x="178.0" y="232.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">First approval</text>
+<line x1="316.1" y1="228.0" x2="478.7" y2="228.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="353.9" y="223.0" width="87.9" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="399.3" cy="228.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="399.3" y="219.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">2.7 h</text>
+<text x="600.0" y="232.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">196</text>
+<text x="632.0" y="232.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">checker 196</text>
+<text x="178.0" y="266.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Landing receipt</text>
+<line x1="329.7" y1="262.0" x2="481.6" y2="262.0" stroke="#9C9888" stroke-width="2"/>
+<rect x="361.7" y="257.0" width="85.4" height="10.0" fill="#7FA08C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<circle cx="403.9" cy="262.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="403.9" y="253.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">3.0 h</text>
+<text x="600.0" y="266.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">202</text>
+<text x="632.0" y="266.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">builder 172, planner 30</text>
+<text x="40.0" y="358.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="600">Review requests per landed request</text>
+<line x1="40.0" y1="470.0" x2="400.0" y2="470.0" stroke="#CFCBBF" stroke-width="1"/>
+<rect x="43.0" y="467.8" width="45.4" height="2.2" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="65.7" y="463.8" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">2</text>
+<text x="65.7" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">0</text>
+<rect x="94.4" y="370.0" width="45.4" height="100.0" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="117.1" y="366.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">93</text>
+<text x="117.1" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">1</text>
+<rect x="145.9" y="421.6" width="45.4" height="48.4" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="168.6" y="417.6" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">45</text>
+<text x="168.6" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">2</text>
+<rect x="197.3" y="437.7" width="45.4" height="32.3" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="220.0" y="433.7" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">30</text>
+<text x="220.0" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">3</text>
+<rect x="248.7" y="460.3" width="45.4" height="9.7" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="271.4" y="456.3" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">9</text>
+<text x="271.4" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">4</text>
+<rect x="300.1" y="461.4" width="45.4" height="8.6" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="322.9" y="457.4" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">8</text>
+<text x="322.9" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">5</text>
+<rect x="351.6" y="453.9" width="45.4" height="16.1" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="374.3" y="449.9" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">15</text>
+<text x="374.3" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">6+</text>
+<text x="460.0" y="358.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="600">Changes-requested verdicts per landed request</text>
+<line x1="460.0" y1="470.0" x2="820.0" y2="470.0" stroke="#CFCBBF" stroke-width="1"/>
+<rect x="463.0" y="370.0" width="45.4" height="100.0" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="485.7" y="366.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">118</text>
+<text x="485.7" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">0</text>
+<rect x="514.4" y="436.1" width="45.4" height="33.9" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="537.1" y="432.1" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">40</text>
+<text x="537.1" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">1</text>
+<rect x="565.9" y="449.7" width="45.4" height="20.3" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="588.6" y="445.7" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">24</text>
+<text x="588.6" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">2</text>
+<rect x="617.3" y="463.2" width="45.4" height="6.8" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="640.0" y="459.2" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">8</text>
+<text x="640.0" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">3</text>
+<rect x="668.7" y="465.8" width="45.4" height="4.2" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="691.4" y="461.8" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">5</text>
+<text x="691.4" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">4</text>
+<rect x="720.1" y="468.3" width="45.4" height="1.7" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="742.9" y="464.3" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">2</text>
+<text x="742.9" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">5</text>
+<rect x="771.6" y="465.8" width="45.4" height="4.2" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="794.3" y="461.8" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal">5</text>
+<text x="794.3" y="484.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">6+</text>
+<text x="24.0" y="528.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">Derived durations and observed counts across all landed work requests.  Workroom head 764cf535, 42,878 events, 1 to 16 Oct 2026 UTC.</text>
+</svg>
