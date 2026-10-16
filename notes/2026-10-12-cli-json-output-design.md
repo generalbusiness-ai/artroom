@@ -1,6 +1,6 @@
 # JSON output for the dap command line
 
-Builder revision 4, for independent design review. Request `f319c428`,
+Builder revision 5, for independent design review. Request `f319c428`,
 promise `a6d5ee53`, under `92d6dddb` and `c1cacd1a`. This replaces the
 retained planner draft at `65609bac` and builder revision 2 at `58889d54`,
 addressing checker review `4a15bc25` against current local Main
@@ -357,13 +357,48 @@ returns usage/2 instead of replacing progress silently. The two options are
 mutually exclusive; --restart-read takes no value. It never replaces
 mutation custody. Progress expires after 30 minutes.
 Each canonical snapshot is capped at 8 MiB before parsing/materialization,
-with at most a current and an in-progress successor snapshot. The existing
-private-store owner, symlink, permission, atomic-write and operation-lock
-rules apply. A revision is committed before its next token is released.
+with at most a current and an in-progress successor snapshot. A new ReadProgressStore must provide owned regular-file admission,
+symlink checks, bounded reads and operation locking/revision checks.
+Current CLI Store.private and files.ts do not provide those guarantees:
+they use whole-file reads and atomic writes, without a progress lock or CAS.
+The new store is a prerequisite, not a property inherited from that API. A revision is committed before its next token is released.
 Concurrent or replayed older revisions cannot merge progress or double-credit
 completed units. A completed prior revision may return its already-retained
 successor token after validating that exact transition. Tokens contain no
 private filenames. No signature permits selecting arbitrary local files.
+
+The new store serializes each configuration's read-progress namespace across
+processes for creation, resume, successor commit, restart and expiry cleanup.
+A lock covers checking the current revision, bounded snapshot read, admitting
+the operation and committing its successor. It is not held across a remote
+read. Admission writes an owned in-flight reservation before releasing the
+lock. A concurrent invocation cannot run the same revision or replace that
+reservation; it gets a bounded busy result. Completion reacquires the lock,
+checks the exact reservation/revision and commits the successor before its
+token is released. An uncertain or orphaned reservation requires explicit
+recovery and does not prove no work. This lock is separate from mutation
+custody and grants no rights to read or replace that custody.
+
+Files must be opened as regular owned files without following a leaf symlink,
+with the opened descriptor's identity/size checked before bounded reading.
+The dedicated parent namespace must also be checked as owned real directories.
+Bounds apply during reads, before parsing; a stat followed by an unbounded
+readFileSync is insufficient. Snapshot identity, canonical digest and revision
+are rechecked while committing. These checks assume the configuration's owner
+and parent directory remain trusted; they are not a defense against an attacker
+who can replace files as that same owner. Restart/expiry cleanup can remove
+only the exact owned read-progress operation under that lock.
+
+The crash boundary is local persistence: write and flush the admitted snapshot,
+atomically commit and flush the new revision pointer, then release its token.
+A partial write, missing/changed snapshot, absent durability confirmation or
+interrupted pointer update returns incomplete with retained prior evidence.
+No valid successor token is claimed before that commit. Recovery validates
+the exact previous/current revision and reservation; it never credits an
+orphan file merely because a digest or native head matches. The Source review
+must verify the actual filesystem guarantees on supported platforms, including
+lock recovery. Atomic rename alone proves neither crash durability nor
+multi-process serialization.
 
 The shared allowance charges progress reads, validation, each remote read,
 result assembly and snapshot persistence. The retained record has separate
@@ -462,7 +497,7 @@ witnesses, not passing evidence from this document change.
 | Aggregate allowances cover nested work and resume | Small injected shared limits, one real-limit check, changed-head and missing-authority continuation cases; no wall-clock sleeps. |
 | Untrusted token claims cannot establish completed work | Alter skipped-scope/count/checkpoint/tail claims while retaining valid native heads; unsigned token and changed retained digest cannot yield cumulative done/consistent. |
 | A short final log segment preserves its actual tail | limit20 with fifteen retained summaries and five final entries, checking exact IDs/hashes; insufficient tail/result allowance gives incomplete with a finite disposition, never false done or a repeating token. |
-| Read-progress custody is bounded and survives interruption | One existing private-store atomic-write/lock fixture, with missing snapshot, stale revision, changed command/key, expiry and failed successor persistence; prior mutation custody stays intact. |
+| Read-progress custody is bounded and survives interruption | New focused filesystem/ReadProgressStore witnesses for concurrent admission/CAS, regular-owner/symlink/size admission before reads, failed flush/pointer commit, orphan reservation and explicit restart; prior mutation custody stays intact. |
 | Schema matches public producers | Validate actual result fixtures and meaningful invalid combinations; do not mirror implementation in a second serializer. |
 
 Run the tests of changed source while implementing, and one gate at the
@@ -497,8 +532,10 @@ continuation custody and tail semantics await independent approval.
 
 After corrected design approval, file separate implementation requests:
 
-1. Reconcile and adopt the shared collector/continuation policy with the
-   bounded-read owners, then implement its producer boundaries.
+1. Implement and independently review the new bounded ReadProgressStore,
+   cross-process reservation/revision protocol and crash recovery witnesses.
+   Coordinate the accepted collector/continuation policy with bounded-read
+   owners, then implement its producer boundaries.
 2. Add typed execution and renderers for finite reads, preserving existing
    text adapters and actual provenance.
 3. Add native intent/founding and retained custody workflows, preserving
@@ -515,3 +552,9 @@ are insufficient proof of earlier work. Only authenticated retained actual
 progress supplies cumulative coverage. The short-final-segment and capacity
 witnesses above distinguish both reported continuation defects. This is a
 document-only successor; no producer, token, private record or test has run.
+
+Revision 5 corrects review `764cf535`: bounded owner-checked private reads,
+progress locking/CAS and crash-safe reservation/commit are new required
+primitives. Current CLI Store.private is not evidence for those guarantees.
+No existing lock fixture is claimed. Continuation and rolling-tail decisions
+accepted in revision 4 remain unchanged. This is still a design-only revision.
