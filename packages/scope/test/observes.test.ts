@@ -2,11 +2,10 @@ import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { expect, test } from "vitest";
 import { DOMAINS } from "@generalbusiness/dap-contract";
-import { issue as issueDefinition } from "@generalbusiness/dap-lanes";
 import type { Answer, Digest, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, valueDigest } from "@generalbusiness/dap-derive";
-import { d, keys, membership, otherLane, type Actor } from "@generalbusiness/dap-derive/testing";
+import { d, keys, membership, notesDefinition, otherLane, type Actor } from "@generalbusiness/dap-derive/testing";
 import { EXTENTS, RULEBOOK, STEP_ROWS, rulebook, signers, weigherRules, weigherWith, type Seen } from "../../derive/test/fixtures-observes.ts";
 import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
 import { httpSource, MemorySource, TRUSTS, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
@@ -247,7 +246,7 @@ test.each([EXTENTS, DOMAINS.definition])("18.48 cases 6 to 8, and 18.50 cases 4 
     const kept = () => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec(DOMAIN === DOMAINS.definition
       ? "SELECT kind, digest, length(bytes) AS size FROM retained_input WHERE kind='definition' ORDER BY digest"
       : "SELECT 'value' AS kind, domain, digest, length(bytes) AS size FROM retained_value ORDER BY domain, digest").toArray());
-    const list = DOMAIN === DOMAINS.definition ? issueDefinition : ["src/**", "docs/**"];
+    const list = DOMAIN === DOMAINS.definition ? notesDefinition.declared : ["src/**", "docs/**"];
     const [bytes, digest] = [canonicalize(list), valueDigest(DOMAIN, list)];
     /** What the scripted rules scope answers: the record with the digest of the extents, and the values that are said to come beside it. */
     const answering = (extents: string, values: readonly { domain: string; bytes: string }[]) => () => ({

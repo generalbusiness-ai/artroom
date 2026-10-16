@@ -23,7 +23,7 @@ the retained service performs no alias or fallback between keys.
 
 The native scope tests strengthen the existing value and observation
 witnesses with a definition-domain case beside the ordinary-domain case.
-The declaration bytes are the repository's actual issue definition. The
+The declaration bytes are derive's existing made-up notes definition. The
 owning platform data/rules, outside answers and observation producers are
 labelled stand-ins. Actual scope turns, SQLite retention, restart, service
 routes and replay are real. Observation histories retain explicit anchors
@@ -50,8 +50,27 @@ assertion. The restored driver SHA-256 is
 `746ca7fb6af705cdc14ba1966bfbb74b41c9a47f589162173d0d3c02eaa57433`.
 These are selected counterexamples, not a mutation sweep.
 
-The final gate at a frozen Source head and exact-head independent review
-remain owed. This slice adds no archive scanner, manifest, closure walk,
+The gate at `2e187c78b9632739fd32f3eeee39aa7d22782f64`, tree
+`e60d4ff1e14a1abe6d0226ddff7f4ff59e94a373`, failed. Installation,
+whitespace and typechecking passed. Vitest passed 1,349 cases with three
+skipped. The chained Node stage passed 15 checks and failed its dependency
+boundary check: these two scope tests imported the lanes package. That was
+the builder's test-layering mistake. Counter checks did not run. The
+test stage took 187.1 elapsed seconds and 264.9 CPU seconds.
+
+The successor replaces only those test imports and declaration values
+with derive's existing notes fixture, and updates this report. Production
+Source is unchanged. The corrected five focused native cases pass; the
+Node stage passes all 16 checks, and the previously unrun Counter stage
+passes all 55 checks. Scope source/test typechecks and whitespace pass.
+Both targeted controls still fail by the expected assertions with the
+generic notes fixture, and both production files are restored to the
+hashes above. These checks are separate completed runs, not one successful
+whole-successor gate. The failed gate is retained. The whole Vitest suite
+was not repeated for this fixture correction, following the test policy
+and checker's guidance. Exact-head independent review remains owed.
+
+This slice adds no archive scanner, manifest, closure walk,
 export, writer or clone reader. The archive's stronger transitive
 declaration closure still needs the explicit reconciliation in section
 15.3 before dependent Source. Ordinary replay does not gain a requirement

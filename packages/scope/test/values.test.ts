@@ -4,9 +4,8 @@ import { expect, test } from "vitest";
 import type { Answer, Digest, Intent, PlatformDefinition, Seed, RetainedInput, OperationId, Read } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import { issue as issueDefinition } from "@generalbusiness/dap-lanes";
 import { clockOf, settleOutcome, validateDefinition, valueDigest, type OutcomeRule } from "@generalbusiness/dap-derive";
-import { grantOf } from "@generalbusiness/dap-derive/testing";
+import { grantOf, notesDefinition } from "@generalbusiness/dap-derive/testing";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import { controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
@@ -71,7 +70,7 @@ test("a value beside an intent, on real storage: the scope reads it only for a p
 test.each(["gate-proof-1", DOMAINS.definition])("an owner's evidence value in %s on real storage and through the read routes: bad bytes write nothing; the valid late answer survives a restart and replays, while missing bytes make replay incomplete", async (DOMAIN) => {
   const MADE = "platform:task@1" as PlatformDefinition;
   const MAX = DOMAIN === DOMAINS.definition ? PROPOSED_BOUNDS.definitionBytes : 64;
-  const proof = DOMAIN === DOMAINS.definition ? issueDefinition : { seat: 12 };
+  const proof = DOMAIN === DOMAINS.definition ? notesDefinition.declared : { seat: 12 };
   const input = { kind: "value", domain: DOMAIN, digest: valueDigest(DOMAIN, proof), bytes: canonicalize(proof) } as const;
   const stored = DOMAIN === DOMAINS.definition
     ? { kind: "definition", digest: input.digest, bytes: input.bytes } as const : input;
