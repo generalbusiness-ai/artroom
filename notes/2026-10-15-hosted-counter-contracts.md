@@ -1,8 +1,9 @@
 # Hosted Counter agents: contracts for the first demo
 
-15 October 2026. Planner draft, revision 2. Revision 1 (`abc7dcd0`) had
-checker changes requested; this revision answers findings F1 to F3 and
-the architecture and clarification notes of that review. Not yet re-reviewed.
+15 October 2026. Planner draft, revision 3. Revision 1 (`abc7dcd0`) had
+checker changes requested (F1 to F3); revision 2 (`c2a93883`) answered
+them, and its review accepted F1 and F3 and requested two more changes
+(an F2 follow-up and F4). This revision answers those. Not yet re-reviewed.
 
 Parent design: [hosted agent teams](2026-10-15-hosted-agent-teams-design.md),
 revision 2, sections 10 and 11. Source baseline: main `85cd430b3`. This
@@ -52,7 +53,7 @@ needs its own reviewed request.
 | The scope deduplicates by the intent's actor and idempotency key. `settle` reads back an outcome without admitting anything | `packages/scope/src/core.ts:558-566`, `:735-750`, `packages/derive/src/judge.ts:214-219` |
 | A head stream exists. It needs a read session of at most 600 s, and restarts close it | `packages/scope/src/worker.ts:43`, `packages/scope/src/sessions.ts:82`, `:421-458` |
 | Rule expressions may call `sum` and `lookup`, and use `in`. `$contains` matches substrings, so it cannot check a whole numeral (checker probe, review of `abc7dcd0`) | `packages/derive/src/rule/profile.ts:22-25`, `packages/derive/src/rule/evaluator.ts:38` |
-| A text field's `max` counts UTF-8 bytes of well-formed text | `packages/derive/src/values.ts:41` |
+| A text field's `max` counts UTF-8 bytes of well-formed text; `required` means present, and the empty string is accepted | `packages/derive/src/values.ts:41` |
 | No effect writes a computed value. A computed value enters as a proposal that a rule checks | `docs/roadmap.md:273-276` |
 | No deployed Worker configuration has an AI binding | `apps/room/wrangler.jsonc`; only `spikes/pi-durable/wrangler.jsonc:25` |
 
@@ -68,8 +69,9 @@ written utterance as the agent's genuine output.
 - The promise gains a value `utterance`, text of 1 to 1,024 bytes.
 - A new act `say`, grant `counting.say`, has exactly the fields, guards,
   rule (`resolution-plan`) and effects of `fulfill`, plus the required
-  field `utterance`, which it records on the promise. It settles the
-  promise.
+  field `utterance` (text, `max` 1,024), which it records on the promise,
+  and one more guard, `{"differs": {"a": {"field": "utterance"}, "b":
+  {"const": ""}}}`. It settles the promise.
 - `board.lastFulfilledAt` accepts facts of kind `fulfill` or `say`.
 
 **The number said is the integer field `n`, not text inside the
@@ -77,7 +79,12 @@ utterance.** `resolution-plan` already requires `n` to equal the
 promise's number and the board's last number plus one
 (`commitments.ts:472`), so the scope guarantees the numeral by equality.
 The utterance is the agent's own words for that turn. The scope checks
-only its bounds: well-formed text of 1 to 1,024 bytes. It places no
+only its bounds: well-formed text of 1 to 1,024 UTF-8 bytes. The field
+type gives the maximum and well-formedness (`values.ts:41`); `required`
+means only present, and the type accepts the empty string, so the
+`differs` guard gives the minimum (F4). If the validator refuses that
+guard's empty-string constant, the one alternative is the rule
+`$length(fields.utterance) > 0` (`length` is in the profile). It places no
 condition on digits, letters, punctuation or script. Screens show `n` as
 the number and the utterance as the speaker's text, and never parse a
 number out of the utterance. The host applies the same check and no
@@ -258,8 +265,12 @@ is not admitted. The host enforces the 6,000-byte content limit before
 each call: the user message drops the oldest utterances until it fits.
 
 **Bound for one attempt.** For entry `e`, the reservation is fixed:
-`bound(e) = ceil(maxInputTokens × inRate + maxOutput × outRate)`. Revision
-1's universal "bytes + 256" claim is withdrawn (F3).
+`bound(e) = ceil(maxInputTokens × inRate + maxOutput × outRate)`, where
+`inRate` and `outRate` are Neurons per token: the published rates per
+million tokens divided by 1,000,000. Revision 1's universal "bytes + 256"
+claim is withdrawn (F3). The 512 framing tokens used below are a
+conditional planning example, not a cap: admission uses each entry's
+argued maximum, and the arithmetic is redone if one is larger.
 
 **Initial catalog (decided 2026-10-15).** Cost-effective models only. The
 rates are Workers AI's published Neurons per million tokens, input then
@@ -325,7 +336,8 @@ to fit both the current `ceiling` and, for its role alone, the role's
 reached `calling`:
 
 - Usage reported in the mapped form, within both maxima: the charge is
-  the reported usage at the row's rates.
+  the reported usage at the row's rates, rounded up to a whole estimated
+  Neuron. Every charge in the ledger is an integer.
 - Usage absent, malformed (not non-negative safe integers in the mapped
   fields) or above either maximum, or a computed charge above the bound:
   the charge is the larger of the bound and any computable reported
@@ -386,7 +398,7 @@ standing, as `hosted.ts:93-102` does:
 
 | Route | Who | Effect |
 |---|---|---|
-| `POST /agents/teams` `{team}` | holder of `agents.configure` | Attach, after the checks below |
+| `POST /agents/teams` `{team}` | holder of `agents.configure` | Attach, after the checks below. A repeat for the same team is accepted and acts as a wake (section 7.2) |
 | `POST /agents/teams/<counter>/agents/<ordinal>/enrol` `{link}` | the row's controller | Section 5, steps 3 to 5 |
 | `GET /agents/teams/<counter>` | holder of `agents.configure` or `agents.administer` | Rows, progress, assignments, ledger totals and waiting reasons |
 
@@ -417,18 +429,40 @@ wake is only a hint to read. Two mechanisms give wakes:
 - **Head streams**, on the Counter and team scopes, under one of the
   object's agents' read sessions, renewed before 600 s. They are fast but
   finite: a restart or eviction closes them (`sessions.ts:421-458`).
-- **A durable alarm, always set while the Counter is attached.** It reads
-  both heads every 5 s while a role is running and the board is open, and
-  every 60 s otherwise: board paused or finished, every role paused, or
-  no live row. The alarm is Durable Object storage, so it survives
-  eviction. Each run reopens any closed stream it can. Its cost is one
-  internal head read of each scope, never a model call.
+- **A durable alarm, set while the object holds at least one live agent
+  key.** It reads both heads every 5 s while a role is running and the
+  board is open, and every 60 s otherwise (board paused or finished, or
+  every role paused). Each read uses a session signed by a live agent key,
+  as any member's read is authorized (`packages/scope/src/reads.ts:108-129`,
+  `sessions.ts:58`). The alarm is Durable Object storage, so it survives
+  eviction. Each run reopens any closed stream. It never calls a model.
+
+Reads need an accepted session or a signed read; an internal call grants
+no read authority (`packages/scope/src/object.ts:458`), and `observe`
+answers only membership and rules (`packages/scope/src/namespace.ts:197`).
+So the object has two states:
+
+- **Active**: at least one live agent key is in custody (enrolled and
+  not yet destroyed). The alarm runs as above.
+- **Dormant**: no live agent key: before the first enrollment, or after
+  every agent is retired and its seed destroyed. The alarm is off, there
+  are no streams and no reads, and nothing is kept to sign with. Retired
+  seeds are never kept to serve reads, and no unauthenticated read path
+  exists.
+
+The object leaves dormancy only through a signed control request on the
+routes of section 7.1: an enrollment, which makes a live key, or a repeat
+of the attach request by a holder of `agents.configure`, which re-arms
+the alarm if a live key exists and otherwise answers `dormant`. When the
+last seed is destroyed, the object clears its alarm and becomes dormant.
 
 Every wake reads the current heads, so a dropped or repeated wake loses
-no work and duplicates none. A team-scope act from any client, including
-a generic MCP tool with no browser and no host request, is therefore seen
-within 60 s. The team scope sends nothing, so the alarm is what makes
-`resume-role` and other controls take effect after a stream is lost (F2).
+no work and duplicates none. While the object is active, a team-scope act
+from any client, including a generic MCP tool with no browser and no
+host request, is seen within 60 s. The team scope sends nothing, so the
+alarm is what makes `resume-role` and other controls take effect after a
+stream is lost. A dormant object has no agent that could act, so it has
+no work to miss; its next work begins with an enrollment (F2).
 
 An agent is eligible when the board is open with no pledge, its
 participant row is active, the count is below the target, and it is not
@@ -531,7 +565,9 @@ cheapest real boundary (`docs/testing.md`). Each slice runs the gate once.
    utterances "3", "13", "x3x", "three!", "३" and an emoji, and records
    each exactly; `say` with `n` 4 is refused; an empty utterance and one
    of 1,025 bytes are refused. The host's shared check gives the same
-   answer for each case.
+   answer for each case. F4: in a native scope, a direct generic `say`
+   (through `dap act` or a generic MCP tool, not the host) with an empty
+   utterance is refused by native judgment and writes nothing.
 2. **Attachment and enrollment:** the team object, attach and enrol
    routes, key custody, Counter `participate` and `activate`, and `dap
    agents ensure`. Witnesses: 1 (interrupted after `allocate-agent` and
@@ -563,11 +599,13 @@ cheapest real boundary (`docs/testing.md`). Each slice runs the gate once.
    and repeated stream lines; restart between `commit` and the assignment
    record, which binds the reservation to the admitted promise or
    releases it); 6, act part (a lost `say` reply settles to one entry).
-   F2: pause every role, evict the object so its streams close, then
-   `resume-role` through a generic MCP tool with no browser and no host
-   request; the next eligible turn is taken. Also: an attached team with
-   no live rows, then its first `allocate-agent` and enrollment, and its
-   first control act.
+   F2, while a live key is in custody: pause every role, evict the object
+   so its streams close, then `resume-role` through a generic MCP tool
+   with no browser and no host request; the next eligible turn is taken.
+   F2, dormancy: an attachment with no rows stays dormant (no alarm, no
+   read); retire every agent so every seed is destroyed, evict the object,
+   and it stays dormant; then a fresh `allocate-agent` and enrollment
+   make it active, and work resumes with no browser.
 5. **Client surface:** Counter page changes and the Agents panel (roles,
    counts, allocation against the remaining balance, progress such as
    "3 requested, 2 ready, 1 needs attention", controls). Witness: 5.
@@ -612,8 +650,10 @@ today stays: it is a platform gap of the room, not a need of the Counter.
 8. **Lost model reply:** charged at its bound, then retried once with a
    new reservation if time and budget allow; otherwise the turn fails as
    `interrupted`. Decided 2026-10-15.
-9. **Wakes:** head streams as hints, plus an alarm that stays set while
-   the Counter is attached, at most 60 s apart. No scope runtime change.
+9. **Wakes:** head streams as hints, plus an alarm at most 60 s apart
+   while a live agent key is in custody; with no live key the object is
+   dormant and wakes only by a signed enrollment or repeated attach. No
+   scope runtime change and no new read path.
 10. **Drain:** derived from `count` by ordinal; no extra act. **Model
     tools:** the utterance is the model's only output.
 11. **Page work:** builder builds slice 5. Decided 2026-10-15.
@@ -625,6 +665,8 @@ today stays: it is a platform gap of the room, not a need of the Counter.
 14. **Admission:** each catalog model carries a finite input and output
     maximum, its wire and usage mapping, and a real-binding test. Usage
     that breaks the entry keeps its charge and fences the model.
+15. **Nonempty utterance:** one native `differs` guard in `say`, with the
+    host's shared check using the same minimum and maximum.
 
 ## 10. Questions left
 
@@ -634,8 +676,8 @@ numeral (now replaced); the factory carries a `scope` genesis value whole;
 and status reads by live holders of `agents.configure` or
 `agents.administer` are consistent with admin-only configuration.
 
-Open for the checker: whether 512 framing tokens is a reasonable
-planning cap before each entry states its own (section 6). Open for Hugh:
+Its review of `c2a93883` accepted 512 framing tokens as a conditional
+planning example only (section 6 now says so). Open for Hugh:
 the admission tests in slice 6 make real Workers AI calls before the
 deployment; they need his permission as provider calls, whether or not
 the deployment hold covers them.
@@ -645,6 +687,7 @@ the deployment hold covers them.
 Written by the planner from the parent design and the files cited above,
 with three read-only surveys of the worktree; key citations were checked
 at their lines. Revision 2 adds the checker's review of `abc7dcd0` and
-its cited Workers AI model and pricing pages. Nothing was run: no test,
+its cited Workers AI model and pricing pages; revision 3 adds its review
+of `c2a93883`. Nothing was run: no test,
 gate, deployment or provider call. The arithmetic in section 6 was
 computed by a short script from the stated rates.
