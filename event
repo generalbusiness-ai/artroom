@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d314f84cae83fe8479621b11468a89174102a03b"}
+{"kind":"promise","text":"Resolve the proposed first internal Node clone-object transport/ref-resolver dependency from current Source, adopted layout boundaries and read-only preparation facts. Return a concrete pre-Source specification/amendments; no implementation before layout lands, no gate/provider/publication.","body":{"request":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b56a482fa5ee62a63642756a3e607f8bf7682fd3"}}
