@@ -10,6 +10,27 @@ requests do not yet have matching whole-scope admission guarantees.
 Existing five-dimensional reservation amounts are partial inputs to that
 work. They must be extended, not replaced with a second calculator.
 
+## Adopted accounting rules
+
+Planner decision `78b6d12993d5d390618f7d5d0207bd7659b52856`
+adopted contract revision 23 at
+`3b3e394fc6807c33211ac80db813621253c38f5c`. Section 17.1 already fixes
+the units: items include live and retained final states; records are
+capability records and relationship copies in every state; bytes are
+canonical entries plus named retained inputs, once per byte-domain/digest.
+Redacted bytes leave Used from the redaction entry onward. Derived
+indexes, folded state, and outbox bookkeeping are outside these dimensions.
+Requests remain pending until a recorded result or `undelivered`
+diagnosis; transport acknowledgment does not settle them.
+
+Section 17.3 already requires `scope-full` to name the exceeded dimension.
+These are adopted semantics, not fresh design choices. Historical
+coordination `f45f1111` distinguishes them from runtime/configuration,
+diagnostic, finite producer-maximum, and incomplete historical-byte
+reporting decisions. The exact section and that coordination act were
+read for this correction; no stale historical support is used as a new
+Source freshness basis.
+
 ## Current counting and commit points
 
 Line numbers refer to the Main above.
@@ -68,17 +89,21 @@ returns `retry/scope-full` (`packages/scope/src/delivery.ts:277`).
 per-entry/type/slot bounds. They must retain those meanings.
 
 The current `full(head)` callback carries no dimension (`turn.ts:73`).
-The optional answer `name` currently identifies a declared guard reason;
-using it for a capacity dimension would change that contract. Choose and
-review the dimension-reporting convention before changing the callback
-and closed reason readers. Do not silently invent four public reason codes.
+The answer type's `name` comment describes a declared guard reason.
+Implementation must carry the adopted dimension diagnostic through the
+callback and public readers, with an exact typed runtime/API convention.
+That integration is the remaining question; neither `scope-full` nor its
+requirement to name the dimension needs adoption again. Do not invent
+four new public reason codes.
 
 The first implementation slice needs three explicit decisions:
 
-1. Adopt the logical record/byte units, including retained-domain
-   deduplication, first keys versus replacements, and redaction. Physical
-   SQLite bytes and derived indexes are different measurements. Historical
-   erased texts cannot be reconstructed from a surviving body.
+1. Apply the adopted units at every first-key, replacement, retention,
+   deduplication, and redaction point. Specify the incomplete/trusted
+   historical replay report when earlier erased text sizes are unavailable;
+   missing historical bytes are not permission to count zero before their
+   redaction. Keep finite producer maxima explicit. Physical SQLite cost
+   remains a separate measurement.
 2. State the four configurable ceilings and their adoption status. There
    are no existing defaults for them in `Bounds`; this note supplies no
    measured or arbitrary replacement values.
@@ -89,8 +114,8 @@ The first implementation slice needs three explicit decisions:
 
 ## Proposed slices and witnesses
 
-1. Agree on those units, ceilings, refusal reporting, and legacy selection.
-   Extend the existing `Amount` accounting through complete declared and
+1. Resolve the remaining runtime/configuration/reporting and legacy
+   choices against the adopted units. Extend existing `Amount` accounting through complete declared and
    owner-supplied closures. Check safe arithmetic and invalid operands;
    missing producer maxima must refuse, not count as zero.
 2. Add used counts at the existing fold/retain commit points, with the
@@ -110,3 +135,8 @@ document; source and tests are unchanged. All four implementation
 guarantees, measurements, boundary witnesses, exact reviews, and the full
 `113a54bd` request remain owed. Judge/P3 preparation and archive work are
 preserved; no deployment or publication is authorized by this note.
+
+Review `94438c26` requested this correction at initial `7007a46b`.
+It found the current-source map and proposed witnesses accurate, with no
+other finding. This successor changes only this note and preserves all
+1,452 Main leaves. The full capacity guarantees remain owed.
