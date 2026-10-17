@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1a5da297631f8e68847997488b758151e99bf7ec","text":"Merge retired a covered predecessor; the successor is at docs/public-sdk-release.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1a85092dcbb62bf9b2aff1ba21ca57ac2a7903f6","text":"Merge retired a covered predecessor; the successor is at examples/lending/test-support.ts."}
