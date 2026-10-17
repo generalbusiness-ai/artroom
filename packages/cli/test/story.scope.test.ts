@@ -9,7 +9,7 @@ import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf } from "../../scope/test/outside.ts";
 import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "../../scope/test/support/native-fixture-lifetime.ts";
-import { foundingPublication } from "../../scope/test/publication.ts";
+import { initialPublication } from "../../scope/test/publication.ts";
 import { command, memoryStore, type Context, type Outcome } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
@@ -123,7 +123,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   // The destination's founding publication: the first head and its receipt, answered by the STAND-IN host. The destination then
   // holds entries that no member signed: the host's outcomes, the receipt's among them.
   const G = node(repository.destination);
-  await foundingPublication(G, lifetime);
+  await initialPublication(G, lifetime);
   const recorded = (await G.item(0)) as { state: string; values: { repository?: { name: string } } };
   expect(recorded.state).toBe("ready");
 

@@ -1,0 +1,69 @@
+# Create and outbox terminology
+
+Source child 1a7c88af, promise 75d700a4, implements items 2 to 5 of
+bb2c27ac. The completed spikes slice and its history tag are preserved.
+The isolated branch starts from Directory candidate f45a5ce80 while its
+exact review 584f53a9 proceeds. Directory corrections retain priority;
+this terminology slice cannot land before Directory.
+
+## First implementation checkpoint
+
+A read-only token inventory separated code identifiers from quoted
+values. The first pass changes 47 distinct type, API and helper names,
+360 token occurrences across 62 files. It includes CreationOffer,
+Created, SignedCreation, the initial-commit helpers and creator custody
+helper names. No compatibility aliases were added. The public found()
+operation, generic internal names, filenames and the outbox terminology
+remain unfinished; this checkpoint is not a completed delivery.
+
+Pinned definition keys, native intent kinds, signed genesis input keys,
+digest-addressed initial Git content and persisted custody keys have not
+changed. In particular, renaming the initial-commit helper leaves its old
+README and commit bytes intact. These values need an explicit file/line
+and next-version inventory before final Source review. No new cohort is
+being created for wording.
+
+The root typecheck passes after this symbol pass. Focused existing tests
+pass: six platform version/initial-object cases, one client offer case,
+and eight Page connection/start custody/UI cases. Logs are
+/tmp/artroom-create-outbox-first-symbol-types.log,
+/tmp/artroom-create-outbox-first-platform-focus.log,
+/tmp/artroom-create-outbox-first-offer-focus.log and
+/tmp/artroom-create-outbox-first-custody-focus.log. These Node checks are
+not rendered or hosted evidence. No full gate has run for this slice.
+
+The new checkout used npm ci --offline with the existing reviewed lock,
+not a tooling-probe install. Package manifests and the lock are unchanged.
+Whitespace passes. A generated-source search initially printed an
+oversized minified line; it is not validation or a changed generated asset.
+
+## Line-count method and baseline
+
+The script /tmp/artroom-terminology-line-count.py counts physical lines
+of tracked UTF-8 files, including blank lines and comments, for .ts,
+.tsx, .js, .jsx, .mjs, .cjs, .py and .sh. It reports tests, generated
+files, tooling and other source separately. This is not a semantic count
+of executable statements.
+
+At the pre-rename Directory freeze 2bcc1a4d, the count is 142,509 lines
+in 814 files: 61,847 test lines, 77,248 other source lines, 3,367 tooling
+lines and 47 generated lines. The subsequent f45 composition changes
+only Markdown, so that code baseline is unchanged. The first symbol pass
+preserves line counts. Final counts will use the same script and exact
+final Source commit.
+
+## Remaining work
+
+Complete the scope-making API and internal names, rename their files and
+unsigned discovery routes, and update active documentation. Preserve and
+list every pinned or signed/digested literal instead of changing old
+journal meanings. Confirm the outbox's unsigned read and bookkeeping
+boundaries before renaming its API and internal mechanism names; preserve
+the meaning and availability of existing retained records. Keep turn,
+settle and pinned settles, define them plainly, and add the general
+patterns section to the ten-terms manual. Rebuild owned generated assets
+after source changes, run the affected existing checks, then one gate at
+the frozen final implementation and independent exact Source review.
+
+No approval, landing, push, publication or provider operation is claimed.
+The Cloudflare hold remains in force.

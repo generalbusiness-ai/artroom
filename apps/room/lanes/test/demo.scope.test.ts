@@ -72,7 +72,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
               }
               return original(url, init);
             };
-            return { ...ctx, fetch, trustedFoundingService: { service: SERVICE, fetch } };
+            return { ...ctx, fetch, trustedCreationService: { service: SERVICE, fetch } };
           },
         });
         const failed = rehearsal.shots.find(shot => shot.title === target)!;
@@ -212,9 +212,9 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
   // Readonly claim eligibility is recorded separately for each actual caller.
   // A path-only map cannot reuse the operator's signed read for a member.
-  const founderSession = { service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! };
-  const configured = await allowedClaim(founderSession, config.register!);
-  const founderAnswers = Object.fromEntries(recording);
+  const creatorSession = { service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! };
+  const configured = await allowedClaim(creatorSession, config.register!);
+  const creatorAnswers = Object.fromEntries(recording);
   recording = new Map();
   const member = people.member!;
   const memberConfig = (await member.store.config())!;
@@ -228,11 +228,11 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   try { await allowedClaim(memberSession, config.register!); }
   catch (error) { memberRefusal = error instanceof Error ? error.message : "Eligibility could not be read."; }
   expect(memberRefusal).not.toBe("");
-  const assets = Object.fromEntries(Object.entries(founderAnswers).filter(([key]) => key === "GET /page/" || key === "GET /page/page.js"));
+  const assets = Object.fromEntries(Object.entries(creatorAnswers).filter(([key]) => key === "GET /page/" || key === "GET /page/page.js"));
   const kept = {
-    service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: founderAnswers,
+    service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: creatorAnswers,
     claimWitness: { register: configured.register, definition: configured.definition,
-      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: founderAnswers },
+      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: creatorAnswers },
       member: { place: memberPlace, secret: b64url(memberSecret), actor: keyIdOfSecret(memberSecret), answers: { ...assets, ...Object.fromEntries(recording) }, refusal: memberRefusal },
     },
   };
@@ -298,7 +298,7 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
     person: (who) => {
       // The injected transport is this real test Worker at SERVICE, not an
       // arbitrary callback asserted to prove a service's historical source.
-      const context = { store: memoryStore(), fetch, trustedFoundingService: { service: SERVICE, fetch }, now, pause, git, read: async (path: string) => FILES[path] ?? null };
+      const context = { store: memoryStore(), fetch, trustedCreationService: { service: SERVICE, fetch }, now, pause, git, read: async (path: string) => FILES[path] ?? null };
       return (people[who] = context);
     },
     pin: async (planned) => {

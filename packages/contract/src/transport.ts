@@ -23,7 +23,7 @@ import type { Cursor, Duty, Item, LogPage, Read, RetainedInput, Sealed, Settleme
  * applied. `scope-refused`: the genesis entry is sealed and its act refused;
  * the scope is terminal. Every other refusal wrote nothing.
  */
-export type Founded =
+export type Created =
   | { answer: "accepted"; receipt: Receipt }
   | { answer: "refused"; reason: RefusalReason | DeliveryRefusal | "unsupported-definition" }
   | { answer: "unavailable"; reason: UnavailableReason };
@@ -52,7 +52,7 @@ export interface ScopeApi {
    * in `create` sends, which the directory retains for its children.
    * `beside`: the detached texts that the founding intent's fields name.
    */
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;
   /**
    * Submit an act (section 4.2). A caller with no answer, or an unavailable
    * one, sends the same signed intent again, with the same `beside`.

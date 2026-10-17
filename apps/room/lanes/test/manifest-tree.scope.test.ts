@@ -31,7 +31,7 @@ import { CheckerService } from "../../../../packages/checkers/src/service.ts";
 import { Outcomes } from "../../../../packages/checkers/src/store.ts";
 import { MemoryDurable } from "../../../../packages/checkers/test/support.ts";
 
-import { room as legacyRoom, rita as legacyFounder } from "./support/room.ts";
+import { room as legacyRoom, rita as legacyCreator } from "./support/room.ts";
 
 const SERVICE = "https://scopes.test";
 const reader = "a test reader";
@@ -539,9 +539,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       expect(beforeRead.value.reservationExpiry).toEqual({ clock: "available", time: net.clock.now, expired: [] });
       net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
       const expiredClock = net.clock.now;
-      const founderConfig = (await founder.store.config())!;
-      const founderSecret = (await founder.store.secret(founderConfig.key))!;
-      const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, founderSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
+      const creatorConfig = (await founder.store.config())!;
+      const creatorSecret = (await founder.store.secret(creatorConfig.key))!;
+      const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, creatorSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
       expect(session.ok).toBe(true);
       if (!session.ok) throw new Error("native session unavailable");
       const sessionRead = await G.stub.summary(session.session.reader());
@@ -560,7 +560,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
         const fallible = await G.stub.summary(session.session.reader());
         expect(fallible.ok && fallible.value.reservationExpiry).toEqual({ clock: "unavailable" });
       } finally { net.clock.read = readClock; }
-      const signed = await signedReader({ key: keyIdOfSecret(founderSecret), sign: (bytes) => sign(founderSecret, bytes) }, G.name, "summary", "summary", { now: () => timeMs(expiredClock)! });
+      const signed = await signedReader({ key: keyIdOfSecret(creatorSecret), sign: (bytes) => sign(creatorSecret, bytes) }, G.name, "summary", "summary", { now: () => timeMs(expiredClock)! });
       const expiredRead = await G.summary();
       expect([expiredRead.at, expiredRead.value.items.find((item) => item.id === expiring.id)?.state, expiredRead.value.reservationExpiry]).toEqual([beforeRead.at, "reserved", { clock: "available", time: expiredClock, expired: [expiring.id] }]);
       net.clock.now = timeOf(timeMs(beforeRead.value.time)! - 1);
@@ -1008,7 +1008,7 @@ test("a native version-2 room refuses branch list proposals before local Git cap
   const directory = await old.D.at(), membership = await old.M.at();
   owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
   try {
-    const store = memoryStore(); await store.keep("founder", legacyFounder.secret);
+    const store = memoryStore(); await store.keep("founder", legacyCreator.secret);
     await store.save({ v: 1, service: SERVICE, key: "founder", repository: { directory, membership, rules: old.rules.name, destination: old.G.name } });
     let reads = 0;
     const outcome = await command({ store, fetch: ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch, now: () => timeMs(net.clock.now)!, git: { run: async () => 0, files: async () => { reads++; return { ok: false, reason: "should-not-read" }; } } }, ["propose", "topic"]);

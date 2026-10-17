@@ -6,7 +6,7 @@ import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, newIncar
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, useOf, validateDefinition, valueDigest, type Fetched, type Item } from "@generalbusiness/dap-derive";
 import { d, keys, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
-import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
+import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, initialCommitObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
 import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
@@ -174,7 +174,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
     // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
     const destinationHost = outsideOf(G.name);
-    const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
+    const firstHead = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
     lifetime.active();
     destinationHost.answer("0:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { send: "accepted", seen: firstHead } } });
     let driving = "mint";

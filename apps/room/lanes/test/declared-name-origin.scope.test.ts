@@ -10,7 +10,7 @@ import { changeDemo } from "../src/index.ts";
 import { room as nativeRoom, rita as nativeRita } from "./support/room.ts";
 import { soon } from "../../../../packages/scope/test/net.ts";
 import { outsideOf } from "../../../../packages/scope/test/outside.ts";
-import { foundingPublication } from "../../../../packages/scope/test/publication.ts";
+import { initialPublication } from "../../../../packages/scope/test/publication.ts";
 import type { Platform } from "../../../../packages/scope/test/repository.ts";
 import { reader } from "../../../../packages/scope/test/support.ts";
 import { beginSessionFixture } from "../../../../packages/scope/test/session-settings.ts";
@@ -67,7 +67,7 @@ test("native reserve refuses declared-name applications across rooms and inside 
       APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, APPLICATION_COHORT.destination]);
     const seat = await M.did(who, "seat", { expected: await M.expected({ roster: 0 }) });
     await M.did(who, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
-    await foundingPublication(G, lifetime);
+    await initialPublication(G, lifetime);
     expect(await G.item(0)).toMatchObject({ state: "ready" });
     return { R, D, M, Q, G, who };
   };

@@ -73,7 +73,7 @@ import { PROPOSED_BOUNDS, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-co
 import type { FactRef, Entry, ItemQueryRead, ItemQueryRefusal, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, parseStrict, readItemQueryReply, utf8, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/dap-derive";
-import { foundedKind, type Founded } from "./core.ts";
+import { creationKind, type Created } from "./core.ts";
 import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, sessionReferencesIn, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
@@ -108,7 +108,7 @@ export interface McpEnv extends Env { REGISTRIES: DurableObjectNamespace; AGENTS
 interface Remote {
   observed?(method: ObservedMethod, args: unknown[], identity: OperationalIdentity, httpPublic?: boolean): Promise<{ value: unknown; turn: boolean }>;
   reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
   prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
   settle(signed: SignedIntent): Promise<Settlement>;
@@ -183,12 +183,12 @@ export function api(binding: Binding, address: string | null = null): Api {
      * names in `create` sends, which the directory retains for its children.
      * `beside`: the detached texts that the founding intent's fields name.
      */
-    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
+    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
       let name: ScopeId;
       try {
         const names = typeof definition === "string" ? definition : definitionDigest(definition);
         // Under the register's platform definition the scope is the founding register, of the kind `register` (I3 delta EP2).
-        const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+        const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
         name = scopeIdOf(seed);
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes
@@ -233,7 +233,7 @@ const BODY_BYTES = 1024 * 1024;
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 /** The status of an answer to a founding or an act (section 4.2). The body says which. */
-function answered(answer: Founded | Answer, accepted: number): Response {
+function answered(answer: Created | Answer, accepted: number): Response {
   const status = answer.answer === "accepted" ? accepted : answer.answer === "unavailable" ? 503 : answer.answer === "mismatch" ? 409 : answer.reason === "unauthorized" ? 403 : 422;
   return json(status, answer);
 }
@@ -482,7 +482,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
 export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> implements ScopeApi {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions, beside); }
+  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return api(this.scopes()).found(founding, definition, definitions, beside); }
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants, beside); }
   prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return api(this.scopes()).prepare(scope, signed, grants, capability, step); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }

@@ -89,7 +89,7 @@ async function recovering(): Promise<void> {
         return response;
       }) as Fetch,
     };
-    ctx.trustedFoundingService = { service: SERVICE, fetch: ctx.fetch! };
+    ctx.trustedCreationService = { service: SERVICE, fetch: ctx.fetch! };
     return { ctx, store, submissions, entryReads: () => entryReads, receipt: (bad: typeof badReceipt) => { badReceipt = bad; } };
   };
   for (const mode of ["reply", "save"] as const) {
@@ -114,7 +114,7 @@ async function recovering(): Promise<void> {
     net.clock.now = timeOf(Date.parse(original.founding.intent.notAfter) + 901_000);
     const sends = s.submissions.length;
     const untrusted = { ...s.ctx };
-    delete untrusted.trustedFoundingService;
+    delete untrusted.trustedCreationService;
     expect((await command(untrusted, ["install", "--planned"])).lines[0]).toMatch(/^Held: this injected transport/);
     expect([s.submissions.length, await s.store.config()]).toEqual([sends, pending]);
     if (mode === "reply") {
@@ -175,7 +175,7 @@ async function planned(): Promise<void> {
   };
 
   // A mismatched plan: its kept register ID is not the one its intent makes. Refused by name; nothing is sent, so no register exists.
-  const sam: Context = { store: memoryStore(), fetch, now, trustedFoundingService: { service: SERVICE, fetch } };
+  const sam: Context = { store: memoryStore(), fetch, now, trustedCreationService: { service: SERVICE, fetch } };
   expect((await command(sam, ["install", "--plan", SERVICE, "--host", "git.example", "--namespace", "artroom"])).code).toBe(0);
   const samPlan = (await sam.store.config())!.plan!;
   const other = samPlan.register.replace(/.$/, (c) => (c === "a" ? "b" : "a"));
@@ -214,7 +214,7 @@ async function planned(): Promise<void> {
     outsideOf(host.R!.name).answer(request.operation, request.attempt, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: `repo-${entry.seq}` } } });
   };
   const pause = async (waiting: readonly string[]) => { await answering(); await settle(...waiting.map((scope) => new Platform(scope as never))); };
-  const rita: Context = { store: memoryStore(), fetch, now, pause, tries: 3, trustedFoundingService: { service: SERVICE, fetch } };
+  const rita: Context = { store: memoryStore(), fetch, now, pause, tries: 3, trustedCreationService: { service: SERVICE, fetch } };
   const run = (...argv: string[]) => command(rita, argv);
   const plan = await run("install", "--plan", SERVICE, "--host", "git.example", "--namespace", "artroom");
   const kept1 = (await rita.store.config())!;

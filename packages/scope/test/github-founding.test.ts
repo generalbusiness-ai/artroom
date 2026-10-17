@@ -4,7 +4,7 @@ import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/dap-contract
 import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/dap-derive/testing";
-import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/dap-platform";
+import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, initialCommitObjects } from "@generalbusiness/dap-platform";
 import { ZERO_ID } from "@generalbusiness/artroom-git";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
 import { SqliteStore, mintSession, readerOf, sessionsOf } from "../src/index.ts";
@@ -201,7 +201,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     const registerEntries = await R.entries();
     const genesis = (await G.entries())[0]!;
     // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
-    const first = foundingObjects("sha1", G.name, genesis.time, factRefOf(registerEntries[1]!), { name: host.name!, handle: "@rita", directory: D.name });
+    const first = initialCommitObjects("sha1", G.name, genesis.time, factRefOf(registerEntries[1]!), { name: host.name!, handle: "@rita", directory: D.name });
     expect(host.creates).toBe(1);
     expect(host.emptyAdvertisements).toBeGreaterThan(0);
     expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: first.commit } });

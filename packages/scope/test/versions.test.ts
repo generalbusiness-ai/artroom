@@ -2,11 +2,11 @@ import { describe, expect, test } from "vitest";
 import type { Intent, PlatformDefinition, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { keys, ticketDefinition } from "@generalbusiness/dap-derive/testing";
-import { firstExtents, foundingObjects, platform, repositoryName } from "@generalbusiness/dap-platform";
+import { firstExtents, initialCommitObjects, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { reader } from "./support.ts";
 import { beginSessionFixture } from "./session-settings.ts";
 import { Platform, rita, routed, sam } from "./repository.ts";
@@ -65,8 +65,8 @@ describe("a room founded on version 1 of every definition, on the code that ship
     expect((await M.item(0)).values["adminActions"]).not.toContain("destination.read-token");
 
     // The founding publication: the first head is version 1's founding commit, the empty tree, with no README.
-    await foundingPublication(G, lifetime);
-    const emptyTree = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!));
+    await initialPublication(G, lifetime);
+    const emptyTree = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!));
     expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: emptyTree.commit } });
 
     // `read-token` is no act of `platform:destination@1`: the scope refuses it by name, and writes nothing.

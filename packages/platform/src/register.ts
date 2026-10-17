@@ -66,7 +66,7 @@ export const CREATION_ATTEMPTS = 3;
 const KEY = { type: "text", max: 64 } as const;
 const NAME = { type: "text", max: 256 } as const;
 const POLICY = { type: "enum", of: ["keys", "open"] } as const;
-const FOUNDERS = { type: "list", of: KEY, max: 32 } as const;
+const CREATORS = { type: "list", of: KEY, max: 32 } as const;
 
 /** The record of a repository at the Git host: its host, namespace, name and ID (section 12.1.1, the slot `claim.repository`). The directory and the destination hold the same record. */
 export const REPOSITORY = {
@@ -91,7 +91,7 @@ export const register: PlatformData = {
         host: { fixed: true, required: true, of: NAME },
         namespace: { fixed: true, required: true, of: NAME },
         policy: { fixed: true, required: true, of: POLICY },
-        founders: { fixed: true, required: false, of: FOUNDERS },
+        founders: { fixed: true, required: false, of: CREATORS },
       },
     },
     // The second row. A claim is `pending` until the directory's applied result is recorded.
@@ -123,7 +123,7 @@ export const register: PlatformData = {
         host: { ...NAME, required: true },
         namespace: { ...NAME, required: true },
         policy: { ...POLICY, required: true },
-        founders: { ...FOUNDERS, required: false },
+        founders: { ...CREATORS, required: false },
       },
       guards: [],
       effects: [

@@ -52,7 +52,7 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
       return new Response(JSON.stringify({ answer: "accepted", receipt }));
     }) as Fetch,
   };
-  ctx.trustedFoundingService = { service: SERVICE, fetch: ctx.fetch! };
+  ctx.trustedCreationService = { service: SERVICE, fetch: ctx.fetch! };
   return { ctx, store, bodies, metrics: () => ({ saves, keyReads, keyWrites }) };
 }
 

@@ -7,7 +7,7 @@ import { openRoom, type Room } from "./data.ts";
 import { startRoom, originalStart, recoveryKeyOnce, type StartOptions } from "./start-custody.ts";
 import type { ClaimStorage } from "./claim.ts";
 
-export interface FounderBinding { key: KeyId; operation: string; membership: ScopeRef }
+export interface CreatorBinding { key: KeyId; operation: string; membership: ScopeRef }
 export interface ConnectionOptions extends Pick<StartOptions, "locks" | "current" | "fetch" | "now" | "pause" | "tries"> { mode: "new" | "check" | "continue" }
 interface Row { operation: string; input: InvitationIssueInput; state: "reserved" | "entered" | InvitationIssueResult["state"]; config: Config; private: Record<string, string>; reason?: string }
 interface Journal { v: 1; binding: string; active: string; rows: Record<string, Row> }
@@ -15,7 +15,7 @@ export interface ConnectionStatus { operation: string; kind: "person" | "agent-k
 const MOST = 256 * 1024, MAX_OPERATIONS = 16;
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
 const unavailable = () => new Error("The original private connection is unavailable or changed. Nothing was replaced or submitted.");
-const bindingOf = (origin: string, expected: FounderBinding) => canonicalize([origin, expected.membership, expected.key, expected.operation]);
+const bindingOf = (origin: string, expected: CreatorBinding) => canonicalize([origin, expected.membership, expected.key, expected.operation]);
 const storageKey = (binding: string) => `artroom-page-connections:${binding}`;
 function read(storage: ClaimStorage, binding: string): Journal | null {
   const bytes = storage.getItem(storageKey(binding));
@@ -49,13 +49,13 @@ function write(storage: ClaimStorage, journal: Journal, current: () => boolean):
   if (!current()) throw unavailable();
   return structuredClone(journal);
 }
-export function originalConnection(origin: string, storage: ClaimStorage, expected: FounderBinding): ConnectionStatus | null {
+export function originalConnection(origin: string, storage: ClaimStorage, expected: CreatorBinding): ConnectionStatus | null {
   const journal = read(storage, bindingOf(origin, expected));
   if (!journal) return null;
   const row = journal.rows[journal.active]!;
   return { operation: row.operation, kind: row.input.kind, handle: row.input.handle, state: row.state, ...(row.reason ? { reason: row.reason } : {}) };
 }
-async function withFounder<T>(origin: string, storage: ClaimStorage, expected: FounderBinding, options: ConnectionOptions, work: (room: Room, config: Config) => Promise<T>): Promise<T> {
+async function withCreator<T>(origin: string, storage: ClaimStorage, expected: CreatorBinding, options: ConnectionOptions, work: (room: Room, config: Config) => Promise<T>): Promise<T> {
   const status = originalStart(origin, storage);
   if (!status || status.key !== expected.key || status.operation !== expected.operation || options.current?.() === false) throw unavailable();
   const result = await startRoom(origin, storage, { ...options, mode: "check" });
@@ -67,12 +67,12 @@ async function withFounder<T>(origin: string, storage: ClaimStorage, expected: F
     return await work(room, { v: 1, service: origin, key: "browser", register: result.configured.register, repository: result.repository, handle: result.handle });
   } finally { secret?.fill(0); }
 }
-export async function connectInvitation(origin: string, storage: ClaimStorage, expected: FounderBinding, input: InvitationIssueInput, options: ConnectionOptions): Promise<InvitationIssueResult> {
+export async function connectInvitation(origin: string, storage: ClaimStorage, expected: CreatorBinding, input: InvitationIssueInput, options: ConnectionOptions): Promise<InvitationIssueResult> {
   const browser = globalThis as { navigator?: { locks?: import("./claim.ts").ClaimLocks } };
   const locks = options.locks ?? browser.navigator?.locks;
   if (!locks) throw unavailable();
   const binding = bindingOf(origin, expected);
-  return locks.request(`artroom-page-connections:${binding}`, () => withFounder(origin, storage, expected, options, async (room, base) => {
+  return locks.request(`artroom-page-connections:${binding}`, () => withCreator(origin, storage, expected, options, async (room, base) => {
     let journal = read(storage, binding) ?? { v: 1 as const, binding, active: "", rows: {} };
     const active = journal.active ? journal.rows[journal.active] : undefined;
     for (const stored of Object.values(journal.rows)) {
@@ -127,12 +127,12 @@ export async function connectInvitation(origin: string, storage: ClaimStorage, e
     return result;
   }));
 }
-export async function founderConnectionFiles(origin: string, storage: ClaimStorage, expected: FounderBinding, options: Omit<ConnectionOptions, "mode"> = {}): Promise<{ config: string; key: string }> {
-  return withFounder(origin, storage, expected, { ...options, mode: "check" }, async (room, config) => ({
+export async function creatorConnectionFiles(origin: string, storage: ClaimStorage, expected: CreatorBinding, options: Omit<ConnectionOptions, "mode"> = {}): Promise<{ config: string; key: string }> {
+  return withCreator(origin, storage, expected, { ...options, mode: "check" }, async (room, config) => ({
     config: JSON.stringify({ ...config, key: "device" }, null, 2) + "\n",
     key: b64url(room.session.secret) + "\n"
   }));
 }
-export async function saveFounderRecoveryOnce(origin: string, storage: ClaimStorage, expected: FounderBinding, options: Omit<ConnectionOptions, "mode"> = {}): Promise<string> {
-  return withFounder(origin, storage, expected, { ...options, mode: "check" }, async () => recoveryKeyOnce(origin, storage, expected, options));
+export async function saveCreatorRecoveryOnce(origin: string, storage: ClaimStorage, expected: CreatorBinding, options: Omit<ConnectionOptions, "mode"> = {}): Promise<string> {
+  return withCreator(origin, storage, expected, { ...options, mode: "check" }, async () => recoveryKeyOnce(origin, storage, expected, options));
 }

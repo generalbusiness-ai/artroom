@@ -31,7 +31,7 @@ import { publicationStandingRecord, publicationStandingKeys, type PublicationSta
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";
 import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane, sourcesOf, manifestFiles } from "./destination-reading.ts";
-import { editCommit, editPath, manifestCommit, foundingObjects, receiptObjects, receiptRef, filePublicationCommit, fileReceiptObjects, fileReceiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { editCommit, editPath, manifestCommit, initialCommitObjects, receiptObjects, receiptRef, filePublicationCommit, fileReceiptObjects, fileReceiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 import { isOf, isStandingDestination, pinnedBy, pinnedOf } from "./versions.ts";
 
 /**
@@ -1123,7 +1123,7 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
     if (!isObjectId(commit)) throw new Error("an imported first head names its commit in the update");
     return commit;
   }
-  return foundingOf(state, own, format).commit;
+  return initialCommitOf(state, own, format).commit;
 }
 
 /**
@@ -1132,15 +1132,15 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
  * `README.md`, with the repository's name, the founder's handle and the
  * directory's scope ID, each held by the branch since the genesis.
  */
-export function foundingOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
+export function initialCommitOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
   const branch = branchOf(state);
   const claim = branch?.refs["claim"];
   if (!branch || !isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
   const genesis = ownEntry(own, 0);
-  if (pinnedOf(own) === DESTINATION_1) return foundingObjects(format, genesis.at.scope, genesis.time, claim);
+  if (pinnedOf(own) === DESTINATION_1) return initialCommitObjects(format, genesis.at.scope, genesis.time, claim);
   const [repository, handle, directory] = [branch.values["repository"] as { name?: unknown } | null, branch.values["founderHandle"], branch.refs["directory"]];
   if (typeof repository?.name !== "string" || typeof handle !== "string" || !isScopeRef(directory)) throw new Error("a founding of version 2 holds the repository's name, the founder's handle and the directory");
-  return foundingObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
+  return initialCommitObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
 }
 
 /** A receipt's recorded file, commit objects and public ref. Every fact is an own entry or a verified reference held by an item. */

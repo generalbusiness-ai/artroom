@@ -8,7 +8,7 @@ import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusines
 import { inbox, platform } from "@generalbusiness/dap-platform";
 import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability, type CapabilityScript } from "../src/testing.ts";
-import { Node, founding as foundingIn, net, routed, soon } from "./net.ts";
+import { Node, founding as creationIn, net, routed, soon } from "./net.ts";
 import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
@@ -216,14 +216,14 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
 
     // A runtime that lacks the code founds no scope under the definition, and writes nothing: the namespace `NET` with no capability.
     net.capability = null;
-    const lacking = foundingIn(staged, fields);
+    const lacking = creationIn(staged, fields);
     expect(await new Node(lacking.name, staged.declared).stub.found(lacking.signed, staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
 
     // A STAND-IN from here on: the scripted test capability answers from the table below. It reads no hold and no repository.
     try {
       net.hold = net.deaf = null;
       net.capability = {};
-      const { signed, name } = foundingIn(staged, fields);
+      const { signed, name } = creationIn(staged, fields);
       const L = new Node(name, staged.declared);
       expect(await L.stub.found(signed, staged.declared)).toMatchObject({ answer: "accepted" });
       const commitment = (await L.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;

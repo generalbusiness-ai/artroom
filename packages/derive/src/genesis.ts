@@ -32,7 +32,7 @@ import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
  * that was reached. `inc` is minted at random by the caller, in the
  * transaction that writes the entry (section 2.2).
  */
-export interface Founding { name: ScopeId; inc: Incarnation; seed: Seed; founding: SignedIntent }
+export interface SignedCreation { name: ScopeId; inc: Incarnation; seed: Seed; founding: SignedIntent }
 
 /** What asks for a child (section 7.2): the delivery of a `create`, which is addressed by its seed. */
 export interface Creation { name: ScopeId; inc: Incarnation; to: Seed; from: FactRef; n: number; message: Request }
@@ -93,11 +93,11 @@ function causeOf(source: Entry, message: Request, facts: readonly Fetched[]): Se
  * the check of its place, as for an act (section 4.2). A fault of a rule
  * leaves the genesis not judged, and nothing is written (section 6.1).
  */
-export function judgeGenesis(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {
+export function judgeGenesis(view: StateView, definition: ValidDefinition, asked: SignedCreation | Creation, context: DeliveryContext): Judgment {
   return withinCounts(view, definition, unjudged(() => genesisJudged(view, definition, asked, context)));
 }
 
-function genesisJudged(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {
+function genesisJudged(view: StateView, definition: ValidDefinition, asked: SignedCreation | Creation, context: DeliveryContext): Judgment {
   const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
   const { clock, bounds } = context;
   const founding = "founding" in asked ? asked.founding : null;

@@ -68,7 +68,7 @@ async function story(lifetime: Lifetime): Promise<void> {
   };
   // A selected-cohort install founds a register by its planned identity, which the command accepts only from a configured service
   // it trusts: the test names the routed transport as that service.
-  const person = (): Context => ({ store: memoryStore(), fetch, now, pause, trustedFoundingService: { service: SERVICE, fetch } });
+  const person = (): Context => ({ store: memoryStore(), fetch, now, pause, trustedCreationService: { service: SERVICE, fetch } });
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
 
   /** A room of one cohort, founded by its admin through the command: install with the cohort, wire the host stand-in, create. */

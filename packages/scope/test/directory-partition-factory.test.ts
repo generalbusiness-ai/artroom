@@ -6,7 +6,7 @@ import { canonicalize, factRefOf, isPlatformDefinition, platformName, scopeIdOf 
 import { PARTITION_COHORT as C, FIRST_ACTIONS_OF, partitionReceiverPolicy, type PartitionNativeFrame } from "@generalbusiness/dap-platform";
 import { applicationPublicationOrigin } from "@generalbusiness/dap-platform";
 import type { EffectRequest } from "../src/operations.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { lending } from "../../../examples/lending/definition.ts";
 import { LENDING_DEFINITION } from "../../../examples/lending/pin.ts";
 import { recordedMembership, recordedRules } from "../src/authority.ts";
@@ -150,7 +150,7 @@ test("a partition-created Lending file reaches the destination6 driver once its 
     const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
     await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
     await M!.did(rita, "set-actions", { on: 0, expected: await M!.expected({ on: 0 }), fields: { role: "admin", actions: [...FIRST_ACTIONS_OF[C.membership]!.admin, "lending.member"] } });
-    await foundingPublication(G!, life);
+    await initialPublication(G!, life);
     expect((await G!.item(0)).state).toBe("ready");
     const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
     const create = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === C.partition);

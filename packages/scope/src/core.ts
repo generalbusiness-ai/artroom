@@ -7,10 +7,10 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
+import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Created, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, retainedValueKey, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/dap-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, SignedCreation, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
 import { ReceiverReads } from "./receiver-reads.ts";
 import { producerName } from "./receiver-facts.ts";
@@ -19,7 +19,7 @@ import type { Asked, DefinitionRead, Further, Ports, Standing } from "./ports.ts
 import type { Retained, Sealed, Store } from "./store.ts";
 import { LATE, Turns, fetchFacts, isSigned, within, type Verdict } from "./turn.ts";
 
-export type { Founded };
+export type { Created };
 
 /** How a checkpoint is answered (section 9.2). It has no caller outside the scope. */
 export type Checkpointed =
@@ -129,7 +129,7 @@ export class Received {
  * the register's definition, each only with the other two. The Worker
  * builds the same seed to find the object's name.
  */
-export const foundedKind = (definition: unknown): "register" | "directory" =>
+export const creationKind = (definition: unknown): "register" | "directory" =>
   (isPlatformDefinition(definition) && platformName(definition) === "platform:register" ? "register" : "directory");
 
 /** What came beside an intent, as a caller over a transport sent it: untrusted, so anything that is not a record is nothing. */
@@ -431,8 +431,8 @@ export class Scope {
    * No grant is asked for: who may found a repository is the authority
    * note's (section 7.1).
    */
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
-    const refused = (reason: Extract<Founded, { answer: "refused" }>["reason"]): Founded => ({ answer: "refused", reason });
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
+    const refused = (reason: Extract<Created, { answer: "refused" }>["reason"]): Created => ({ answer: "refused", reason });
     const name = this.#name;
     if (!name || !isSigned(founding)) return refused("source-unverified");
     const { random, resolver } = this.#ports;
@@ -479,7 +479,7 @@ export class Scope {
     }, (text) => this.validate(text), bounds.namedDefinitions);
     if (!children.ok) return refused("unsupported-definition");
 
-    const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
     // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
@@ -491,13 +491,13 @@ export class Scope {
     if (!facts) return unavailable("dependency-unavailable");
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
-    const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
+    const asked = (inc: SignedCreation["inc"]): SignedCreation => ({ name, inc, seed, founding });
     const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
     const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, platform };
-    const answer = (sealed: Sealed): Founded =>
+    const answer = (sealed: Sealed): Created =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
 
-    const end = await this.#turns.run<Founded>({
+    const end = await this.#turns.run<Created>({
       asks: (view, clock) => prepareRules(view, valid, { genesis: asked(NO_INCARNATION), context: { ...context(clock), prepared: [] } }),
       judge: (view, clock, prepared) => {
         // Section 2.2: the incarnation is minted in the transaction that writes the first entry.
@@ -516,8 +516,8 @@ export class Scope {
           }
           case "source-unverified": return said(refused("source-unverified"));
           case "refused": return said(refused(judged.reason));
-          case "unavailable": return said<Founded>(unavailable(judged.reason));
-          default: return said<Founded>(unavailable("unavailable"));
+          case "unavailable": return said<Created>(unavailable(judged.reason));
+          default: return said<Created>(unavailable("unavailable"));
         }
       },
     }, valid);

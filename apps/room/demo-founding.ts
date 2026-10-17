@@ -1,11 +1,11 @@
 /** The demo's HTTP route; the native read-only projection stays with ScopeObject. */
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Binding } from "../../packages/scope/src/namespace.ts";
-import { demoFoundingConfig, registerRef, type DemoFoundingBindings, type DemoFoundingConfig, type DemoFoundingOffer } from "../../packages/scope/src/demo-founding.ts";
-export { demoFoundingConfig, type DemoFoundingOffer } from "../../packages/scope/src/demo-founding.ts";
+import { demoCreationConfig, registerRef, type DemoCreationBindings, type DemoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-founding.ts";
+export { demoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-founding.ts";
 export const DEMO_OFFER_PATH = "/v1/demo/founding-offer";
-export async function demoFoundingRoute(request: Request, env: DemoFoundingBindings & { SCOPES: Binding }): Promise<Response> {
-  const url = new URL(request.url), settings = demoFoundingConfig(env.DEMO_START_CONFIG, env.DEPLOYMENT);
+export async function demoCreationRoute(request: Request, env: DemoCreationBindings & { SCOPES: Binding }): Promise<Response> {
+  const url = new URL(request.url), settings = demoCreationConfig(env.DEMO_START_CONFIG, env.DEPLOYMENT);
   const reply = (status: number, value: unknown) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
   if (url.pathname !== DEMO_OFFER_PATH || !settings || url.origin !== settings.current.origin || url.hash) return reply(404, { error: "not-found" });
   let config = settings.current;
@@ -18,7 +18,7 @@ export async function demoFoundingRoute(request: Request, env: DemoFoundingBindi
     config = match;
   }
   if (request.method !== "GET") return reply(405, { error: "method-not-allowed" });
-  const stub = env.SCOPES.get(env.SCOPES.idFromName(config.register.scope)) as unknown as { demoFoundingOffer(config: DemoFoundingConfig): DemoFoundingOffer | null | Promise<DemoFoundingOffer | null> };
-  const offer = await stub.demoFoundingOffer(config);
+  const stub = env.SCOPES.get(env.SCOPES.idFromName(config.register.scope)) as unknown as { demoCreationOffer(config: DemoCreationConfig): DemoCreationOffer | null | Promise<DemoCreationOffer | null> };
+  const offer = await stub.demoCreationOffer(config);
   return offer ? reply(200, offer) : reply(404, { error: "not-found" });
 }

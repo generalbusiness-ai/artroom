@@ -11,7 +11,7 @@ vi.mock("@generalbusiness/dap-cli", async () => ({ ...await vi.importActual<type
 const founder = vi.hoisted(() => ({ originalStart: vi.fn(), startRoom: vi.fn(), recoveryKeyOnce: vi.fn() }));
 vi.mock("../src/start-custody.ts", () => founder);
 vi.mock("../src/data.ts", async () => ({ ...await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts"), openRoom: async (session: { service: string; secret: Uint8Array }) => ({ session, directory: directory.scope, membership, key, me: { handle: "@founder", ref: controller, actions: ["membership.invite", "membership.manage"] } }) }));
-import { connectInvitation, originalConnection, founderConnectionFiles, saveFounderRecoveryOnce } from "../src/connection-custody.ts";
+import { connectInvitation, originalConnection, creatorConnectionFiles, saveCreatorRecoveryOnce } from "../src/connection-custody.ts";
 const origin = "https://connection-custody.test";
 const ref = (kind: "register" | "directory" | "membership") => ({ scope: scopeIdOf({ v: 1, kind, definition: kind === "register" ? "platform:register@7" : "platform:directory@3", creator: null, cause: textDigest("SCRIPTED connection " + kind), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(4)), kind });
 const directory = ref("directory"), membership = ref("membership"), register = ref("register"), seed = new Uint8Array(32).fill(71), key = keyIdOfSecret(seed);
@@ -85,7 +85,7 @@ test("dropped connection reservation dispatches nothing; true agent input uses t
   });
   const agent = await connectInvitation(origin, f.storage, expected, { kind: "agent-key", handle: "@agent", hours: 24, controller: { membership, member: "@forged" } }, { mode: "new", locks });
   expect(agent.state).toBe("verified");
-  const files = await founderConnectionFiles(origin, f.storage, expected, { locks });
+  const files = await creatorConnectionFiles(origin, f.storage, expected, { locks });
   expect(files.key.trim() === b64url(seed)).toBe(true);
   const config = JSON.parse(files.config); expect(config.repository.membership).toEqual(membership); expect(config.key).toBe("device");
   // Real CLI fileStore consumes the downloaded config/key layout. No CLI
@@ -100,7 +100,7 @@ test("dropped connection reservation dispatches nothing; true agent input uses t
     try { expect(keyIdOfSecret(privateKey)).toBe(expected.key); } finally { privateKey.fill(0); }
   } finally { rmSync(directory, { recursive: true, force: true }); }
   founder.recoveryKeyOnce.mockResolvedValue(b64url(seed) + "\n");
-  const recovery = await saveFounderRecoveryOnce(origin, f.storage, expected, { locks });
+  const recovery = await saveCreatorRecoveryOnce(origin, f.storage, expected, { locks });
   expect(recovery.trim() === b64url(seed)).toBe(true);
   expect(founder.recoveryKeyOnce).toHaveBeenCalledWith(origin, f.storage, expected, { locks });
   expect(f.handed.every(bytes => bytes.every(byte => byte === 0))).toBe(true);

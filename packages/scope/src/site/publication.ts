@@ -4,7 +4,7 @@
  */
 import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isScopeRef } from "@generalbusiness/artroom-bytes";
-import { isOf, destinationReceipt, foundingOf } from "@generalbusiness/dap-platform";
+import { isOf, destinationReceipt, initialCommitOf } from "@generalbusiness/dap-platform";
 import { isObjectId, refName } from "@generalbusiness/artroom-git";
 import type { DestinationRepository } from "../destination-host.ts";
 
@@ -130,7 +130,7 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
           judged = reservation;
         } else {
           // An imported first head is not a native founding publication.
-          if (!branch || branch.values["import"] !== false || foundingOf(state, own, "sha1").commit !== commit
+          if (!branch || branch.values["import"] !== false || initialCommitOf(state, own, "sha1").commit !== commit
             || !opening.entry.effects.some(e => e.effect === "state" && e.item === branch.id && e.state === "ready")) continue;
         }
         const writtenPositions = store.statePositions(receipt.id, "written", receipt.id, PUBLICATION_PROOF_BOUNDS.historyEntries, 2);

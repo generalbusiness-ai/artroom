@@ -32,9 +32,9 @@ test("C1 native admission reserves before new work, rolls back ordinary/owed mar
   const rules = { "settle-counter": { place: "effect" as const, most: 1, run() { reached++; return [{ effect: "value" as const, item: 0, slot: "count", value: next }]; } } };
   wired.set(name, () => ({ transport: null, owners: { rules: () => null, reserves: () => extra }, definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: named => named === MADE ? { data, rules } : null } }));
   try {
-    const stub = stubOf(name), receiver = objectOf(name) as unknown as Pick<ScopeObject, "deliver">, foundingAnswer = await stub.found(signIntent(founding, rita.secret), MADE);
-    if (foundingAnswer.answer !== "accepted") return expect.fail(JSON.stringify(foundingAnswer));
-    const scope = foundingAnswer.receipt.fact.at;
+    const stub = stubOf(name), receiver = objectOf(name) as unknown as Pick<ScopeObject, "deliver">, creationAnswer = await stub.found(signIntent(founding, rita.secret), MADE);
+    if (creationAnswer.answer !== "accepted") return expect.fail(JSON.stringify(creationAnswer));
+    const scope = creationAnswer.receipt.fact.at;
     // A different, fully named scope is a scripted result source, not a live peer.
     const peer = { scope: scopeIdOf({ ...seed, ordinal: 1 }), kind: scope.kind, inc: newIncarnation(new Uint8Array(16).fill(2)) };
     const act = (kind: string, fields: Intent["fields"] = {}): Promise<Answer> => stub.submit(signIntent({ v: 1, to: scope, actor: rita.key, kind, on: 0, expected: { on: revision }, fields, idempotencyKey: crypto.randomUUID(), notAfter: at(60) }, rita.secret), [grantOf(rita, scope, ["set"])]);

@@ -90,8 +90,8 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     // The scheduler remains a stand-in; no founding outcome is scripted here.
     for (let pass = 0; pass < 32; pass++) if (await (G.stub as unknown as { effect(): Promise<number> }).effect() === 0) break;
     const published = (await G.summary()).value.items.find((item) => item.type === "branch")!;
-    const foundingEvidence = (await G.entries()).filter((entry) => entry.input.type === "outcome").map((entry) => ({ seq: entry.seq, input: entry.input, effects: entry.effects }));
-    expect(published.state, canonicalize({ foundingEvidence, local: await bridge.status() })).toBe("ready");
+    const creationEvidence = (await G.entries()).filter((entry) => entry.input.type === "outcome").map((entry) => ({ seq: entry.seq, input: entry.input, effects: entry.effects }));
+    expect(published.state, canonicalize({ creationEvidence, local: await bridge.status() })).toBe("ready");
     const firstHead = published.values["head"];
     expect((await G.entries()).some((entry) => entry.input.type === "outcome" && entry.input.kind === "receipt" && entry.input.result === "confirmed" && entry.effects.some((effect) => effect.effect === "state" && effect.state === "written"))).toBe(true);
     net.clock.now = soon(901);

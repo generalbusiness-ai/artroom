@@ -28,7 +28,7 @@
  * refusing one of `production()`.
  */
 
-import { demoFoundingOffer, type DemoFoundingConfig } from "./demo-founding.ts";
+import { demoCreationOffer, type DemoCreationConfig } from "./demo-founding.ts";
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
@@ -38,7 +38,7 @@ import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-deriv
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
 import type { Delivered, StateView } from "@generalbusiness/dap-derive";
-import { Scope, type Checkpointed, type Founded } from "./core.ts";
+import { Scope, type Checkpointed, type Created } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, sourceOrigin, type Sourced } from "./namespace.ts";
 import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
@@ -357,7 +357,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return { value, turn: context.turn.entered };
   }
 
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return this.#publicInvoke("found", async () => this.#sent(await this.#scope.found(founding, definition, definitions, beside))); }
+  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return this.#publicInvoke("found", async () => this.#sent(await this.#scope.found(founding, definition, definitions, beside))); }
   /**
    * `address`: the caller's address as the Worker's route had it, or null. Only the serving limits of a join read it (`limits.ts`):
    * at a membership scope a join is served through them, and no other act and no other scope is.
@@ -453,7 +453,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   /** Future bounded query support only; existing public reads are unchanged. */
   protected sessionEligibility(reader: unknown, visibility: QueryVisibility): Promise<boolean> { return this.#sessionPreparation.eligible(reader, visibility); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
-  demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
+  demoCreationOffer(config: DemoCreationConfig) { return demoCreationOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
   siteRoom() {
     if ((this.#store.storedBytes(0) ?? 0) > 1024 * 1024 || (this.#store.scopeBytes() ?? 0) > 1024 * 1024) throw new Error("publication-history-limit");

@@ -56,8 +56,8 @@ describe("claim resumes a claim it gave up on. The Git host and the scheduler ar
 async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesActive: () => void, advanceClock: () => void): Promise<void> {
   // HTTP fault injection is a STAND-IN only for loss: accepted turns below
   // are still the actual Worker's. Lost replies are cancelled before throwing.
-  let beforeFound = false;
-  let unavailableFound = false;
+  let beforeCreation = false;
+  let unavailableCreation = false;
   let unavailableSettlement = false;
   let mismatchedDefinition = false;
   const requestedPaths: string[] = [];
@@ -76,9 +76,9 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
     const signed = new URL(url).pathname.endsWith("/acts") ? body?.signed : undefined;
     const kind = signed?.intent.kind;
     if (signed && kind && sent[kind]) sent[kind]!.push(structuredClone(signed));
-    if (kind === "found" && beforeFound) { beforeFound = false; throw new Error("scripted loss before found delivery"); }
+    if (kind === "found" && beforeCreation) { beforeCreation = false; throw new Error("scripted loss before found delivery"); }
     // STAND-IN for an unavailable reply, before delivery to the real Worker.
-    if (kind === "found" && unavailableFound) { unavailableFound = false; return Response.json({ answer: "unavailable", reason: "unavailable" }); }
+    if (kind === "found" && unavailableCreation) { unavailableCreation = false; return Response.json({ answer: "unavailable", reason: "unavailable" }); }
     const url_ = new URL(url);
     const authorization = new Headers(init?.headers).get("authorization");
     if (watchingAgain && url_.pathname === `/v1/scopes/${registerName}` && (init?.method ?? "GET") === "GET") {
@@ -166,27 +166,27 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
 
   // Save before delivery: the first POST never reaches the Worker. A resume
   // must resend the exact bytes rather than wait forever on an absent digest.
-  beforeFound = true;
+  beforeCreation = true;
   const unsent = await run("create", "demo", "--handle", "@rita");
   expect(unsent).toMatchObject({ code: 1, lines: [expect.stringMatching(/^No answer:/)] });
-  const savedFound = (await configOf())!.claim!.found!.signed;
+  const savedCreation = (await configOf())!.claim!.found!.signed;
   const beforeCheck = await configOf();
   const beforeCheckPosts = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
   let checkPauses = 0;
-  const checkedMissing = await owner.required(() => checkClaim({ ...rita, foundingOffer: async () => { throw new Error("Check does not discover a new offer"); }, pause: async () => { checkPauses++; } }, "demo"));
+  const checkedMissing = await owner.required(() => checkClaim({ ...rita, creationOffer: async () => { throw new Error("Check does not discover a new offer"); }, pause: async () => { checkPauses++; } }, "demo"));
   expect(checkedMissing).toMatchObject({ code: 1, lines: [expect.stringContaining("not confirmed")] });
   expect(await configOf()).toEqual(beforeCheck);
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeCheckPosts);
   expect(checkPauses).toBe(0);
-  expect([(await founds()).length, sent["found"]]).toEqual([0, [savedFound]]);
+  expect([(await founds()).length, sent["found"]]).toEqual([0, [savedCreation]]);
   const beforeLegacy = (await configOf())!;
   await owner.required(async () => rita.store.save({ ...beforeLegacy, claim: { register: beforeLegacy.claim!.register, intent: beforeLegacy.claim!.intent, handle: beforeLegacy.claim!.handle } }));
   expect(await run("claim", "demo")).toMatchObject({ code: 1, lines: [expect.stringMatching(/^This pending claim has only a digest and no readable admitted directory/)] });
   expect([(await founds()).length, sent["found"]!.length]).toEqual([0, 1]);
   await owner.required(async () => rita.store.save(beforeLegacy));
-  unavailableFound = true;
+  unavailableCreation = true;
   expect(await run("found", "demo")).toEqual({ code: 1, lines: ["Use dap create instead of dap found. The found alias remains for one release.", `Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect dap log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
-  expect((await configOf())!.claim!.found!.signed).toEqual(savedFound);
+  expect((await configOf())!.claim!.found!.signed).toEqual(savedCreation);
   expect((await founds()).length).toBe(0);
   advanceClock();
   await owner.required(() => R.restart());
@@ -195,8 +195,8 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   const resume = "run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.";
   expect(first).toEqual({ code: 1, lines: [`Gave up waiting for the directory after 3 reads. What was asked may still take effect; ${resume}`] });
   const pending = (await configOf())!;
-  expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", found: { signed: savedFound, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);
-  expect(sent["found"]).toEqual([savedFound, savedFound, savedFound]);
+  expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", found: { signed: savedCreation, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);
+  expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation]);
   await noSecret();
   expect([(await founds()).length, host.sent.length]).toEqual([1, 0]);
 
@@ -297,7 +297,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([(await founds()).length, host.attempts.sort()]).toEqual([2, [`${(await founds())[0]!.seq}:0#1`, `${(await founds())[1]!.seq}:0#1`].sort()]);
   expect([(await enrollment("seat")).length, (await enrollment("first-key")).length]).toEqual([1, 1]);
   expect(sent["first-key"]).toEqual([keyedPending.firstKey!.signed, keyedPending.firstKey!.signed]);
-  expect(sent["found"]).toEqual([savedFound, savedFound, savedFound, second.found!.signed, second.found!.signed]); // The mismatched reply retries only its exact admitted envelope.
+  expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation, second.found!.signed, second.found!.signed]); // The mismatched reply retries only its exact admitted envelope.
   await noSecret();
   // A legacy digest can recover its exact admitted found from the real
   // directory's retained claim, and its already admitted enrollment from

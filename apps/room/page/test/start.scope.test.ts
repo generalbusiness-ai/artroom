@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 import { expect, test } from "vitest";
 import type { Seed, SignedIntent, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, unb64url } from "@generalbusiness/artroom-bytes";
-import { agentKeyInvitationOf, foundingOffer, secretSigner, signedIntent, type Fetch, type FoundingOfferFetch } from "@generalbusiness/artroom-client";
+import { agentKeyInvitationOf, creationOffer, secretSigner, signedIntent, type Fetch, type CreationOfferFetch } from "@generalbusiness/artroom-client";
 import { DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT, DEMO_PURPOSE } from "@generalbusiness/dap-platform";
 import worker from "../../worker.ts";
 import { beginSessionFixture } from "../../../../packages/scope/test/session-settings.ts";
@@ -15,7 +15,7 @@ import { TEST_DEPLOYMENT } from "../../../../packages/scope/test/worker.ts";
 import { reader } from "../../../../packages/scope/test/support.ts";
 import { ownHost } from "../../../../packages/scope/test/hosts.ts";
 import { originalStart, startRoom } from "../src/start-custody.ts";
-import { connectInvitation, founderConnectionFiles, originalConnection, saveFounderRecoveryOnce } from "../src/connection-custody.ts";
+import { connectInvitation, creatorConnectionFiles, originalConnection, saveCreatorRecoveryOnce } from "../src/connection-custody.ts";
 import { command, enrolAgentKey, linkOf, memoryStore, type Config, type Context } from "@generalbusiness/dap-cli";
 import { openRoom } from "../src/data.ts";
 import type { ClaimLocks, ClaimStorage } from "../src/claim.ts";
@@ -64,7 +64,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     expect(anonymous.status).toBe(403);
     await anonymous.body?.getReader().cancel();
     let offerStatus: number | null = null, offerTransportError: string | null = null;
-    const offerFetch: FoundingOfferFetch = async (url, init) => {
+    const offerFetch: CreationOfferFetch = async (url, init) => {
       let response: Awaited<ReturnType<Fetch>>;
       // workerd Request accepts only follow/manual; the SDK requests browser
       // redirect:error. Direct Worker.fetch has no network redirect to follow.
@@ -78,19 +78,19 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
       // adapted. Real response status/body and native policy are unchanged.
       return { status: response.status, url, redirected: false, body: response.body };
     };
-    let offer: Awaited<ReturnType<typeof foundingOffer>> | undefined;
+    let offer: Awaited<ReturnType<typeof creationOffer>> | undefined;
     let offerFailed = false;
-    try { offer = await lifetime.wait(() => foundingOffer(origin, { fetch: offerFetch })); }
+    try { offer = await lifetime.wait(() => creationOffer(origin, { fetch: offerFetch })); }
     catch { offerFailed = true; }
     expect([offerStatus, offerTransportError], "native offer HTTP response before codec acceptance").toEqual([200, null]);
     expect(offerFailed, "bounded SDK acceptance of the actual native offer").toBe(false);
     if (!offer) throw new Error("The actual native offer was not decoded.");
     expect([offer.definition, offer.register, offer.at.seq, offer.registerItem.revision, offer.registerItem.purpose]).toEqual([WEB_DEMO_REGISTER, register, 0, 1, DEMO_PURPOSE]);
-    const retainedOffer = await lifetime.wait(() => foundingOffer(origin, { fetch: offerFetch, register: legacyRegister }));
+    const retainedOffer = await lifetime.wait(() => creationOffer(origin, { fetch: offerFetch, register: legacyRegister }));
     expect([retainedOffer.definition, retainedOffer.register]).toEqual([DEMO_REGISTER, legacyRegister]);
     const unrelatedInc = newIncarnation(new Uint8Array(16).fill(1));
     const unseenLegacy = { ...legacyRegister, inc: unrelatedInc !== legacyRegister.inc ? unrelatedInc : newIncarnation(new Uint8Array(16).fill(2)) };
-    await expect(lifetime.wait(() => foundingOffer(origin, { fetch: offerFetch, register: unseenLegacy }))).rejects.toThrow();
+    await expect(lifetime.wait(() => creationOffer(origin, { fetch: offerFetch, register: unseenLegacy }))).rejects.toThrow();
     const values = new Map<string, string>(), readbacks = new Map<string, string>();
     const storage: ClaimStorage = { setItem: (key, bytes) => { lifetime.active(); values.set(key, bytes); }, getItem: key => { const bytes = values.get(key) ?? null; if (bytes !== null) readbacks.set(key, bytes); return bytes; } };
     const sent: SignedIntent[] = [], mutationPaths: string[] = [];
@@ -133,7 +133,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     };
     const pause = async (waiting: readonly ScopeId[] = []) => driveFixture([R, ...waiting.filter(name => name !== R.name).map(name => lifetime.platform(name))], lifetime.wait);
     const locks = locksOf();
-    const fresh = await lifetime.wait(() => startRoom(origin, storage, { mode: "new", label: "My new room", offer, foundingOffer: async register => foundingOffer(origin, { fetch: offerFetch, register }), fetch, now: lifetime.now, pause, tries: 16, locks }));
+    const fresh = await lifetime.wait(() => startRoom(origin, storage, { mode: "new", label: "My new room", offer, creationOffer: async register => creationOffer(origin, { fetch: offerFetch, register }), fetch, now: lifetime.now, pause, tries: 16, locks }));
     expect([fresh.pending, fresh.repository, sent.map(s => s.intent.kind)]).toEqual([true, null, ["found"]]);
     const original = sent[0]!, status = originalStart(origin, storage)!;
     expect([status.key === original.intent.actor, status.operation === fresh.operation, status.label]).toEqual([true, true, "My new room"]);
@@ -141,12 +141,12 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     let checkPauses = 0, checkOfferReads = 0;
     const reload: ClaimStorage = { getItem: storage.getItem, setItem: storage.setItem };
     checkMode = true;
-    const checked = await lifetime.wait(() => startRoom(origin, reload, { mode: "check", fetch, now: lifetime.now, locks, pause: async () => { checkPauses++; }, foundingOffer: async () => { checkOfferReads++; throw new Error("Check must not discover another offer"); } }));
+    const checked = await lifetime.wait(() => startRoom(origin, reload, { mode: "check", fetch, now: lifetime.now, locks, pause: async () => { checkPauses++; }, creationOffer: async () => { checkOfferReads++; throw new Error("Check must not discover another offer"); } }));
     expect([checked.pending, checked.repository, sent.length, mutationPaths.length, checkPauses, checkOfferReads, checked.operation]).toEqual([true, null, 1, 1, 0, 0, fresh.operation]);
     checkMode = false;
     expect(originalStart(origin, storage)!.key).toBe(status.key);
     expect(canonicalize([...values]) === before).toBe(true); // Unconfirmed Check preserves the exact private checkpoint.
-    const completed = await lifetime.wait(() => startRoom(origin, reload, { mode: "continue", label: "Ignored replacement label", fetch, now: lifetime.now, locks, pause, tries: 16, foundingOffer: async () => { throw new Error("Continue must not rediscover"); } }));
+    const completed = await lifetime.wait(() => startRoom(origin, reload, { mode: "continue", label: "Ignored replacement label", fetch, now: lifetime.now, locks, pause, tries: 16, creationOffer: async () => { throw new Error("Continue must not rediscover"); } }));
     expect([completed.outcome.code, completed.pending, completed.operation, completed.label, completed.key]).toEqual([0, false, fresh.operation, "My new room", status.key]);
     expect(completed.repository).not.toBeNull();
     expect(sent.map(s => s.intent.kind)).toEqual(["found", "found", "seat", "first-key"]);
@@ -175,16 +175,16 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     // key or inspector credential is supplied to Page/CLI callers.
     const binding = { key: status.key, operation: fresh.operation, membership: completed.repository!.membership };
     const ready = { fetch: native, now: lifetime.now, locks, pause, tries: 16 };
-    const files = await lifetime.wait(() => founderConnectionFiles(origin, reload, binding, ready));
+    const files = await lifetime.wait(() => creatorConnectionFiles(origin, reload, binding, ready));
     const exportedConfig = JSON.parse(files.config) as Config, exportedSeed = unb64url(files.key.trim())!;
     try {
       expect([exportedConfig.key, keyIdOfSecret(exportedSeed) === status.key, keyIdOfSecret(exportedSeed) === installer.key]).toEqual(["device", true, false]);
-      const cliFounder = memoryStore(); await cliFounder.keep("device", exportedSeed); await cliFounder.save(exportedConfig);
-      expect((await lifetime.wait(() => command({ store: cliFounder, fetch: native, now: lifetime.now }, ["acts", "membership"]))).code).toBe(0);
+      const cliCreator = memoryStore(); await cliCreator.keep("device", exportedSeed); await cliCreator.save(exportedConfig);
+      expect((await lifetime.wait(() => command({ store: cliCreator, fetch: native, now: lifetime.now }, ["acts", "membership"]))).code).toBe(0);
     } finally { exportedSeed.fill(0); }
-    const savedRecovery = await lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready));
+    const savedRecovery = await lifetime.wait(() => saveCreatorRecoveryOnce(origin, reload, binding, ready));
     expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native founder backup, not the internal CLI recovery key.
-    await expect(lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
+    await expect(lifetime.wait(() => saveCreatorRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
     const creatorSent: SignedIntent[] = [], creatorMutationPaths: string[] = [], creatorReplies: { kind: string; answer: string; reason: string | null; name: string | null }[] = [];
     let creatorSessions = 0;
     let loseCreator: "add-member" | "invite-key" | null = "add-member", creatorCheck = false;

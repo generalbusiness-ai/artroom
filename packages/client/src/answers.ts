@@ -14,14 +14,14 @@
  * and it computes the hash itself.
  */
 
-import type { Answer, DeliveryRefusal, Founded, MismatchReason, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/dap-contract";
+import type { Answer, DeliveryRefusal, Created, MismatchReason, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/dap-contract";
 import { REFUSAL_REASONS, isItemQueryRead, among, isDuty, isHead, isItem, isListOf, isLogPage, isRead, isReceipt, isRecord, isRetainedInput, isSealed, isSummary } from "@generalbusiness/artroom-bytes";
 
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 /** Why an act is refused (`Answer`). A source check and a platform definition are a founding's to answer, and are not here. */
 const ACT_REFUSED: Record<RefusalReason, true> = REFUSAL_REASONS;
 /** Why a founding is refused (`Founded`). */
-const FOUNDING_REFUSED: Record<RefusalReason | DeliveryRefusal | "unsupported-definition", true> = { ...REFUSAL_REASONS, "source-unverified": true, "unsupported-definition": true };
+const CREATION_REFUSED: Record<RefusalReason | DeliveryRefusal | "unsupported-definition", true> = { ...REFUSAL_REASONS, "source-unverified": true, "unsupported-definition": true };
 const UNAVAILABLE: Record<UnavailableReason, true> = { "dependency-unavailable": true, busy: true, "clock-behind": true, "scope-provisional": true, "guard-incomplete": true, "authority-unavailable": true, unavailable: true, "rate-limited": true };
 const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
 
@@ -29,11 +29,11 @@ const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
 const only = (v: Record<string, unknown>, ...members: string[]): boolean => Object.keys(v).length === members.length && members.every((m) => Object.hasOwn(v, m));
 
 /** The answer to a founding (section 7.1): it has no `mismatch`, and its refusal names no head. */
-function isFounded(v: unknown): v is Founded {
+function isCreated(v: unknown): v is Created {
   if (!isRecord(v)) return false;
   switch (v["answer"]) {
     case "accepted": return only(v, "answer", "receipt") && isReceipt(v["receipt"]);
-    case "refused": return only(v, "answer", "reason") && among(FOUNDING_REFUSED)(v["reason"]);
+    case "refused": return only(v, "answer", "reason") && among(CREATION_REFUSED)(v["reason"]);
     case "unavailable": return only(v, "answer", "reason") && among(UNAVAILABLE)(v["reason"]);
     default: return false;
   }
@@ -54,7 +54,7 @@ function isAnswer(v: unknown): v is Answer {
 
 /** For each operation, whether a reply is an answer of that operation. */
 export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => reply is Awaited<ReturnType<ScopeApi[K]>> } = {
-  found: isFounded,
+  found: isCreated,
   submit: isAnswer,
   prepare: isAnswer,
   settle: isRead(isReceipt),

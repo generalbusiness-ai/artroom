@@ -18,8 +18,8 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
-import { foundingOffer } from "@generalbusiness/artroom-client";
-import { connectInvitation, originalConnection, founderConnectionFiles, saveFounderRecoveryOnce, type FounderBinding } from "./connection-custody.ts";
+import { creationOffer } from "@generalbusiness/artroom-client";
+import { connectInvitation, originalConnection, creatorConnectionFiles, saveCreatorRecoveryOnce, type CreatorBinding } from "./connection-custody.ts";
 import { originalStart, startRoom, type StartedRoom } from "./start-custody.ts";
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
@@ -648,7 +648,7 @@ function startScreen(): HTMLElement {
         if (!keep(next)) { tell("The room is verified, but connection storage could not be read back. Check the saved original before another request.", true); return; }
         opened.clear(); startDraft = ""; location.hash = "#/"; void draw(true);
       });
-      const expected: FounderBinding = { key: result.key, operation: result.operation, membership: result.repository.membership };
+      const expected: CreatorBinding = { key: result.key, operation: result.operation, membership: result.repository.membership };
       const connectionPanel = h("section", { class: "start-connection-panel", hidden: "", "aria-live": "polite" });
       const connectionOptions = { current };
       const showConnection = (kind: "person" | "agent-key") => {
@@ -717,13 +717,13 @@ function startScreen(): HTMLElement {
         button.addEventListener("click", action);
         return h("div", { class: "start-connection" }, h("div", {}, h("h2", {}, title), h("p", {}, description)), button);
       };
-      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void founderConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original founder connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
+      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void creatorConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original founder connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
       const recovery = h("button", { type: "button", class: "link-button" }, "Save a recovery file");
       try { if (originalStart(location.origin, localStorage)?.recoverySaved) recovery.setAttribute("disabled", ""); } catch { recovery.setAttribute("disabled", ""); }
       recovery.addEventListener("click", () => {
         if (!current() || connectionBusy || recovery.hasAttribute("disabled")) return;
         connectionBusy = true; recovery.setAttribute("disabled", "");
-        void saveFounderRecoveryOnce(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) download("recovery.key", value, "text/plain"); }).catch(error => tell(error instanceof Error ? error.message : "The recovery file could not be saved. Its original key remains in private custody.", true)).finally(() => { connectionBusy = false; });
+        void saveCreatorRecoveryOnce(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) download("recovery.key", value, "text/plain"); }).catch(error => tell(error instanceof Error ? error.message : "The recovery file could not be saved. Its original key remains in private custody.", true)).finally(() => { connectionBusy = false; });
       });
       form.setAttribute("hidden", ""); check.setAttribute("hidden", "");
       heading.textContent = "Your room is ready"; intro.setAttribute("hidden", "");
@@ -746,10 +746,10 @@ function startScreen(): HTMLElement {
       // choosing another first-run task. Read-only Start Check remains safe.
       const enrollment = originalJoin(location.origin, localStorage);
       if (mode !== "check" && enrollment && ["prepared", "unknown"].includes(enrollment.status)) throw new Error("An original invitation enrollment remains unresolved. Check that original join before starting another room.");
-      const offer = mode === "new" ? await foundingOffer(location.origin).catch(() => { throw new Error("This service is not set up to create rooms. Nothing was sent."); }) : undefined;
+      const offer = mode === "new" ? await creationOffer(location.origin).catch(() => { throw new Error("This service is not set up to create rooms. Nothing was sent."); }) : undefined;
       if (!current()) return;
       const result = await startRoom(location.origin, localStorage, { mode, ...(offer ? { offer } : {}), label: name.value,
-        foundingOffer: async register => { const offered = await foundingOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
+        creationOffer: async register => { const offered = await creationOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
       await showResult(result);
     } catch (error) { tell(error instanceof Error ? error.message : "The original creation remains unresolved. Check status without replacing its key.", true); }
     finally { connectionBusy = false; if (current()) { restore(); if (!blocked) { submit.removeAttribute("disabled"); check.removeAttribute("disabled"); } } }

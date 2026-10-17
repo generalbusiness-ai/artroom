@@ -97,11 +97,11 @@ test("a register is founded by an install intent, under its own definition and n
     const s = new Ledger(definition);
     return judgeGenesis(s.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding }, { clock: clockOf(s.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules }).result;
   };
-  const byFound = installing(paul, "keys", [], "found");
+  const byCreation = installing(paul, "keys", [], "found");
   expect([
     found(),
     // A register is asked for by an `install`, and a `found` asks for none.
-    found(registerSeed(byFound), byFound),
+    found(registerSeed(byCreation), byCreation),
     // The register's definition founds a register, and no directory.
     found(registerSeed(install, { kind: "directory" })),
     // A register is founded under its own definition, and under no other.

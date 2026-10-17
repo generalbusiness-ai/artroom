@@ -49,7 +49,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
   const store = memoryStore();
   await lifetime.wait(() => store.keep("operator", rita.secret));
   const fetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
-  const context: Context = { store, fetch, trustedFoundingService: { service: SERVICE, fetch },
+  const context: Context = { store, fetch, trustedCreationService: { service: SERVICE, fetch },
     now: () => { lifetime.active(); return timeMs(soon(0))!; } };
   const run = (...argv: string[]) => lifetime.wait(() => command(context, argv));
   const planned = await run("install", "--plan", SERVICE, "--cohort", "application-publication", "--host", "git.example", "--namespace", "lending");

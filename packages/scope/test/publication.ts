@@ -16,7 +16,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/dap-platform";
+import { destinationReceipt, initialCommitOf, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";
@@ -29,7 +29,7 @@ import type { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts
  * written. The first head is the founding commit of the destination's own version, from its own records (`foundingOf`). The
  * STAND-IN host is wired for the destination while this runs, and unwired after.
  */
-export async function foundingPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
+export async function initialPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
   const wait = <T>(run: () => Promise<T>): Promise<T> => lifetime ? lifetime.wait(run) : run();
   const host = outsideOf(G.name);
   let driving = "";
@@ -47,7 +47,7 @@ export async function foundingPublication(G: Platform, lifetime?: ReturnType<typ
         const body = kind === "mint" ? { token: `token-${operation.id}`, ends: timeOf(timeMs(net.clock.now)! + 60_000) }
           : kind === "revoke" ? { token: revokedToken(store, own, operation) }
           : kind === "receipt" ? { send: "accepted", seen: destinationReceipt(store, own, targetOf(store, own, operation)!, "sha1").commit }
-          : { send: "accepted", seen: foundingOf(store, own, "sha1").commit };
+          : { send: "accepted", seen: initialCommitOf(store, own, "sha1").commit };
         return { operation: operation.id as OperationId, attempt: attempt.attempt, body };
       }));
     }));

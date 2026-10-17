@@ -24,7 +24,7 @@ import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDi
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
-import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, PARTITION_COHORT, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
+import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, PARTITION_COHORT, destinationReceipt, initialCommitObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Transport as NativeTransport } from "../../../../../packages/scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
@@ -278,7 +278,7 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   wired.delete(R.name);
   // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
   const readme = { name: repositoryName(seedDigest(seed), 1), handle: "@rita", directory: D.name };
-  const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!), readme).commit;
+  const firstHead = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!), readme).commit;
   const made = new Room(R, D, M, rules, G, firstHead, {});
   for (const kind of ["mint", "first-head", "mint", "receipt", "revoke"] as const) await made.drive(kind);
   expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: firstHead } });

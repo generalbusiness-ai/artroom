@@ -263,13 +263,13 @@ test("explicit new creates another native directory while exact operation resume
     const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { d.lifetime.active(); values.set(key, value); } };
-    let loseFound = true;
+    let loseCreation = true;
     const sent: SignedIntent[] = [];
     const fetch: Fetch = async (url, init) => {
       d.lifetime.active();
       const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? JSON.parse(init.body).signed as SignedIntent : undefined;
       if (signed) sent.push(structuredClone(signed));
-      if (signed?.intent.kind === "found" && loseFound) { loseFound = false; throw new Error("scripted loss before found"); }
+      if (signed?.intent.kind === "found" && loseCreation) { loseCreation = false; throw new Error("scripted loss before found"); }
       return d.fetch(url, init);
     };
     const session = { ...d.session, fetch };

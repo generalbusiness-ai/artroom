@@ -15,7 +15,7 @@
  */
 
 import type {
-  Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
+  Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Created, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
   SignedIntent, Summary, ItemQuery, ItemQueryRead,
 } from "@generalbusiness/dap-contract";
 import { definitionDigest, entryHash, encodeItemQueryParameter, readItemQueryParameter, itemQueryReadFor, within, LATE, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
@@ -154,7 +154,7 @@ export class ScopeHandle {
  */
 export async function found(
   transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
-): Promise<{ answer: Founded; scope: ScopeHandle | null }> {
+): Promise<{ answer: Created; scope: ScopeHandle | null }> {
   const answer = await transport.found(founding, definition, definitions, beside);
   return { answer, scope: answer.answer === "accepted" ? new ScopeHandle(transport, answer.receipt.fact.at.scope, reader) : null };
 }

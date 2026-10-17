@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type { Entry, Intent, Seed, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/dap-derive/testing";
-import { DIRECTORY, REGISTER, destinationReceipt, foundingOf, repositoryName } from "@generalbusiness/dap-platform";
+import { DIRECTORY, REGISTER, destinationReceipt, initialCommitOf, repositoryName } from "@generalbusiness/dap-platform";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import { SqliteStore } from "../src/index.ts";
 import { site } from "../src/site/route.ts";
@@ -12,7 +12,7 @@ import type { SiteEnv } from "../src/site/host.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
 
 // Actual platform rules, real Durable Objects and SQLite. Only the Git host,
@@ -60,7 +60,7 @@ async function founding(publish: boolean) {
   const peers = (await d.entries())[0]!.sends.filter(s => (s.to as Seed).kind === "membership" || (s.to as Seed).kind === "rules" || (s.to as Seed).kind === "destination").map(s => new Platform(scopeIdOf(s.to as Seed)));
   await settle(r, d, ...peers);
   const destination = new Platform(((await d.item(0)).refs["destination"] as { scope: ScopeId }).scope);
-  if (publish) await foundingPublication(destination);
+  if (publish) await initialPublication(destination);
   return { r, d, g: destination, repo };
 }
 beforeAll(async () => {
@@ -69,7 +69,7 @@ beforeAll(async () => {
   const commit = await runInDurableObject(G.object, (_instance, state) => {
     const store = new SqliteStore({ exec: (q, ...b) => state.storage.sql.exec(q, ...b), transaction: (f) => state.storage.transactionSync(f) });
     const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
-    const first = foundingOf(store, own, "sha1");
+    const first = initialCommitOf(store, own, "sha1");
     const receipt = destinationReceipt(store, own, store.page("receipt", ["written"], null, 1).items[0]!, "sha1");
     return { ...first, receipt };
   });

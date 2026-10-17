@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Digest, FieldValue, OperationId, RetainedInput, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, newIncarnation, signIntent } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/dap-derive/testing";
-import { DESTINATION_5, destination5, destinationRules5, destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { DESTINATION_5, destination5, destinationRules5, destinationReceipt, initialCommitObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { useOf } from "@generalbusiness/dap-derive";
 import { keys } from "@generalbusiness/dap-derive/testing";
 import { publicationJourney } from "../../platform/test/support-publication-journey.ts";
@@ -104,7 +104,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       const genesis = f.branch.own(0)!.entry;
       // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
       const readme = { name: (f.branch.branch.values["repository"] as { name: string }).name, handle: "@rita", directory: (f.branch.branch.refs["directory"] as { scope: ScopeId }).scope };
-      const expected = foundingObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
+      const expected = initialCommitObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
       expect({ commit: sent.commit, objects: sent.objects }).toEqual(expected);
       expect(sent).toMatchObject({ old: null, ref: "refs/heads/main", token: "private-token-1", binding: { mint, write, writeAttempt: 1 } });
       f.record(write, written!);

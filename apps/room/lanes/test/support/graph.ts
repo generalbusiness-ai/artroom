@@ -470,14 +470,14 @@ export const README = "The office of a test repository.";
  * capability code at all, no scope runs under either lane definition: the
  * scope package's founding test shows that.
  */
-export async function graph(foundingTransport: Transport = transport): Promise<Graph> {
+export async function graph(creationTransport: Transport = transport): Promise<Graph> {
   net.hold = net.deaf = null;
   net.capability = {};
   net.outside = null;
   const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
   // Native service by default. The dedicated wire witness supplies HTTP.
   // Both receive the exact declaration closure and detached text beside it.
-  const { answer, scope } = await found(foundingTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
+  const { answer, scope } = await found(creationTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
   expect(answer.answer).toBe("accepted");
   expect(scope).not.toBeNull();
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);

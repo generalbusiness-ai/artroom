@@ -54,7 +54,7 @@ function oneFile(format: ObjectFormat, name: string, blob: DestinationObject): D
  * entry's. Version 1 (`readme` null): the empty tree. Version 2: a tree of
  * one file, `README.md` (`readmeText`).
  */
-export function foundingObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef, readme: Readme | null = null): DestinationCommit {
+export function initialCommitObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef, readme: Readme | null = null): DestinationCommit {
   const blob = readme === null ? null : object(format, "blob", utf8(readmeText(readme)));
   const tree = blob === null ? object(format, "tree", new Uint8Array()) : oneFile(format, "README.md", blob);
   const commit = commitObject(format, scope, time, tree.id, "Found this repository.", "claim", claim);

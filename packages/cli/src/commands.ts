@@ -29,11 +29,11 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
  * | `issue`, `issues` | `open` is the directory's `open-issue`; `comment`, `assign` and `close` are the issue lane's own acts. `issues` lists each issue as its lane has it. |
  */
 
-import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Created, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, activeDirectory, partitionIndexes, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
-  type Fetch, type Session, type FoundingOffer, type ReadSigning, type Signing, type Transport,
+  ScopeHandle, ShapeError, TransportError, activeDirectory, partitionIndexes, wellFormedInvitation, isCreationOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  type Fetch, type Session, type CreationOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
 import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/dap-platform";
@@ -54,10 +54,10 @@ export interface Context {
   fetch?: Fetch;
   /** Internal configured-service trust for this exact injected founding
    * transport. It authenticates no independent remote history. */
-  trustedFoundingService?: { service: string; fetch: Fetch };
+  trustedCreationService?: { service: string; fetch: Fetch };
   /** Explicit fixed-origin demo projection for fresh claim preflight only.
    * It grants no authority and is never used to resume/check an original. */
-  foundingOffer?: (register: ScopeRef) => Promise<FoundingOffer>;
+  creationOffer?: (register: ScopeRef) => Promise<CreationOffer>;
   /** The clock that intents are signed by, in milliseconds. The default is the runtime's. */
   now?: () => number;
   /**
@@ -322,7 +322,7 @@ function answered(scope: ScopeId, answer: Answer, took: string): Outcome {
   }
 }
 
-function accepted(answer: Answer | Founded, scope: ScopeId | null, took: string): Extract<Answer, { answer: "accepted" }> {
+function accepted(answer: Answer | Created, scope: ScopeId | null, took: string): Extract<Answer, { answer: "accepted" }> {
   if (answer.answer === "accepted") return answer;
   if (answer.answer === "unavailable") return stop(unavailableAnswer(answer.reason, scope));
   if (answer.answer === "mismatch") return stop(mismatchAnswer(answer.reason, scope));
@@ -557,7 +557,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   if (prior !== undefined && (!prior || prior.status !== "service-acknowledged" || prior.service !== plan.service || !matches(prior.receipt))) {
     return failed("Held: the retained install acknowledgement does not match the original plan. The plan is kept.");
   }
-  if (ctx.fetch !== undefined && (ctx.trustedFoundingService?.service !== plan.service || ctx.trustedFoundingService.fetch !== ctx.fetch)) {
+  if (ctx.fetch !== undefined && (ctx.trustedCreationService?.service !== plan.service || ctx.trustedCreationService.fetch !== ctx.fetch)) {
     return failed("Held: this injected transport has no configured-service acknowledgement trust. The plan is kept; no request was sent.");
   }
   // The durable marker must precede the first possible request. An exact
@@ -606,7 +606,7 @@ function validRepository(repository: Repository, directory: Seed): boolean {
       && (repository.inbox === undefined || isScopeId(repository.inbox));
   } catch { return false; }
 }
-function foundingMembership(summary: Summary, at: ScopeRef, key: KeyId, handle: string, definition: PlatformDefinition): boolean {
+function creationMembership(summary: Summary, at: ScopeRef, key: KeyId, handle: string, definition: PlatformDefinition): boolean {
   const roster = summary.items.find((item) => item.type === "roster");
   return canonicalize(summary.scope) === canonicalize(at) && summary.definition === definition
     && roster?.values["foundingKey"] === key && roster.values["foundingHandle"] === handle;
@@ -668,12 +668,12 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
       if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
     } else {
-      let offered: FoundingOffer | undefined;
-      if (ctx.foundingOffer) {
-        const value = await ctx.foundingOffer(structuredClone(register));
-        if (!isFoundingOffer(value, config.service, register)) return failed("The demo offer does not match the configured origin, full register reference, pin and purpose. Nothing was prepared or submitted.");
+      let offered: CreationOffer | undefined;
+      if (ctx.creationOffer) {
+        const value = await ctx.creationOffer(structuredClone(register));
+        if (!isCreationOffer(value, config.service, register)) return failed("The demo offer does not match the configured origin, full register reference, pin and purpose. Nothing was prepared or submitted.");
         // Own the projection before asynchronous recovery-key preparation.
-        offered = JSON.parse(canonicalize(value)) as FoundingOffer;
+        offered = JSON.parse(canonicalize(value)) as CreationOffer;
         if (!DIRECTORY_OF[offered.definition] || !platform(offered.definition)) return failed("The demo register version is unsupported here. Nothing was prepared or submitted.");
       }
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
@@ -760,11 +760,11 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       }
       return receipt.fact;
     };
-    const foundFact = await submitted(pending.found!, register, R, "Created");
+    const creationFact = await submitted(pending.found!, register, R, "Created");
     if (!pending.found!.accepted) {
       // An unavailable answer also requires the same request on retry. Even
       // an expired/refused envelope remains saved: only --again replaces it.
-      await keep({ ...pending, found: { signed: pending.found!.signed, accepted: foundFact } });
+      await keep({ ...pending, found: { signed: pending.found!.signed, accepted: creationFact } });
     } else if (!pending.repository) {
       // Wake recorded creation after a settings restart. This read does not
       // settle the found or change its already accepted request bytes.
@@ -806,7 +806,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
     if (!pending.seat && readOnly) return failed("The creation and its children are confirmed, but no original seat request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.seat) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
+      if (!creationMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const members = summary.items.filter((item) => item.type === "member");
       const own = members.filter((item) => item.values["handle"] === pending.handle);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, seat: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "seat") });
@@ -823,7 +823,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
     if (!pending.firstKey && readOnly) return failed("The original seat is confirmed, but no original first-key request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.firstKey) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
+      if (!creationMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const keys = summary.items.filter((item) => item.type === "key");
       const own = keys.filter((item) => item.values["id"] === signer.key && item.refs["member"] === seat.seq);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, firstKey: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "first-key") });

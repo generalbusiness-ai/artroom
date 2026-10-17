@@ -26,7 +26,7 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     };
     await rita.tick();
     seen.set(rita, rita.told);
-    const atFounding = rita.told;
+    const atCreation = rita.told;
     await settled(rita, 0, "the room as founded, once more");
 
     // The rules, and the two demo definitions activated with their bytes beside the act.
@@ -187,7 +187,7 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     expect(credential).toMatchObject({ credential: expect.any(String), remote: expect.stringMatching(/^https:/) });
     await settled(paul, 0, "the end of the story");
     lines.push(`room story, ${mode}: requests to the scope service: rita ${rita.requests.length}, paul ${paul.requests.length}`);
-    return { told: { founding: atFounding, rita: rita.told, paul: paul.told }, requests: rita.requests.length + paul.requests.length };
+    return { told: { founding: atCreation, rita: rita.told, paul: paul.told }, requests: rita.requests.length + paul.requests.length };
   } finally { room.done(); }
 }
 

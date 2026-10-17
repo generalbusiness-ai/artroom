@@ -11,7 +11,7 @@ import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, Key
 import { canonicalize, entryHash, isOperationId, isFactRef, verifySignedIntent, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/dap-derive";
 import { isStandingDestination, publicationStandingRecord } from "@generalbusiness/dap-platform";
-import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, filePublicationCause, filePublicationCurrent, filePublicationCommit, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, initialCommitOf, isOf, isRecordedJudgeEvidence, revokedToken, filePublicationCause, filePublicationCurrent, filePublicationCommit, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
@@ -420,7 +420,7 @@ export class DestinationHost implements Outside {
     } else if (write.kind === DESTINATION_KINDS.firstHead) {
       commit = firstHeadCommit(state, own, write, format);
       // The founding commit of the scope's own version: the empty tree at version 1, a README at version 2.
-      const founding = foundingOf(state, own, format);
+      const founding = initialCommitOf(state, own, format);
       objects = commit === founding.commit ? founding.objects : await this.#options.provider.objects(repository, commit);
       if (commit === founding.commit) { expectedTree = founding.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
     } else if (write.kind === "reservation-stage") {

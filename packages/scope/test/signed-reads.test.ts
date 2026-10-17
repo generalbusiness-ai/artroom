@@ -15,7 +15,7 @@ import { mintSession, openSession, sessionsOf } from "../src/sessions.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { Platform, rita, routed, settle } from "./repository.ts";
 import { beginSessionChild, beginSessionFixture, type SessionOwner } from "./session-settings.ts";
 import { reader } from "./support.ts";
@@ -413,7 +413,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
     const { D, children } = await claimedBy(R, rita, "@rita");
     const { children: vics } = await claimedBy(R, vic, "@vic");
     const [M, Ru, G] = children as [Platform, Platform, Platform];
-    await foundingPublication(G);
+    await initialPublication(G);
     const entries = await G.entries();
     // The publication wrote the host's outcomes, the receipt's among them: entries that no member signed. The branch is ready.
     expect((await G.item(0)).state).toBe("ready");

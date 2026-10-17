@@ -4,7 +4,7 @@ import { expect, test } from "vitest";
 import type { Answer, Intent } from "@generalbusiness/dap-contract";
 import { signIntent } from "@generalbusiness/artroom-bytes";
 import { grantOf } from "@generalbusiness/dap-derive/testing";
-import type { Founded } from "../src/index.ts";
+import type { Created } from "../src/index.ts";
 import { route, type Api } from "../src/worker.ts";
 import { definition } from "./support.ts";
 import { founding, rita, soon } from "./net.ts";
@@ -13,7 +13,7 @@ test("one real route: a founding, an act and a request for a step through the Wo
   const post = (path: string, body: unknown) => SELF.fetch(`https://scopes.test${path}`, { method: "POST", body: JSON.stringify(body) });
   const { signed, name } = founding(definition, { title: "A lane", opener: rita.member });
   const founded = await post("/v1/scopes", { founding: signed, definition: definition.declared });
-  const genesis = await founded.json<Founded>();
+  const genesis = await founded.json<Created>();
   if (genesis.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(genesis)}`);
   // The service computed the scope ID from the signed intent and the definition.
   const at = genesis.receipt.fact.at;

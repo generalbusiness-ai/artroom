@@ -30,7 +30,7 @@ test("a real change and Lending tell share one slot: the held change finishes fi
   const store = memoryStore();
   await store.keep("operator", rita.secret);
   const fetch = ((url: string, init?: RequestInit) => life.wait(() => routed(url, init))) as NonNullable<Context["fetch"]>;
-  const ctx: Context = { store, fetch, trustedFoundingService: { service: "https://scopes.test", fetch },
+  const ctx: Context = { store, fetch, trustedCreationService: { service: "https://scopes.test", fetch },
     now: () => timeMs(net.clock.now)!, pause, read: async name => files[name as keyof typeof files] ?? null };
   const run = (...args: string[]) => life.wait(() => command(ctx, args));
   const ok = (result: Outcome) => { expect(result.code, result.lines.join("\n")).toBe(0); return result; };
