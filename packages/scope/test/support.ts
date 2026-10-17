@@ -132,7 +132,7 @@ export class Lane {
   alarmAt(): Promise<number | null> { return this.inside((state) => state.storage.getAlarm()); }
 }
 
-/** Found a scope on real storage, with its clock at the start. `bounds` and `reads` replace the defaults for this scope only. `under`: a variant of the definition above, with the same grants. */
+/** Create a scope on real storage, with its clock at the start. `bounds` and `reads` replace the defaults for this scope only. `under`: a variant of the definition above, with the same grants. */
 export async function create(bounds: Partial<Bounds> = {}, reads: Partial<ReadBounds> = {}, under: ValidDefinition = definition): Promise<Lane> {
   const { signed, name } = creation(at(60), under);
   const c = controls(name, START);

@@ -486,7 +486,7 @@ function plannedLines(plan: PlannedInstall): Outcome {
 }
 
 /**
- * `dap install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
+ * `dap install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will create, and create
  * nothing. The intent lives as long as an intent may, so it can be created until its `notAfter`, the time printed. The plan is
  * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
  * run `install --planned`. Only a definitely-unsent legacy plan may be replaced; a selected cohort plan stays exact.

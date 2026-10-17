@@ -17,7 +17,7 @@ const SERVICE = "https://scopes.test";
 const reader = "a test reader";
 
 // Invariant: the command's functions, over the Worker's real HTTP routes, the real read sessions and a key kept by the command,
-// found a repository whole, reading by signed reads until the creator holds a seat; invite and join a member; list and take one
+// create a repository whole, reading by signed reads until the creator holds a seat; invite and join a member; list and take one
 // act; show a refusal with its reason and nothing written; and read and verify the histories they wrote.
 //
 // Every scope is a Durable Object of the namespace `PLATFORM`: the deployed class, the production authority and the platform

@@ -428,7 +428,7 @@ export class Scope {
    * (section 6.2). Each is checked against its digest and retained with the
    * genesis.
    *
-   * No grant is asked for: who may found a repository is the authority
+   * No grant is asked for: who may create a repository is the authority
    * note's (section 7.1).
    */
   async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {

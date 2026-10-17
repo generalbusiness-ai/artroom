@@ -10,10 +10,10 @@ No compatibility method or command alias is added.
 
 The completed spikes slice and its history tag are preserved. Independent
 review 670198c8 requested changes at be3444d36. The corrections below
-preserve the v1 demo custody key and repair finite active wording. A new
-frozen gate and successor Source review are required; the earlier passing
-gate at d5e321cd4 does not certify this runtime correction. No approval
-or landing is claimed. The sections below retain original checkpoints,
+preserve the v1 demo custody key and repair finite active wording. The new
+original gate at 4526224d1 passes; successor Source review and normal
+landing remain outstanding. The earlier gate at d5e321cd4 does not certify
+this runtime correction. No approval or landing is claimed. The sections below retain original checkpoints,
 failed attempts and qualified evidence, not a union of passing results.
 
 The checker assessed the six unrelated Jam source lookups and their
@@ -575,3 +575,64 @@ excludes notes. The inventory's source rows are checked separately.
 
 This runtime correction requires a new frozen gate. No earlier gate is
 reused as its passing result. Cloudflare operations remain held.
+
+
+## Corrected frozen gate and finite comment/report successor
+
+Original owner session 84758 at 4526224d16bd1ff716bfaef892157433fec0ae45,
+tree c74fdf3f04ca99348f870f23ab5b05f31d43da91, ended CLOSED 0. The
+checkout was clean and the warm dependency view verified against the
+unchanged lock. Whitespace passed in 0.1 seconds (0.1 CPU), types in
+7.1 seconds (26.3 CPU), and tests in 429.9 seconds (521.1 CPU): 1,540
+Vitest pass, 3 skip, zero failures, then 16 Node and 55 Counting passes.
+This is the original complete execution for the runtime correction; no
+earlier gate or later rerun supplies this result. Original log:
+/tmp/artroom-create-outbox-4526224d1-first-gate.log. Step logs:
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.cRIDLkqUM8.
+Original terminal metadata:
+/tmp/artroom-create-outbox-4526224d1-terminal.json. The same Node 26.12.0,
+npm 11.20.0 and arm64 environment applies; no load or diagnostic cause,
+leak or drain claim is made.
+
+The successor changes this report and five finite comment paths only:
+packages/scope/src/core.ts, packages/cli/src/commands.ts,
+packages/scope/test/support.ts, packages/scope/src/reads.ts and
+packages/cli/test/story.scope.test.ts. These remove remaining imperative
+scope-making wording and correct An outbox ID. The last grammar issue
+was independently pointed out by the checker. All five paths preserve
+non-trivia TypeScript tokens and physical line counts. All other Git
+mode/blob leaves must match the passing freeze exactly before review.
+The complete finite F2 correction now covers 20 prose/comment paths;
+the v1 demo helper and its strengthened witness remain the only runtime
+and test-behavior changes since reviewed be3444d36.
+
+The checker independently reports that its old-Main-prepare/new-reader
+probe passes at immutable 4526224d1: the original foundId and role actor
+are retained, the signed native act verifies, the old file bytes are
+unchanged, and provider calls are zero with a scripted install fact.
+This preview is qualified evidence, not a new Source approval. The
+173 inventory rows and 211 occurrences match their source. Nine owned
+generated files reproduce exactly at the new freeze, and all 36 platform
+canonical data values, catalog names and defaults remain unchanged.
+Manifests, lock, the fixed initial Git-content module and Jam's historical
+source and bundle are unchanged from the first reviewed candidate.
+
+The corrected count is 142,596 physical lines across 815 files, up 87
+from Main 9a1238b7: tests 61,896 (+49), other source 75,918 (+6), tooling
+3,399 (+32), generated code 1,383 (unchanged). The corrected freeze JSON
+is /tmp/artroom-create-outbox-4526224d1-line-count.json. This is not a
+reduction claim. The five later comments preserve these counts.
+
+A scratch lexical comparison initially exhausted its heap while using a
+scanner without template/regular-expression context handling. The bounded
+context-aware comparison succeeds; that failed probe is not a code check
+or a gate result, and no performance cause is inferred from it. The
+source checkout was not changed during the original gate.
+
+The successor review will receive a closed metadata projection containing
+the exact final head/tree, all 367 actual paths including ten removals,
+the original gate terminal, retained first-review findings and failed
+controls, the finite comment/report comparison, line counts, inventory,
+canonical catalog comparison and generated correspondences. No raw logs,
+helper directory, onward access or new execution grant is implied.
+Cloudflare operations and publication remain held.
