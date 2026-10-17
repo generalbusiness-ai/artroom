@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:100358f73bdf12486c9ee63e5aaec5f9515b6a9d","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/support/standin.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:101e7b1bf915a41d7b9a895719d685dd9b741869","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/item-query-wire.ts."}
