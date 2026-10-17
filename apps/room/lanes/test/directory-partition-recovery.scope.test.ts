@@ -13,6 +13,46 @@ import { wired } from "../../../../packages/scope/test/outside.ts";
 import { net } from "./support/graph.ts";
 import { room, rita, Platform, settle, soon } from "./support/room.ts";
 
+// A short state-transition/control specimen. The separate completed 1,000-
+// generation capacity case is neither repeated nor claimed by this test.
+test("native root abandons only terminal routing generations and opens a fresh seed", async () => {
+  const originalClock = net.clock.now;
+  const r = await room({ partitioned: true, openPartition: false, roster: [] });
+  const D = r.root, actual = namespace(env.PLATFORM).transport, names: string[] = [];
+  wired.set(D.name, () => ({ transport: { send: envelope => {
+    if ("definition" in envelope.to && envelope.to.definition === C.partition) {
+      names.push(scopeIdOf(envelope.to)); return Promise.resolve({ answer: "routing", reason: "not-found" });
+    }
+    return actual.send(envelope);
+  } } }));
+  try {
+    await D.restart();
+    for (let generation = 1; generation <= 3; generation++) {
+      const before = (await D.summary()).at;
+      const opened = await D.act(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
+      expect(opened).toMatchObject({ answer: "accepted" });
+      if (opened.answer !== "accepted") return expect.fail("terminal generation blocked the next open");
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await D.stub.dispatch();
+        const outbox = await D.stub.outbox("a test reader");
+        if (!outbox.ok) return expect.fail("actual outbox unavailable");
+        if (outbox.value.find(duty => duty.duty === `${opened.receipt.fact.seq}.0`)?.diagnosis?.finding === "undelivered") break;
+        net.clock.now = soon(PROPOSED_BOUNDS.dispatchRetryMaxSeconds + 1);
+      }
+      const row = await runInDurableObject(D.object, (_instance, storage) => {
+        const store = new SqliteStore({ exec: (query, ...args) => storage.storage.sql.exec(query, ...args), transaction: work => storage.storage.transactionSync(work) });
+        return store.item(opened.receipt.fact.seq);
+      });
+      expect(row).toMatchObject({ state: "undelivered", values: { generation, base: (generation - 1) * 100000 + 1 }, refs: { scope: null } });
+      expect((await D.summary()).at.seq).toBe(before.seq + 2);
+      await D.restart();
+    }
+    expect(names).toHaveLength(9);
+    expect(new Set(names)).toHaveProperty("size", 3);
+    for (let group = 0; group < 3; group++) expect(new Set(names.slice(group * 3, group * 3 + 3))).toHaveProperty("size", 1);
+  } finally { wired.delete(D.name); net.clock.now = originalClock; }
+}, 60_000);
+
 // Real Native creation, diagnosis, authority, outbox and operator resend.
 // Test transport discards one real acknowledgment, then refuses routing;
 // the child's authentic result is held separately. Git, clock and finite

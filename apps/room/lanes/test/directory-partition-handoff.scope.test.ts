@@ -1,8 +1,8 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Entry, type Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, intentDigest, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { owed, PROFILES, validateDefinition } from "@generalbusiness/dap-derive";
+import { canonicalize, entryHash, intentDigest, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { applyEntry, MemoryState, owed, PROFILES, validateDefinition } from "@generalbusiness/dap-derive";
 import { PARTITION_COHORT as C, platform } from "@generalbusiness/dap-platform";
 import { partitionLane, partitionGeneration } from "../../../../packages/platform/src/directory-partitions.ts";
 import { SqliteStore } from "../../../../packages/scope/src/sqlite.ts";
@@ -28,6 +28,9 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
     expect(await r.root.stub.submit(signed, [])).toMatchObject({ answer: "accepted" });
     await settle(...r.scopes, P);
     expect((await P.summary()).value).toMatchObject({ status: "active", definition: C.partition });
+    const activeHead = (await r.root.summary()).at;
+    expect(await r.root.act(rita, "open-partition", { expected: await r.root.expected({ repository: 0 }) })).toMatchObject({ answer: "refused", reason: "guard-failed", name: "partition-pending" });
+    expect((await r.root.summary()).at).toEqual(activeHead);
     const data = platform(C.partition)!.data, checked = validateDefinition(data, bounds, PROFILES, { platform: true });
     if (!checked.ok) return expect.fail("native partition data does not validate");
     const definition = checked.definition;
@@ -77,6 +80,9 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
     const active = (await r.root.summary()).value.items.filter(item => item.type === "partition" && ["active", "creating"].includes(item.state));
     expect(active).toHaveLength(1);
     expect(active[0]).toMatchObject({ values: { generation: 2, base: 100001 } });
+    const pendingHead = (await r.root.summary()).at;
+    expect(await r.root.act(rita, "open-partition", { expected: await r.root.expected({ repository: 0 }) })).toMatchObject({ answer: "refused", reason: "guard-failed", name: "partition-pending" });
+    expect((await r.root.summary()).at).toEqual(pendingHead);
     // A creator's deciding entry precedes the child's result. Register the
     // actual successor from that exact entry before draining its dispatcher.
     const creation = await r.root.stub.entry("a test reader", active[0]!.id);
@@ -136,5 +142,15 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
       return partitionGeneration(store, 1);
     });
     expect(first).toMatchObject({ state: "sealed", refs: { scope: await P.at() } });
+    // Fold the actual Root entries to check every recorded head. This is
+    // a state-projection invariant, not an additional provenance replay.
+    const nativeRoot = platform(C.directory)!, rootBounds = { ...PROPOSED_BOUNDS, scopeEntries: 3012 };
+    const rootDefinition = validateDefinition(nativeRoot.data, rootBounds, PROFILES, { platform: true });
+    if (!rootDefinition.ok) return expect.fail("native Root data is invalid");
+    const entries = await r.root.sealed(), projected = new MemoryState();
+    for (const held of entries) {
+      applyEntry(projected, rootDefinition.definition, held.entry, entryHash(held.entry), { bounds: rootBounds, platform: { named: C.directory, rules: nativeRoot.rules }, own: seq => entries[seq] ?? null });
+      expect(projected.count("partition", "active") + projected.count("partition", "creating"), `Root head ${held.entry.seq}`).toBeLessThanOrEqual(1);
+    }
   } finally { net.hold = null; net.clock.now = originalClock; if (partName) net.sized.delete(partName); }
 }, 60_000);

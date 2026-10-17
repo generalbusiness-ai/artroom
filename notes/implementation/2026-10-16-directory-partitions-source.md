@@ -1045,3 +1045,56 @@ assertion. The source is restored. The distinguishing log is
 /tmp/artroom-directory-native-editor-successor-retarget-control.log.
 This completes the native retained-editor witness left open above; it does
 not change unknown handling or authorize automatic replacement requests.
+
+## Index-update cost and final authority boundaries
+
+The SQLite point-read fixture now places its target after 3,000 other live
+listed rows with coherent seed/number keys and scope refs. Besides the
+three point reads, it runs the actual partition index-ready, index-row and
+index-number rules on an explicitly scripted advisory source, then applies
+their effects with the actual fold. The title and seen position update on
+the original numbered row. Rule evaluation uses exactly 12 SQL statements,
+reads at most 24 rows and writes none. The fold stays within 64 statements,
+128 rows read and 32 rows written. Neither query plan uses SCAN or TEMP.
+Deleting one derived key makes both lookup and the actual index guard
+unavailable, using four statements and at most eight rows in total.
+
+This is actual Durable Object SQLite, native rule code and fold over
+storage fixtures, with a scripted source. It is not an additional Native
+factory/Authority delivery or capacity claim. Actual native index deliveries
+remain covered by the handoff and consumer journeys. Restoring a page walk
+only in index-row preserves the correct update but raises rule evaluation
+from 12 statements to 39; the bound assertion fails. The source is restored.
+The first fixture version mistakenly gave an advisory a result clause;
+typecheck and the fold rejected it. The corrected advisory and last-row
+specimen pass with scope typecheck. Logs use
+/tmp/artroom-directory-index-update-*; page-scan-control records the
+distinguishing result. Counts above are asserted ceilings where stated,
+not unprinted exact row counts.
+
+Both successful native handoff cases now interleave open-partition while
+the prior partition is active and while its successor is creating. Each
+is refused partition-pending without a Root entry. Folding the actual
+Root entries checks every recorded head has at most one active or creating
+partition. This checks the state projection of actual entries, not another
+provenance replay. Both cases pass in
+/tmp/artroom-directory-handoff-p1-first-focus.log with lane typecheck.
+
+A real partition of a second native room seals to its own Root. Redirecting
+that actual written tell to the first Root returns source-unverified and
+changes no Root entry or partition row. Separately, a pure invocation of
+the actual full-reference guard, over the first Root's actual stored state
+and that actual foreign source, returns not-the-active-partition. The
+runtime negative stops at source verification; no handler refusal entry is
+claimed for it. Existing factory witnesses already cover absent issue.open,
+early seal, exact membership/rules refs and restart. The foreign case and
+lane types pass in /tmp/artroom-directory-foreign-seal-first-*.
+
+A short three-generation native routing specimen confirms each terminal
+undelivered row frees P1 for a fresh seed, with three identical attempts per
+generation. It does not repeat the completed 1,000-generation capacity run.
+Removing only the undelivered state effect leaves creating and fails that
+state assertion; the separate mixed lost-answer case still passes. The
+source is restored. The short native baseline and types pass; its focused
+control is /tmp/artroom-directory-routing-terminal-pending-control.log.
+No first Source gate, approval or provider operation has run.
