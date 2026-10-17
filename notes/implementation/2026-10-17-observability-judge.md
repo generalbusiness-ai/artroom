@@ -36,7 +36,7 @@ Actual storage reporting remains owed.
 Six focused Node witnesses use explicitly synthetic observations. They
 cover weighted counters and quantiles, exact threshold boundaries,
 insufficient data, freshness, errors, latency, busy, critical-loss
-precedence, HTTP place balance, sampling, head/version and health
+precedence, HTTP place balance, sampling, version and health
 matching, malformed inputs and a missing supplied bound. These are local
 evaluator checks, not recorded SQL responses or an observed demo.
 
@@ -61,10 +61,37 @@ The original control driver `d37011` exited zero. Its logs are
 SHA-256 `af887764de023872283d8cbf3d88a94062103c86cc06efaf6a83277c786e9795`.
 There was no sweep or full-suite run.
 
+## Read-only client checkpoint
+
+`scripts/deploy-check.mjs` now exports the client. It has no command-line
+entry point yet. The caller supplies the deployment, version and bound;
+the function explicitly does not certify their provenance. It sends one
+SQL request for a fixed fifteen-minute window and one independent health
+request. The token goes only to the fixed account-scoped Analytics Engine
+endpoint. Redirects are errors. Health receives no analytics credential.
+Scope indexes, request IDs and trace IDs are not selected from the dataset.
+Raw provider answers and exception text are never included in the result.
+
+The client accepts at most 50,000 rows, asks for one extra to detect an
+overfull window, and rejects inconsistent row metadata or a declared
+truncated result. SQL and health bodies are bounded at 16 MiB and 4 KiB,
+respectively, with at most 65,536 stream pieces and a ten-second deadline
+per request. The stream is cancelled on refusal, completion or deadline;
+the deadline covers both headers and body. No partial response can pass.
+These are client refusal bounds, not measurements of platform capacity.
+
+Direct run `45fe94` passed all eight Node cases after adding the client.
+Direct run `e4b63c` passed all eight after tightening cancellation and
+nonprogress bounds. The two client witnesses use scripted fetch ports
+and standard Response streams: they check the fixed query window,
+credential separation, successful evaluation, provider failure, truncated
+metadata, oversized health and a stream of empty pieces. They query no
+account and prove no real SQL execution, timeout latency or hosted health.
+
 ## Remaining third-stage work
 
-The bounded SQL/health client, deployment-report binding and observed
-calibration provenance, MCP console and hosted events, concurrent
+The command-line interface, deployment-report binding and observed
+calibration provenance, actual storage-row reporting, MCP console and hosted events, concurrent
 operation-owned read/page counting, successful persisted custody-phase
 events, telemetry loss/privacy/equivalence witnesses and live acceptance
 remain outstanding. The complete third stage has not passed a gate or

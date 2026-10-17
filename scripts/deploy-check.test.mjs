@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateDeployment } from "./deploy-check-evaluate.mjs";
+import { checkDeployment } from "./deploy-check.mjs";
 
 // Synthetic metrics-v1 observations, not an observed demo or SQL API recording.
 const version = "11111111-1111-1111-1111-111111111111", deployment = "local-fixture", now = 2_000_000;
@@ -81,4 +82,52 @@ test("Judge refuses malformed query observations and a missing bound", () => {
   assert.ok(evaluateDeployment(f).failures.includes("query"));
   const clean = fixture(); delete clean.p95BoundMs;
   assert.ok(evaluateDeployment(clean).failures.includes("calibration"));
+});
+
+function apiRows(rows) {
+  return { rows: rows.length, data: rows.map(row => Object.fromEntries([
+    ["epochSeconds", String(row.timeMs / 1000)], ["_sample_interval", String(row._sample_interval)],
+    ...row.blobs.flatMap((s, i) => i === 6 || i === 7 ? [] : [[`blob${i + 1}`, s]]),
+    ...row.doubles.map((n, i) => [`double${i + 1}`, n]),
+  ])) };
+}
+const clientOptions = { account: "a".repeat(32), token: "PRIVATE-TOKEN-FIXTURE", deployment, version, p95BoundMs: 10, healthUrl: "https://fixture.invalid/health" };
+
+test("Judge client binds one bounded SQL window and a private independent health read", async () => {
+  const f = fixture(), calls = [];
+  const r = await checkDeployment(clientOptions, { now: () => now, fetch: async (url, init) => {
+    calls.push({ url, init });
+    assert.equal(init.redirect, "error");
+    if (url === clientOptions.healthUrl) { assert.equal(init.headers, undefined); return Response.json(f.health.body); }
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${clientOptions.account}/analytics_engine/sql`);
+    assert.equal(init.method, "POST"); assert.equal(init.headers.Authorization, `Bearer ${clientOptions.token}`);
+    assert.match(init.body, /blob3 = '11111111-1111-1111-1111-111111111111'/);
+    assert.match(init.body, /toDateTime\(1100\)/); assert.match(init.body, /toDateTime\(2000\)/);
+    assert.match(init.body, /LIMIT 50001 FORMAT JSON/);
+    assert.doesNotMatch(init.body, /blob7|blob8|index1/);
+    return Response.json(apiRows(f.rows));
+  } });
+  assert.equal(r.pass, true); assert.equal(r.routeCount, 100); assert.equal(calls.length, 2);
+  assert.doesNotMatch(JSON.stringify(r), /PRIVATE-TOKEN-FIXTURE/);
+});
+
+test("Judge client refuses failed, truncated or oversized observations without echoing them", async () => {
+  const f = fixture();
+  for (const bad of [new Response("PRIVATE-RESPONSE-FIXTURE", { status: 503 }), Response.json({ rows: 102, data: [] }),
+    Response.json({ ...apiRows(f.rows), rows_before_limit_at_least: 50001 })]) {
+    const r = await checkDeployment(clientOptions, { now: () => now, fetch: async url => url === clientOptions.healthUrl ? Response.json(f.health.body) : bad });
+    assert.equal(r.pass, false); assert.ok(r.failures.includes("query"));
+    assert.doesNotMatch(JSON.stringify(r), /PRIVATE-(?:TOKEN|RESPONSE)-FIXTURE/);
+  }
+  let cancelled = false;
+  const r = await checkDeployment(clientOptions, { now: () => now, fetch: async url => url === clientOptions.healthUrl
+    ? new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(4097)); }, cancel() { cancelled = true; } }))
+    : Response.json(apiRows(f.rows)) });
+  assert.equal(r.pass, false); assert.ok(r.failures.includes("health")); assert.equal(cancelled, true);
+  let pieces = 0, stopped = false;
+  const fragmented = await checkDeployment(clientOptions, { now: () => now, fetch: async url => url === clientOptions.healthUrl
+    ? Response.json(f.health.body)
+    : new Response(new ReadableStream({ pull(c) { pieces++; c.enqueue(new Uint8Array()); }, cancel() { stopped = true; } })) });
+  assert.equal(fragmented.pass, false); assert.ok(fragmented.failures.includes("query"));
+  assert.equal(stopped, true); assert.ok(pieces <= 65_538);
 });
