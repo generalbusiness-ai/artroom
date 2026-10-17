@@ -137,7 +137,7 @@ test("one operation cannot recapture a new genesis allowance and post-await chan
 function pin(state: DurableObjectState, named: PlatformDefinition) {
   const store = new SqliteStore(sqlOf(state)), sample = JSON.parse(store.stored(0)!.bytes) as Entry, current = store.scope()!;
   if (sample.input.type !== "genesis") return expect.fail("native fixture lacks genesis");
-  const kind = named.slice("platform:".length).split("@")[0];
+  const kind = named.startsWith("platform:directory-partition@") ? "directory" : named.slice("platform:".length).split("@")[0];
   if (!isScopeKind(kind)) return expect.fail("fixture pin has unsupported scope kind");
   const seed = { ...sample.input.seed, kind, definition: named }, at = { ...sample.at, kind, scope: scopeIdOf(seed) };
   const entry: Entry = { ...sample, at, input: { ...sample.input, seed, founding: null, kind: platform(named)?.data.genesis ?? "unsupported" }, effects: [], sends: [] };

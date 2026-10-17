@@ -18,8 +18,9 @@
  */
 
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/dap-contract";
+import { carryProducerName } from "./receiver-facts.ts";
 import { CanonicalError, canonicalize, entryHash, parseStrict, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, StandingError, timeMs, timeOf } from "@generalbusiness/dap-derive";
+import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, same, judgeTimed, nextDue, StandingError, timeMs, timeOf } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, RuleInput, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { ownOf, retainedFacts, snapshotsOf } from "./core.ts";
 import type { Ports, Resolver } from "./ports.ts";
@@ -58,7 +59,7 @@ export async function within<T>(work: () => Promise<T>, seconds: number): Promis
 export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: readonly FactRef[]): Promise<Fetched[] | null> {
   const read = await Promise.all(named.map(async (fact): Promise<Fetched | null> => {
     const found = await within(() => resolver.read(fact, bounds.fetchSeconds), bounds.fetchSeconds);
-    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? { fact, entry: found.entry, under: found.under } : null;
+    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? carryProducerName({ fact, entry: found.entry, under: found.under }, found) : null;
   }));
   return read.every((f) => f !== null) ? read : null;
 }
@@ -69,7 +70,7 @@ export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: read
 export type Verdict<A> =
   /** Write the draft. `retain`: the inputs it names by digest. `sealed` builds the answer from the sealed entry. `unfit` answers for a draft that cannot be an entry: over the size bound, or not canonical values. */
   /** `full` answers for an entry that admits new duties and would leave no room for them to settle (section 9.2). Nothing is written then. */
-  | { verdict: "write"; draft: Draft; retain: readonly Retained[]; sealed(sealed: Sealed): A; unfit(why: "size" | "form"): A; full(head: Head): A }
+  | { verdict: "write"; draft: Draft; retain: readonly Retained[]; facts?: readonly Fetched[]; sealed(sealed: Sealed): A; unfit(why: "size" | "form"): A; full(head: Head): A }
   /** Step 6.3: a transition is due. Nothing is written, and the turn goes back to step 3. */
   | { verdict: "stop" }
   /** Nothing is written. */
@@ -330,7 +331,7 @@ export class Turns {
         return { kind: "rule", digest: p.input, bytes: canonicalize(asked.input) };
       });
       try {
-        const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules]);   // 6.5
+        const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules], verdict.facts);   // 6.5
         // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
         // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
         // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
@@ -353,7 +354,7 @@ export class Turns {
    * inputs, the fold, and the removal of each text the entry redacts.
    * `applyEntry` is the only code that changes folded state.
    */
-  #seal(definition: ValidDefinition, draft: Draft, clock: Reading, retain: readonly Retained[]): Sealed {
+  #seal(definition: ValidDefinition, draft: Draft, clock: Reading, retain: readonly Retained[], facts?: readonly Fetched[]): Sealed {
     const entry = entryOf(this.#store, draft, clock);
     let bytes: string;
     try {
@@ -368,7 +369,7 @@ export class Turns {
     this.#store.append(entry, hash, bytes, size);
     for (const input of retain) this.#store.retain(input);
     applyEntry(this.#store, definition, entry, hash, {
-      bounds: this.#bounds, platform: this.#platform(), own: ownOf(this.#store), facts: retainedFacts(this.#store, entry), snapshot: snapshotsOf(this.#store),
+      bounds: this.#bounds, platform: this.#platform(), own: ownOf(this.#store), facts: retainedFacts(this.#store, entry).map(read => facts?.find(fact => same(fact.fact, read.fact)) ?? read), snapshot: snapshotsOf(this.#store),
       texts: (digest) => { const kept = this.#store.retained("text", digest); if (!kept) return undefined; const text: unknown = parseStrict(kept.bytes); return typeof text === "string" ? utf8(text).length : undefined; },
     });
     // Section 6.6: a redaction removes the bytes of each text it lists from the retained inputs, in the commit that seals its tombstone.

@@ -12,6 +12,8 @@ import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlat
 import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
+import { ReceiverReads } from "./receiver-reads.ts";
+import { producerName } from "./receiver-facts.ts";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Further, Ports, Standing } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
@@ -55,11 +57,11 @@ export const ownOf = (store: Store): Own => (seq) => {
 };
 
 /** Section 9.2: the bytes of each foreign entry the draft's `uses` name, under its content digest. */
-export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
+export function used(draft: Pick<Draft, "uses">, facts: readonly Fetched[]): Retained[] {
   return draft.uses.map((use) => {
     const read = facts.find((f) => f.fact.hash === use.fact.hash);
     if (!read) throw new Error(`the foreign entry ${use.fact.hash} was not fetched before the turn`);
-    return { kind: "entry", digest: use.content, bytes: canonicalize(read.entry), under: read.under };
+    return { kind: "entry", digest: use.content, bytes: canonicalize(read.entry), under: producerName(read) };
   });
 }
 
@@ -69,7 +71,7 @@ export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
  * again (sections 6.6 and 7.4). One that is missing is left out, and the
  * clause is then not judged.
  */
-export function retainedFacts(store: Store, entry: Entry): Fetched[] {
+export function retainedFacts(store: Pick<Store, "retained">, entry: Pick<Entry, "uses">): Fetched[] {
   return entry.uses.flatMap((use): Fetched[] => {
     const kept = store.retained("entry", use.content);
     return kept ? [{ fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" }] : [];
@@ -273,6 +275,14 @@ export class Scope {
 
   /** The one queue of this scope. Every writer's input waits in it: an act here, a delivery and a diagnosis from their own modules. */
   get turns(): Turns { return this.#turns; }
+
+  /** One input's receiver policy and evidence budget. No derived name is
+   * cached on Scope or used by the global producer Source API. */
+  async receiverReads(): Promise<ReceiverReads | null> {
+    const scope = this.#store.scope(), pinned = this.pinned(), stored = this.#store.stored(0);
+    const birth = stored ? (JSON.parse(stored.bytes) as Entry).input : null;
+    return scope && pinned && birth?.type === "genesis" ? ReceiverReads.forReceiver(this.#ports, scope.at, pinned.named, birth) : null;
+  }
 
   /**
    * The further observations of one input of this scope (`Observes`). Under a definition whose data states no row, and with a
@@ -570,7 +580,9 @@ export class Scope {
     // data states one. So a scope under a declared definition reads no value and keeps none.
     const places = act && fields?.ok ? placesOf(act.fields, fields.fields) : [];
     const values = valuesBeside(besideOf(beside).values, places);
-    const facts = await fetchFacts(resolver, bounds, wanted);
+    const reader = wanted.length ? await this.receiverReads() : resolver;
+    if (!reader) return unavailable("dependency-unavailable");
+    const facts = await fetchFacts(reader, bounds, wanted);
     if (!facts) return unavailable("dependency-unavailable");
 
     // Section 5.1, held authority, in two phases. Phase one is here, the last read before the turn: what the judgment of this
@@ -606,7 +618,7 @@ export class Scope {
             const head = view.scope()!.head;
             return {
               // Section 6.2, "Retention": each value that the entry names is kept with it, in the entry's own transaction.
-              verdict: "write", draft: judged.draft, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft), ...valuesOf(judged.draft)],
+              verdict: "write", draft: judged.draft, facts, retain: [...used(judged.draft, facts), ...texts.retain(definition, judged.draft), ...valuesOf(judged.draft)],
               // The entry now retains the grant that was judged. A port that keeps a read for a later commit learns here, inside the
               // transaction, which entry used it last (authority note, section 3.3, guard 3). A transaction that then does not commit
               // breaks the object, and what the port holds in memory is gone with it.

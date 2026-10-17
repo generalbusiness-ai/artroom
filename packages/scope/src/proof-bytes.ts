@@ -34,21 +34,25 @@ export class ProofBytes {
   constructor(sql: Pick<Sql, "exec">, beforeSql: () => void = () => {}) { this.#sql = sql; this.#beforeSql = beforeSql; }
   #one(query: string, ...bindings: SqlValue[]) { this.#beforeSql(); return this.#sql.exec(query, ...bindings).toArray()[0] ?? null; }
   /** Admit the entire metadata row, not just the fields later projected. */
-  identity(): ProofIdentity | null {
+  identity(): ProofIdentity | null { return this.#identity(false); }
+  #identity(refused: boolean): ProofIdentity | null {
     try {
       const row = this.#one("SELECT CASE WHEN octet_length(v)<=? THEN v ELSE NULL END AS v FROM meta WHERE k='scope'", PROOF_BYTE_BOUNDS.scope);
       if (typeof row?.["v"] !== "string") return null;
       const value: unknown = parseStrict(row["v"]);
-      if (!isObject(value) || !isScopeRef(value["at"]) || !["active", "provisional"].includes(value["status"] as string)
+      if (!isObject(value) || !isScopeRef(value["at"]) || !(value["status"] === "active" || value["status"] === "provisional" || refused && value["status"] === "refused")
         || !isObject(value["genesis"]) || !isDigest(value["genesis"]["hash"])
         || !isObject(value["head"]) || !integer(value["head"]["seq"]) || !isDigest(value["head"]["hash"])) return null;
       return { genesis: { at: value["at"], seq: 0, hash: value["genesis"]["hash"] }, head: { seq: value["head"]["seq"], hash: value["head"]["hash"] } };
     } catch { return null; }
   }
-  own(seq: number, maxBytes: number): ProofRead {
+  own(seq: number, maxBytes: number): ProofRead { return this.#own(seq, maxBytes, false); }
+  /** Raw refused genesis can prove its result, never an active actor. */
+  birth(maxBytes: number): ProofRead { return this.#own(0, maxBytes, true); }
+  #own(seq: number, maxBytes: number, refused: boolean): ProofRead {
     if (!integer(seq) || cap(maxBytes) === null) return { kind: "unavailable" };
     try {
-      const current = this.identity();
+      const current = this.#identity(refused);
       if (!current || seq > current.head.seq) return { kind: "unavailable" };
       const row = this.#one("SELECT CASE WHEN octet_length(hash)=71 THEN hash ELSE NULL END AS hash, octet_length(bytes) AS size FROM entry WHERE seq=?", seq);
       if (!row) return { kind: "missing" };

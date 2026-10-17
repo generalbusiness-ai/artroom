@@ -25,9 +25,10 @@ import { isOf, platform, sourceName } from "@generalbusiness/dap-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
-import { PROOF_BYTE_BOUNDS, type ProofBody, type ProofSource } from "./proof-bytes.ts";
+import { EXACT_PROOF_RECEIVER_BOUNDS, PROOF_BYTE_BOUNDS, type ProofBody, type ProofSource } from "./proof-bytes.ts";
 import type { Store } from "./store.ts";
 import { encodeSessionReference, sessionReferenceRequest, SESSION_REFERENCE_BOUNDS, type SessionReferenceSource } from "./session-reference.ts";
+import { readNativeBirth, type NativeBirth, type NativeBirthSource } from "./native-birth.ts";
 import { operational, type OperationalIdentity } from "./operational.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
@@ -39,6 +40,8 @@ export interface Peer {
   source(seq: number, origin?: boolean): Promise<Sourced | null>;
   /** Optional: unsupported native senders never fall back to source(). */
   proofSource?(fact: FactRef, maxBytes: number, milliseconds?: number): Promise<ProofBody | null>;
+  /** Raw checked birth only; never a producer-selected privileged identity. */
+  nativeBirth?(at: ScopeRef, milliseconds: number, maxBytes?: number): Promise<NativeBirth | null>;
   /** Optional bounded native directory witness; never fall back to summary. */
   sessionReference?(request: string): Promise<string | null>;
   declared(digest: Digest): Promise<string | null>;
@@ -227,7 +230,7 @@ export function observedAt(store: Store, pinned: Pinned | null, asked: unknown):
  * namespace binding. A call that fails is no answer: the entry cannot be
  * read now, or the attempt is unanswered.
  */
-export function namespace(binding: Binding): { resolver: Resolver; proofs: ProofSource; transport: Transport; definitions: Definitions; texts: SentTexts } {
+export function namespace(binding: Binding): { resolver: Resolver; proofs: ProofSource; births: NativeBirthSource; transport: Transport; definitions: Definitions; texts: SentTexts } {
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
     proofs: {
@@ -239,6 +242,15 @@ export function namespace(binding: Binding): { resolver: Resolver; proofs: Proof
           if (typeof source.proofSource !== "function") return null;
           return milliseconds === undefined ? await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body))
             : await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body), milliseconds);
+        } catch { return null; }
+      },
+    },
+    births: {
+      async read(at, milliseconds, maxBytes = PROOF_BYTE_BOUNDS.body) {
+        if (!isScopeRef(at) || !Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > PROOF_BYTE_BOUNDS.body) return null;
+        try {
+          const source = peer(at.scope);
+          return typeof source.nativeBirth === "function" ? readNativeBirth(await source.nativeBirth(at, milliseconds, maxBytes), at, maxBytes) : null;
         } catch { return null; }
       },
     },

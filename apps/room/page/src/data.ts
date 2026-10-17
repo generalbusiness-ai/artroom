@@ -37,7 +37,7 @@ import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
 import { LATE, b64url, byteOrder, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, collectItemQuery, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+  ScopeHandle, activeDirectory, collectItemQuery, partitionIndexes, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/dap-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/dap-platform";
@@ -312,13 +312,20 @@ export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; change
   await fresh(room);
   const index = room.directoryIndex;
   if (!index || index.scope.scope !== room.directory) throw new Unreadable("The room has no bound directory index reference. Reopen the room.");
-  const declared = platform(index.definition)?.data.items["lane"];
-  if (!declared) throw new Unreadable("The directory index definition is unsupported.");
-  const handle = handleOf(room, room.directory);
-  const coverage = await collectItemQuery(handle, { v: 1, scope: index.scope, type: "lane", states: Object.keys(declared.states).sort(byteOrder), ids: null, limit: 100, cursor: null });
-  if (!coverage.complete) throw new Unreadable(`Directory index incomplete (${coverage.reason ?? "unavailable"}); rows read: ${coverage.items.length}.`);
+  let items: readonly Item[];
+  if (index.definition === "platform:directory@10") {
+    const coverage = await partitionIndexes({ summary: scope => handleOf(room, scope).summary(), query: (scope, query) => handleOf(room, scope).queryItems(query) }, index.scope, room.membership);
+    if (!coverage.complete) throw new Unreadable(`Directory indexes incomplete (${coverage.reason ?? "unavailable"}); partitions read: ${coverage.indexes.length}.`);
+    items = coverage.indexes.flatMap(part => [...part.lanes]);
+  } else {
+    const declared = platform(index.definition)?.data.items["lane"];
+    if (!declared) throw new Unreadable("The directory index definition is unsupported.");
+    const coverage = await collectItemQuery(handleOf(room, room.directory), { v: 1, scope: index.scope, type: "lane", states: Object.keys(declared.states).sort(byteOrder), ids: null, limit: 100, cursor: null });
+    if (!coverage.complete) throw new Unreadable(`Directory index incomplete (${coverage.reason ?? "unavailable"}); rows read: ${coverage.items.length}.`);
+    items = coverage.items;
+  }
   const rows: LaneRow[] = [];
-  for (const item of coverage.items) {
+  for (const item of items) {
     const scope = scopeOf(item.refs["scope"]);
     if (!scope) continue;
     rows.push({ scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
@@ -885,7 +892,15 @@ export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offere
   await fresh(room);
   const me = await refreshStanding(room);
   const handle = handleOf(room, scope);
-  const { shape } = await shapeOf(room, handle, (await summaryOf(handle)).summary);
+  const summary = (await summaryOf(handle)).summary;
+  let { shape } = await shapeOf(room, handle, summary);
+  if (scope === room.directory && summary.definition === "platform:directory@10") {
+    const selected = await activeDirectory({ summary: scope => handleOf(room, scope).summary(), query: (scope, query) => handleOf(room, scope).queryItems(query) }, summary.scope, room.membership);
+    if (selected.ref) {
+      const part = platform("platform:directory-partition@1")!.data;
+      shape = { ...shape, acts: { ...shape.acts, ...Object.fromEntries(Object.entries(part.acts).filter(([kind]) => OPENING_ACTS.has(kind))) } } as DefinitionShape;
+    } else if (!["no-active-partition", "partition-pending", "partition-sealed"].includes(selected.reason ?? "")) throw new Unreadable(`Cannot read the opening partition: ${selected.reason}.`);
+  }
   const { acts, hidden } = heldActs(shape, me);
   const definitions = acts.some(([, a]) => Object.values(a.fields).some((f) => domainOf(f) === DEFINITION_DOMAIN)) ? await activeDefinitions(room) : [];
   return {
@@ -905,18 +920,21 @@ export function fieldValue(room: Room, type: string, typed: string): FieldValue 
 /** The scope's answer and independent before/after observations. A category alone proves no absence of timed entries. */
 export interface Acted {
   service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
+  /** UI association only; scope and the receipt still name the actual target. */
+  requestedScope?: ScopeId;
   answer: Answer; before: Head; after: Head | null; observation: string | null;
 }
 export type IssueCreation = { state: "confirmed"; child: ScopeRef } | { state: "pending" } | { state: "unavailable" };
 /** Read only the original accepted creation; missing proof is never a pending outcome. */
 export async function issueCreation(room: Room, result: Acted, current: () => boolean = () => true): Promise<IssueCreation> {
   const unavailable: IssueCreation = { state: "unavailable" };
-  if (!current() || result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
-    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return unavailable;
+  if (!current() || result.kind !== "open-issue" || (result.requestedScope ?? result.scope) !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
+    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.requestedScope ?? result.scope])) return unavailable;
   try {
     await fresh(room);
     if (!current()) return unavailable;
-    const receipt = result.answer.receipt, handle = handleOf(room, room.directory);
+    const receipt = result.answer.receipt, handle = handleOf(room, result.scope);
+    if (receipt.fact.at.scope !== result.scope) return unavailable;
     const source = await handle.entry(receipt.fact.seq);
     if (!current()) return unavailable;
     if (!source.ok || !source.complete || source.next !== undefined) return unavailable;
@@ -931,6 +949,11 @@ export async function issueCreation(room: Room, result: Acted, current: () => bo
     const { summary, at } = await summaryOf(handle);
     if (!current()) return unavailable;
     if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return unavailable;
+    if (result.scope !== room.directory) {
+      const control = summary.items.find(item => item.id === 0 && item.type === "repository" && item.state === "open");
+      if (room.directoryIndex?.definition !== "platform:directory@10" || summary.definition !== "platform:directory-partition@1"
+        || !control || canonicalize(control.refs["root"]) !== canonicalize(room.directoryIndex.scope) || canonicalize(control.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    }
     const row = summary.items.find(item => item.id === receipt.fact.seq && item.type === "lane" && item.values["kind"] === "issue");
     const child = row?.refs["scope"];
     if (!row || row.state !== "listed") return unavailable;
@@ -974,6 +997,17 @@ export function actAssociation(room: Pick<Room, "session" | "directory" | "membe
   return JSON.stringify([room.session.service.replace(/\/+$/, ""), room.directory, room.membership, keyIdOfSecret(room.session.secret), scope]);
 }
 
+const OPENING_ACTS = new Set(["open-issue", "open-pr", "open-task", "establish-application"]);
+/** Resolve only before preparing a new act. An accepted or unknown request
+ * keeps its actual partition; follow-up never reselects a successor. */
+export async function openingScope(room: Room): Promise<ScopeId> {
+  const root = (await summaryOf(handleOf(room, room.directory))).summary;
+  if (root.definition !== "platform:directory@10") return room.directory;
+  const selected = await activeDirectory({ summary: scope => handleOf(room, scope).summary(), query: (scope, query) => handleOf(room, scope).queryItems(query) }, root.scope, room.membership);
+  if (!selected.ref) throw new Unreadable(`Cannot open work: ${selected.reason}. No mutation was submitted.`);
+  return selected.ref.scope;
+}
+
 /**
  * Signs and sends one act. The expected revision of each item the act
  * names is read from the summary, and the scope checks each again. A lane's
@@ -982,6 +1016,8 @@ export function actAssociation(room: Pick<Room, "session" | "directory" | "membe
  */
 export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void, submitting?: () => void): Promise<Acted> {
   await fresh(room);
+  const requestedScope = scope;
+  if (scope === room.directory && OPENING_ACTS.has(kind)) scope = await openingScope(room);
   const handle = handleOf(room, scope);
   const { summary, at: before } = await summaryOf(handle);
   const { shape, declared } = await shapeOf(room, handle, summary);
@@ -1013,7 +1049,7 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     submitting?.();
     answer = await handle.submit(signed, [], values.length > 0 ? { ...shaped.beside, values } : shaped.beside);
   }
-  const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
+  const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, ...(scope !== requestedScope ? { requestedScope } : {}), kind, on, answer, before, after: null, observation: "Observation refresh pending." };
   received?.(result); // Preserve the real answer before any awaited refresh.
   try { result.after = (await summaryOf(handle)).at; result.observation = null; }
   catch (error) { result.observation = error instanceof Unreadable ? error.message : "The observation refresh failed."; }

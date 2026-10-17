@@ -130,7 +130,7 @@ describe("identifiers", () => {
       [isMemberId, ["@a", "@Alice Smith"], ["@", "a", "@\ud800", null]],
       [isOperationId, ["0:0", "17:2"], ["op_1", "17", "17:02", "1:2:3", "-1:0", null]],
       [isDutyId, ["0.0", "17.2"], ["17", "17.02", "1.2.3", "-1.0", 17.2]],
-      [isPlatformDefinition, ["platform:directory@1"], ["platform:lane@1", "platform:directory@01", "directory@1"]],
+      [isPlatformDefinition, ["platform:directory@1", "platform:directory-partition@1"], ["platform:lane@1", "platform:directory@01", "platform:directory-partition@01", "platform:directory-partitions@1", "directory@1"]],
       [isScopeKind, ["lane", "directory"], ["room", "", null]],
       // Section 9.2, revision 19: a retained value states its domain, and no other kind states one.
       [isRetainedInput, [{ kind: "value", domain: "artroom-check-configuration-1", digest: KEPT, bytes: "{}" }, { kind: "snapshot", digest: KEPT, bytes: "[]" }, { kind: "entry", digest: KEPT, bytes: "{}", under: "issue" }],

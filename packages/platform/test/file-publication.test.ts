@@ -65,7 +65,7 @@ for (const format of ["sha1", "sha256"] as const) test(`file ${format} commit an
 });
 
 
-test.each(["platform:destination@4", "platform:destination@5"] as const)("%s: only an unsent stale file holding the shared slot yields a cause-bound supersession; unknown stays held", owner => {
+test.each(["platform:destination@4", "platform:destination@5", "platform:destination@6"] as const)("%s: only an unsent stale file holding the shared slot yields a cause-bound supersession; unknown stays held", owner => {
   const state = new MemoryState(), early = file(1, 7, 0, "reserved"), later = file(4, 8, 0, "published");
   state.putItem({ ...file(0, 0), type: "branch", state: "ready", refs: {}, values: { slot: early.id, judging: null, head: "a".repeat(40) } });
   state.putItem(early); state.putItem(later);
@@ -75,7 +75,7 @@ test.each(["platform:destination@4", "platform:destination@5"] as const)("%s: on
   const own: Own = seq => seq === 2 ? { entry, hash: textDigest("PUBLIC TEST scripted opening") } : null;
   const before = state.snapshot();
   expect(fileSupersededOutcome(state, operation, own)).toEqual({ basis: "own-answer", body: { send: "not-sent", seen: "a".repeat(40), supersededBy: filePublicationCause(later) } });
-  expect(fileSupersededOutcome(state, { ...operation, owner: "platform:destination@6" }, own)).toBeNull();
+  expect(fileSupersededOutcome(state, { ...operation, owner: "platform:destination@7" }, own)).toBeNull();
   expect(state.snapshot()).toEqual(before);
   const unknown: Operation = { ...operation, attempts: [{ ...operation.attempts[0]!, outcomes: [{ seq: 3, result: "unknown", evidence: textDigest("PUBLIC TEST unknown"), selected: null }] }] };
   expect(fileSupersededOutcome(state, unknown, own)).toBeNull();

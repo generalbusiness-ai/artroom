@@ -37,6 +37,7 @@ interface Surface {
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
+  entry(reader: unknown, seq: number): Promise<Read<Sealed>>;
   outbox(reader: unknown): Promise<Read<readonly Duty[]>>;
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   deliver(envelope: Delivered): Promise<Delivery>;

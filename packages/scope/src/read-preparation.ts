@@ -8,7 +8,7 @@ import type { Pinned, Supplied } from "./core.ts";
 import { PREPARATION_BOUNDS as B, PreparationBudget } from "./preparation-budget.ts";
 import { preparationScope } from "./preparation-scope.ts";
 import { preparationView } from "./preparation-view.ts";
-import { ProofBytes, proofEntry } from "./proof-bytes.ts";
+import { ProofBytes, proofEntry, type ProofBody } from "./proof-bytes.ts";
 import type { Sql } from "./sqlite.ts";
 
 /** Native pure support callbacks, specifically Scope.validate/platform.
@@ -24,13 +24,14 @@ type Genesis = Extract<Input, { type: "genesis" }>;
 export class PreparedRead {
   readonly scope: ScopeState;
   readonly genesis: Genesis;
+  readonly birth: ProofBody;
   readonly budget: PreparationBudget;
   readonly view: ReturnType<typeof preparationView>;
   readonly #sql: Pick<Sql, "exec">;
   readonly #support: () => Pinned | null;
   #pinned: Pinned;
-  constructor(sql: Pick<Sql, "exec">, scope: ScopeState, genesis: Genesis, pinned: Pinned, budget: PreparationBudget, support: () => Pinned | null) {
-    this.#sql = sql; this.scope = scope; this.genesis = genesis; this.#pinned = pinned; this.budget = budget; this.#support = support;
+  constructor(sql: Pick<Sql, "exec">, scope: ScopeState, genesis: Genesis, birth: ProofBody, pinned: Pinned, budget: PreparationBudget, support: () => Pinned | null) {
+    this.#sql = sql; this.scope = scope; this.genesis = genesis; this.birth = birth; this.#pinned = pinned; this.budget = budget; this.#support = support;
     this.view = preparationView(sql, scope, budget);
   }
   get pinned(): Pinned { return this.#pinned; }
@@ -75,19 +76,24 @@ export class ReadPreparation {
     return definition && definition.digest === named && definitionDigest(definition.declared) === named && canonicalize(definition.declared) === raw
       ? { named, definition, platform: null } : null;
   }
-  capture(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null {
+  capture(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null { return this.#capture(budget, true); }
+  /** Raw immutable metadata also serves a refused child's result. This is
+   * no query/authority preparation; those still require applied genesis. */
+  birth(budget: PreparationBudget = new PreparationBudget(), maxBytes: number = B.genesis): PreparedRead | null { return this.#capture(budget, false, maxBytes); }
+  #capture(budget: PreparationBudget, applied: boolean, maxBytes: number = B.genesis): PreparedRead | null {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > B.genesis) return null;
     try {
       const snapshot = preparationScope(this.#sql, budget);
       if (snapshot.kind !== "scope") { budget.invalidate(); return null; }
       const policy = this.#policy(budget);
       // One genesis read per operation. Reserving the hard maximum before
       // metadata also prevents recapture from resetting its byte allowance.
-      budget.spend({ genesis: B.genesis });
+      budget.spend({ genesis: maxBytes });
       const reader = new ProofBytes(this.#sql, () => budget.spend({ calls: 1, candidates: 1, metadata: 4096 }));
-      const stored = reader.own(0, B.genesis), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
+      const stored = applied ? reader.own(0, maxBytes) : reader.birth(maxBytes), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
       if (stored.kind !== "body" || !same(stored.value.fact, expected)) return budget.stop();
-      const entry = proofEntry(stored.value, expected, B.genesis);
-      if (!entry || entry.input.type !== "genesis" || entry.input.decision !== "applied") return budget.stop();
+      const entry = proofEntry(stored.value, expected, maxBytes);
+      if (!entry || entry.input.type !== "genesis" || applied && entry.input.decision !== "applied") return budget.stop();
       const named = entry.input.seed.definition;
       if (named.length > 128) return budget.stop();
       budget.spend({ metadata: 2048 }); // full incarnation/genesis/name/policy key
@@ -108,7 +114,7 @@ export class ReadPreparation {
       const pinned = this.#pin(named, raw, budget);
       if (!pinned || !budget.available) return budget.stop();
       if (raw !== null) this.#content = { id, bytes: raw };
-      return new PreparedRead(this.#sql, snapshot.scope, entry.input, pinned, budget, () => {
+      return new PreparedRead(this.#sql, snapshot.scope, entry.input, stored.value, pinned, budget, () => {
         if (this.#policy(budget) !== policy) return null;
         return this.#pin(named, raw, budget);
       });

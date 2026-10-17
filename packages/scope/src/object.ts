@@ -50,6 +50,8 @@ import { EXACT_PROOF_RECEIVER_BOUNDS, ProofBytes } from "./proof-bytes.ts";
 import { PreparationFlights } from "./preparation-flight.ts";
 import { ItemQueries } from "./item-queries.ts";
 import { ReadPreparation } from "./read-preparation.ts";
+import { nativeBirth } from "./native-birth.ts";
+import { PreparationBudget } from "./preparation-budget.ts";
 import { SessionReferences, type SessionReferenceSource } from "./session-reference.ts";
 import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
 import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
@@ -436,6 +438,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       if (!active() || ++calls > EXACT_PROOF_RECEIVER_BOUNDS.sqlCalls) throw new Error("proof-unavailable");
     });
     const result = bytes.exact(fact, maxBytes);
+    return active() ? result : null;
+  }
+  /** Closed raw birth view, without activation, source identity or authority. */
+  nativeBirth(at: unknown, milliseconds: number, maxBytes?: number) {
+    const began = this.#queryFlights.clock.now(), ends = began + milliseconds;
+    if (!Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isFinite(began) || !Number.isFinite(ends)) return null;
+    const active = () => { const now = this.#queryFlights.clock.now(); return now >= began && now < ends; };
+    const result = nativeBirth(this.#readPreparation, at, new PreparationBudget(undefined, active), maxBytes);
     return active() ? result : null;
   }
   /** Authenticated small directory witness. No HTTP route or activation turn. */

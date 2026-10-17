@@ -16,10 +16,16 @@ import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, directory5, directory8, di
 export { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, applicationPublicationValues, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
+/** Explicit partition cohort. Exports and catalog support do not move default
+ * pins or select a receiver's identity policy. Lineage admission is separate. */
+import { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
+export { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
+import { PARTITION_IDENTITY_POLICY } from "./partition-provenance.ts";
+export { PARTITION_IDENTITY_POLICY, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionSourceName, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionNativeCreationPolicy, partitionPublicationOrigin, partitionProducerName, type PartitionCreationSelection, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverLineage, type PartitionReceiverPolicy } from "./partition-provenance.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";
-import { destination, destination2, destination3, destination4, destination5, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRules4, destinationRules5, destinationRulesScope } from "./destination.ts";
+import { destination, destination2, destination3, destination4, destination5, destination6, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRules4, destinationRules5, destinationRules6, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
 import { DEMO_REGISTER, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, demoRegister, demoRegisterRules, webDemoRegister } from "./demo-register.ts";
@@ -30,8 +36,8 @@ import type { RecordedRef, Rules, StateView } from "@generalbusiness/dap-derive"
 import { RULES } from "./rules.ts";
 import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScope4, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
-export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2, destination4, destination5, destinationRules4, destinationRules5 };
-export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
+export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2, destination4, destination5, destination6, destinationRules4, destinationRules5, destinationRules6 };
+export { isOf, isStandingDestination, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
 export { ACTIONS_MOST, FIRST_ACTIONS, FIRST_ACTIONS_OF, MEMBERSHIP, MEMBERSHIP_1, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, ROLE_TABLE_OF, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, SIBLINGS_OF, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
@@ -67,6 +73,7 @@ export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
   readonly sourceName?: typeof sourceName;
+  readonly receiverIdentity?: typeof PARTITION_IDENTITY_POLICY;
   /** New destination admission/replay policy; old platform versions retain their original identities. */
   readonly applicationPublicationOrigin?: typeof applicationPublicationOrigin;
   /**
@@ -127,6 +134,10 @@ export interface Platform {
  * cannot run.
  */
 const VERSION_DATA: Readonly<Record<string, Platform>> = {
+  [PARTITION_COHORT.register]: { data: register, rules: registerRules },
+  [PARTITION_COHORT.directory]: { data: directory10, rules: directoryRules10, membership: directoryMembership, rulesScope: directoryRulesScope },
+  [PARTITION_COHORT.partition]: { data: directoryPartition1, rules: directoryPartitionRules1, membership: directoryMembership, rulesScope: directoryRulesScope },
+  [PARTITION_COHORT.destination]: { data: destination6, rules: destinationRules6, membership: destinationMembership, rulesScope: destinationRulesScope },
   [INVITATION_KEY_COHORT.register]: { data: register, rules: registerRules },
   [INVITATION_KEY_COHORT.directory]: { data: directory9, rules: directoryRules9, membership: directoryMembership, rulesScope: directoryRulesScope },
   [INVITATION_KEY_COHORT.membership]: { data: membership6, rules: membershipRules6, observed: (state, asked) => standingOf(state, asked, INVITATION_KEY_COHORT.membership) },
@@ -162,7 +173,7 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
 };
 
 /** Stable native code objects with the same source policy for runtime and replay. */
-export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName }]));
+export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName, receiverIdentity: PARTITION_IDENTITY_POLICY }]));
 
 /** Existing default founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {

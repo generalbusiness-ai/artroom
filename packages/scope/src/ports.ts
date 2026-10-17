@@ -9,6 +9,7 @@
  * are the platform package's, which is code of this runtime.
  */
 
+import type { NativeBirthSource } from "./native-birth.ts";
 import type { ProofSource } from "./proof-bytes.ts";
 import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/dap-contract";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Fetched, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/dap-derive";
@@ -247,6 +248,8 @@ export interface Readers {
 export interface Ports {
   /** Dedicated trusted-native causal proof reads, admitted before materialization. No generic resolver fallback. */
   proofs?: ProofSource;
+  /** Bounded raw native birth metadata; no identity alias or authority. */
+  births?: NativeBirthSource;
   clock: Clock; random: Random; authority: Authority; resolver: Resolver; rules: Rules; alarm: Alarm; definitions: Definitions; texts: SentTexts; readers: Readers;
   /** Null: this scope has no transport. Its sends stay in the outbox and nothing dispatches them. */
   transport: Transport | null;

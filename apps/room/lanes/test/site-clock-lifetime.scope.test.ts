@@ -24,7 +24,9 @@ test("a released Site continuation cannot advance the shared clock past a new na
     expect(await C.stub.deliver(g.rules.relate(C.at, "rules", "published", { approvals: 0, checks: [], ownerMayReview: true }))).toMatchObject({ answer: "recorded" });
     const signed = await C.signed(rita, "offer", { fields: { offeree: una.member, terms: "Integrate." } });
     const sampled = timeMs(clock.now)!;
-    expect(timeMs(signed.signed.intent.notAfter)! - sampled).toBe(300_000);
+    // Intents use whole-second deadlines. Prior native scenarios may leave
+    // a legitimate subsecond clock floor; release must not rewind it.
+    expect(timeMs(signed.signed.intent.notAfter)).toBe(Math.floor(sampled / 1000) * 1000 + 300_000);
     gate.release(); await continuing;
     const answer = await C.submit(signed);
     expect(answer.answer).toBe("accepted"); // Old unguarded +1800 yields expired.

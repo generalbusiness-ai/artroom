@@ -17,14 +17,14 @@
 
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { expect } from "vitest";
+import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Answer, Bounds, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, signInvitationProof, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
-import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
+import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, PARTITION_COHORT, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Transport as NativeTransport } from "../../../../../packages/scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
@@ -68,14 +68,14 @@ export class Room {
 
   constructor(
     readonly R: Platform, readonly D: Platform, readonly M: Platform, readonly rules: Platform, readonly G: Platform,
-    readonly firstHead: string, readonly members: Record<string, number>,
+    readonly firstHead: string, readonly members: Record<string, number>, readonly root: Platform = D,
   ) {}
 
   /** A member of the room, as a lane's slot holds one: the real membership scope's reference and the handle. */
   async member(handle: string): Promise<MemberRef> { return { membership: await this.M.at(), member: handle as MemberRef["member"] }; }
 
   /** Every real scope of the room and every lane it made, for the dispatchers. */
-  get scopes(): Platform[] { return [this.R, this.D, this.M, this.rules, this.G, ...[...this.#lanes.keys()].map((name) => new Platform(name as never))]; }
+  get scopes(): Platform[] { return [this.R, ...(this.root === this.D ? [] : [this.root]), this.D, this.M, this.rules, this.G, ...[...this.#lanes.keys()].map((name) => new Platform(name as never))]; }
   /** Let every dispatcher of the room carry what is due now. */
   settle(): Promise<void> { return settle(...this.scopes); }
 
@@ -248,20 +248,25 @@ export async function publicationOf(r: Room, C: { name: string }, merge: number)
  */
 /** Fresh native enrollments; defaults retain all three members in their original order. */
 type RoomMember = "@una" | "@vic" | "@paul";
-export interface RoomSetup { roster?: readonly RoomMember[] }
+export interface RoomSetup { roster?: readonly RoomMember[]; partitioned?: boolean; openPartition?: boolean; rootBounds?: Bounds }
 export async function room(setup: RoomSetup = {}): Promise<Room> {
   net.hold = net.deaf = null;
+  const registerPin = setup.partitioned ? PARTITION_COHORT.register : REGISTER;
+  const directoryPin = setup.partitioned ? PARTITION_COHORT.directory : DIRECTORY;
   const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
-  const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
+  const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: registerPin, creator: null, cause: intentDigest(install), ordinal: 0 }));
   // STAND-IN: the Git host of this register.
   const host = outsideOf(R.name);
   wired.set(R.name, () => ({ outside: host }));
-  const installed = await R.stub.found(signIntent(install, paul.secret), REGISTER);
+  const installed = await R.stub.found(signIntent(install, paul.secret), registerPin);
   if (installed.answer !== "accepted") throw new Error(`no register: ${JSON.stringify(installed)}`);
   const register = await R.at();
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-  const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+  const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
   const D = new Platform(scopeIdOf(seed));
+  // Explicit native capacity-fixture bound, before root birth. Other scopes
+  // retain their own defaults; no deployed configuration is changed.
+  if (setup.rootBounds) { net.sized.set(D.name, setup.rootBounds); onTestFinished(() => { net.sized.delete(D.name); }); }
   host.answer("1:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
   const claimed = await R.stub.submit(found, []);
   if (claimed.answer !== "accepted") throw new Error(`no claim: ${JSON.stringify(claimed)}`);
@@ -286,10 +291,22 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   for (const [who, handle] of [[una, "@una"], [vic, "@vic"], [paul, "@paul"]] as const) {
     if (!roster.includes(handle)) continue;
     const secret = `the secret of the invitation of ${handle}, of 32 bytes or more`;
-    const invitation = await M.did(rita, "invite-member", { fields: { handle, role: "member", inviteHash: textDigest(secret), inviteEnds: soon(3600) } });
-    await M.did(who, "join", { fields: { invitation, secret } });
+    // The explicit M6 cohort records only the invitation public key. The
+    // synthetic invitation seed stays in this fixture and signs redemption.
+    const invitationSeed = new Uint8Array(32).fill(32 + Object.keys(made.members).length);
+    const invitation = await M.did(rita, "invite-member", { fields: { handle, role: "member", ...(setup.partitioned ? { inviteKey: keyIdOfSecret(invitationSeed) } : { inviteHash: textDigest(secret) }), inviteEnds: soon(3600) } });
+    await M.did(who, "join", { fields: { invitation, ...(setup.partitioned ? { proof: signInvitationProof(invitationSeed, await M.at(), invitation, who.key) } : { secret }) } });
     made.members[handle] = invitation;
   }
   await made.settle();
+  if (setup.partitioned && setup.openPartition !== false) {
+    const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
+    const send = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === PARTITION_COHORT.partition);
+    if (!send) return expect.fail("actual root has no partition creation");
+    const P = new Platform(scopeIdOf(send.to as Seed));
+    await settle(...made.scopes, P);
+    expect((await P.summary()).value).toMatchObject({ status: "active", definition: PARTITION_COHORT.partition });
+    return new Room(R, P, M, rules, G, firstHead, made.members, D);
+  }
   return made;
 }

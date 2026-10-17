@@ -16,10 +16,10 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
   if (!summary.ok) return unavailable(summary.reason);
   if (!summary.complete || summary.next !== undefined) return unavailable("incomplete summary");
   if (!sameHead(summary.at) || canonicalize(summary.value.scope) !== canonicalize(target.at)) return unavailable("the current head or incarnation differs from the replay target");
-  // Versions 3 and 4 share staged change-reservation cleanup status.
+  // Versions 3 through 6 share staged change-reservation cleanup status.
   // Legacy pins define no staged-reservation cleanup status. Preserve their
   // historical output without adding any absence or cleanup-complete claim.
-  if (!["platform:destination@3", "platform:destination@4"].includes(summary.value.definition)) return { lines: [], finding: null };
+  if (!["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(summary.value.definition)) return { lines: [], finding: null };
   if (!Number.isSafeInteger(pages) || pages < 1) return unavailable("the cleanup page bound must be a positive integer");
   // The summary contains live items; the items route enumerates retained
   // final items. An owed cleanup keeps custody and is deliberately live.

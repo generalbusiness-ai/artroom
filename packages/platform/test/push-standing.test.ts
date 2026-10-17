@@ -1,9 +1,9 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Digest, Entry, FactRef, FieldValue, Observation, OperationId } from "@generalbusiness/dap-contract";
 import { derivable, grantFrom, runnable } from "@generalbusiness/dap-derive";
 import { keys, T0, t, type Actor } from "@generalbusiness/dap-derive/testing";
 import { digestBytes, entryHash, factRefOf, keyIdOfSecret, newIncarnation, utf8 } from "@generalbusiness/artroom-bytes";
-import { DESTINATION_5, destination5, destinationReceipt, destinationRules5, readFor, revokedToken } from "../src/destination.ts";
+import { DESTINATION_5, destination5, destination6, destinationReceipt, destinationRules5, destinationRules6, readFor, revokedToken } from "../src/destination.ts";
 import { NEWEST, platform } from "../src/index.ts";
 import { handMade, keyObserved, MEMBERSHIP, retained, HEAD } from "./support-destination.ts";
 import { publicationJourney } from "./support-publication-journey.ts";
@@ -11,7 +11,8 @@ import { publicationJourney } from "./support-publication-journey.ts";
 // Actual validator, judges and fold, in memory. The creator and source
 // lane, membership/rules answers and Git replies remain scripted stand-ins.
 // No SQLite runtime, restart, driver, provider or token issuance is claimed.
-const journey = publicationJourney(destination5, DESTINATION_5, destinationRules5);
+describe.each([[DESTINATION_5, destination5, destinationRules5], ["platform:destination@6", destination6, destinationRules6]] as const)("standing policy under %s", (named, data, rules) => {
+const journey = publicationJourney(data, named, rules);
 const token = { token: "d1-scripted-token", ends: t(600) };
 const observed = (over: Partial<Observation> = {}) => [retained(keyObserved(keys.rita, T0, over), 1)];
 const observe = (over: Partial<Observation> = {}) => ({ observed: observed(over), observing: { membership: MEMBERSHIP } });
@@ -21,7 +22,7 @@ const openingId = (ledger: ReturnType<typeof journey.make>, kind: string): Opera
 test("D1 validates and runs under an explicit pin while existing default founding stays @3", () => {
   expect(derivable(journey.definition, null)).toBe(true);
   expect(runnable(journey.definition, journey.platform.rules)).toBe(true);
-  expect(platform(DESTINATION_5)?.data).toBe(destination5);
+  expect(platform(named)?.data).toBe(data);
   expect(NEWEST["platform:destination"]).toBe("platform:destination@3");
   expect(Object.keys(destination5.items["publication"]!.values)).toHaveLength(12);
 });
@@ -227,4 +228,6 @@ test.each([8, 9])("%i accepted checker keys plus the merger produce a complete n
     expect(ledger.state.operation(mint)?.attempts[0]?.outcomes).toEqual([]);
     expect(ledger.item(reserved.publication.id)).toMatchObject({ state: "reserved", values: { aborting: false, token: null } });
   }
+});
+
 });

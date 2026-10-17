@@ -1,6 +1,6 @@
 /** Pure checker snapshot boundary. The retained @3 record supplies signed
  * source/object bytes; changing its outcome owner below is a synthetic
- * cohort-selection control, not a recorded native @5 run or a Git checkout. */
+ * cohort-selection control, not a recorded native @5/@6 run or a Git checkout. */
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import type { Digest, ReservationSnapshot } from "@generalbusiness/dap-contract";
@@ -14,8 +14,8 @@ const snapshot = (): ReservationSnapshot => ({ ...structuredClone(saved.snapshot
   return { ...object, data };
 }) });
 
-test("the checker accepts the explicit D1 reservation owner while unknown and previously unsupported cohorts remain refused", () => {
-  for (const version of [3, 5, 4, 6]) {
+test("the checker accepts explicit D1 and partition reservation owners while unknown and previously unsupported cohorts remain refused", () => {
+  for (const version of [3, 5, 6, 4, 7]) {
     const reservation = snapshot(), input = reservation.reservation.entry.input;
     if (input.type !== "outcome") throw Error("Recorded reservation is an outcome");
     input.owner = `platform:destination@${version}`;
@@ -26,7 +26,7 @@ test("the checker accepts the explicit D1 reservation owner while unknown and pr
     const notice: Notice = { lane: reservation.job.entry.at, job: factRefOf(reservation.job.entry), name: name.value, tree: reservation.tree };
     const read: OriginRead = { entry: reservation.job, manifest: reservation.manifest, pinned: saved.configurationDigest, activated: { name: "change", state: "active" }, reservation };
     const result = originOf(notice, read);
-    if (version === 3 || version === 5) expect(result).toMatchObject({ job: { commit: reservation.commit, ref: reservation.ref, tree: reservation.tree } });
+    if (version === 3 || version === 5 || version === 6) expect(result).toMatchObject({ job: { commit: reservation.commit, ref: reservation.ref, tree: reservation.tree } });
     else expect(result).toEqual({ not: "no-manifest" });
   }
 });

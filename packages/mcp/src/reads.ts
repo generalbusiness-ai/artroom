@@ -7,7 +7,7 @@
  * anywhere: `Session` keeps it out of its JSON and text.
  */
 
-import type { Read, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
+import type { ItemQueryRead, Read, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { timeOf } from "@generalbusiness/artroom-bytes";
 import { TransportError, httpTransport, requestSession, signedReads, signerSessionRequest, type Fetch, type Session, type Signer, type Transport } from "@generalbusiness/artroom-client";
 
@@ -66,7 +66,9 @@ export class Reads {
    * One read of one scope: with the session of `membership` first, and by a
    * signed read where there is no session or the session was refused.
    */
-  async read<T>(membership: ScopeRef | null, run: (transport: Transport, reader: string | null) => Promise<Read<T>>): Promise<Read<T>> {
+  async read<T>(membership: ScopeRef | null, run: (transport: Transport, reader: string | null) => Promise<Read<T>>): Promise<Read<T>>;
+  async read(membership: ScopeRef | null, run: (transport: Transport, reader: string | null) => Promise<ItemQueryRead>): Promise<ItemQueryRead>;
+  async read<R extends { ok: true } | { ok: false; reason: string }>(membership: ScopeRef | null, run: (transport: Transport, reader: string | null) => Promise<R>): Promise<R> {
     const session = await this.session(membership);
     if (session) {
       const got = await run(this.#plain, session.reader());

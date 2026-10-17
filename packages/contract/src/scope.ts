@@ -38,7 +38,7 @@ export type Base64Url = string;
 export type OperationId = `${number}:${number}`;
 
 /** A definition the platform supplies in code, by name and version (section 6.1). */
-export type PlatformDefinition = `platform:${"register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "task"}@${number}`;
+export type PlatformDefinition = `platform:${"register" | "directory" | "directory-partition" | "membership" | "rules" | "destination" | "inbox" | "task"}@${number}`;
 
 /** What a scope ID is the digest of. It holds no sequence number and no hash of the creating entry (section 2.1). */
 export interface Seed {

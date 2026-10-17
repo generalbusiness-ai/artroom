@@ -2,7 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, test, onTestFinished } from "vitest";
 import type { DeclaredDefinition, Entry, FactRef, Item, Read, ScopeId } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, foundingObjects, platform } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -87,6 +87,9 @@ describe("dap edit on real scopes, through the production wiring of each Git hos
   for (const [label, made] of [["Artifacts", async () => ownHost()], ["GitHub", gitHub]] as const) {
     test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async ({ task }) => {
       net.hold = net.deaf = null;
+      // Keep GitHub's scripted upstream correct with a legitimate subsecond
+      // clock, independently of the order in which other native cases ran.
+      if (label === "GitHub" && timeMs(net.clock.now)! % 1000 === 0) net.clock.now = timeOf(timeMs(net.clock.now)! + 1);
       const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
       onTestFinished(owner.close);
       const wired = new Set<ScopeId>();

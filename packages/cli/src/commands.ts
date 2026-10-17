@@ -32,7 +32,7 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, ShapeError, TransportError, activeDirectory, partitionIndexes, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type Session, type FoundingOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
@@ -184,6 +184,28 @@ async function handleOf(ctx: Context, config: Config, scope: ScopeId, reader?: s
 async function summaryOf(handle: ScopeHandle): Promise<Summary> {
   const read = await handle.summary();
   return read.ok ? read.value : stop(failed(`Cannot read ${handle.scope}: ${read.reason}.`));
+}
+
+const directoryReader = (ctx: Context, config: Config, reader: string | null) => ({
+  summary: async (scope: ScopeId) => (await handleOf(ctx, config, scope, reader)).summary(),
+  query: async (scope: ScopeId, query: import("@generalbusiness/dap-contract").ItemQuery) => (await handleOf(ctx, config, scope, reader)).queryItems(query),
+});
+/** Read the opening target by its exact cohort pin. Recovery stays explicit:
+ * this read signs no open-partition, seal or replacement lane request. */
+async function openingDirectory(ctx: Context, config: Config, reader: string | null): Promise<{ D: ScopeHandle; summary: Summary; target: ScopeRef }> {
+  const repository = config.repository!;
+  let target = repository.directory;
+  let D = await handleOf(ctx, config, repository.directory.scope, reader);
+  let summary = await summaryOf(D);
+  if (summary.definition === "platform:directory@10") {
+    const selected = await activeDirectory(directoryReader(ctx, config, reader), repository.directory, repository.membership);
+    if (!selected.ref) return stop(failed(`Cannot open work: ${selected.reason}. Inspect the directory and its pending partition; no mutation was submitted.`));
+    target = selected.ref;
+    D = await handleOf(ctx, config, selected.ref.scope, reader);
+    summary = await summaryOf(D);
+    if (canonicalize(summary.scope) !== canonicalize(selected.ref) || summary.definition !== "platform:directory-partition@1") return stop(failed("The opening partition changed. No mutation was submitted."));
+  }
+  return { D, summary, target };
 }
 
 /** A scope by the name `claim` or `join` gave it, or by its ID. */
@@ -1484,18 +1506,18 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const change = await activeDefinition(ctx, config, reader, "change");
     if (change.declared.acts["propose-file"]?.on !== "source" && !supportsEdit(change.declared, path, content, bytes)) return failed(`Unsupported edit: the active change definition ${change.digest} does not support this command's ask-rules, one-file manifest and merge inputs and effects. No change was opened.`);
     const destination = await destinationOf(ctx, config);
-    if (["platform:destination@3", "platform:destination@4"].includes(destination.summary.definition) && change.declared.acts["propose-file"]?.on === "source") {
+    if (["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(destination.summary.definition) && change.declared.acts["propose-file"]?.on === "source") {
       const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
       if (typeof base !== "string") return failed("Cannot edit: no-published-head.");
       return proposingFiles(ctx, config, base, [{ path, bytes }], options.title ?? `Edit ${path}`, { edit: true, ...(closes ? { closes } : {}) });
     }
-    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4"].includes(destination.summary.definition)) return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
+    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(destination.summary.definition)) return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
 
     // The change lane, opened by the directory.
-    const D = await handleOf(ctx, config, repository.directory.scope, reader);
-    const shape = (await definitionOf(D, await summaryOf(D))).shape;
+    const { D, summary, target } = await openingDirectory(ctx, config, reader);
+    const shape = (await definitionOf(D, summary)).shape;
     const fields = { definition: change.digest, title: options.title ?? `Edit ${path}`, draft: false };
-    const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
+    const signed = await signedIntent(signer, { to: target, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
     const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;
     const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed(`Entry ${D.scope}:${opened} opens no lane.`));
     const L = await handleOf(ctx, config, lane, reader);
@@ -1510,7 +1532,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     // The one version: the file on the published head. Lane/rules awaits
     // may advance it; the earlier protocol check is not a frozen head.
     const currentDestination = await destinationOf(ctx, config);
-    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4"].includes(currentDestination.summary.definition)) return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
+    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(currentDestination.summary.definition)) return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
     const head = currentDestination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof head !== "string") return failed(`The destination ${repository.destination} has no published head yet.`);
     const file = { base: head, path, digest: digestBytes(bytes), size: bytes.length, content };
@@ -1545,7 +1567,7 @@ export function propose(ctx: Context, branch: string, options: { title?: string 
     if (!ctx.git?.files) return failed("Cannot propose: git-unavailable.");
     const config = await configOf(ctx);
     const destination = await destinationOf(ctx, config);
-    if (!["platform:destination@3", "platform:destination@4"].includes(destination.summary.definition)) return failed("Cannot propose: version-mismatch. This room has no manifest-list destination.");
+    if (!["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(destination.summary.definition)) return failed("Cannot propose: version-mismatch. This room has no manifest-list destination.");
     const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof base !== "string") return failed("Cannot propose: no-published-head.");
     const captured = await ctx.git.files(base, branch);
@@ -1580,10 +1602,10 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
     return failed("Cannot propose: unsupported-workflow. This command's required act inputs do not fit the active definition; no change was opened.");
   }
   const signer = secretSigner(await signerOf(ctx, config));
-  const D = await handleOf(ctx, config, repository.directory.scope, reader);
-  const shape = (await definitionOf(D, await summaryOf(D))).shape;
+  const { D, summary, target } = await openingDirectory(ctx, config, reader);
+  const shape = (await definitionOf(D, summary)).shape;
   const fields = { definition: change.digest, title, draft: false };
-  const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
+  const signed = await signedIntent(signer, { to: target, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
   const opening = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact;
   const opened = opening.seq;
   let knownLane: ScopeId | null = null;
@@ -1761,7 +1783,14 @@ const memberOf = (party: unknown): string | null => (party && typeof party === "
  */
 async function issuesOf(ctx: Context, config: Config, reader: string | null): Promise<Issue[]> {
   const D = await handleOf(ctx, config, config.repository!.directory.scope, reader);
-  const rows = (await summaryOf(D)).items.filter((item) => item.type === "lane" && item.values["kind"] === "issue").sort((a, b) => a.id - b.id);
+  const summary = await summaryOf(D);
+  let rows = summary.items;
+  if (summary.definition === "platform:directory@10") {
+    const coverage = await partitionIndexes(directoryReader(ctx, config, reader), config.repository!.directory, config.repository!.membership);
+    if (!coverage.complete) return stop(failed(`Directory indexes incomplete: ${coverage.reason}. No issue absence is inferred.`));
+    rows = coverage.indexes.flatMap(index => [...index.lanes]);
+  }
+  rows = rows.filter((item) => item.type === "lane" && item.values["kind"] === "issue").sort((a, b) => Number(a.values["number"] ?? a.id) - Number(b.values["number"] ?? b.id));
   const issues: Issue[] = [];
   for (const row of rows) {
     const lane = (row.refs["scope"] as ScopeRef | undefined)?.scope;
@@ -1822,16 +1851,15 @@ export function issueOpen(ctx: Context, options: { title?: string; body?: string
   return run(async () => {
     if (options.title === undefined) return usage("issue open needs --title <text>.");
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
+    if (!config.repository) return usage("No repository is known here. Run: dap create <name>, or dap join <link>.");
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
     const issue = await activeDefinition(ctx, config, reader, "issue");
-    const D = await handleOf(ctx, config, repository.directory.scope, reader);
-    const summary = await summaryOf(D);
+    const { D, summary, target } = await openingDirectory(ctx, config, reader);
     const shape = (await definitionOf(D, summary)).shape;
     // The body is a detached text: the intent holds its digest, and the text travels beside it.
     const fields = { definition: issue.digest, title: options.title, ...(options.body !== undefined ? { body: textDigest(options.body) } : {}), conditions: [options.title] };
-    const signed = await signedIntent(signer, { to: repository.directory, kind: "open-issue", fields, expected: expectedOf(shape.acts["open-issue"]!, summary.items, null, fields) }, signing(ctx));
+    const signed = await signedIntent(signer, { to: target, kind: "open-issue", fields, expected: expectedOf(shape.acts["open-issue"]!, summary.items, null, fields) }, signing(ctx));
     const opened = accepted(await D.submit(signed, [], { values: [issue.bytes], ...(options.body !== undefined ? { texts: [options.body] } : {}) }), D.scope, "Opened").receipt.fact.seq;
     const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed(`Entry ${D.scope}:${opened} opens no lane.`));
     const L = await handleOf(ctx, config, lane, reader);

@@ -12,7 +12,7 @@ export const MEMBERSHIP = "sc_membershipxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 const ref = (scope: string, kind: ScopeRef["kind"]): ScopeRef => ({ scope: scope as ScopeId, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa", kind });
 
 export function heldOf(scope: string, place: Place, pinned: Digest | PlatformDefinition, definition: DefinitionLike, membership: ScopeId | null = MEMBERSHIP): Held {
-  const kind = place === "lane" || place === "root" || place === "application" ? "lane" : place;
+  const kind = place === "partition" ? "directory" : place === "lane" || place === "root" || place === "application" ? "lane" : place;
   return { scope: scope as ScopeId, ref: ref(scope, kind), place, pinned, definition, membership };
 }
 
