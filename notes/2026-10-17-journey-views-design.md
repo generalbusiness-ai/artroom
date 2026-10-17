@@ -418,7 +418,7 @@ it does not claim pixel equality with those differently sized bitmaps.
 | Comparison | Concept and render evidence | Result or deliberate correction |
 | --- | --- | --- |
 | Needs you structure | `concepts/needs-you-desktop.png`; `renders/needs-you-light-1536-viewport.png` | Same header, catch-up band and three open rows with reason, responsibility and settling act. Titles and three action labels are retained. |
-| Work density and terms | `concepts/work-desktop.png`; `renders/work-active-light-1536-viewport.png` | Open sections, three conditions and aligned agent rows retained. Excess row/section spacing was reduced. Entries 221 and 223 correct the generated text. |
+| Work density and terms | `concepts/work-desktop.png`; `renders/work-active-light-1536-viewport.png` | Open sections, three conditions and aligned agent rows retained. Excess row/section spacing was reduced. Entries 221 and 223 correct the generated text. The inapplicable footer offer is removed once both commitments are accepted, preserving current terms. |
 | Decision hierarchy | `concepts/decision-desktop.png`; `renders/decision-requested-light-1536-viewport.png` | Proposal, alternatives, recommendation, requested person, comment and separate controls retained. The long title fits the desktop row. The read-only comment notice is an explicit prototype correction. |
 | Change review | `concepts/change-desktop.png`; `renders/change-review-light-1536-viewport.png` | Pinned commit band and two-column diff/conditions/review layout retained. A flex basis that added sidebar height was removed. Required checks and controller-review rules stay explicit. |
 | Reader and gutters | `concepts/file-diff-desktop.png`; `renders/file-diff-light-1536-viewport.png` | Full-width file surface, signed additions/removals and both line gutters retained. The caption now promises all changed lines of this file, rather than all file lines. File itself says lines 12–16. |
@@ -435,7 +435,9 @@ truncation captions; plain monospaced code with change signs and
 backgrounds rather than generated syntax colours; explicit required-check wording; the read-only comment
 notice; and the independent recovery hash with Full commits. The compact
 phone header reorders the room name into the top row. A version label sits
-beside the title on desktop and below it on phone. No marketing copy or
+beside the title on desktop and below it on phone. Standalone read links
+receive the same minimum target as action controls. The accepted-work
+footer no longer offers an inapplicable historical handoff restart. No marketing copy or
 unrelated product feature was added.
 
 The code-native mockups were faithfully verified against the selected
@@ -444,3 +446,31 @@ remains in the inspected comparisons. This is builder verification;
 checker approval and the planner's read are separate requirements. Host
 theme updates, standard bridge messages, actual service authority, shared
 recovery custody and a real publication result remain implementation work.
+
+
+### Exact-head review repairs
+
+Checker report `ae5ea4f6` requested two corrections at `bef83fa80`.
+Its full review covered all states and found no other issue in that
+coverage. That report is a changes-requested verdict, not an approval.
+
+- **Current terms.** The old footer's Offer work link could take resumed
+  or delivered v2 work back to a v1 setup example. That inapplicable
+  footer action is removed from accepted-work states. Offers appear only
+  where initial work or revised terms actually await an offer. Browser
+  checks enter both resumed and delivered states in both themes and
+  verify that no offer or historical setup link is present. Old v1
+  commitments and separate offeree acceptance remain visible.
+- **Touch targets.** Every link in the mockups is a standalone control.
+  Shared CSS now gives those links at least 44 × 44 CSS pixels, including
+  Change's file reads, its linked decision, recovery's return link and the
+  wordmark. There is no inline-link exception in these examples. Every
+  rendered page measures every visible link, button and summary at both
+  widths and themes; the renderer records the actual target dimensions.
+  This replaces the earlier reader-only target probe's limited coverage.
+
+The reviewed head's render report is retained as
+`verification/reviewed-bef83-render-report.json`. The current render index
+and PNGs describe the successor. Previous passing browser checks did not
+detect these two issues and do not count as proof of their repair.
+Fresh exact-head checker approval and a planner read remain due.

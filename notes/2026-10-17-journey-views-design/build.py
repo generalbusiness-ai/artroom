@@ -156,7 +156,7 @@ def work(theme, state):
         return content + '<div class="actions">' + link("work-active", "Read latest record", theme, True) + '<p class="muted">Each offer names one agent and the current terms. Only the named offeree can accept it.</p></div>'
     if renewing:
         return content + '<div class="actions">' + link("work-resumed", "Read latest record", theme, True) + '<p class="muted">Each new offer is recorded separately. The later snapshot includes the agents’ own acceptances, block release, and cancellation of old commitments.</p></div>'
-    return content + '<div class="actions">' + link("work-ready", "Offer work", theme, True) + '<p class="muted">Each offer names one agent and the current terms.</p></div>'
+    return content + f'<p class="muted foot">These commitments name terms v{version}. A conditions revision needs separate new offers; existing commitments keep their terms.</p>'
 
 
 def decision(theme, state):

@@ -102,7 +102,7 @@
       "state": "active",
       "theme": "light",
       "path": "work-active-light.html",
-      "sha256": "630299f972b330735635cf469151382ebab9fecee29e1e876551b327bcddf326"
+      "sha256": "016a63339d13ecc9f95c89c5cfda526a13497d0bbebefc858df69cdaa15e2e00"
     },
     {
       "key": "work-terms-changed",
@@ -142,7 +142,7 @@
       "state": "resumed",
       "theme": "light",
       "path": "work-resumed-light.html",
-      "sha256": "95352cae0bcca988cf7cc0cfac84910c0386c3ec0f86a078a6b2e62627288070"
+      "sha256": "e16a119a778053cd48305a442cffe38f89fbbde02328a0d6367e580b3f5a9d48"
     },
     {
       "key": "work-stalled",
@@ -150,7 +150,7 @@
       "state": "stalled",
       "theme": "light",
       "path": "work-stalled-light.html",
-      "sha256": "0913c4df8f6a23d31b1ce86bb651caee2dbe971587ace24df5c27d955182a82f"
+      "sha256": "4b8de8e9a71990e17f9f72310def2368237c68632675693ff0781f678dcd1019"
     },
     {
       "key": "work-delivered",
@@ -158,7 +158,7 @@
       "state": "delivered",
       "theme": "light",
       "path": "work-delivered-light.html",
-      "sha256": "88ed3b92c30f39b7fda6baf6a306af735b2539e5ca85318b56d36f826ce53198"
+      "sha256": "d09804220fb9ecfedcf0245f4b85ffc6aaf79659d066206b9367cac6acc43e13"
     },
     {
       "key": "decision-requested",
@@ -454,7 +454,7 @@
       "state": "active",
       "theme": "dark",
       "path": "work-active-dark.html",
-      "sha256": "040402237eac283bae7fde3ae17d5f5ff5ddaf91e561197c097ca55f44656ea9"
+      "sha256": "cce076288e61df963770dcdcd210c0222f70a99f96e9ff8eacde1e8b856ecb04"
     },
     {
       "key": "work-terms-changed",
@@ -494,7 +494,7 @@
       "state": "resumed",
       "theme": "dark",
       "path": "work-resumed-dark.html",
-      "sha256": "23fc53edeaff602ffe393661b2efb5b049e11439f0da9b43195f41b16df0961e"
+      "sha256": "2e3d04c0be5f75cbf140ece2316f5d2f91337b1af6dc27cf4b4487d17cc73aee"
     },
     {
       "key": "work-stalled",
@@ -502,7 +502,7 @@
       "state": "stalled",
       "theme": "dark",
       "path": "work-stalled-dark.html",
-      "sha256": "645aa1d0f09c9af7c73bd0e4f61c7505ec6cbad8429e3ec9d2eddf7c85bfee90"
+      "sha256": "2758791eb1ad734efeffbddb83d16a1419b4e91e23d30c6607f719deee4e3065"
     },
     {
       "key": "work-delivered",
@@ -510,7 +510,7 @@
       "state": "delivered",
       "theme": "dark",
       "path": "work-delivered-dark.html",
-      "sha256": "be6aa4ebedb9d530d65d93c093d7094a6d2ef7807829e0bfb993508f164af0dc"
+      "sha256": "447d48f09149868a07dcfe21665285e5c0aedb86008ffce267f2d770e18dadde"
     },
     {
       "key": "decision-requested",

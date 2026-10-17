@@ -18,6 +18,9 @@
 body { margin: 0; }
 a { color: var(--accent); text-underline-offset: .18em; }
 a:hover { text-decoration-thickness: 2px; }
+/* Every link here is a standalone control, including plain-text reads. */
+main a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+.masthead > a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
 code { overflow-wrap: anywhere; }
 a:focus-visible, button:focus-visible, summary:focus-visible, textarea:focus-visible {
   outline: 3px solid var(--accent); outline-offset: 4px;
