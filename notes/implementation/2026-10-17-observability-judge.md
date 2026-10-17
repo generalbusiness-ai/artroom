@@ -1,7 +1,10 @@
 # Judge development
 
-Source request `e6c47499`, promise `830b56c2`, under observability
-`f57fc4da`. This is work in progress on the approved third head. The
+Source request `be612eec`, promise `979cc1cc`, under observability
+`f57fc4da`. This renews standalone `e6c47499` / `830b56c2` after the
+archive dependency actually landed; the old child was normally retired
+by `f641b97c`, with its code and evidence preserved. This is work in
+progress on the approved third head. The
 retain/count and See stages are already on Main. The preparation report
 is `d7c5ec9d`, under `d1e1942f`.
 
@@ -226,10 +229,10 @@ operator run after deployment reopens. Its reader is a follow-up under
 `f57fc4da`, delivered with the first post-freeze deploy check. Calibration
 rules are unchanged. No provider query, introspection, token or schema
 change is authorized or executed by this local delivery.
-The local implementation has passed its one final gate, as recorded below;
-it has not received Source review or measured acceptance. Archive review
-`17dad8da` keeps priority for Source filing and
-landing. The five prepared P3 slices are preserved separately.
+The standalone implementation passed the gate recorded below. The current
+candidate includes the landed archive dependency and needs one composed
+gate. It has not received Source review or measured acceptance. The five
+prepared P3 slices are preserved separately.
 
 No provider query, credential access, configuration change, deployment,
 publication, native answer change or claimed measured latency follows
