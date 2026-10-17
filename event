@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:20f738b8f5e64507a462940f1a69ac8867cb8fd9","text":"Merge retired a covered predecessor; the successor is at packages/cli/test/config-dir.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:21baf4651f8f09a7daca0884b4713dee011bda75","text":"Merge retired a covered predecessor; the successor is at examples/lending/demo-script.md."}
