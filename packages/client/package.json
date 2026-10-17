@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-client",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's client: build and sign an intent, and a typed handle on one scope over HTTP or a service binding: found, submit, settle, read, follow a receipt, follow a duty.",
+  "description": "Artroom's client: build and sign an intent, and use a typed handle for one scope over HTTP or a service binding: create, submit, settle, read, follow a receipt or an outbox item.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

@@ -10,8 +10,8 @@ No compatibility method or command alias is added.
 
 The completed spikes slice and its history tag are preserved. The six
 unrelated Jam source lookups and their retained bundle copies remain an
-explicit scope clarification for review. No terminology approval,
-landing or passing final gate is claimed at this checkpoint. The sections
+explicit scope clarification for review. The frozen implementation gate passes at d5e321cd4. Independent Source
+review and normal landing remain outstanding; no approval is claimed. The sections
 below retain the original implementation checkpoints, failed attempts and
 qualified evidence; they are not a union of passing gate results.
 
@@ -464,3 +464,58 @@ Jam lookup locations and their six bundle copies, their segment-selection
 meaning, and both unchanged historical hashes. They are ordinary lookup
 code, not pinned definition literals; requester clarification is pending.
 The original 157/126 checkpoint remains historical preparation above.
+
+## Passing implementation gate and final metadata successor
+
+Original session 87150 at d5e321cd4c70361c33f4b4f9a62a83f708baf5fc,
+tree 30c197fa29d5bd53151b56355a4af916c04ed146, ended CLOSED 0. It
+started from a clean checkout, used the warm verified dependency view,
+passed whitespace in 0.1 seconds (0.1 CPU), types in 7.3 seconds (26.6
+CPU), and the complete test step in 434.9 seconds (526.7 CPU). Its actual
+results are 1,540 Vitest pass / 3 skip / 0 fail, followed by 16 Node and
+55 Counting passes. The two earlier gates remain failed results above;
+this is the one passing execution of the corrected implementation head.
+
+Original log: /tmp/artroom-create-outbox-d5e321cd4-first-gate.log.
+Step logs: /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.80HgqfmT9x.
+The observed original terminal is retained in
+/tmp/artroom-create-outbox-d5e321cd4-terminal.json. No gate rerun supplies
+this result. Native scripted-fault or disposal diagnostics, if present in
+the original step log, are retained rather than converted into a cause,
+drain or leak claim.
+
+The final successor changes this report and the client package's prose
+only: its description now says create and outbox item. Parsed package
+JSON is exactly equal after removing only description, including exports,
+dependencies, engine, scripts and version. The root manifest and lock are
+unchanged. This is an explicit report/description successor, not a claim
+that the whole tree or every package blob is identical. Every other Git
+mode/blob leaf, including code and generated assets, is compared with the
+passing freeze before review. The checker acknowledged this bounded
+comparison without requesting another whole-suite run for the prose field.
+
+The final physical code count remains 142,573 lines in 815 files, up 64
+from exact Main 9a1238b7. Tests are 61,874 (+27); other source 75,918
+(+6); tooling 3,398 (+31, including the retained counting script and the
+clarifying custody comment); generated code 1,383 (unchanged). The before
+and frozen-after JSON records are
+/tmp/artroom-create-outbox-before-line-count.json and
+/tmp/artroom-create-outbox-d5e321cd4-line-count.json. No line reduction is
+claimed for this terminology slice; the already completed spikes deletion
+is separate.
+
+Read-only reproduction at the passing freeze exactly matches all nine
+Page, Counting and Lending output files, including the five changed
+tracked generated outputs. The retained projection is
+/tmp/artroom-create-outbox-d5e321cd4-generated-correspondence.json.
+All 36 platform data/default values remain canonical matches, and all
+169 protected-literal file/line/value rows match their source. The
+historical plan index is byte-identical to its pre-prose state. The
+unrelated Jam lookup condition remains explicitly for requester/reviewer
+interpretation; no broad exception approval is inferred. This Source
+requests review of the stated creation/outbox slice, not silent closure
+of the parent's broader ambiguous condition or its other completed slices.
+
+Git pushes apply only after normal reviewed Main landing under the lifted
+Git freeze. Cloudflare delivery, publication and all provider operations
+remain held. No such operation was performed for this implementation.
