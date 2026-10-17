@@ -235,7 +235,7 @@ No provider query, credential access, configuration change, deployment,
 publication, native answer change or claimed measured latency follows
 from this checkpoint. The Cloudflare hold remains in effect.
 
-## Final local gate
+## Standalone local gate
 
 The final implementation freeze is
 `7f6ee2bb030e5d96c73d39c0ba35100cd0309b22`, tree
@@ -263,6 +263,24 @@ The gate ended at the same clean head and tree. Its original log is
 The owner terminal is `/tmp/artroom-judge-7f6ee2bb-gate-terminal.json`.
 These private evidence paths are references, not read grants. This
 delivery-note update changes no source or test; the gate is not repeated.
+
+## Landed archive dependency
+
+Archive Source `6d1a1973` received exact approval `f250f501`, ratified by
+`9e34d990`. Normal receipt `2643d98e` records Main
+`698a3d71337a6a03bdea0dfdac10043dd5cbf011`, tree
+`deccfd55aa75809669789fa427e27a52be3c3c0c`. The normal landing and
+required workroom push completed. The full archive root remains owed.
+
+This Judge candidate now incorporates that actual Main. All thirteen
+archive leaves are exact, and its twenty-one Judge paths keep their
+standalone source bodies except this delivery note. The earlier standalone
+gate did not include the thirteen archive additions. One gate is due at
+this new composed implementation freeze; the earlier gate is historical,
+not combined validation. Source filing follows this correspondence and
+the completed gate. The five P3 slices remain separate, with Judge before
+P3 in the latest review order. Calibration and real SQL/health acceptance
+remain owed, and Cloudflare deployment remains held.
 
 ## Query references
 
