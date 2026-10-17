@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6c0ca8af6a19e4edfaf6cd4bbbc231913f71da07","text":"Merge retired a covered predecessor; the successor is at packages/cli/test/invitations.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6fe8ee450b803121e569df1a6654ec66382eabd0","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-lending-refused-drafts.md."}
