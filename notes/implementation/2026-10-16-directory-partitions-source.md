@@ -3,13 +3,15 @@
 Source child `e9943975`, promise `536af54f`, implements the approved
 Draft 4 under NOW request `e0292346`. It adopts technical reconciliation
 `d1543f97` and the subsequent bounded-proof and foreign-fixture advice.
-The implementation is prepared for exact Source review over Main 4f7b07ee.
-Its original gate at frozen 2bcc1a4d closed 0: 1,540 Vitest pass, three
-skip, 16 Node and 55 Counting. The final successor adds only this evidence
-update and the two already approved Main design notes. All other blobs
-and modes match the tested tree. Earlier sections retain their original
-checkpoint status; the terminal evidence below supersedes those progress
-statements while preserving every failed gate and stated limitation.
+The first Source review at f45a5ce80 requests only regeneration of two
+Lending outputs, recorded as F1 in b8b351f1. That correction is now
+prepared over Main 4f7b07ee, with 84 actual changed paths. The prior
+2bcc1a4d gate remains a passing historical result: 1,540 Vitest pass,
+three skip, 16 Node and 55 Counting. It did not establish Lending asset
+freshness. The corrected frozen implementation needs its own gate and
+exact successor review. Earlier sections retain their original checkpoint
+status; the latest evidence below supersedes those progress statements
+while preserving every failed gate, review finding and stated limitation.
 No Source approval, landing, default activation, provider action or
 Cloudflare change is claimed.
 
@@ -1363,3 +1365,43 @@ protected for their own Source; this Directory delivery does not retire
 them. No source-review approval, Main landing or push is claimed here.
 Git push authorization remains separate from the continuing Cloudflare
 hold. No Cloudflare or other provider operation has run for Directory.
+
+
+## F1: regenerate the omitted Lending outputs
+
+Independent review b8b351f18bf7812fcad200f8ffe92abbc3f8c9b3
+requests changes at f45a5ce80/tree9d876b7d for one introduced generated
+asset mismatch. The Lending JavaScript and Worker module omitted the new
+platform-name parser alternative, although their Source and rebuilt Page
+and Counting already contained it. No other blocker was found in all 82
+reviewed paths. Requester ratification 96e92740 adopts F1. The passing
+2bcc gate and f45 notes-only correspondence remain accurate historical
+evidence; neither is approval or proof of Lending asset freshness.
+
+The repository-owned examples/lending/scripts/assets.mjs regenerates the
+outputs with existing esbuild 0.28.1 and no package installation. Exactly
+two tracked paths change. Lending JS is 117,572 bytes, SHA256
+f839a78ba12bf032b08e9174d03b8a4c1997941b3654e3f2c58527052574546f.
+The Worker module is 124,156 bytes, SHA256
+37b3f4cf862c25e448be1f8f2d53383e62e40f4e67bbbef180768f263c8ffe2f.
+These match the independent review's expected outputs. The sole JS
+replacement adds |directory-partition to the existing platform-name
+regex, exactly 20 bytes. The module embeds that change and its digest.
+No pinned declaration, parser source, HTML or CSS changes.
+
+An independent comparison against lendingFiles() and lendingAssets()
+reproduces all four owned outputs exactly: the three public files and the
+Worker module. HTML remains 472 bytes/SHA256
+73dd9fda69f9f539f50a6d64fe79255e4455cd708a169906f70e34a829a02c2d;
+CSS remains 2,377 bytes/SHA256
+cde330d2cd3718cd4e1ff269250f14230046fb31c656badbcc6617b2d1e619e9.
+The owned build log is /tmp/artroom-directory-lending-f1-owned-build.log.
+Ten existing browser-source Node checks across model, custody and
+publication pass in
+/tmp/artroom-directory-lending-f1-browser-source-focus.log. This is not
+rendered browser or hosted proof, and no whole suite was repeated for the
+focused check. The new frozen correction will receive its single full
+gate before exact review, binding all 84 paths under the same Source
+child and promise. Five unlanded naming artifact bases remain protected.
+The separate terminology branch is cleanly checkpointed at b38c578a1;
+none of its changes enters this Directory correction. No provider action.
