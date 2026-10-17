@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8154225aa61876ff8e2f9022d2420b9d213311ac","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/support/story.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:818ccc9279a88c4db137ecbb8337758994a65d3e","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/sqlite.ts."}
