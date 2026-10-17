@@ -84,6 +84,38 @@ Original owner logs remain at:
 - `/tmp/artroom-cli-runbook-p3-owned-page-assets.log`
 
 These references grant no external-file, helper or execution access.
-No full gate, Source approval or landing is claimed yet. Original
+The focused checkpoint preceded the composition gate below. Source
+approval and landing remain owed. Original
 invitation schemes, custody and all hosted outputs remain unchanged.
 No provider call, deployment or publication ran, and no dependency was added.
+
+## Frozen composition gate
+
+The local composition adds these seven paths from `4e8cd9b1b` to the
+previous completed archive/Lending/invitation composition `2a44ead06`.
+All prior leaves outside those paths remain exact. The owned Page producer
+ran again (`931b4c`, exit 0); its tracked module stayed exact to the prior
+composition, including the invitation repair. The delta against Main
+`55e1970a5` is exactly thirty-seven paths, with 1,455 tracked leaves.
+
+Original gate `51005` ran once at clean implementation freeze
+`af623e49df8c933ade6dc64c3179fc69c1fae108`, tree
+`cfb51d86e2c68b1a68342d7177cf1593ba0f0d60`, and exited zero. Owner terminal
+`dd35b4` records completion. A matching verified-lock stamp allowed the
+existing dependency view, so installation was skipped. Whitespace took
+0.0 seconds elapsed and 0.0 CPU; types 7.2 and 26.0; tests 446.9 and 557.6.
+All 1,563 Vitest tests passed with three skips; sixteen Node cases and
+fifty-five Counting cases passed. This was macOS 27.0.1 arm64 with eighteen
+logical CPUs and observed pre-gate load 1.29, 1.33 and 1.46. These figures
+establish no load cause. The unchanged package-lock SHA256 is
+`a3dd5689f33c5181b5ff48553fbb3c45b44abf96720ba9935eed40853a3b09bc`.
+
+Original wrapper: `/tmp/artroom-p3-cli-composed-gate.log`. Original step
+logs: `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.dOBREjOuyF`.
+The successor updates only the three P3 notes; Source preparation must
+verify all 1,452 other mode/type/blob leaves against this passing freeze.
+All thirteen archive `6d1a1973d` leaves remain exact; its independent
+review `17dad8da` and finite grant are unchanged. No extra gate is needed
+for this notes-only successor. Exact archive approval/landing, final Main
+correspondence and independent P3 review still precede Source filing and
+landing. These references grant no raw-file, helper or execution access.

@@ -184,3 +184,31 @@ Archive's exact review `17dad8da` and finite grant `6e2b59c7` remain
 separate. P3 Source filing still waits for its reviewed landing and exact
 Main correspondence. No approval or external-file access follows from
 this gate record.
+
+### Composition with the CLI runbook follow-up
+
+The independent seven-path CLI/runbook follow-up `03b4ff8a` / `527d0f9b`
+was then composed from checkpoint `4e8cd9b1b`. It changes recovery guidance,
+runtime documentation and resolver fixtures, with no Lending or invitation
+implementation change. All prior composition leaves outside its seven
+paths, including all thirteen archive `6d1a1973d` leaves, remain exact.
+The composed Page producer ran and its tracked output remained unchanged.
+
+Original gate `51005` ran once at clean commit
+`af623e49df8c933ade6dc64c3179fc69c1fae108`, tree
+`cfb51d86e2c68b1a68342d7177cf1593ba0f0d60`, and exited zero. Owner
+terminal `dd35b4` records completion. Installation was skipped with a
+matching verified-lock stamp; whitespace took 0.0 seconds elapsed and
+0.0 CPU, types 7.2 and 26.0, tests 446.9 and 557.6. All 1,563 Vitest
+tests passed with three skips; sixteen Node and fifty-five Counting
+tests passed. On macOS 27.0.1 arm64, eighteen logical CPUs, observed
+pre-gate load was 1.29, 1.33 and 1.46. These are not load-cause claims.
+The wrapper log is `/tmp/artroom-p3-cli-composed-gate.log`; step logs are
+under `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.dOBREjOuyF`.
+
+This final update changes only the three P3 notes. All 1,452 other
+mode/type/blob leaves must remain exact to that passing freeze. Archive's
+candidate, grant and independent review remain unchanged. P3 Source
+filing and landing still wait for archive approval/landing, exact Main
+correspondence and independent exact-head review. Log references grant
+no external-file or execution access.
