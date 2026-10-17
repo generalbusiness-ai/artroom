@@ -71,6 +71,8 @@ Every displayed short hash has a full value under **Full commits**.
 | Version 2 source | `569c9aeed9e74b4d803f874cfbfbd90a9218c24d` |
 | Version 1 integration | `62a6aced9f5b9e2473d33960fb336721de14582f` |
 | Version 2 integration | `6ef56437b0cf81a1d95c2a00b7c539d1856e0fdf` |
+| Change 9 integration | `1faf54e188a46dd8edeb5ead4adb7f9fbee10fb4` |
+| Change 18 version 2 integration | `d664779063515feb27b0532f708970d1c4f68008` |
 
 File shows a file at one exact commit. Diff compares the base with the
 selected integration. Interdiff compares the two integrations on their
@@ -132,6 +134,8 @@ corrections. They are not evidence that the example operations occurred:
   Interdiff image omitted Diff; the HTML must restore that required choice.
 - Wrapped code continues the same logical line. A continuation gets no
   new line number, even when the generated image numbers a wrapped fragment.
+- Change 9 uses its own integration `1faf54e`. Its generated recovery
+  reference borrowed Change 12's hash; the HTML must use the correct fixture.
 - Normal spaces remain in labels such as **entry 245** and **Version 2**.
 - The existing exact brand tokens and SVG control colour and geometry.
   Bitmap texture, slight shading, and generated logo variations are not
