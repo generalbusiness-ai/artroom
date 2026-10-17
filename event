@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:16ec02de4e4a364ffe53ae3338c9d5965d2d18bd","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-observability-judge.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1a4da8121ec529cc5f0164c30f03e3c24fb2a191","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/support/room.ts."}
