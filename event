@@ -1,1 +1,1 @@
-{"kind":"assert","text":"14:17 survey: main and GitHub agree at 2637e6bb. Views design 911d8c16: checker approved 9f014ba8, planner read met (df05d378); builder may land it. Capacity runtime progressing on request/capacity-whole-scope-20261017 (checkpoint 241caea0). Next after the views landing: capacity to its witnesses, then archive A2/A3 on fixtures, then J3 with the evidence-rules slice; the S2 view kit may start from the landed design."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:df05d378631503474efbba45902789c3b9386f9b"}
