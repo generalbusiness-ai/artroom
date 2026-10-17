@@ -33,7 +33,7 @@ const work = (budget = new ArchiveBudget({}, () => 0)) => new JournalWork(budget
 test("explicit SHA-1 and SHA-256 archive objects have deterministic Git ordering and bytes, and real local Git reads their exact types, trees and bounded commit timestamps", async () => {
   for (const format of formats) {
     const dir = repository(format), maker = new JournalObjects(format, work());
-    const payload = utf8.encode("mechanical fixture, not journal data\n");
+    const payload = Buffer.from("mechanical fixture, not journal data\n");
     const blob = maker.make("blob", payload);
     payload[0] = 0; // caller ownership cannot rewrite an already made object.
     const sub = maker.tree([{ name: "leaf", mode: "100644", id: blob.id }]);
@@ -79,12 +79,27 @@ test("archive primitives refuse executable, symlink and gitlink modes, duplicate
   const noncanonicalTime = new TextDecoder().decode(maker.commit(valid.id, null, 0).data).replaceAll("+0000\n", "+0000\r\n");
   expect(() => reader.commit(utf8.encode(noncanonicalTime))).toThrow("journal-layout-timestamp");
   for (const seconds of [-1, -0, NaN, Infinity, 0.5, JOURNAL_LAST_SECOND + 1]) expect(() => maker.commit(valid.id, null, seconds)).toThrow("journal-layout-timestamp");
+  const directory = new JournalObjects("sha1", work());
+  const rows = Array.from({ length: 4096 }, (_, n) => ({ mode: "100644" as const, name: `f${String(n).padStart(4, "0")}`, id: blob.id }));
+  const full = directory.tree(rows);
+  expect(full.type).toBe("tree");
+  expect(() => directory.tree([...rows, { mode: "100644", name: "overflow", id: blob.id }])).toThrow("journal-layout-limit");
+  expect(() => directory.objects()).toThrow("journal-layout-limit");
+  const shared = work(), prior = new JournalObjects("sha1", shared);
+  prior.make("blob", utf8.encode("prior partial object"));
+  const parser = new JournalObjectReader("sha1", { object: async () => null }, shared);
+  const tooMany = Buffer.concat([full.data, Buffer.from("100644 overflow\0"), Buffer.from(blob.id, "hex")]);
+  expect(() => parser.tree(tooMany)).toThrow("journal-layout-limit");
+  expect(() => prior.objects()).toThrow("journal-layout-limit");
+  const bounded = new JournalObjects("sha256", work());
+  expect(bounded.make("blob", new Uint8Array(8 * 1024 * 1024)).data.length).toBe(8 * 1024 * 1024);
+  expect(() => bounded.make("blob", new Uint8Array(8 * 1024 * 1024 + 1))).toThrow("journal-layout-limit");
 });
 
 test("the original native allowance is not reset, object metadata precedes body work, corrupt bytes cannot pass, and cached construction still spends work", async () => {
   const budget = new ArchiveBudget({}, () => 0);
   budget.spend({ entries: 7, attempts: 2, inputWork: 100 }); // preceding inventory work, not a new pass.
-  const shared = work(budget), maker = new JournalObjects("sha256", shared), bytes = utf8.encode("named immutable bytes");
+  const shared = work(budget), maker = new JournalObjects("sha256", shared), bytes = Buffer.from("named immutable bytes");
   const blob = maker.make("blob", bytes), before = budget.admitted().inputWork;
   expect(maker.make("blob", bytes)).toBe(blob);
   expect(budget.admitted().inputWork).toBeGreaterThan(before);
@@ -95,7 +110,10 @@ test("the original native allowance is not reset, object metadata precedes body 
     if (limit > 0) expect(budget.admitted().inputWork).toBeGreaterThanOrEqual(before + bytes.length * 4);
     return { type: "blob", size: bytes.length, data: limit === 0 ? null : bytes };
   } }, shared);
-  expect(await reader.read(blob.id, "blob")).toEqual(bytes);
+  const owned = await reader.read(blob.id, "blob");
+  expect([...owned]).toEqual([...bytes]);
+  bytes[0] = 0;
+  expect(owned[0]).toBe("n".charCodeAt(0));
   expect(calls).toEqual([0, bytes.length]);
   expect(budget.admitted()).toMatchObject({ entries: 7, attempts: 3, calls: 2 });
   for (const corrupt of [bytes.slice(1), new Uint8Array(bytes.length)]) {
@@ -107,6 +125,24 @@ test("the original native allowance is not reset, object metadata precedes body 
   const exhausted = new JournalObjectReader("sha256", { object: async (_id, limit) => { transfers++; expect(limit).toBe(0); return { type: "blob", size: bytes.length, data: null }; } }, work(new ArchiveBudget({ inputWork: 128 }, () => 0)));
   await expect(exhausted.read(blob.id, "blob")).rejects.toBeInstanceOf(ArchiveStopped);
   expect(transfers).toBe(1); // budget refuses before the nonempty body call.
+  // Untrusted source envelopes are reusable/mutable objects. A later
+  // callback must not change the already validated primitive reservation.
+  const big = new Uint8Array(17).fill(3), bigId = new JournalObjects("sha256", work()).make("blob", big).id;
+  const probe = { type: "blob", size: 1, data: null };
+  const allowance = new ArchiveBudget({ inputWork: 280 }, () => 0);
+  const changing = new JournalObjectReader("sha256", { object: async (_id, limit) => {
+    if (limit === 0) return probe;
+    expect(limit).toBe(1); probe.size = 17;
+    return { type: "blob", size: 17, data: big };
+  } }, new JournalWork(allowance, { objectBytes: 16 }));
+  const changed = await changing.read(bigId, "blob").then(() => "accepted", error => error instanceof JournalLayoutRefusal ? error.reason : "unexpected-error");
+  expect(changed).toBe("object-mismatch"); expect(allowance.admitted().inputWork).toBeLessThanOrEqual(280);
+  let dataReads = 0;
+  const getters = new JournalObjectReader("sha256", { object: async (_id, limit) => limit === 0 ? { type: "blob", size: 1, data: null } : {
+    type: "blob", size: 1, get data() { return ++dataReads <= 2 ? new Uint8Array([3]) : big; },
+  } }, new JournalWork(new ArchiveBudget({}, () => 0), { objectBytes: 16 }));
+  const captured = await getters.read(bigId, "blob").then(() => "accepted", error => error instanceof JournalLayoutRefusal ? error.reason : "unexpected-error");
+  expect(captured).toBe("object-mismatch"); expect(dataReads).toBe(1);
   const limited = new JournalWork(new ArchiveBudget({}, () => 0), { outputWork: 7 });
   const tiny = new JournalObjects("sha1", limited);
   expect(tiny.make("blob", new Uint8Array()).data.length).toBe(0); // seven header bytes.

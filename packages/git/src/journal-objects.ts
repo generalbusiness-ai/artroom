@@ -48,6 +48,19 @@ function hash(format: JournalFormat, type: JournalObjectType, data: Uint8Array):
 }
 const rawId = (id: string): Uint8Array => Uint8Array.from(id.match(/../g)!, pair => Number.parseInt(pair, 16));
 const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
+const nativeByteLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "byteLength")!.get!;
+function byteCount(value: unknown): number | null {
+  if (!(value instanceof Uint8Array) || !ArrayBuffer.isView(value)) return null;
+  return nativeByteLength.call(value) as number;
+}
+function ownedCopy(input: Uint8Array, size: number): Uint8Array {
+  // Fixed-size allocation and intrinsic copying avoid Buffer.slice views,
+  // shadowed length properties and caller-controlled species constructors.
+  const copy = new Uint8Array(size);
+  try { copy.set(input); } catch { return refuseJournal("object-mismatch"); }
+  if (byteCount(input) !== size) return refuseJournal("object-mismatch");
+  return copy;
+}
 const secondsOf = (n: number): number => Number.isSafeInteger(n) && n >= 0 && !Object.is(n, -0) && n <= JOURNAL_LAST_SECOND ? n : refuseJournal("timestamp");
 
 /** A build owns its object bytes. Every repeated construction is charged
@@ -63,12 +76,13 @@ export class JournalObjects {
     this.work.input(header.length + size, 3);
   }
   make(type: JournalObjectType, input: Uint8Array): JournalObject {
-    if (!types.includes(type) || !(input instanceof Uint8Array)) refuseJournal("object-mismatch");
-    this.#reserve(type, input.length);
-    return this.#keep(type, input);
+    const size = byteCount(input);
+    if (!types.includes(type) || size === null) return refuseJournal("object-mismatch");
+    this.#reserve(type, size);
+    return this.#keep(type, input, size);
   }
-  #keep(type: JournalObjectType, input: Uint8Array): JournalObject {
-    const data = input.slice(), id = hash(this.format, type, data);
+  #keep(type: JournalObjectType, input: Uint8Array, size: number): JournalObject {
+    const data = ownedCopy(input, size), id = hash(this.format, type, data);
     this.work.check();
     const before = this.#objects.get(id);
     if (before) {
@@ -81,7 +95,7 @@ export class JournalObjects {
   }
   tree(rows: readonly JournalTreeRow[]): JournalObject {
     this.work.spend({ trees: 1, names: rows.length });
-    if (rows.length > 4096) refuseJournal("limit");
+    if (rows.length > 4096) this.work.stop();
     // Reserve row metadata before cloning/sorting the caller's list.
     this.work.metadata(rows.length * 512);
     const ordered = rows.map(row => {
@@ -105,7 +119,7 @@ export class JournalObjects {
       const prefix = utf8(`${row.mode} ${row.name}\0`); body.set(prefix, at); at += prefix.length;
       body.set(rawId(row.id), at); at += width;
     }
-    return this.#keep("tree", body);
+    return this.#keep("tree", body, length);
   }
   commit(tree: string, parent: string | null, seconds: number): JournalObject {
     journalId(this.format, tree);
@@ -113,7 +127,7 @@ export class JournalObjects {
     const identity = `${JOURNAL_IDENTITY} ${secondsOf(seconds)} +0000`;
     const body = `tree ${tree}\n${parent === null ? "" : `parent ${parent}\n`}author ${identity}\ncommitter ${identity}\n\n${JOURNAL_MESSAGE}`;
     this.#reserve("commit", body.length); // All header/message characters are ASCII.
-    return this.#keep("commit", utf8(body));
+    return this.#keep("commit", utf8(body), body.length);
   }
   /** A result is exposed only by the caller after the complete build fence. */
   objects(): readonly JournalObject[] { this.work.metadata(this.#objects.size * 64); return [...this.#objects.values()]; }
@@ -123,19 +137,24 @@ export class JournalObjects {
  * work. The same original native budget fences both awaited calls. */
 export class JournalObjectReader {
   constructor(readonly format: JournalFormat, readonly source: JournalObjectSource, readonly work: JournalWork) { journalFormat(format); }
-  async read(id: string, type: JournalObjectType): Promise<Uint8Array> {
+  async read(id: string, type: JournalObjectType, maximum = this.work.limits.objectBytes): Promise<Uint8Array> {
     journalId(this.format, id);
+    this.work.maximumSize(maximum);
     this.work.spend({ objects: 1 });
     this.work.budget.spend({ attempts: 1, calls: 1, metadata: 128, inputWork: 128 });
     const probe = await this.work.budget.wait(() => this.source.object(id, 0));
     if (!probe) return refuseJournal("missing-object");
-    if (probe.type !== type || !Number.isSafeInteger(probe.size) || probe.size < 0 || Object.is(probe.size, -0)) refuseJournal("object-mismatch");
-    this.work.size(probe.size);
-    if (probe.data !== null && (!(probe.data instanceof Uint8Array) || probe.data.length !== 0 || probe.size !== 0)) refuseJournal("object-mismatch");
-    this.work.budget.spend({ calls: 1, inputWork: probe.size * 4 + 128 });
-    const got = await this.work.budget.wait(() => this.source.object(id, probe.size));
-    if (!got || got.type !== type || got.size !== probe.size || !(got.data instanceof Uint8Array) || got.data.length !== probe.size) refuseJournal("object-mismatch");
-    const body = got.data.slice();
+    const size = probe.size, statedType = probe.type, probeData = probe.data;
+    if (statedType !== type || !Number.isSafeInteger(size) || size < 0 || Object.is(size, -0)) refuseJournal("object-mismatch");
+    this.work.size(size);
+    if (size > maximum) this.work.stop();
+    if (probeData !== null && (byteCount(probeData) !== 0 || size !== 0)) refuseJournal("object-mismatch");
+    this.work.budget.spend({ calls: 1, inputWork: size * 4 + 128 });
+    const got = await this.work.budget.wait(() => this.source.object(id, size));
+    if (!got) return refuseJournal("object-mismatch");
+    const gotType = got.type, gotSize = got.size, data = got.data;
+    if (gotType !== type || gotSize !== size || !(data instanceof Uint8Array) || byteCount(data) !== size) refuseJournal("object-mismatch");
+    const body = ownedCopy(data, size);
     if (hash(this.format, type, body) !== id) refuseJournal("object-mismatch");
     this.work.check();
     return body;
@@ -148,7 +167,7 @@ export class JournalObjectReader {
     const seen = new Set<string>();
     for (let at = 0; at < body.length;) {
       this.work.check();
-      if (rows.length === 4096) refuseJournal("limit");
+      if (rows.length === 4096) this.work.stop();
       this.work.spend({ names: 1 }); this.work.metadata(512);
       const space = body.indexOf(32, at), nul = space < 0 ? -1 : body.indexOf(0, space + 1);
       if (space < 0 || space - at > 6 || nul < 0 || nul - space - 1 > 255 || nul + 1 + width > body.length) refuseJournal("tree");

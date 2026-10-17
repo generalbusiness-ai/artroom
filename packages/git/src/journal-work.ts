@@ -28,11 +28,11 @@ export const JOURNAL_LAYOUT_LIMITS = Object.freeze({
   outputWork: 64 * 1024 * 1024,
 });
 export type JournalLayoutLimits = { -readonly [K in keyof typeof JOURNAL_LAYOUT_LIMITS]: number };
-export type JournalLayoutReason = "limit" | "timeout" | "unavailable" | "format" | "object-id" | "missing-object" | "object-mismatch" | "tree" | "commit" | "timestamp" | "manifest" | "input" | "parent";
+export type JournalLayoutReason = "limit" | "timeout" | "unavailable" | "format" | "object-id" | "missing-object" | "object-mismatch" | "tree" | "commit" | "timestamp" | "manifest" | "input" | "missing-input" | "input-mismatch" | "parent";
 export class JournalLayoutRefusal extends Error {
-  constructor(readonly reason: JournalLayoutReason) { super(`journal-layout-${reason}`); }
+  constructor(readonly reason: JournalLayoutReason, readonly where?: string) { super(`journal-layout-${reason}`); }
 }
-export function refuseJournal(reason: JournalLayoutReason): never { throw new JournalLayoutRefusal(reason); }
+export function refuseJournal(reason: JournalLayoutReason, where?: string): never { throw new JournalLayoutRefusal(reason, where); }
 const natural = (n: number): boolean => Number.isSafeInteger(n) && n >= 0 && !Object.is(n, -0);
 const keys = Object.keys(JOURNAL_LAYOUT_LIMITS) as (keyof JournalLayoutLimits)[];
 
@@ -60,9 +60,12 @@ export class JournalWork {
     }
     for (const [key, n] of Object.entries(cost)) this.used[key as keyof typeof cost] += n;
   }
-  size(n: number): void {
+  maximumSize(n: number): void {
     this.check();
     if (!natural(n) || n > this.limits.objectBytes) this.stop();
+  }
+  size(n: number): void {
+    this.maximumSize(n);
     this.used.objectBytes = Math.max(this.used.objectBytes, n);
   }
   depth(n: number): void {
