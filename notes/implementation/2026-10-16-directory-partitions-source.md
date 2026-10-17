@@ -2,9 +2,36 @@
 
 Source child `e9943975`, promise `536af54f`, implements the approved
 Draft 4 under NOW request `e0292346`. It adopts technical reconciliation
-`d1543f97`. This preparation is incomplete. No Source review, gate,
-landing, default activation, provider action or Cloudflare change is
-claimed.
+`d1543f97` and the subsequent bounded-proof and foreign-fixture advice.
+Implementation and its focused witnesses are prepared for the frozen gate.
+No Source review, gate, landing, default activation, provider action or
+Cloudflare change is claimed at this checkpoint. Earlier sections retain
+their original checkpoint status; the latest evidence below supersedes
+only those progress statements, not the retained failures or limitations.
+
+## Current implementation boundary
+
+This is one explicit future cohort, with old pins and defaults preserved.
+Runtime and replay choose meanings by the actual receiving version and
+immutable lineage. The producer's ordinary Source API remains unchanged.
+One proof collection admits at most 32 raw frames/reads, with each identity
+using at most 16 needed frames, depth four, one physical pending read and
+the original ten-second deadline. The 32 MiB reserved-work allowance and
+16 MiB actual UTF-8 admission ceiling are separate from heap measurement.
+Neither synchronous preemption nor a worst-case/peak-heap bound is claimed.
+Advisory client navigation has its separately stated logical data-call and
+decoded-reply limits; it does not grant acts or attest Native provenance.
+
+Actual native cases cover authority, factories, old/new receivers, concerns,
+canonical local-hold publication, pin consumers, restart, bounded raw-frame
+residency, Root capacity, full-partition seal, post-seal traffic, exact
+unknown-request recovery and CLI/Page/MCP data consumers. The unchanged
+canonical foreign-hold declaration still refuses required-unset; request
+416238f2 owns its future repair. The sole changed foreign-path declaration
+is an explicitly activated, one-field test fixture, with no local-path or
+production revision claim. Git hosts, clocks, schedulers and individual
+scripted proof boundaries remain labelled. No rendered browser, hosted
+execution or provider/deployment proof is claimed.
 
 ## The explicit cohort
 
@@ -1098,3 +1125,53 @@ state assertion; the separate mixed lost-answer case still passes. The
 source is restored. The short native baseline and types pass; its focused
 control is /tmp/artroom-directory-routing-terminal-pending-control.log.
 No first Source gate, approval or provider operation has run.
+
+## Successful Native capacity through generation 1,000
+
+The separate successful-capacity case now passes in
+/tmp/artroom-directory-success-thousand-sixth-callback-focus.log (115.86
+seconds of test execution, an observation only). Real M6 enrolment and
+compromised-key relays first fill ordinary Root admission. Root's explicit
+fixture scopeEntries is 3,012; its production standing counter still starts
+at the full 3,000 entries. Its controller's original key remains active.
+There is no counter injection in this capacity case.
+
+All 1,000 partitions are created, confirmed and active under their actual
+Native pins and Root/membership refs. Each has an explicit test-only bound
+of eight entries, so birth and confirmation reach its quarter threshold.
+This isolates actual handoff capacity; it makes no ordinary-lane-capacity
+claim at that tiny bound. The separate P64 full/index witness supplies that
+traffic. All 999 successor handoffs complete with handedOff true. Each
+generation consumes two Root entries and releases exactly three standing
+entries; written plus reserved stays within Root's bound. Root and the
+current partition restart every 100 generations.
+
+The last authentic seal reaches root-exhausted, whose recorded native
+refusal returns to the original partition as sealRefused true. No child
+1,001 is created. Root ends with zero standing, exactly baseline plus 2,001
+entries and its original generation-1,000 partition reference. Transport
+observes precisely 1,000 distinct actual creates, with no rerouted or fake
+genesis. No heap setting, runtime default or generation/standing limit was
+changed; no completion-time guarantee or provider execution is inferred.
+
+Original failures remain in success-thousand-first/second/third-diagnostic-
+focus.log: the fixture checked the prior partition's reply before running
+its successor. Fourth-focus.log then reached the first history-page limit
+of the fixture's created() helper. Exact creation and final-entry reads
+replace that convenience helper; no unbounded history walk was introduced.
+Fifth-focus.log records all 1,000 births and 999 handoffs but failed before
+joining the final refusal's scheduled callback. A separate, explicitly
+counter-injected boundary specimen isolates that refusal path: its Root
+counter starts at 999 solely for that diagnostic test. It is not capacity
+or replay evidence. Its actual birth, seal and refusal pass after joining
+actual callbacks. The full, uninjected capacity case then passes with the
+same finite callback join. All original logs use the
+/tmp/artroom-directory- prefix. Lane typecheck passes. The completed old
+1,000-generation routing-failure run was not repeated for this work.
+
+The owned Page build now regenerates assets from the final source:
+703,344 bytes of page.js. Twenty focused asset/action/editor Node checks
+pass; an initial command with the wrong relative executable path ran no
+tests and remains logged. These checks are not rendered browser proof.
+The first frozen gate and a current-head memory specimen still follow this
+checkpoint, with exact evidence before Source review.
