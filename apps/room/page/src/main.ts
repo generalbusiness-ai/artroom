@@ -1058,7 +1058,7 @@ async function draw(focus = false): Promise<void> {
     let fence: ReturnType<ScopeSending["get"]>;
     try {
       const context = { session: sessionOf(kept), directory: kept.place.directory, membership: kept.place.membership };
-      known = [...lastActs.entries()].filter(([association, result]) => association === actAssociation(context, result.scope)).map(([, result]) => result);
+      known = [...lastActs.entries()].filter(([association, result]) => association === actAssociation(context, result.requestedScope ?? result.scope)).map(([, result]) => result);
       const scope = route.scope ?? (route.destination === "rules" ? room?.rules : kept.place.directory);
       fence = scope ? sending.get(actAssociation(context, scope as ScopeId)) : undefined;
     } catch { /* Invalid current settings cannot match a known result. */ }

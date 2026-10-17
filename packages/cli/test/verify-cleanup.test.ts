@@ -10,12 +10,12 @@ const summary = (definition: Summary["definition"] = "platform:destination@3"): 
 const item = (id: number, reason: string): Item => ({ id, type: "publication", state: "cleanup-owed", revision: 3, opened: textDigest("opened"), parties: {}, refs: {}, values: { cleanupReason: reason, cleanupAttempts: 3, integration: `git:sha1:${"a".repeat(40)}`, token: "private-token-must-not-print" }, attributed: [] });
 
 // Scripted read-port boundary: no native destination or external cleanup runs.
-test.each(["platform:destination@3", "platform:destination@4"] as const)("%s complete same-head cleanup observations name every owed change reservation and retain unknown custody without exposing token values", async (definition) => {
+test.each(["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"] as const)("%s complete same-head cleanup observations name every owed change reservation and retain unknown custody without exposing token values", async (definition) => {
   const cursors: (string | undefined)[] = [];
   const both: Item = { ...item(8, "reservation-token-unknown"), values: { ...item(8, "reservation-token-unknown").values, cleanupReason: { refReason: "reservation-stage-unknown", tokenReason: "reservation-token-unknown", tokenAttempts: 1, refRemoved: false }, cleanupAttempts: 1 } };
   const file: Item = { id: 16, type: "file-publication", state: "unresolved", revision: 2, opened: textDigest("file opening"), attributed: [], parties: {},
     refs: { sender: { ...at, kind: "lane" } }, values: { sourceSeq: 4, sourceHash: textDigest("source"), sourceOrdinal: 0, path: "shelf/pot.md", content: "# Pot", contentDigest: textDigest("# Pot"), token: "private-file-token-must-not-print" } };
-  const liveSummary = (): Read<Summary> => { const read = summary(definition); return read.ok ? { ...read, value: { ...read.value, items: [item(4, "reservation-ref"), both, ...(definition === "platform:destination@4" ? [file] : [])] } } : read; };
+  const liveSummary = (): Read<Summary> => { const read = summary(definition); return read.ok ? { ...read, value: { ...read.value, items: [item(4, "reservation-ref"), both, ...(["platform:destination@4", "platform:destination@6"].includes(definition) ? [file] : [])] } } : read; };
   const final = { ...item(12, "reservation-ref"), state: "cleaned" };
   const result = await observeCleanup({ summary: async () => liveSummary(), items: async (_type, cursor) => {
     cursors.push(cursor);
@@ -40,7 +40,7 @@ test.each(["platform:destination@3", "platform:destination@4"] as const)("%s com
   expect(remaining.lines[0]).not.toContain("reservation-ref-unknown");
 });
 
-test.each(["platform:destination@3", "platform:destination@4"] as const)("%s head movement, pin changes or incomplete pagination yields no cleanup absence claim, while old pins make no cleanup claim", async (definition) => {
+test.each(["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"] as const)("%s head movement, pin changes or incomplete pagination yields no cleanup absence claim, while old pins make no cleanup claim", async (definition) => {
   const moved = { ...head, seq: head.seq + 1 };
   for (const read of [
     { ok: true as const, complete: true, at: moved, value: [] },
@@ -64,7 +64,7 @@ test.each(["platform:destination@3", "platform:destination@4"] as const)("%s hea
   expect(old.lines).toEqual([]);
 });
 
-test.each(["platform:destination@3", "platform:destination@4"] as const)("%s write-free expiry projection reports pending cleanup before the next turn and never invents expiry without its clock", async (definition) => {
+test.each(["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"] as const)("%s write-free expiry projection reports pending cleanup before the next turn and never invents expiry without its clock", async (definition) => {
   const reservation: Item = { ...item(5, "reservation-ref"), state: "reserved", values: { checkDeadline: "2099-01-01T00:00:10Z" } };
   const read = (expiry: Summary["reservationExpiry"]): Read<Summary> => { const got = summary(definition); return got.ok ? { ...got, value: { ...got.value, items: [reservation], ...(expiry ? { reservationExpiry: expiry } : {}) } } : got; };
   for (const expiry of [{ clock: "available" as const, time: "2099-01-01T00:00:11Z" as const, expired: [5] }, { clock: "unavailable" as const }, undefined]) {

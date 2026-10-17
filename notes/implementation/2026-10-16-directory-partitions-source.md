@@ -935,3 +935,83 @@ with the pure clause boundary, and conflict-second-types passes lane
 typecheck after correcting a nonexistent private helper import. The focused
 pending-guard-control log records the distinguishing P1 result. No gate,
 Source approval or provider action has occurred.
+
+## Root and partition consumer navigation
+
+The client now has explicit advisory readers for Root10 and partition1.
+An opening selection requires one active partition, its exact native pin,
+its full Root reference and its recorded membership. Directory kind alone
+is insufficient. It does not open, seal, retry or replace work. Listing
+queries active/sealed partition rows, then each partition's lane and
+application rows, retaining each separate head. Prefix-only summaries
+supply control metadata, never an inferred item inventory. A changed head,
+incomplete query, unknown pin or missing affiliation remains incomplete.
+
+One navigation operation allows 32 logical data calls, four pages per
+selection and 10 seconds. It reserves 256 KiB per admitted decoded reply,
+at most 8 MiB total, and checks its original deadline before and after
+reads, serialization and final validation. These limits describe the
+logical reader and admitted returned JSON. They do not bound session
+acquisition, transport retry overhead, parser residency or peak heap.
+A late custom transport can still finish physically; it starts no further
+logical read. The reader offers no all-room or common-snapshot guarantee
+when these limits truncate a large room.
+
+CLI issue/edit/propose opening selects that partition only while preparing
+a new request. Old cohorts retain their configured full target reference;
+they do not silently retarget a different incarnation from a summary.
+Existing new-work refusal and unknown handling remains native. Issues
+listing fails explicitly if partition coverage is incomplete. Page listing
+uses the same reader. Its room-level opening forms read the partition's
+declarations; the submitted act and receipt keep the actual partition,
+while a separate requestedScope keeps only the UI association with Root.
+Creation follow-up verifies the original partition and its Root/membership
+refs without selecting a later successor. Retained editor tasks distinguish
+the stable Root context from their original opening partition, including
+after an unknown answer. Native partition editor execution across handoff
+remains a separate witness to complete; no browser UI claim is made here.
+
+MCP keeps Root as its one named directory and holds partitions separately,
+addressed by scope. Their heads participate independently in inventory
+refresh. An incomplete partition index is an unread finding, including
+number lookup; it cannot become a complete empty room. The existing session
+fallback gains only an item-query result overload, with no permission or
+retry behavior change. CLI verify-all's existing creation-history traversal
+already follows partition seeds and their descendants. The site readers
+still require a native Root created by a register. No importer implementation
+exists in this checkout; the GitHub importer is a separate design, not a
+new provider caller or a partial switch hidden in this Source.
+
+The native consumer case uses actual HTTP routes, sessions, factories,
+Authority and SQLite. With no partition, CLI opening is refused without a
+Root entry. CLI creates issues 1 and 2 under the first partition, then
+100,001 under its actual successor after an explicit seal. Page creates
+100,002 under that successor; the exact accepted creation is followed to
+the authentic confirmed child. Page and MCP list all four, keep the stable
+Root and retain the two actual partition heads. Git, clock, setup inspector
+and finite scheduler remain stand-ins. The final native result is
+/tmp/artroom-directory-native-page-opening-second-focus.log; the earlier
+read-only consumer case also passes. Lane and Page types pass.
+
+Four scripted navigation cases pass, including unknown pin/Root/membership,
+head movement, invalid incompleteness, the shared 32-call limit and expiry
+before a later read. The initial fixture used noncanonical incarnation
+strings and attempted to mutate readonly item maps; both were corrected.
+After adding exact query-context validation, a malformed incomplete reply
+correctly became invalid-index rather than incomplete-index. Removing only
+the exact pin check makes the kind-only control fail its Root-pin assertion;
+the source is restored. Logs are /tmp/artroom-directory-client-navigation-*
+and /tmp/artroom-directory-client-kind-only-control.log.
+
+Closed version selectors now include destination6 explicitly in the checker
+reservation reader and CLI edit/propose/cleanup paths. Destination7 remains
+refused by the checker boundary. Its one synthetic reservation-origin case
+passes; this changes a retained @3 outcome's owner only as a selection
+specimen, not a Native @6 check execution claim. Twelve cleanup cases pass,
+as do the existing old-cohort CLI issues/edit-linked journey, five MCP
+inventory cases and eight affected Page opening/editor cases. A first
+checker command used the wrong workspace/root and ran no tests; the
+corrected focused command and workspace typecheck pass. Navigation types
+required the item-query overload and the fixture mapping partition place
+to directory kind; no contract ScopeKind was added. No Source gate or
+provider action has run.

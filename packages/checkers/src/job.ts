@@ -131,7 +131,7 @@ export function manifestOf(sealed: Sealed | null, job: FactRef): number | null {
 
 function reservationOrigin(notice: Notice, job: Sealed["entry"], manifest: Sealed["entry"], snapshot: ReservationSnapshot, configuration: Digest, deadline: Timestamp): Origin {
   const reservation = ownEntry(snapshot.reservation, snapshot.destination, snapshot.reservation.entry.seq);
-  if (!reservation || snapshot.destination.kind !== "destination" || reservation.input.type !== "outcome" || !["platform:destination@3", "platform:destination@5"].includes(reservation.input.owner) || reservation.input.kind !== "judge" || reservation.input.result !== "confirmed"
+  if (!reservation || snapshot.destination.kind !== "destination" || reservation.input.type !== "outcome" || !["platform:destination@3", "platform:destination@5", "platform:destination@6"].includes(reservation.input.owner) || reservation.input.kind !== "judge" || reservation.input.result !== "confirmed"
     || entryHash(snapshot.job.entry) !== snapshot.job.hash || snapshot.job.hash !== notice.job.hash || canonicalize(snapshot.job.entry) !== canonicalize(job)
     || entryHash(snapshot.manifest.entry) !== snapshot.manifest.hash || canonicalize(snapshot.manifest.entry) !== canonicalize(manifest)) return { not: "no-manifest" };
   if (!reservation.uses.some((use) => use.fact.hash === snapshot.manifest.hash && sameScope(use.fact.at, notice.lane))) return { not: "no-manifest" };

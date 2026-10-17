@@ -5,7 +5,7 @@ import { ScopeHandle, declaredHandle, httpTransport, secretSigner, shapeDeclared
 import { expectedOf, heldActs, type DefinitionShape } from "@generalbusiness/dap-cli";
 import { editPath, fileSound, platform } from "@generalbusiness/dap-platform";
 import { knownLIST1 } from "./source-support.ts";
-import { actAssociation, openRoom, Unreadable, type ChangeView, type Room } from "./data.ts";
+import { actAssociation, openingScope, openRoom, Unreadable, type ChangeView, type Room } from "./data.ts";
 
 export interface EditSource { definition: string; manifestFact: FactRef; sourceFact: FactRef; scope: ScopeRef; manifest: number; opened: Digest; base: string; path: string; digest: Digest; size: number; content: string }
 export interface EditDraft { title: string; path: string; content: string }
@@ -95,11 +95,12 @@ export async function prepareEdit(room: Room, change: ChangeView, manifest: numb
   const base = await head(fresh, workflow === "list1"); check(options);
   if (workflow === "legacy" && !supports(declared, editFields(captured, base))) throw new Unreadable("The active change definition does not support this bounded text workflow.");
   shapeDeclaredAct(declared, "propose-file", { on: null, fields: editFields(captured, base) });
-  const D = await summary(handle(fresh, fresh.directory));
+  const root = await summary(handle(fresh, fresh.directory));
+  const D = await summary(handle(fresh, await openingScope(fresh)));
   const directoryShape = platform(D.value.definition)?.data as unknown as DefinitionShape | undefined;
   if (!directoryShape || !heldActs(directoryShape, fresh.me).acts.some(([kind]) => kind === "open-pr")) throw new Unreadable("The directory does not offer the supported native change opening.");
   shapeDeclaredAct(platform(D.value.definition)!.data as unknown as DeclaredDefinition, "open-pr", { on: null, fields: { definition: digest, title: captured.title, draft: false, body: "Source reference" } } as never);
-  return { association: actAssociation(room, change.scope), source, draft: captured, base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, workflow, context: freeze({ service: fresh.session.service.replace(/\/+$/, ""), directory: D.value.scope, membership: fresh.membership, key: fresh.key, rules: fresh.rules, destination: fresh.destination }), directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
+  return { association: actAssociation(room, change.scope), source, draft: captured, base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, workflow, context: freeze({ service: fresh.session.service.replace(/\/+$/, ""), directory: root.value.scope, membership: fresh.membership, key: fresh.key, rules: fresh.rules, destination: fresh.destination }), directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
 }
 
 async function taskRoom(room: Room, task: EditTask, options: EditOptions): Promise<Room> {
@@ -107,7 +108,13 @@ async function taskRoom(room: Room, task: EditTask, options: EditOptions): Promi
   const fresh = await currentRoom(room, options);
   if (fresh.session.service.replace(/\/+$/, "") !== task.context.service || canonicalize(fresh.membership) !== canonicalize(task.context.membership) || fresh.key !== task.context.key || fresh.rules !== task.context.rules || fresh.destination !== task.context.destination) throw new Unreadable("The original room/key/rules/destination binding changed. Nothing new was sent.");
   const directory = await summary(handle(fresh, fresh.directory)); check(options);
-  if (canonicalize(directory.value.scope) !== canonicalize(task.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
+  if (canonicalize(directory.value.scope) !== canonicalize(task.context.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
+  if (task.directory.scope !== fresh.directory) {
+    const part = await summary(handle(fresh, task.directory.scope)); check(options);
+    const control = part.value.items.find(item => item.id === 0 && item.type === "repository" && item.state === "open");
+    if (directory.value.definition !== "platform:directory@10" || part.value.definition !== "platform:directory-partition@1" || canonicalize(part.value.scope) !== canonicalize(task.directory)
+      || !control || canonicalize(control.refs["root"]) !== canonicalize(task.context.directory) || canonicalize(control.refs["membership"]) !== canonicalize(task.context.membership)) throw new Unreadable("The original opening partition changed. Nothing new was sent.");
+  }
   const rules = await summary(handle(fresh, fresh.rules)); check(options);
   if (!rules.value.items.some(item => item.type === "definition" && item.state === "active" && item.values["name"] === "change" && item.values["digest"] === task.definition)) throw new Unreadable("The confirmed change definition is no longer active. Nothing new was sent.");
   return fresh;
@@ -178,17 +185,17 @@ export async function continueEdit(room: Room, task: EditTask, options: EditOpti
     check(options);
     if (task.steps.length === 0) {
       const body = `Based on retained source ${task.source.scope.scope}, version ${task.source.manifest}, opening ${task.source.opened}. Original path: ${task.source.path}. This is a new proposal; it does not replace the source version.`;
-      if (!await sendStep(room, task, "open-pr", room.directory, null, { definition: task.definition, title: task.draft.title, body, draft: false }, options)) return;
+      if (!await sendStep(room, task, "open-pr", task.directory.scope, null, { definition: task.definition, title: task.draft.title, body, draft: false }, options)) return;
       task.state = "waiting-lane";
     }
     const opened = task.steps.find(s => s.kind === "open-pr");
     if (!opened || opened.answer?.answer !== "accepted" || !opened.receiptVerified) return;
-    const fresh = await taskRoom(room, task, options); const D = handle(fresh, room.directory);
+    const fresh = await taskRoom(room, task, options); const D = handle(fresh, task.directory.scope);
     const original = await D.followReceipt(opened.answer.receipt); if (!original.ok) throw new Unreadable("Change opened; its creation entry is currently unreadable.");
     const children = original.entry.sends.filter(s => "creator" in s.to && s.to.kind === "lane").map(s => scopeIdOf(s.to as Seed));
     if (children.length !== 1) throw new Unreadable("The original opening does not name exactly one change lane.");
     task.lane = children[0]!;
-    await options.pause?.([room.directory, task.lane]); check(options);
+    await options.pause?.([task.directory.scope, task.lane]); check(options);
     const L = handle(fresh, task.lane); const lane = await summary(L);
     if (lane.value.status === "refused") throw new Unreadable("The opened change refused its creation. The directory opening remains recorded.");
     if (lane.value.status !== "active") { task.message = "Change opened; waiting for its native lane. Continue checks progress without reopening it."; return; }

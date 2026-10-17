@@ -27,7 +27,7 @@ import { surfaceOf, wordsDigest, type Words } from "./words.ts";
 import { markRefusals, markText } from "./marks.ts";
 
 /** Where a scope of the inventory sits. */
-export type Place = "register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "lane" | "application" | "root";
+export type Place = "register" | "directory" | "partition" | "membership" | "rules" | "destination" | "inbox" | "lane" | "application" | "root";
 
 /** One scope of the inventory, with the definition it pins. */
 export interface Held {

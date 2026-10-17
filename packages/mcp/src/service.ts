@@ -21,7 +21,7 @@ import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, genera
 import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
 import { describeAct, grantAction, onOf, schemaOf, type DefinitionLike } from "./describe.ts";
 import { answered, clip, finding, type Finding } from "./errors.ts";
-import { Kept, definitionOf, readInventory, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
+import { Kept, definitionOf, readInventory, readPartitionIndexes, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
 import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.ts";
 import { Reads } from "./reads.ts";
 import { Unshaped, effectiveFields, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
@@ -317,6 +317,13 @@ export class McpService {
     if (number !== null && room) {
       let lane = room.lanes.find((l) => l.number === number);
       if (!lane) {
+        if (held(room.directory.scope)?.pinned === "platform:directory@10") {
+          const coverage = await readPartitionIndexes(this.#reads, room.directory, room.membership);
+          if (!coverage.complete) return stop({ error: "read", scope: room.directory.scope, reason: "unavailable" });
+          const row = coverage.indexes.flatMap(index => [...index.lanes]).find(item => item.values["number"] === number && isScopeRef(item.refs["scope"]));
+          if (row) return at((row.refs["scope"] as ScopeRef).scope);
+          return stop({ error: "target", what: `no issue or change ${number} is listed in the selected complete partition indexes` });
+        }
         // A lane opened since the list was read: the directory's rows, read once.
         const read = await this.#reads.read(room.membership, (t, r) => t.summary(room.directory.scope, r));
         if (read.ok) {

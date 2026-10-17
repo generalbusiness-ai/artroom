@@ -22,6 +22,7 @@
 import type { DeclaredDefinition, Digest, Head, Item, PlatformDefinition, Read, ScopeId, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { definitionDigest, isDigest, isPlatformDefinition, parseStrict } from "@generalbusiness/artroom-bytes";
 import { ROLE_LISTS, SIBLINGS_OF, platform, type Role } from "@generalbusiness/dap-platform";
+import { ScopeHandle, partitionIndexes } from "@generalbusiness/artroom-client";
 import type { Held, Inventory, Place, Standing } from "./catalogue.ts";
 import type { DefinitionLike } from "./describe.ts";
 import type { Reads } from "./reads.ts";
@@ -87,6 +88,10 @@ export interface Room {
 }
 
 const headText = (at: Head): string => `${at.seq}:${at.hash}`;
+export const readPartitionIndexes = (reads: Reads, root: ScopeRef, membership: ScopeRef) => partitionIndexes({
+  summary: scope => reads.read(membership, (transport, reader) => transport.summary(scope, reader)),
+  query: (scope, query) => reads.read(membership, (transport, reader) => new ScopeHandle(transport, scope, reader).queryItems(query)),
+}, root, membership);
 const isRef = (v: unknown): v is ScopeRef => typeof v === "object" && v !== null && typeof (v as ScopeRef).scope === "string" && typeof (v as ScopeRef).inc === "string";
 
 /** The caller's standing in a membership summary: the role of the active member whose active key signs here, and that role's actions. */
@@ -176,14 +181,26 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
       const d = directoryRead.value;
       const repo = d.items.find((item) => item.type === "repository");
       const ref = (name: string): ScopeRef | null => (isRef(repo?.refs[name]) ? repo!.refs[name] as ScopeRef : null);
-      const lanes = d.items.filter((item) => item.type === "lane" && isRef(item.refs["scope"])).sort((a, b) => a.id - b.id).map((item) => ({
+      let rows = d.items;
+      if (d.definition === "platform:directory@10") {
+        const coverage = await readPartitionIndexes(reads, repository.directory, M);
+        if (!coverage.complete) unread.push({ scope: repository.directory.scope, reason: `directory-index-incomplete:${coverage.reason}` });
+        rows = coverage.indexes.flatMap(index => [...index.lanes, ...index.applications]);
+        for (const index of coverage.indexes) {
+          heads[index.ref.scope] = headText(index.at);
+          // Partition tools are addressed by scope. They never replace the
+          // Root's singleton directory name or its stable room reference.
+          await hold("partition", index.ref.scope, M, index.summary);
+        }
+      }
+      const lanes = rows.filter((item) => item.type === "lane" && isRef(item.refs["scope"])).sort((a, b) => Number(a.values["number"] ?? a.id) - Number(b.values["number"] ?? b.id)).map((item) => ({
         ref: item.refs["scope"] as ScopeRef,
         number: typeof item.values["number"] === "number" ? item.values["number"] : null,
         kind: typeof item.values["kind"] === "string" ? item.values["kind"] : null,
         title: typeof item.values["title"] === "string" ? item.values["title"] : null,
         state: typeof item.values["state"] === "string" ? item.values["state"] : null,
       }));
-      const applications = d.items.filter((item) => item.type === "application").sort((a, b) => a.id - b.id).map((item) => ({
+      const applications = rows.filter((item) => item.type === "application").sort((a, b) => a.id - b.id).map((item) => ({
         digest: typeof item.values["definition"] === "string" ? item.values["definition"] : null,
         state: item.state,
         ref: isRef(item.refs["scope"]) ? item.refs["scope"] as ScopeRef : null,
