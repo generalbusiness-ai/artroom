@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at package.json","body":{"commit":"02a9180357171ad2d15d3dd9e44b1fe8833f3492","path":"package.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/src/custody.ts","body":{"commit":"02a9180357171ad2d15d3dd9e44b1fe8833f3492","path":"packages/mcp/src/custody.ts"}}
