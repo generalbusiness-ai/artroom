@@ -1245,3 +1245,72 @@ full gate can establish the current combined sequence result.
 All these are local checks. The next frozen implementation still needs
 its single gate, current-head memory specimen and exact Source review.
 No landing, push or provider operation is inferred from this checkpoint.
+
+
+## Second frozen gate and subsecond GitHub stand-in correction
+
+Repair freeze 7ccc45025c545c5b3c2601ba5805d1e695ee40a2 has tree
+1aa138532355414c41265b2a8173c137ba9cc205. Its original gate,
+session 4123, closed with exit 1: 1,538 Vitest pass, two fail and three
+skip; 299 files passed, two failed and one skipped. Whitespace passed;
+typecheck took 7.1 seconds elapsed and 26.4 CPU seconds. The test step took
+425.4 seconds elapsed and 515.3 CPU seconds. Dependency installation was
+skipped after verification against the same lockfile. Node and Counting
+downstream steps were not reached. The exact original gate log is
+/tmp/artroom-directory-7ccc45025-first-gate.log, with retained gate files
+under /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.8IPtXIHnFm.
+This is a second failed gate, not a union pass or a load-only diagnosis.
+
+The two failures are the original GitHub-founding case, whose destination
+branch stayed empty with head null, and the GitHub edit journey, whose
+initial native/host heads were null/undefined. The other repaired
+assertions passed in this combined sequence. Inspection found that both
+GitHub upstream stand-ins copied the scripted clock's fractional
+milliseconds into expires_at. The production GitHub adapter accepts only
+whole-second expiry strings. The new Directory refused-genesis witness
+legitimately advances the same shared clock by an additional millisecond;
+its fixture ownership preserves that advance, so later tests can expose
+the invalid upstream responses. The clock itself and production adapter
+must not be widened or reset to conceal this boundary.
+
+Both existing GitHub journeys now explicitly advance a whole-second
+fixture clock by one millisecond, and leave an already fractional clock
+alone. This advances time monotonically and makes the boundary independent
+of suite order. With the original upstream responses, both initial-head
+assertions fail in the focused reproduction at
+/tmp/artroom-directory-github-subsecond-second-reproduction.log; the
+Artifacts case passes. An earlier diagnostic forgot the timeMs import:
+original-reproduction.log records that ReferenceError for founding and
+the real edit assertion failure. It is not a valid two-case reproduction.
+
+Only the two upstream stand-ins' expires_at producers then change: they
+floor the current clock to whole seconds before adding one hour. No
+production code, token permission, accepted expiry grammar, driver,
+assertion, scope definition, key, lifetime or heap limit changes. The same
+two complete files now pass all three cases at a subsecond clock in
+/tmp/artroom-directory-github-subsecond-repaired-focus.log. Scope and lane
+typechecks also pass in github-subsecond-repaired-types.log under that
+prefix. The original gate failures remain; a new frozen head needs its
+own gate before Source review.
+
+## Closed memory specimen at the repair freeze
+
+The original current-head specimen at 7ccc45025 closed with exit 0,
+workerd 1.20260815.1 and no inspector errors. Its sole public file is
+/private/tmp/artroom-directory-native-memory-final2-public.json: 1,520
+bytes, SHA256
+1722e30a9f7a398891e2c063b700b669657e4dfa55cba5830afab2917647f2d7,
+owned regular single-link nonsymlink mode 0600. The driver and child are
+closed. Grant de00bcdd permits checker to read only that file, with no
+adjacent log, helper, directory, onward grant or new operation. Checker
+independently verified its exact bytes, ownership and reported results.
+
+After completed GC, used heap samples are 63,143,500 before collection,
+68,487,780 with the proof collected and 64,090,580 after release. The
+specimen has 32 calls, 32 reads, 32 frames, 4,299,780 actual UTF-8 bytes,
+33,554,432 reserved work bytes, no pending read at the samples and one
+physical read at peak. These are observed local post-GC samples, not
+peak/worst-case heap, maximum-frame input coverage, leak/zero-residue or
+hosted capacity evidence. No heap setting changed. Attempt5 and final1
+files remain intact. This specimen stays tied to its exact repair freeze;
+the subsequent GitHub changes are three test-only paths and this note.

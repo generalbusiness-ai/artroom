@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
 import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/dap-derive/testing";
 import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/dap-platform";
@@ -77,7 +77,9 @@ class ScriptedGitHub {
         expect(scope).toEqual({ repository_ids: [71], permissions: { contents: "write" } });
         const token = `ghs_foundation_fixture_${this.minted.length + 1}`;
         this.minted.push(token);
-        return json({ token, expires_at: soon(3600), repository_selection: "selected", permissions: { contents: "write", metadata: "read" }, repositories: [this.#repository()] }, 201);
+        // The upstream contract returns whole seconds even when our clock
+        // has milliseconds; do not emit an invalid fractional expiry.
+        return json({ token, expires_at: timeOf(Math.floor(timeMs(net.clock.now)! / 1000) * 1000 + 3600_000), repository_selection: "selected", permissions: { contents: "write", metadata: "read" }, repositories: [this.#repository()] }, 201);
       }
       if (request.method === "DELETE" && url.pathname === "/installation/token") {
         const token = request.headers.get("authorization")?.slice("Bearer ".length);
@@ -136,6 +138,9 @@ class ScriptedGitHub {
 // below use actual membership-issued sessions. No lane, source publication or
 // actual GitHub runs.
 test("real PLATFORM founding through production GitHub factory writes exact first head and receipt with private revoked custody; upstream is scripted", async () => {
+  // A legitimate shared clock need not be at a whole second. Exercise the
+  // upstream stand-in at that boundary without rewinding the fixture clock.
+  if (timeMs(net.clock.now)! % 1000 === 0) net.clock.now = soon(0.001);
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: false, inspector: reader });
   onTestFinished(owner.close);
   const { paul } = keys;

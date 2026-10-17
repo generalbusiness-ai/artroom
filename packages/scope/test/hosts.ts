@@ -177,7 +177,9 @@ export class Hub {
         const token = `ghs_edit_fixture_${this.minted.length + 1}`;
         this.minted.push(token);
         this.mintedPermissions.push(body.permissions.contents);
-        return json({ token, expires_at: timeOf(timeMs(net.clock.now)! + 3600_000), repository_selection: "selected", permissions: { contents: body.permissions.contents, metadata: "read" }, repositories: [this.#repository()] }, 201);
+        // Match the upstream's whole-second expiry independently of the
+        // scripted clock's legitimate fractional milliseconds.
+        return json({ token, expires_at: timeOf(Math.floor(timeMs(net.clock.now)! / 1000) * 1000 + 3600_000), repository_selection: "selected", permissions: { contents: body.permissions.contents, metadata: "read" }, repositories: [this.#repository()] }, 201);
       }
       if (request.method === "DELETE" && url.pathname === "/installation/token") {
         this.revoked.add(request.headers.get("authorization")!.slice("Bearer ".length));
