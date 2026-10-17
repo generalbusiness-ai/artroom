@@ -88,8 +88,8 @@ Archive6d1 and local Judge0f35 are independently reviewed and landed in
 actual Main02a. This five-slice preparation incorporates that Main. The
 Judge implementation, including operation-owned receipt/page/failure
 counters, is preserved; the three intended shared paths are MCP guidance,
-service cache hints and their budget witnesses. No native policy, signed
-bytes, key/config migration, dependency or hosted output changes here.
+service cache hints and their budget witnesses. This incorporation adds no native policy, signed-data change, key/config
+migration or dependency. No deployment is performed.
 
 The actual-service HTTP stand-in checks cover both final-page query/head
 continuation and receipt recovery after a lost reply. Four coupled cases
