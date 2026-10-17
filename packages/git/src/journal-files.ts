@@ -91,6 +91,9 @@ export async function journalTreeFiles(reader: JournalObjectReader, tree: string
   async function visit(id: string, prefix: string, depth: number): Promise<void> {
     work.depth(depth);
     const rows = reader.tree(await reader.read(id, "tree"));
+    // The canonical file writer creates directories only for a file.
+    // Empty trees otherwise disappear from the expected flat path set.
+    if (rows.length === 0) return refuseJournal("tree");
     for (const row of rows) {
       work.check();
       if (prefix.length + row.name.length + (row.mode === "40000" ? 1 : 0) > JOURNAL_PATH_BYTES) return work.stop();

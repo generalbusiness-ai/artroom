@@ -129,8 +129,8 @@ The immediate parent must match the selected object format, full native
 scope/incarnation, strictly earlier cutoff, canonical head and manifest,
 fixed commit timestamp and parent ID. Its represented prefix, retained
 keys, closed segments and final segment prefix must match the selected
-native bytes. Unexpected paths and executable, symlink or gitlink modes
-refuse. The Git-valid corrupt-retained-file counterexample passes real
+native bytes. Unexpected paths, empty directories and executable, symlink
+or gitlink modes refuse. The Git-valid corrupt-retained-file counterexample passes real
 Git fsck but fails this native content comparison.
 
 Decision `30b4f3f7`, adopted by `e9201582`, adds the finite parent closure
@@ -273,6 +273,49 @@ freeze; the Source preparation checks that correspondence before filing.
 Read-only advisory `86a5e5d5` at earlier checkpoint `d6c86ac0` is distinct
 from independent Source review of the final candidate. No Source approval
 or landing is claimed by this gate record.
+
+## Empty-directory correction after Source filing
+
+Self-audit found that the immediate-parent flat file map silently dropped
+empty directories. A Git-valid parent could therefore contain an extra
+empty directory outside the archive path set while all expected files
+still matched. The file writer never creates an empty directory, so this
+parent is not the canonical archive layout.
+
+The unchanged `c811785ea` candidate reproduced the defect in one offline
+scratch-Git probe (`8ed6f7`, exit 1): the ordinary SHA-1 parent extended,
+but the same parent with only an unexpected empty directory also extended.
+The assertion required a parent refusal. The first probe attempt
+(`d1f36c`, exit 9) used a flag removed from Node 26; it did not run the
+probe and is not defect evidence. The existing esbuild then bundled the
+same probe without installing a tool or changing checkout dependencies.
+
+The strengthened existing parent-path witness reproduced the same
+assertion in both SHA-1 and SHA-256 (`63037`, exit 1, two failures and nine
+unselected cases). Its previous metadata, forbidden-mode and unexpected
+blob checks passed before each new empty-directory assertion failed.
+The immediate-parent file walker now refuses an empty tree as a malformed
+layout. The generic object reader and older Git-closure walk are unchanged:
+older blobs remain opaque and older native layout semantics are not
+replayed.
+
+Git source/test typechecks passed. The repaired files, layout and closure
+focus (`79243`, exit 0) passed sixteen cases in three files. Original logs:
+`/tmp/artroom-archive-empty-tree-c811-probe.log`,
+`/tmp/artroom-archive-empty-tree-c811-bundled-probe.log`,
+`/tmp/artroom-archive-empty-directories-original-focus.log`,
+`/tmp/artroom-archive-empty-directories-types.log` and
+`/tmp/artroom-archive-empty-directories-repaired-focus.log`.
+
+Finding `bdcf6890` holds the old candidate. Supersession `24704f32`
+withdraws its exact Source review `27b153f3`; Source request `3957ab1c`
+and promise `1311f791` remain live. The old passing gate, thirteen reports
+and immutable metadata grant `73a8e23f` are historical evidence, not
+approval of this repair. The changed implementation requires a fresh
+freeze and gate before replacement artifacts and independent review.
+The separate P3 integration gate `24299` also remains an actual pass
+of its original composition; it cannot validate this changed dependency.
+These log references grant no external-file or execution access.
 
 ## Remaining archive outcomes
 
