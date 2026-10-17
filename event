@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:36b451f864761244946b64c92f71ec6ffa4e4696","text":"Merge retired a covered predecessor; the successor is at docs/manual/life-of-an-act.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:36b761d7f52bbe7afe79d3a71741b53cff55a760","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/turn.test.ts."}
