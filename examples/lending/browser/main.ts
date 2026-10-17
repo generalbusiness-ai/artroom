@@ -82,7 +82,10 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
   const outcome = await using.act(kind, input);
   if (at !== epoch) return;
   tell(kind, outcome);
-  if (outcome.status === "recorded" || outcome.status === "refused") for (const key of kind === "donate" ? ["donate-name", "donate-description"] : [`reason-${input.thing}`]) dropped.add(key);
+  if (outcome.status === "recorded") {
+    const consumed = kind === "donate" ? ["donate-name", "donate-description"] : kind === "cancel" ? [`reason-${input.thing}`] : [];
+    for (const key of consumed) dropped.add(key);
+  }
   await look();
 });
 
