@@ -3,17 +3,17 @@
 Source child `e9943975`, promise `536af54f`, implements the approved
 Draft 4 under NOW request `e0292346`. It adopts technical reconciliation
 `d1543f97` and the subsequent bounded-proof and foreign-fixture advice.
-The first Source review at f45a5ce80 requests only regeneration of two
-Lending outputs, recorded as F1 in b8b351f1. That correction is now
-prepared over Main 4f7b07ee, with 84 actual changed paths. The prior
-2bcc1a4d gate remains a passing historical result: 1,540 Vitest pass,
-three skip, 16 Node and 55 Counting. It did not establish Lending asset
-freshness. The corrected frozen implementation needs its own gate and
-exact successor review. Earlier sections retain their original checkpoint
-status; the latest evidence below supersedes those progress statements
-while preserving every failed gate, review finding and stated limitation.
-No Source approval, landing, default activation, provider action or
-Cloudflare change is claimed.
+The F1 Lending correction is prepared for exact successor Source review
+over Main 4f7b07ee, with all 84 actual changed paths. Its original gate
+at frozen 67ea36850 closed 0: 1,540 Vitest pass, three skip, 16 Node and
+55 Counting. The final successor changes only this evidence report; every
+other blob, mode and path matches that tested tree. The earlier 2bcc gate
+also passed, but did not establish Lending asset freshness; first review
+b8b351f1 correctly requested that correction at f45. Earlier sections
+retain their original checkpoint status; terminal evidence below
+supersedes progress statements while preserving every failed gate,
+review finding and limitation. No Source approval, landing, default
+activation, provider action or Cloudflare change is claimed.
 
 ## Current implementation boundary
 
@@ -1405,3 +1405,41 @@ gate before exact review, binding all 84 paths under the same Source
 child and promise. Five unlanded naming artifact bases remain protected.
 The separate terminology branch is cleanly checkpointed at b38c578a1;
 none of its changes enters this Directory correction. No provider action.
+
+
+## Passing F1 gate and exact successor boundary
+
+The original single gate at
+67ea36850c5dafc56ad6e8d6e844880cf92f7db2, tree
+8b531062edd6e04c8ce3195c7ed0f1986224d4e6, session 85443,
+closed with exit 0. It reports 1,540 Vitest pass, three skip, 16 Node
+and 55 Counting. Whitespace passes. Typecheck took 7.1 seconds elapsed
+and 26.5 CPU seconds; the full test step took 446.9 seconds elapsed and
+537.6 CPU seconds. These are phases of this original gate, not a union
+of focused executions. Dependencies were verified against the same lock;
+installation was skipped. The machine remains arm64 Mac17,7, 18 logical
+CPUs, 68,719,476,736 bytes of memory. An observed load sample during this
+warm local run was 2.37, 1.76, 1.74; no controlled idle or cold-cache
+claim. Original log:
+/tmp/artroom-directory-67ea36850-first-gate.log. Retained gate files:
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.XQKQ54sJNn.
+
+The original log also retains one nonfatal native RPC-disposal diagnostic
+and the scripted-fault scenarios' native diagnostics. Exit 0 is not a
+claim of physical draining or absence of leaked resources; no cause is
+assigned to that disposal diagnostic here. The closed final2 inspector
+specimen remains specifically at 7ccc. Its raw32/provenance functions
+are unchanged; the later two generated Lending assets differ. No new-head
+heap measurement is claimed.
+
+Checker independently confirms that 67ea differs from reviewed f45 in
+only the two predicted Lending outputs and this report: all 1,433 other
+leaf modes, blobs and paths are unchanged. The final evidence-only
+successor then changes only this report from the passing 67ea tree,
+leaving all 1,435 other leaves unchanged. No repeated gate is run for that
+report-only successor, under docs/testing.md. Exact successor review must
+bind all 84 paths, primary first, and preserve both approved Main design
+notes. Previous failed freezes, the prior passing gate and the F1
+changes-requested verdict remain tied to their own exact heads. Five
+unlanded native-room-naming artifacts remain protected. No terminology
+change, provider operation or default activation is included.
