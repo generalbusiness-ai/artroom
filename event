@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"docs/mcp.md at exact 50dd61e77022c275e656927e345bbcdea37b8e54 on request/p3-after-judge-20261017, under promise git:sha1…e2d2c99 on request git:sha1…3f79e1f","body":{"commit":"50dd61e77022c275e656927e345bbcdea37b8e54","path":"docs/mcp.md"}}
+{"kind":"artifact","text":"packages/mcp/src/recent.ts at exact 50dd61e77022c275e656927e345bbcdea37b8e54 on request/p3-after-judge-20261017, under promise git:sha1…e2d2c99 on request git:sha1…3f79e1f","body":{"commit":"50dd61e77022c275e656927e345bbcdea37b8e54","path":"packages/mcp/src/recent.ts"}}
