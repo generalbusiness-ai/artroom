@@ -1,5 +1,15 @@
 # MCP invitation and bearer custody guidance
 
+## Current Source
+
+Source request `e50e8375`, promise `eb98565f`, renews
+the complete original scope on actual Judge Main
+`02a9180357171ad2d15d3dd9e44b1fe8833f3492`, tree `b43a07d1`.
+The older Source IDs, dependency waits and gate results below describe
+earlier preparation checkpoints. All original attempts remain recorded.
+
+## Earlier preparation
+
 Request `5251ef36`, under `f3ef39dc`; correction `d38a5410`.
 
 The older request described thirty days as a retention limit and every
@@ -70,3 +80,29 @@ exact path, mode, type and blob correspondence must accompany review.
 The separately scoped Source request remains unfulfilled until its
 exact-path review and normal landing. Filing and landing follow archive
 review `17dad8da`; the passing gate does not approve either source.
+
+
+## Actual Judge Main composition
+
+Archive6d1 and local Judge0f35 are independently reviewed and landed in
+actual Main02a. This five-slice preparation incorporates that Main. The
+Judge implementation, including operation-owned receipt/page/failure
+counters, is preserved; the three intended shared paths are MCP guidance,
+service cache hints and their budget witnesses. No native policy, signed
+bytes, key/config migration, dependency or hosted output changes here.
+
+The actual-service HTTP stand-in checks cover both final-page query/head
+continuation and receipt recovery after a lost reply. Four coupled cases
+passed in original run34507 (`48122e`). The fixture retains observation,
+metrics and lost-reply wrapping together. Those cases prove transport and
+cache accounting, not Native admission. The subsequent Main incorporation
+changes only the Judge delivery note relative to that checked composition.
+
+The earlier P3 gate at52c1 passed before this Judge composition. It is
+historical evidence; one new gate is due at the final changed composition
+freeze before complete exact-path Source review. The approved Judge slice
+retains its three failed gates and cause-unknown timeout qualifications;
+those are neither waived nor counted as a passing combined P3 gate. All
+five P3 scopes and their earlier evidence remain intact. No provider,
+deployment, publication or unreviewed branch push is performed. Further
+GitHub egress waits for the pending direct destination approval.
