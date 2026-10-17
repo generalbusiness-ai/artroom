@@ -92,6 +92,7 @@ import { admittedRequestUrl, itemQueryWire } from "./item-query-wire.ts";
 import { isSite, site } from "./site/route.ts";
 import { requestQuery, type RequestPage } from "./request-index.ts";
 import { measuredRequest, OBSERVED_METHODS, operational, operationPlace, unknownTurnMark, type MetricEnvironment, type OperationalIdentity, type ObservedMethod } from "./operational.ts";
+import type { MetricPoint } from "./metrics.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -636,6 +637,7 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
     const scopes = this.scopes();
     this.#agent = new HostedAgent(sqlOf(this.ctx), {
       id: this.ctx.id.toString(), now: () => Date.now(), random: (n) => crypto.getRandomValues(new Uint8Array(n)), observe: observeThrough(scopes),
+      ...(this.env.METRICS ? { metrics: { deployment: this.env.DEPLOYMENT ?? "unknown", version: this.env.VERSION_METADATA?.id ?? "unknown", report: (point: MetricPoint) => this.env.METRICS?.writeDataPoint(point) } } : {}),
       fetch: ((url: string, init?: RequestInit) => route(new Request(url, init), scopes)) as unknown as AgentPorts["fetch"],
       ...this.ports(),
     });
