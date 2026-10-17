@@ -48,11 +48,22 @@ async function story(lifetime: Lifetime): Promise<void> {
   };
   // Each request goes through the Worker's routes; after an act is answered the scheduler stand-in runs, so an issuance's add-member
   // has its inbox created before the issuance verifies it, as a deployment's alarm would have.
+  let actSubmits = 0, forbidActSubmit = false;
   const fetch = (async (url: string, init?: RequestInit) => {
+    if (new URL(url).pathname.endsWith("/acts")) {
+      actSubmits++;
+      if (forbidActSubmit) throw Error("SUBMIT TRIPWIRE: retained or locally refused work must not submit an act");
+    }
     const response = await lifetime.wait(() => routed(url, init));
     if (new URL(url).pathname.endsWith("/acts")) await settle();
     return response;
   }) as unknown as Fetch;
+  const withoutActSubmission = async <T>(work: () => Promise<T>): Promise<T> => {
+    const before = actSubmits, previous = forbidActSubmit;
+    forbidActSubmit = true;
+    try { return await work(); }
+    finally { forbidActSubmit = previous; expect(actSubmits, "observed act-submit tripwire, independently of unchanged heads").toBe(before); }
+  };
   // STAND-IN for the scheduler while a command waits: each register's creation request gets the host's answer the test writes.
   const pause = async (waiting: readonly string[]) => {
     lifetime.active();
@@ -197,7 +208,7 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect(lost.code, lost.lines.join("\n")).toBe(1);
   expect(lose, "the invite-member was sent once and its answer lost").toBe(false);
   // While its outcome is unknown, the retained invitation blocks a new one: nothing new is signed or sent.
-  const blocked = await run(lia, "invite", "@quin", "--role", "member", "--keep");
+  const blocked = await withoutActSubmission(() => run(lia, "invite", "@quin", "--role", "member", "--keep"));
   expect(blocked).toEqual({ code: 1, lines: ["An invitation of @pat is retained. Run dap invite --check, or dap invite --continue. Nothing new was signed."] });
   const recorded = (await library.M.summary()).at;
   const checked = await run(lia, "invite", "--check");
@@ -232,11 +243,11 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect(signedOnce, "one invite-member of @rex, however often it was continued").toHaveLength(1);
   const headBefore = (await library.M.summary()).at;
   const directoryScope = library.repository.directory.scope;
-  const interrupted = await run({ ...lia, fetch: dropping((url) => url.includes(directoryScope)) }, "invite", "--check");
+  const interrupted = await withoutActSubmission(() => run({ ...lia, fetch: dropping((url) => url.includes(directoryScope)) }, "invite", "--check"));
   expect([interrupted.code, interrupted.lines[0]], interrupted.lines.join("\n")).toEqual([1, expect.stringMatching(/Nothing was read; the read may be made again\. The original invitation is retained/)]);
-  const settled = await run(lia, "invite", "--check");
+  const settled = await withoutActSubmission(() => run(lia, "invite", "--check"));
   expect([settled.code, settled.lines[0]], settled.lines.join("\n")).toEqual([0, "Invited @rex: the invitation is recorded and verified."]);
-  expect((await library.M.summary()).at, "Check sends nothing").toEqual(headBefore);
+  expect((await library.M.summary()).at, "Check admits no new invitation").toEqual(headBefore);
   expect((await library.M.summary()).value.items.filter((item) => item.type === "member" && item.values["handle"] === "@rex")).toHaveLength(1);
   // The three modes stay distinct on the command line.
   expect((await run(lia, "invite", "--check", "--continue")).code).toBe(2);
@@ -266,7 +277,7 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect([mislabelledConfig.repository, mislabelledConfig.handle, mislabelledConfig.join?.accepted]).toEqual([undefined, undefined, undefined]);
   // The same link, relabelled, checked again: the same refusal, and nothing further is sent.
   const headAfterWrongPin = (await counter.M.summary()).at;
-  expect(await lifetime.wait(() => enrolAgentKey(mislabelled, relabel(spare, { definition: "platform:membership@4" }), { mode: "check" }))).toEqual(wrongPin);
+  expect(await withoutActSubmission(() => lifetime.wait(() => enrolAgentKey(mislabelled, relabel(spare, { definition: "platform:membership@4" }), { mode: "check" })))).toEqual(wrongPin);
   expect((await counter.M.summary()).at).toEqual(headAfterWrongPin);
 
   // A counting invitation presented to the library's membership: the library refuses the enrol natively, since it holds no such
@@ -277,8 +288,8 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect([crossRoom.code, crossRoom.lines[0]], crossRoom.lines.join("\n")).toEqual([1, expect.stringMatching(/^Agent enrollment refused: .*\. The exact original remains retained\.$/)]);
   expect((await library.M.summary()).at).toEqual(libraryHead);
   expect((await presentedElsewhere.store.config())!.repository).toBeUndefined();
-  // Retried, the same configuration reports the retained refusal and sends nothing.
-  expect(await run(presentedElsewhere, "join", retarget(spare, library, { definition: "platform:membership@4" }))).toEqual({ code: 1, lines: [expect.stringMatching(/^The original agent enrollment was refused: .*\. Nothing was replaced\.$/)] });
+  // Retried, the same configuration reports the retained refusal and submits no act.
+  expect(await withoutActSubmission(() => run(presentedElsewhere, "join", retarget(spare, library, { definition: "platform:membership@4" })))).toEqual({ code: 1, lines: [expect.stringMatching(/^The original agent enrollment was refused: .*\. Nothing was replaced\.$/)] });
   expect((await library.M.summary()).at).toEqual(libraryHead);
 
   // A key of one room presented as an invitation of the other: the library membership refuses a counting agent's enrol too, under
@@ -296,10 +307,10 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect([bot4.state, (await counter.M.summary()).value.items.find((item) => item.type === "key" && item.refs["member"] === bot4.id)?.state]).toEqual(["active", "active"]);
   expect(((await counter.M.summary()).value.items.find((item) => item.type === "key" && item.refs["member"] === bot4.id)!.values["id"])).toBe((await retained(mislabelled)).intent.actor);
 
-  // An admin who names another member as the controller: the issuance is refused before anything is signed, and the membership's
-  // head does not move.
+  // The issuer names another member as controller: no invitation act is
+  // submitted. Read-session authentication may still sign and send.
   const before = (await counter.M.summary()).at;
-  await expect(issue(rita, counter.membership, "@bot5", "@bot1")).rejects.toThrow("The original invitation custody or context is unavailable. Nothing was replaced.");
+  await expect(withoutActSubmission(() => issue(rita, counter.membership, "@bot5", "@bot1"))).rejects.toThrow("The original invitation custody or context is unavailable. Nothing was replaced.");
   expect((await counter.M.summary()).at).toEqual(before);
   expect((await counter.M.summary()).value.items.some((item) => item.type === "member" && item.values["handle"] === "@bot5")).toBe(false);
 }
