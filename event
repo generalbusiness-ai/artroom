@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-16-evidence-rules-design.md","body":{"commit":"d09cc9185f025819632d20178f7f75072184f95c","path":"notes/2026-10-16-evidence-rules-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:52665cc8dc3edbfa06a3debd5e6948c6405f7908","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-evidence-rules-design.md."}
