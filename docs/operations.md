@@ -106,7 +106,7 @@ are dropped and counted, without truncating caller text into a valid row.
 
 A native end is `answer`, `idle`, `busy`, `clock-behind` or `unavailable`.
 It stays separate from the public answer. Internal diagnosis turns can end
-`answer` with no public answer. HTTP public turns use `found`, `acts` and
+`answer` with no public answer. HTTP public turns use `create`, `acts` and
 `preparations`; direct and MCP-backed calls use their separate `rpc:`
 places. A route mark comes from entry into the actual native turn.
 Missing execution metadata counts as critical coverage loss.
