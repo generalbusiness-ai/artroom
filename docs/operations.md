@@ -202,8 +202,17 @@ are not printed. Exit 0 means the observed check passed; 1 means it
 failed; 2 means its retained inputs were invalid.
 
 The reported `weightedRows` is the sum of sample intervals over metric
-points. It is not SQLite rows written. Actual storage-row reporting is
-still owed; `rowsWritten` remains unknown (`null`) and does not gate.
+points. SQLite storage rows written remain unmeasured: `rowsWritten` is
+`null`, with `rowsWrittenReason: "not-measured"`. This total does not gate
+the check. Turn wrote-count and timed-entry count cannot substitute for it.
+
+The intended source is the platform's Durable Objects analytics dataset
+for SQLite storage rows written. Its exact dataset and field names are
+unverified. The first operator run must confirm them by introspection
+after deployment reopens. That reader is a follow-up under observability
+request `f57fc4da`, delivered with the first post-freeze deploy check.
+No provider query, introspection, token or schema change is part of this
+local delivery.
 
 ## Request correlation
 

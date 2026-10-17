@@ -34,6 +34,7 @@ export function evaluateDeployment({ deployment, version, now, p95BoundMs, rows,
     loss: { rows: 0, turns: 0, critical: 0, mask: 0 },
     // The delivered point map does not carry SQLite rows-written totals.
     rowsWritten: null,
+    rowsWrittenReason: "not-measured",
   };
   const fail = name => { if (!failures.includes(name)) failures.push(name); };
   const finish = () => {

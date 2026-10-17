@@ -63,8 +63,8 @@ There was no sweep or full-suite run.
 
 ## Read-only client checkpoint
 
-`scripts/deploy-check.mjs` now exports the client. It has no command-line
-entry point yet. The caller supplies the deployment, version and bound;
+`scripts/deploy-check.mjs` exports the client and the operator command
+described below. The client caller supplies the deployment, version and bound;
 the function explicitly does not certify their provenance. It sends one
 SQL request for a fixed fifteen-minute window and one independent health
 request. The token goes only to the fixed account-scoped Analytics Engine
@@ -103,8 +103,8 @@ The initial closed name map covers the generic tools, `list` and hosted
 `enrol`. Dynamic act tool names are outside that map and are dropped with
 tainted-loss accounting. No name is redacted into a supported name.
 Record phase observations occur only after successful custody writes,
-using the phase captured before mutation. Preparation steps' separate
-phase observations remain to be added.
+using the phase captured before mutation. Preparation steps have separate
+phase observations, as described below.
 
 The CLI's `serve` path now emits `dap.metric` JSON on stderr. Hosted
 services and control enrolments use the optional reporter; the production
@@ -215,12 +215,17 @@ observations remain attributed to their own source checkpoints.
 
 ## Remaining third-stage work
 
-Observed demo calibration, actual storage-row reporting and live acceptance
-remain outstanding. Request `5ddf26c3` asks the planner to reconcile the
-rows-written source within the existing approved stage. The delivered
-metrics-v1 map contains no such total, and public platform documentation
-requires GraphQL introspection to identify exposed fields. No account
-introspection or new metric schema has been inferred or executed.
+Observed demo calibration and live acceptance remain outstanding.
+Planner disposition `e93b5353` resolves request `5ddf26c3`: no adopted
+storage-row counter exists. The result reports `rowsWritten: null` with
+`rowsWrittenReason: "not-measured"`, never turn wrote-count or timed-entry
+count. This total does not gate Judge acceptance. `docs/operations.md`
+names the intended Durable Objects analytics source as unverified; exact
+dataset and field names must be confirmed by introspection on the first
+operator run after deployment reopens. Its reader is a follow-up under
+`f57fc4da`, delivered with the first post-freeze deploy check. Calibration
+rules are unchanged. No provider query, introspection, token or schema
+change is authorized or executed by this local delivery.
 The complete third stage has not passed a gate or
 received Source review. One gate is due at its final changed implementation
 freeze. Archive review `17dad8da` keeps priority for Source filing and

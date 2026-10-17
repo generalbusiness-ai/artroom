@@ -39,7 +39,7 @@ test("Judge passes the unsampled synthetic boundary with declared limits", () =>
   assert.equal(r.pass, true); assert.equal(r.errorRate, 0.01); assert.equal(r.refusals, 1);
   assert.equal(r.routeP95Ms, 10); assert.equal(r.coverage, "complete");
   assert.match(r.message, /100 turns, no recorded loss, counts balanced/);
-  assert.equal(r.rowsWritten, null); assert.equal(r.gaps.length, 3);
+  assert.equal(r.rowsWritten, null); assert.equal(r.rowsWrittenReason, "not-measured"); assert.equal(r.gaps.length, 3);
 });
 
 test("Judge refuses insufficient, stale, erroneous, slow or busy observations", () => {
