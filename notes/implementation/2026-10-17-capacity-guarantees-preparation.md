@@ -1,8 +1,8 @@
 # Capacity guarantees: preparation
 
-Request `113a54bd`, promise `0dc3ead9`; preparation Source `32864765`,
-promise `4aa3f4fb`. This note maps Main
-`02a9180357171ad2d15d3dd9e44b1fe8833f3492`. It changes no runtime,
+Request `113a54bd`, promise `0dc3ead9`; preparation Source `2e0ed258`,
+promise `9d4e0d85`. This note maps Main
+`532b1d0d00e05f32cb5e454a0e838b447bff0b12`. It changes no runtime,
 definition, bound, refusal, storage schema, or replay rule.
 
 Entries have admission accounting. Bytes, items, records, and pending
@@ -156,3 +156,22 @@ adopted by `a9455973`. This is a changed candidate with a fresh Source
 commission on live capacity-root bases; those earlier approvals and the
 landing receipt are historical evidence only. A new exact-head review is
 required. No implementation or test changed and no gate was repeated.
+
+
+## Current Main plan and authorization
+
+Preparation `7071e7df` was approved by `f78f6598` and adopted by
+`401ef82c` on Judge Main `02a91803`. Current Main `532b1d0d` adds only
+the independently reviewed journey plan and its index. This successor
+preserves both documents exactly and changes only this preparation note
+against Main. All 1,459 Main leaves, including the cited source and S1–S3
+notes, remain exact. The earlier approvals are historical evidence; fresh
+Source `2e0ed258` and promise `9d4e0d85` require review of this exact head.
+No runtime or test changed, so no gate is repeated.
+
+Hugh directly authorized repository pushes and planner deployments to
+Cloudflare as needed. A normal reviewed landing and push can proceed;
+this preparation makes no deployment or provider operation. Decision
+`4dccae54` remains open for the remaining runtime/configuration/reporting,
+version, producer and numeric choices. The adopted units are settled.
+The full capacity guarantees and their implementation witnesses remain owed.
