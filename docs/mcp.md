@@ -25,10 +25,13 @@ directory (`DAP_HOME`, or the legacy `ARTROOM_HOME`). Set the room up first
 with `dap install` and `dap create`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
 there as `dap join` does. The link holds the invitation's secret.
-`join`'s own result never repeats it. The join that membership admits
-holds it, as its signed input, so a journal read of membership (`step`,
-`record`) returns it to whoever may read that journal, as the native
-record does for any member's session.
+`join`'s own result never repeats it. With membership@6, the signed join
+holds a proof made with the invitation's private key, bound to that
+membership scope, invitation and joining key; it does not hold the secret.
+Legacy membership@1, @2, @4 and @5 hold the secret in the signed join.
+A journal read of membership (`step`, `record`) returns that signed input
+to whoever may read the journal. Local custody retains the same envelope;
+see [Custody](#custody) for retention.
 
 ### Over stdio
 
@@ -63,6 +66,16 @@ The server answers `401` to a request without that header, `403` to any
 request that carries an `Origin` header (no browser page is a client of a
 signing server), and `404` to any path but `/mcp`. A new process makes a
 new token. Batches are not served.
+
+The bearer grants access to this signing server. A launching host that
+collects standard error can retain it in a log, even though the server
+prints it only once. Keep startup standard error out of collected logs
+and pass the token directly to the host's protected Authorization-header
+configuration, if the host supports that private handoff. The CLI has no
+alternate bearer-output option. If the host cannot keep that stream and
+header private, use `dap mcp` over stdio instead: that transport issues no
+loopback bearer. Access to the host, process and config directory still
+controls access to the signing key.
 
 The loopback server and the hosted endpoint validate every request the
 same way, through one HTTP layer (`packages/mcp/src/http.ts`); the rules
@@ -229,6 +242,13 @@ The server keeps each signed envelope before it sends it, under the
 caller's `idempotencyKey`, in the config directory's
 `private/mcp-custody/`, readable only by its owner.
 
+- **Invitation contents and retention.** A join record keeps its exact
+  signed input: an invitation proof for membership@6, or the invitation
+  secret for legacy membership@1, @2, @4 and @5. An archived record keeps
+  the same input. The invitation link remains secret in either case;
+  hosts may also retain tool inputs. Neither intent expiry nor archival
+  erases the envelope. Thirty days is an archival threshold, not a
+  maximum retention period, and unresolved records are retained.
 - **A lost reply** leaves the record unknown. The same call with the same
   key sends the same bytes again; `settle` reads the scope's settlement.
   Neither signs a second intent.
@@ -258,11 +278,16 @@ caller's `idempotencyKey`, in the config directory's
 - **Preparation steps** are kept apart from the act. A step keeps its first
   answer and its latest 63; the answers between them are not kept. The act's
   outcomes are never dropped.
-- **Archives.** Terminal records move to archive files of at most 64 MiB,
-  with an index, in one transaction under an archive lease: the archive file
+- **Archives.** A terminal write checks for terminal records older than
+  thirty days or beyond the newest 1,024. Eligible records move to archive
+  files of at most 64 MiB, with an index, in one transaction under an
+  archive lease: the archive file
   is written whole and renamed into place, then the index, and only then are
   the live records removed. A record whose lock another process holds is
-  skipped. A crash at any point loses no record.
+  skipped. This runs on terminal writes, not a timer, so an old terminal
+  file can remain until a later check. Archives remain readable; this
+  store has no automatic age-based deletion of retained envelopes.
+  A crash at any point loses no record.
 - **Locks.** A lock or lease is broken only when the process that took it
   is gone, whatever its time; the passing of an intent's deadline is never
   an outcome. One process at a time breaks it, under a reclaim lock, after
@@ -1568,9 +1593,11 @@ Enrolment is the membership's own; nothing here grants a permission.
 1. An admin adds the agent as a member with its controller, an active
    person: `member.add` with `kind: agent`, the handle and `controller`.
 2. An admin invites a key for that member: `key.invite` with the member,
-   `kind: agent`, `inviteHash` (the digest of a 32-byte secret) and
-   `inviteEnds`. `dap invite --kind agent-key` performs both and prints the
-   invitation link, which holds the secret: keep it private.
+   `kind: agent`, `inviteEnds` and the membership version's invitation
+   field: `inviteKey`, the invitation's public key, for membership@6;
+   `inviteHash`, the secret's digest, for legacy membership@2, @4 and @5.
+   `dap invite --kind agent-key` performs both and prints the invitation
+   link, which holds the secret: keep it private.
 3. The controller (or an admin) signs a **control request** with their own
    member key and sends `create` with the link as the body. The Worker's
    registry checks the signature, that the request is for this service and
@@ -1581,9 +1608,10 @@ Enrolment is the membership's own; nothing here grants a permission.
    records the request under `op` and creates the agent's object.
 4. The agent's object makes its key, keeps the signed `enrol` under
    custody before sending it, reads the admitted entry back, confirms the
-   key is active, and mints the bearer. The secret of the invitation lives
-   where the membership puts it, in `enrol`'s signed fields and the entry
-   that retains them, and nowhere else in the hosted store.
+   key is active, and mints the bearer. Membership@6's signed `enrol`
+   holds the invitation proof; legacy @2, @4 and @5 hold its secret.
+   Custody and the admitted journal entry retain those signed fields.
+   Hosted custody archival does not delete them; see its budgets below.
 5. Give the agent host `https://<service>/mcp` and
    `Authorization: Bearer <agent>.<secret>`.
 
@@ -1700,9 +1728,18 @@ it without changing the generation. A cursor whose layout no longer holds
 is answered with the first page and `restarted`, so no entry is repeated
 or skipped.
 
-The searches of `wait` and `credential` keep their position between polls
-and calls and read at most 16 entries, or 4 pages of final items, each
-time, with no fixed window.
+The searches of `wait` and `credential` retain at most 64 recent entry-search
+positions and 64 recent final-page positions per server. A lookup keeps its
+position recent; the oldest is evicted at the bound. Each poll or call still
+reads at most 16 entries, or 4 pages of final items, with no fixed history
+window. An evicted search restarts those bounded reads. These hints hold
+neither an answer nor a credential and grant no authority.
+
+An entry search belongs to its service and immutable opening entry's full
+scope, position and hash, so appending entries does not reset it. A final-page
+position belongs to its service, full scope, observed head and query. A new
+head or query starts at the first page. If the head changes between summary
+and final-item reads, that poll returns no item; a later poll reads again.
 
 ### Per tool, end to end
 

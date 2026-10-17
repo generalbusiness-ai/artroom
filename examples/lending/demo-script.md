@@ -120,6 +120,10 @@ reconciled its lost join answer and lost Small pot donation answer with
 rehearsal also contains two Check recoveries; keep each run's evidence
 with its own room.
 
+**Check** submits no new lending or join act. Its reads may first sign and
+send read-session authentication. Local renderer checks with scripted
+ports are separate from the hosted browser and publication evidence above.
+
 For the public closing shot, use an unseated browser. Read all three shelf
 pages and commit history. Show the cancelled page's reason and the lending
 scope and incarnation named by its text. Match its commit to the member's

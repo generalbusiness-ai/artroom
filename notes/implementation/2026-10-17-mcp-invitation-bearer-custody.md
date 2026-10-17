@@ -1,0 +1,197 @@
+# MCP invitation and bearer custody guidance
+
+## Current Source
+
+Source request `b379940c`, promise `99bd5573`, preserves the complete
+original scope on actual Main
+`afcf416e8c077499abbe7efd16bbdbe329811445`, tree `4b45f8ca`.
+That Main includes the reviewed Judge, journey plan and capacity preparation.
+Complete review `0ad4e770` found one Lending draft-loss issue. This successor
+repairs that boundary and its owned generated assets; the other scopes keep
+their reviewed runtime and test bytes. The one repaired-composition gate failed an unchanged archive timeout;
+its result and separate diagnostics are recorded below. Complete
+exact-head re-review and explicit residue disposition remain due. Earlier
+Source IDs, dependency waits and gate results below are historical checkpoints.
+All original attempts and the complete five-scope conditions remain recorded.
+
+## Earlier preparation
+
+Request `5251ef36`, under `f3ef39dc`; correction `d38a5410`.
+
+The older request described thirty days as a retention limit and every
+join as secret-bearing. Current code supports neither universal claim.
+The guide now states what is retained and how a launcher can expose the
+loopback bearer through its logs. This changes documentation only.
+
+## Evidence from current code
+
+- `packages/client/src/invitation-fields.ts` selects membership@6's
+  invitation proof; legacy @1, @2, @4 and @5 use the secret. The proof is
+  bound to the membership scope, invitation and joining key.
+- `packages/mcp/src/service.ts`, `#join`, uses those fields when signing
+  the envelope kept by custody. `step` and `record` expose the admitted
+  signed input to an authorized journal reader. A new-cohort proof does
+  not make the invitation link public or remove host-retained tool inputs.
+- `packages/mcp/src/node.ts` sets terminal archival thresholds of thirty
+  days and 1,024 records. A terminal write checks for eligible records,
+  skips a record another process holds, and moves the exact serialized
+  record into an indexed archive. Archived records remain readable.
+  This is not a deletion deadline or an expiry timer. Unresolved records
+  stay retained.
+- `serveHttp` makes one bearer per process and announces it once on
+  standard error by default. The CLI has no alternate bearer-output
+  option. A private launcher-to-header handoff is conditional on the
+  host keeping both private. The existing stdio transport avoids issuing
+  a loopback bearer; host, process and config custody still matter.
+
+- `packages/mcp/src/hosted.ts` uses the same redemption helper for
+  `enrol`. The controller recipe now distinguishes the invitation's
+  public key and proof in membership@6 from the digest and secret in
+  legacy agent-key cohorts @2, @4 and @5. The existing hosted archive
+  retention section still applies; this adds no erasure claim.
+
+No runtime, schema, custody record, retention policy, archive writer,
+token transport, package or generated asset changes. No deployment,
+hosted acceptance or secret-erasure guarantee is claimed.
+
+## Validation and review boundary
+
+This two-path slice starts at Main
+`55e1970a5f7a87a9aeeda92542b3e98ad0088a10`, tree
+`8125caf09510d3415dd13649e371e07ed289465d`. The document-only
+composition was checked against the frozen, passing implementation
+`52c1a0fc1e44a604977a95698c8014cf0ab04b7d`, tree
+`409b91640dd326d867e2a329be5ffe99b3f72358`, and its final notes
+successor `a156b08f1c6169c3a943160440cac122231bdfab`, tree
+`3e6340bb0a05dfbfb05771a066a8cd52a274a2fb`.
+
+The original composition check at
+`2a52d2c5a3119f4c8bca73b937e1714f7a41941e`, tree
+`96b21e2925eb8ea54b978108ddc59d1e511186b4`, found exactly this
+guide and this new note changed after `a156b08f`: the other 1,457
+existing mode, type and blob leaves agree. Against the gate freeze,
+only the guide and five delivery notes differ; all 1,453 other leaves
+agree. All thirteen archive leaves match its current final source
+`6d1a1973dd5bb361dbe22d4c6b29c223be6c91e6`. The new Custody link
+resolves to the existing heading, and whitespace checks pass. This
+paragraph is a later note-only addition; final review must retain the
+same source correspondence.
+
+Original gate session `49806` exited zero: 1,567 Vitest cases passed,
+three existing cases skipped, 16 Node checks and 55 Counting browser
+checks passed. This slice changes no source or test. Per
+`docs/testing.md`, the gate is not repeated for a document-only successor;
+exact path, mode, type and blob correspondence must accompany review.
+
+The separately scoped Source request remains unfulfilled until its
+exact-path review and normal landing. Filing and landing follow archive
+review `17dad8da`; the passing gate does not approve either source.
+
+
+## Actual Judge Main composition
+
+Archive6d1 and local Judge0f35 are independently reviewed and landed in
+actual Main02a. This five-slice preparation incorporates that Main. The
+Judge implementation, including operation-owned receipt/page/failure
+counters, is preserved; the three intended shared paths are MCP guidance,
+service cache hints and their budget witnesses. This incorporation adds no native policy, signed-data change, key/config
+migration or dependency. No deployment is performed.
+
+The actual-service HTTP stand-in checks cover both final-page query/head
+continuation and receipt recovery after a lost reply. Four coupled cases
+passed in original run34507 (`48122e`). The fixture retains observation,
+metrics and lost-reply wrapping together. Those cases prove transport and
+cache accounting, not Native admission. The subsequent Main incorporation
+changes only the Judge delivery note relative to that checked composition.
+
+The earlier P3 gate at52c1 passed before this Judge composition. It is
+historical evidence; one new gate is due at the final changed composition
+freeze before complete exact-path Source review. The approved Judge slice
+retains its three failed gates and cause-unknown timeout qualifications;
+those are neither waived nor counted as a passing combined P3 gate. All
+five P3 scopes and their earlier evidence remain intact. No provider,
+deployment, publication or unreviewed branch push is performed. Further
+At that checkpoint, GitHub egress waited for direct destination approval.
+Hugh has since approved repository pushes and planner deployments to
+Cloudflare as needed. Reviewed Main and Gitseq were pushed successfully;
+this P3 delivery performs no deployment.
+
+
+## Passing final composition gate
+
+The clean implementation freeze was
+`39572e24115702e78e7e309a1ace958f886d8f40`, tree
+`fd00a9ed16e64fbe9343869e633bc179abc81f05`. Original session 64174
+closed with exit 0 (`1126ed`), at the same clean head and tree. The single
+pipeline passed 1,575 Vitest cases and skipped three; Node passed 25 and
+Counter passed 55. It took 587.393 seconds elapsed and 702.399 child CPU
+seconds on macOS 27.0.1 arm64, 18 logical CPUs, with pre-run load
+2.616/4.841/5.456. Existing-lock installation took 2.6 s elapsed/3.9CPU,
+typechecking 8.2 s/28.1CPU, and tests 576.2 s/670.1CPU. The lock remained
+unchanged. These are one run’s observations, not a diagnosis or a saving
+claim. Private log: `/tmp/artroom-p3-judge-39572e24-gate.log`; step logs:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.nYIMzv1BCH`.
+Path references grant no private-file or execution access.
+
+After that gate, the reviewed Main532 journey plan/index and these five
+delivery notes were incorporated. No runtime, test, dependency or asset
+body changes after the tested freeze. Final Source reports compare the
+complete 31-path P3 scope against actual Main532, with two report bindings
+for the shared MCP guide. The final tree carries the Main plan exactly;
+all tested runtime/test leaves remain exact. No gate is repeated for the
+document-only successor. The original failed Judge gates remain failed,
+with their cause and broader gate stability unresolved. This new passing
+P3 run does not rewrite them or satisfy operational/root acceptance.
+
+Fresh Source commissions preserve every original P3 condition and evidence.
+The earlier pre-plan commissions were normally retired after the new
+promises became effective. Complete independent exact-head review remains
+required; no approval is inferred from this gate. Hugh has directly
+approved repository pushes. Reviewed landing may proceed after exact-head
+approval. Planner may deploy to Cloudflare as needed; no provider or
+deployment action is part of this delivery.
+
+
+## Repaired composition on actual Main
+
+Reviewed capacity preparation `d2af3569` landed as Main `afcf416e`,
+with tree `4b45f8ca`, under approval `04e50ac0` and normal receipt
+`a673d2c1`. It preserves the prior 1,459 Main leaves and adds only its
+preparation note. Landing session 5512 closed with exit 0 (`00b30a`);
+reviewed Main and Gitseq push 92784 closed with exit 0 (`3a0199`). Remote
+readback and exact approved-tree correspondence passed (`fdd6bb`).
+The P3 candidate incorporates this exact document before its new gate.
+Full capacity implementation and decision `4dccae54` remain open.
+
+F1 repair changes only Lending's renderer and its two owned generated
+outputs. All other P3 runtime/test leaves remain exact to the fully reviewed
+`50dd61e7` candidate. The earlier passing gate at `39572e24` covers the
+pre-repair composition; a new gate must cover this changed implementation.
+All earlier failed Judge gates and their cause-unknown qualifications remain.
+No approval, deployment or operational/root acceptance is inferred.
+
+
+## Repaired composition gate result
+
+Original gate 42187 closed with exit 1 (`809e1b`) at clean freeze
+`f4976192ed8027bf44065df5aff8e0e2e7e07cc1`, tree
+`7ea1894608934d3b2f2962e220619008f0aaacb4`: 1,574 Vitest passes,
+one unchanged Git archive parent test timeout at its original 5,000 ms,
+and three skips. Node and Counter were not reached. The failed gate
+remains failed; earlier passing runs do not cover this repair.
+
+The exact failed case passed once at the same deadline in separate
+run 58872, exit 0 (`0332e7`): one pass, ten unselected, 2.88 s body.
+The originally unreached Node and Counter stages then passed 25 and
+55 cases. This separate evidence is no passing gate or cause diagnosis.
+The original gate also retains an unattributed Durable Object I/O-context
+warning in Vitest's timeout abort helper. Both the new deadline failure
+and that warning require an explicit reviewer disposition; no earlier
+Judge disposition transfers. No source, assertion, deadline or pool
+was changed for diagnostics. No whole gate is repeated.
+
+Only these five delivery notes change after the tested freeze. All runtime,
+test, dependency and generated asset leaves remain exact. Complete fresh
+31-path/32-subject review remains required before landing, with all five
+scopes and historical failures intact. Full-root and operational duties
+remain open.

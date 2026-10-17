@@ -60,8 +60,9 @@ be enrolled as `docs/mcp.md` describes.
   accurate statement, not a replaced one.
 
 Unchanged: the native membership definitions and their rules; the
-controller binding (the issuer must be the controller, a person admin
-holding `membership.invite` and `membership.manage`); the private request,
+controller binding (the issuer must be the person controller and hold
+`membership.invite` and `membership.manage` under the room's current
+policy; no particular role name supplies that authority); the private request,
 envelope and key custody of both functions; person invitations.
 
 ## Kept person invitations (added 14 October 2026)
@@ -129,25 +130,36 @@ sessions, the Git host and the scheduler as stand-ins, as
 - An application cohort room (`platform:membership@4`, directory `@5`) in
   a second register, founded by `install --cohort application`; one agent
   enrolled the same way, with a `platform:membership@4` receipt.
-- **Wrong pin.** A `@5` link relabelled to `@4` is refused with the
-  message above; the configuration holds no repository or handle; `join
-  --check` repeats the refusal and moves the membership's head by nothing.
+- **Wrong pin.** A `@5` link relabelled to `@4` is admitted natively under
+  `@5`, then fails receipt-pin verification. Its original enrolment stays
+  retained unverified; the configuration takes up no repository or handle.
+  `join --check` repeats that result without submitting another act. This
+  does not undo the native enrolment or restore the consumed invitation.
 - **Cross-room.** A Counting link addressed to the library's membership
   (repository, controller membership and both fact references retargeted,
   as the link's shape requires) is refused natively by the library
   membership, `guard-failed`; its head does not move; a retry reports the
-  retained refusal and sends nothing. The same with the pin left at `@5`
+  retained refusal without another act submission. The same with the pin left at `@5`
   is refused too; neither room's head moves.
 - **Kept person invitation on membership@4.** In the application cohort
   room, the answer to the first `invite-member` is lost after the scope
   records it (a fetch stand-in). A new `--keep` invitation is then refused
-  with nothing signed. `dap invite --check` verifies the original without
+  without a new invitation act. `dap invite --check` verifies the original without
   moving the membership's head; there is one invitation of `@pat`; the
   link names `platform:membership@4`; a fresh configuration joins with it.
   The next `--keep` invitation is verified.
 - **Controller.** An issuance naming another member (`@bot1`) as the
-  controller is refused before anything is signed, and the Counting
-  membership's head does not move.
+  controller is refused before an invitation act is submitted. Read-session
+  authentication may still sign and send. The Counting membership's head
+  does not move.
+
+The follow-up submission tripwire observes the act transport for these
+zero-submit claims, independently of the retained head comparisons.
+The `acts` outputs above are authenticated listings of held actions, not
+execution of those actions. No independently signed post-enrolment role
+act was run for every fresh configuration in this witness. The separately
+recorded Counter take proves that Counter action for its own configuration;
+it does not establish subsequent role use by all the configurations above.
 
 Each issuance in the test runs on its own view of the admin's store, as
 the page's connection custody gives one: the admin's configuration without

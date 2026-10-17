@@ -4,16 +4,16 @@ import { join as pathJoin } from "node:path";
 import { tmpdir } from "node:os";
 import { fileStore } from "../src/files.ts";
 import type { Receipt, SignedIntent, Summary, Entry, OutboxId, Item } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
-import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
+import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { agentKeyInvitationOf, encodeAgentKeyInvitation, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/dap-platform";
 import { Roster, rita } from "../../../packages/platform/test/support.ts";
 import { command, enrolAgentKey, issueInvitation, linkOf, memoryStore, type Context, type Config, type Store } from "../src/index.ts";
 
-// Real SDK/envelopes/followReceipt/CLI Store and native M2 rules in memory.
+// Real SDK/envelopes/followReceipt/CLI Store and pinned membership rules in memory.
 // Scripted HTTP/session authority/read pages/inbox confirmation; no native session,
 // Durable Object, browser, host, provider or full parent acceptance is proved.
-test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent opening and key invitation survive loss; independent enrollment Checks without replacement, follows exact native facts and preserves legacy person custody (HTTP and inbox STAND-INs, %s)", async named => {
+test.each([MEMBERSHIP, "platform:membership@4", "platform:membership@5", "platform:membership@6"] as const)("retained native agent opening and key invitation survive loss; independent enrollment Checks without replacement, follows exact native facts and preserves legacy person custody (HTTP and inbox STAND-INs, %s)", async named => {
   const home = await mkdtemp(pathJoin(tmpdir(), "artroom-agent-custody-"));
   try {
   const m = new Roster(named).seated(), service = "https://agents.test";
@@ -71,7 +71,8 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
     }
     if (url.includes(directory.scope)) {
       expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
-      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED directory head") }, complete: true, value: { scope: directory, status: "active", definition: named === MEMBERSHIP ? "platform:directory@3" : "platform:directory@9", time: m.now, counts: [["repository", "ready", 1]], items: [{ id: 0, type: "repository", state: "ready", revision: 1, opened: textDigest("SCRIPTED repository"), attributed: [], parties: {}, values: {}, refs: { membership: m.at, rules: { ...directory, kind: "rules" }, destination: { ...directory, scope: wrongDirectory ? m.at.scope : directory.scope, kind: "destination" } } }] } });
+      const definition = { "platform:membership@2": "platform:directory@3", "platform:membership@4": "platform:directory@5", "platform:membership@5": "platform:directory@6", "platform:membership@6": "platform:directory@9" }[named];
+      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED directory head") }, complete: true, value: { scope: directory, status: "active", definition, time: m.now, counts: [["repository", "ready", 1]], items: [{ id: 0, type: "repository", state: "ready", revision: 1, opened: textDigest("SCRIPTED repository"), attributed: [], parties: {}, values: {}, refs: { membership: m.at, rules: { ...directory, kind: "rules" }, destination: { ...directory, scope: wrongDirectory ? m.at.scope : directory.scope, kind: "destination" } } }] } });
     }
     if (path.includes("/entries/")) {
       const seq = Number(path.split("/").at(-1)), sealed = m.entries[seq];
@@ -127,6 +128,30 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
   expect(canonicalize(sent[1]) === canonicalize(first)).toBe(true);
   const link = invitation.link!, decoded = agentKeyInvitationOf(link)!;
   expect([decoded.kind, decoded.controller.member, linkOf(link)]).toEqual(["agent-key", "@rita", null]);
+  // A retained leaf can be corrupt independently of its signed native facts.
+  // Observe the actual submit boundary, not just an unchanged model head.
+  const completedConfig = (await issuer.config())!, completedPointer = completedConfig.invitationIssue!;
+  const completedBytes = (await issuer.private(completedPointer.request))!;
+  const guardedCheck = async (raw: string) => {
+    let submits = 0;
+    const altered: Store = { ...issuer,
+      config: async () => ({ ...completedConfig, invitationIssue: { ...completedPointer, digest: textDigest(raw) } }),
+      private: async request => request === completedPointer.request ? utf8(raw) : issuer.private(request),
+    };
+    const observed = await issueInvitation({ ...ctx, store: altered, fetch: async (url, init) => {
+      if (new URL(url).pathname.endsWith("/acts")) { submits++; throw Error("SUBMIT TRIPWIRE: retained Check must not submit an act"); }
+      return fetch(url, init);
+    } }, input, { mode: "check", operation, privateRequests: [...requests] }).then(value => value.state, error => error instanceof Error && error.message.includes("original invitation custody") ? "blocked" : "unexpected-error");
+    expect(submits).toBe(0);
+    return observed;
+  };
+  if (named === MEMBERSHIP) {
+    const legacy = JSON.parse(new TextDecoder().decode(completedBytes)); delete legacy.definition;
+    expect(await guardedCheck(canonicalize(legacy))).toBe("verified");
+  }
+  const inconsistent = JSON.parse(new TextDecoder().decode(completedBytes));
+  inconsistent.link = encodeAgentKeyInvitation({ ...decoded, definition: named === MEMBERSHIP ? "platform:membership@4" : MEMBERSHIP });
+  expect(await guardedCheck(canonicalize(inconsistent))).toBe("blocked");
   const receiver = fileStore(pathJoin(home, "agent")); let submittedWithCustody = false;
   const receiving: Context = { store: receiver, now: ctx.now!, fetch: async (url, init) => {
     if (new URL(url).pathname.endsWith("/acts")) {
@@ -192,4 +217,27 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
     }
   }
   } finally { await rm(home, { recursive: true, force: true }); }
+});
+
+test("a retained successor preserves the effective membership declaration, including the implicit legacy M2 default, before any request", async () => {
+  const m = new Roster().seated(), service = "https://retained.test";
+  const directory = { ...m.office.at, kind: "directory" as const };
+  const repository = { directory, membership: m.at, rules: directory.scope, destination: directory.scope };
+  const input = { kind: "agent-key" as const, handle: "@helper", hours: 24, controller: { membership: m.at, member: "@rita" as const } };
+  const operation = "30000000-0000-4000-8000-000000000001", names = ["i-" + "1".repeat(30), "i-" + "2".repeat(30)] as const;
+  const root = { v: 1, operation, input, service, repository, actor: rita.key, secret: b64url(new Uint8Array(32).fill(17)), ends: "2030-01-01T00:00:00Z" };
+  async function attempt(definition: "platform:membership@2" | "platform:membership@4") {
+    const store = memoryStore(), raw = canonicalize(root);
+    await store.keep("issuer", rita.secret);
+    await store.keepPrivate(names[0], utf8(raw));
+    await store.keepPrivate(names[1], utf8(canonicalize({ ...root, definition, previous: { request: names[0], digest: textDigest(raw) } })));
+    await store.save({ v: 1, service, key: "issuer", repository, invitationIssue: { operation, request: names[0], digest: textDigest(raw), membership: m.at, actor: rita.key } });
+    let calls = 0, submits = 0;
+    const observed = await issueInvitation({ store, fetch: async (url) => { calls++; if (new URL(url).pathname.endsWith("/acts")) submits++; throw Error("REQUEST TRIPWIRE: declaration validation precedes I/O"); } }, input, { mode: "check", operation, privateRequests: [...names] })
+      .then(value => value.state, error => error instanceof Error && error.message.includes("original invitation custody") ? "blocked" : "unexpected-error");
+    expect([calls, submits]).toEqual([0, 0]);
+    return observed;
+  }
+  expect(await attempt(MEMBERSHIP)).toBe("unknown"); // legal private successor, no automatic pointer restoration.
+  expect(await attempt("platform:membership@4")).toBe("blocked");
 });

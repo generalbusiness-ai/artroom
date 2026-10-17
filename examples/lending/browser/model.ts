@@ -68,6 +68,19 @@ export function actsFor(thing: ShownThing): LendingAct[] {
   return thing.state === "available" ? ["borrow", "cancel", "publish"] : thing.state === "lent" ? ["return", "cancel", "publish"] : ["publish"];
 }
 
+/** This key's active member in an authenticated membership summary.
+ * The invitation's proposed handle supplies no identity evidence. */
+export function memberForKey(summary: Summary, key: KeyId): MemberRef | null {
+  if (summary.scope.kind !== "membership") return null;
+  const keys = summary.items.filter(item => item.type === "key" && item.state === "active" && item.values["id"] === key);
+  if (keys.length !== 1) return null;
+  const seats = summary.items.filter(item => item.type === "member" && item.state === "active" && item.id === keys[0]!.refs["member"]);
+  if (seats.length !== 1) return null;
+  const seat = seats[0]!, who = seat.parties["member"];
+  if (!isMemberRef(who) || canonicalize(who.membership) !== canonicalize(summary.scope) || seat.values["handle"] !== who.member) return null;
+  return { membership: { ...who.membership }, member: who.member };
+}
+
 /** Presentation from the complete authenticated roster, following Page's key-to-member projection. This issues no grant. */
 export function membershipActions(summary: Summary, who: MemberRef, key: KeyId): readonly string[] | null {
   if (canonicalize(summary.scope) !== canonicalize(who.membership)) return null;

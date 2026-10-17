@@ -24,6 +24,7 @@ import { answered, clip, finding, type Finding } from "./errors.ts";
 import { Kept, definitionOf, readInventory, readPartitionIndexes, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
 import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.ts";
 import { Reads } from "./reads.ts";
+import { Recent } from "./recent.ts";
 import { Unshaped, effectiveFields, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
 import { WORDS, type Words } from "./words.ts";
 import { McpMetrics, observedFetch, type McpMetricOptions } from "./metrics.ts";
@@ -171,9 +172,10 @@ export class McpService {
   readonly #tools: readonly string[] | null;
   #snapshot: Snapshot | null = null;
   #stale = false;
-  /** Where each history search goes on from: the next entry to read, or the next page's cursor. Kept in memory, never authority. */
-  readonly #searches = new Map<string, number>();
-  readonly #pages = new Map<string, string | undefined>();
+  /** At most 64 recent hints per cache: next entry or page cursor. Eviction
+   * restarts bounded reads; no result or authority is retained here. */
+  readonly #searches = new Recent<number>();
+  readonly #pages = new Recent<string | undefined>();
   readonly #listeners = new Set<(generation: Digest) => void>();
   #stopWatch: (() => void) | null = null;
   #told: Digest | null = null;
@@ -932,11 +934,14 @@ export class McpService {
         // An item in a final state is no longer live: with its type, the retained final items are read too, following the pages
         // across polls, a few pages a poll, from where the last poll stopped; at the last page the search starts over.
         if (typeof args["item"] === "number" && typeof args["type"] === "string" && !read.value.items.some((i) => i.id === args["item"])) {
-          const key = `final ${scope} ${args["type"]}`;
+          const key = canonicalize(["final", this.#service, read.value.scope, read.at, args["type"], args["item"], states]);
           let cursor = this.#pages.get(key);
           for (let n = 0; n < SEARCH_PAGES; n++) {
             const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string, cursor));
             if (!final.ok) break;
+            // A page belongs to its own observed head. Retry with a fresh
+            // summary rather than labelling it with an earlier one.
+            if (final.at.seq !== read.at.seq || final.at.hash !== read.at.hash) { this.#pages.delete(key); return null; }
             const matched = final.value.find(match);
             if (matched) { this.#pages.delete(key); return { item: matched, head: read.at, final: true }; }
             cursor = final.next;
@@ -967,7 +972,7 @@ export class McpService {
       // The search reads a few entries a poll and goes on from where it stopped, with no limit on how far; once it finds the entry,
       // it starts there.
       const cause = intentDigest(entry.input.signed.intent);
-      const key = `created ${scope} ${seq}`;
+      const key = canonicalize(["created", this.#service, entry.at, seq, read.value.hash]);
       let next = this.#searches.get(key) ?? seq + 1;
       for (let n = 0; n < SEARCH_ENTRIES && seeds.length === 0; n++, next++) {
         const at = next;
@@ -1032,7 +1037,7 @@ export class McpService {
     if (input.type !== "act" || input.signed.intent.kind !== "read-token" || input.signed.intent.actor !== this.#port.signer.key) return failed({ error: "credential", destination: scope, why: `entry ${seq} is no read-token act your key signed` });
     // The mint's outcome: searched a few entries a call, going on from where the last call stopped, with no limit on how far.
     const operation = `${seq}:0`;
-    const key = `credential ${scope} ${seq}`;
+    const key = canonicalize(["credential", this.#service, opening.value.entry.at, seq, opening.value.hash]);
     let handle: string | null = null;
     let ended: string | null = null;
     let next = this.#searches.get(key) ?? seq + 1;
@@ -1049,7 +1054,7 @@ export class McpService {
     }
     this.#searches.set(key, next);
     if (ended) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} is ${ended}` });
-    if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome up to entry ${next - 1}; call credential again, which goes on from entry ${next}, or wait first` });
+    if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome up to entry ${next - 1}; call credential again to continue the bounded search, or wait first. An evicted continuation restarts the search` });
     let answer: Read<{ token: string; ends: string; remote: string }>;
     try { answer = await readCredential(this.#service, scope, reader, handle, this.#fetch ? { fetch: this.#fetch } : {}); }
     catch { return failed({ error: "credential", destination: scope, why: "the credential reply was unavailable or invalid; the one-time credential may have been consumed" }); }

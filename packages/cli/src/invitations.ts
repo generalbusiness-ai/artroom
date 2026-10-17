@@ -109,14 +109,14 @@ function issueValid(value: unknown): value is Issue {
         if (!parsed || !same(parsed, { v: 1, service: row.service, repository, invitation: row.invitation.receipt.fact.seq, secret: row.secret, handle: row.input.handle, definition: pinOf(row) })) return false;
       } else {
         const parsed = agentKeyInvitationOf(row.link);
-        if (!parsed || !row.member?.receipt || parsed.service !== row.service || !same(parsed.repository, repository) || parsed.handle !== row.input.handle || !same(parsed.controller, row.input.controller) || !same(parsed.member, row.member.receipt.fact) || !same(parsed.invitation, row.invitation.receipt.fact) || parsed.secret !== row.secret) return false;
+        if (!parsed || !row.member?.receipt || parsed.definition !== pinOf(row) || parsed.service !== row.service || !same(parsed.repository, repository) || parsed.handle !== row.input.handle || !same(parsed.controller, row.input.controller) || !same(parsed.member, row.member.receipt.fact) || !same(parsed.invitation, row.invitation.receipt.fact) || parsed.secret !== row.secret) return false;
       }
     }
     return row.input.kind !== "person" || row.member === undefined;
   } catch { return false; }
 }
 function successor(before: Issue, after: Issue): boolean {
-  const core = (row: Issue) => ({ v: row.v, operation: row.operation, input: row.input, service: row.service, repository: row.repository, actor: row.actor, secret: row.secret, ends: row.ends });
+  const core = (row: Issue) => ({ v: row.v, operation: row.operation, input: row.input, service: row.service, repository: row.repository, actor: row.actor, secret: row.secret, ends: row.ends, definition: pinOf(row) });
   if (!same(core(before), core(after)) || before.link !== undefined && before.link !== after.link) return false;
   for (const name of ["member", "invitation"] as const) {
     const prior = before[name], next = after[name];

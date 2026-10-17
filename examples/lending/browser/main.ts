@@ -21,8 +21,8 @@ const root = document.querySelector<HTMLElement>("#lending")!;
 let epoch = 0, reading = 0;
 let memory: Remembered | null = null, gateway: LendingGateway | null = null, state: LendingState = { status: "loading" };
 let kept: Pending | null = null, keptJoin: Seat | null = null, notice: Notice = null, busy = false, timer: number | undefined;
-/** Controls whose typed text a redraw must drop: a donation that took effect empties its form. */
-const dropped = new Set<string>();
+/** Clear a consumed value only while that control still holds the submitted draft. */
+const dropped = new Map<string, string>();
 /** Keep a staff member's draft while a permission refresh temporarily hides its control. */
 const reasonDrafts = new Map<string, string>();
 let drawnEpoch = epoch;
@@ -82,7 +82,12 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
   const outcome = await using.act(kind, input);
   if (at !== epoch) return;
   tell(kind, outcome);
-  if (outcome.status === "recorded" || outcome.status === "refused") for (const key of kind === "donate" ? ["donate-name", "donate-description"] : [`reason-${input.thing}`]) dropped.add(key);
+  if (outcome.status === "recorded") {
+    const consumed: [string, string | undefined][] = kind === "donate"
+      ? [["donate-name", input.name], ["donate-description", input.description]]
+      : kind === "cancel" ? [[`reason-${input.thing}`, input.reason]] : [];
+    for (const [key, value] of consumed) if (value !== undefined) dropped.set(key, value);
+  }
   await look();
 });
 
@@ -108,10 +113,11 @@ async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Pro
     if (expectedEpoch !== epoch) return;
     const stored = await remembered.load();
     if (expectedEpoch !== epoch || rememberedContext(stored) !== previous || stored?.device.publicKey !== device.publicKey) return;
-    const next: Remembered = { v: 1, device, seat, ...(matched.ok ? { identity: matched.identity } : {}) };
+    const confirmedSeat = matched.ok ? { ...seat, handle: matched.identity.member.member } : seat;
+    const next: Remembered = { v: 1, device, seat: confirmedSeat, ...(matched.ok ? { identity: matched.identity } : {}) };
     await remembered.save(next);
     if (expectedEpoch !== epoch) return;
-    if (!matched.ok) notice = { kind: "plain", text: matched.reason };
+    notice = { kind: "plain", text: matched.ok ? `The room confirmed your handle: ${confirmedSeat.handle}.` : matched.reason };
     // Every remembered writer takes this lock. Open the committed context before releasing it.
     await open(next);
   });
@@ -119,7 +125,7 @@ async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Pro
 function joined(device: DeviceKey, outcome: JoinOutcome | null, expectedEpoch = epoch): Promise<void> | void {
   if (expectedEpoch !== epoch) return;
   if (outcome === null) return;
-  if (outcome.status === "joined") { notice = { kind: "plain", text: `You joined as ${outcome.seat.handle}.` }; keptJoin = null; return seated(device, outcome.seat, expectedEpoch); }
+  if (outcome.status === "joined") { notice = { kind: "plain", text: "Your join was recorded. Confirming your membership…" }; keptJoin = null; return seated(device, outcome.seat, expectedEpoch); }
   notice = { kind: outcome.status === "refused" ? "refusal" : "plain", text: outcome.reason };
   if (outcome.status === "refused") keptJoin = null;
   if (outcome.status === "unknown" && outcome.seat) keptJoin = outcome.seat;
@@ -248,7 +254,10 @@ function draw(): void {
     drawnEpoch = epoch;
   }
   for (const [key, value] of typed) if (key.startsWith("reason-")) reasonDrafts.set(key, value);
-  for (const key of dropped) { typed.delete(key); reasonDrafts.delete(key); }
+  for (const [key, consumed] of dropped) {
+    if (typed.get(key) === consumed) typed.delete(key);
+    if (reasonDrafts.get(key) === consumed) reasonDrafts.delete(key);
+  }
   for (const [key, value] of reasonDrafts) if (!typed.has(key)) typed.set(key, value);
   dropped.clear();
   const nodes = memory?.seat && memory.identity ? drawLibrary(memory.seat) : drawJoin();
