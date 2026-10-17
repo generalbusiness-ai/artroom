@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/implementation/2026-10-17-capacity-guarantees-preparation.md","body":{"commit":"afcf416e8c077499abbe7efd16bbdbe329811445","path":"notes/implementation/2026-10-17-capacity-guarantees-preparation.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c8f8844e77758af0fe9b64d254ded5d6152162fc","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-capacity-guarantees-preparation.md."}
