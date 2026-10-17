@@ -52,7 +52,7 @@ export function isCreationOffer(value: unknown, origin: string, register?: Scope
 export async function creationOffer(origin: string, options: { fetch?: CreationOfferFetch; register?: ScopeRef } = {}): Promise<CreationOffer> {
   try {
     if (options.register && (!closed(options.register, ["scope", "kind", "inc"]) || !isScopeRef(options.register) || options.register.kind !== "register")) throw failed();
-    const endpoint = `${exactOrigin(origin)}/v1/demo/founding-offer${options.register ? `?register=${encodeURIComponent(options.register.scope)}&inc=${encodeURIComponent(options.register.inc)}` : ""}`;
+    const endpoint = `${exactOrigin(origin)}/v1/demo/creation-offer${options.register ? `?register=${encodeURIComponent(options.register.scope)}&inc=${encodeURIComponent(options.register.inc)}` : ""}`;
     const send = options.fetch ?? (globalThis as { fetch?: CreationOfferFetch }).fetch;
     if (!send) throw failed();
     const bytes = await within(30, async signal => {

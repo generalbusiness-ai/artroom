@@ -320,7 +320,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       expect((await D.summary()).value.definition).toBe(DIRECTORY);
       expect(scopes.find((scope) => scope.scope.scope === target.scope)!.retained).toContainEqual({ kind: "entry", digest: use.content, bytes: canonicalize((await D.entries())[genesis.source.seq]), under: platformName(DIRECTORY) });
       const text = canonicalize({ format: "artroom-native-replay-capture-1", target, scopes, missing: { scope: D.name, fact: genesis.source }, limits,
-        provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/founding-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
+        provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/creation-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
           namespace: "PLATFORM", storedBytes: "native HTTP history and retained-input routes", grants: "proven", anchors: [],
           labels: ["recorded local native fixture; no deployed service", "real Durable Objects, SQLite, production platform rules and membership authority", "Git host OutsideDouble is a stand-in", "clock and transport are test boundaries; reads use a real session under a TEST SECRET", "fixture public keys and signatures only; no reader or secret exported"] },
         observed: replay });

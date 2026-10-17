@@ -3,7 +3,7 @@ import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { entryHash, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { d } from "@generalbusiness/dap-derive/testing";
 import { repositoryName } from "@generalbusiness/dap-platform";
-import { Register, rita } from "../../../packages/platform/test/support-founding.ts";
+import { Register, rita } from "../../../packages/platform/test/support-creation.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import type { EffectRequest } from "../src/operations.ts";
 import { RegisterHost, type RegisterProvider } from "../src/register-host.ts";

@@ -5,7 +5,7 @@ import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest } from "
 import { clockOf, derivable, judgeDelivery, judgeGenesis, runnable, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/dap-derive";
 import { Ledger, T0, deskDefinition, founded } from "@generalbusiness/dap-derive/testing";
 import { CREATION_ATTEMPTS, DIRECTORY, REGISTER, directoryIdOf, platform, register, registerRules, repositoryName } from "../src/index.ts";
-import { Directory, Register, installing, paul, registerDefinition, registerPlatform, registerSeed, rita, una } from "./support-founding.ts";
+import { Directory, Register, installing, paul, registerDefinition, registerPlatform, registerSeed, rita, una } from "./support-creation.ts";
 
 // The plan's T43, for `platform:register@1` (authority note, section 12.1.1, and its table of marks, section 12.1.8).
 test("the register definition validates whole with the platform option; every mark of the note's table has its rule, so the package's rules run it, and with any one missing they do not", () => {

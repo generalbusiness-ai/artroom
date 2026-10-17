@@ -1,7 +1,7 @@
 /**
  * A room for the lane scenarios that run against the real platform scopes:
  * a repository founded whole on real scopes in the namespace `PLATFORM`, as
- * `packages/scope/test/founding-real.test.ts` founds one, with its members,
+ * `packages/scope/test/creation-real.test.ts` founds one, with its members,
  * and lanes that its real directory creates under the pinned lane digests.
  *
  * | Part | Is |

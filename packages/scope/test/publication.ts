@@ -7,7 +7,7 @@
  * `receipt` write and a `revoke` of each token. `foundingPublication`
  * answers each of them by `OutsideDouble` of `outside.ts`, with the exact
  * commit IDs that the platform package computes, as
- * `founding-real.test.ts` does. The destination, its rules and its store are
+ * `creation-real.test.ts` does. The destination, its rules and its store are
  * real: the stand-in only gives each request the answer that the test
  * writes from the destination's own SQLite records. No host runs, nothing is
  * pushed, and no token is minted.

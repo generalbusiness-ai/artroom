@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { newIncarnation, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { creationOffer, isCreationOffer, type CreationOffer, type CreationOfferFetch } from "../src/founding-offer.ts";
+import { creationOffer, isCreationOffer, type CreationOffer, type CreationOfferFetch } from "../src/creation-offer.ts";
 
 // Actual SDK byte/URL guard over SCRIPTED HTTP, no native founding or permission.
 test("fixed same-origin founding discovery accepts only the closed bounded demo projection and refuses redirects without consuming their body", async () => {
@@ -10,7 +10,7 @@ test("fixed same-origin founding discovery accepts only the closed bounded demo 
   let calls = 0;
   const fetch: CreationOfferFetch = async (url, init) => {
     calls++;
-    expect(url).toBe(origin + "/v1/demo/founding-offer");
+    expect(url).toBe(origin + "/v1/demo/creation-offer");
     expect(init).toMatchObject({ method: "GET", redirect: "error", credentials: "omit", cache: "no-store", headers: { accept: "application/json" } });
     return { status: 200, url, redirected: false, body: Response.json(offer).body };
   };
@@ -25,7 +25,7 @@ test("fixed same-origin founding discovery accepts only the closed bounded demo 
   expect(calls).toBe(1);
   let canceled = 0, read = 0;
   const body = { getReader: () => ({ read: async () => { read++; return { done: false, value: utf8("not needed") }; }, cancel: async () => { canceled++; } }) };
-  await expect(creationOffer(origin, { fetch: async () => ({ status: 200, url: "https://foreign.test/v1/demo/founding-offer", redirected: true, body }) })).rejects.toThrow("No claim was submitted");
+  await expect(creationOffer(origin, { fetch: async () => ({ status: 200, url: "https://foreign.test/v1/demo/creation-offer", redirected: true, body }) })).rejects.toThrow("No claim was submitted");
   expect([read, canceled]).toEqual([0, 1]);
   const oversized = { getReader: () => ({ read: async () => ({ done: false, value: new Uint8Array(16 * 1024 + 1) }), cancel: async () => { canceled++; } }) };
   await expect(creationOffer(origin, { fetch: async url => ({ status: 200, url, redirected: false, body: oversized }) })).rejects.toThrow("No claim was submitted");
@@ -35,7 +35,7 @@ test("fixed same-origin founding discovery accepts only the closed bounded demo 
   let selectedReads = 0;
   const selected: CreationOfferFetch = async url => {
     selectedReads++;
-    expect(url).toBe(`${origin}/v1/demo/founding-offer?register=${legacy.scope}&inc=${legacy.inc}`);
+    expect(url).toBe(`${origin}/v1/demo/creation-offer?register=${legacy.scope}&inc=${legacy.inc}`);
     return { status: 200, url, redirected: false, body: Response.json(legacyOffer).body };
   };
   expect(await creationOffer(origin, { register: legacy, fetch: selected })).toEqual(legacyOffer);

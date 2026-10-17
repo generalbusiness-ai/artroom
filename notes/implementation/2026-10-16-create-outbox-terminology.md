@@ -105,3 +105,23 @@ create-operation-client-focus.log and
 create-operation-platform-focus.log. The separate alias-removal run is
 one additional execution of its changed claim case, not a union gate.
 No full gate, Source review or provider operation has run for this slice.
+
+
+## Filename and unsigned discovery route checkpoint
+
+Ten creation-related modules, fixtures and test files now use creation
+instead of founding in their filenames; import references and live source
+links are updated. The paired anonymous demo offer route is now
+/v1/demo/creation-offer, with no old route alias. Signed native act names,
+legacy custody fields and retained opaque session nonces are unchanged.
+Historical Markdown prose and exact log filenames remain historical;
+only live link targets were repaired where needed. Root types pass in
+/tmp/artroom-create-outbox-filenames-first-types.log; the documentation
+link check reports 484 relative links and zero broken in
+/tmp/artroom-create-outbox-filenames-doc-links.log. The new route still
+needs its focused runtime checks. No full slice gate has run.
+
+Directory review b8b351f1 now requests regeneration of the Lending JS
+and Worker module. Terminology implementation is checkpointed while that
+higher-priority Directory correction proceeds. No terminology delivery,
+approval or landing is claimed.

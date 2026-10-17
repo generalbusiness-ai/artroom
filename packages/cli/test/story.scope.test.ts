@@ -21,7 +21,7 @@ const reader = "a test reader";
 // act; show a refusal with its reason and nothing written; and read and verify the histories they wrote.
 //
 // Every scope is a Durable Object of the namespace `PLATFORM`: the deployed class, the production authority and the platform
-// package's own data and rules, as in `packages/scope/test/founding-real.test.ts`. Every request of the command goes through
+// package's own data and rules, as in `packages/scope/test/creation-real.test.ts`. Every request of the command goes through
 // `route`, the Worker's HTTP routes, called in the test's isolate.
 //
 // | Part | Is |

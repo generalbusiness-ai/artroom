@@ -7,7 +7,7 @@ import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { DEMO_PURPOSE, DEMO_REGISTER, WEB_DEMO_REGISTER } from "@generalbusiness/dap-platform";
 import type { Seed } from "@generalbusiness/dap-contract";
 import type { Binding } from "../src/namespace.ts";
-import { demoCreationConfig, demoCreationRoute, type DemoCreationOffer } from "../../../apps/room/demo-founding.ts";
+import { demoCreationConfig, demoCreationRoute, type DemoCreationOffer } from "../../../apps/room/demo-creation.ts";
 import { beginSessionFixture } from "./session-settings.ts";
 import { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 import { routed } from "./repository.ts";
@@ -27,10 +27,10 @@ test("demo offer exposes only its configured register and admits a previously un
     const at=await lifetime.wait(()=>register.at()), origin="https://artroom-rehearsal.inguz.workers.dev";
     const deployment="TEST demo runtime identity", config={v:2 as const,origin,deployment,register:at,definition:WEB_DEMO_REGISTER};
     const bindings={DEPLOYMENT:deployment,SCOPES:env.PLATFORM as unknown as Binding,DEMO_START_CONFIG:canonicalize(config)};
-    const get=()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer"),bindings);
+    const get=()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer"),bindings);
     expect((await lifetime.wait(()=>routed(`https://scopes.test/v1/scopes/${at.scope}`))).status).toBe(403);
     const first=await lifetime.wait(get), offer=await first.json() as DemoCreationOffer;
-    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer"),{...bindings,DEPLOYMENT:"TEST unrelated runtime"}))).status).toBe(404);
+    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer"),{...bindings,DEPLOYMENT:"TEST unrelated runtime"}))).status).toBe(404);
     expect(first.headers.get("cache-control")).toBe("no-store");
     expect([first.status,offer]).toEqual([200,{v:1,origin,register:at,definition:WEB_DEMO_REGISTER,at:{seq:0,hash:(await lifetime.wait(()=>register.summary())).at.hash},registerItem:{id:0,revision:1,state:"open",host:"github.com",namespace:"generalbusiness-ai",policy:"open",purpose:DEMO_PURPOSE}}]);
     expect(JSON.stringify(offer)).not.toContain(newcomer.key);
@@ -54,13 +54,13 @@ test("demo offer exposes only its configured register and admits a previously un
     expect((await lifetime.wait(()=>legacy.stub.create(legacyInstall,DEMO_REGISTER))).answer).toBe("accepted");
     const legacyAt=await lifetime.wait(()=>legacy.at());
     bindings.DEMO_START_CONFIG=canonicalize({...config,legacy:{register:legacyAt,definition:DEMO_REGISTER}});
-    const selected=()=>demoCreationRoute(new Request(`${origin}/v1/demo/founding-offer?register=${legacyAt.scope}&inc=${legacyAt.inc}`),bindings);
+    const selected=()=>demoCreationRoute(new Request(`${origin}/v1/demo/creation-offer?register=${legacyAt.scope}&inc=${legacyAt.inc}`),bindings);
     const legacyResponse=await lifetime.wait(selected),legacyOffer=await legacyResponse.json() as DemoCreationOffer;
     expect([legacyResponse.status,legacyOffer.register,legacyOffer.definition]).toEqual([200,legacyAt,DEMO_REGISTER]);
     const legacyV1={...bindings,DEMO_START_CONFIG:canonicalize({...config,v:1,register:legacyAt,definition:DEMO_REGISTER})};
-    const legacyDefault=await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer"),legacyV1));
+    const legacyDefault=await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer"),legacyV1));
     expect([legacyDefault.status,(await legacyDefault.json() as DemoCreationOffer).definition]).toEqual([200,DEMO_REGISTER]);
-    for(const query of [`?register=${legacyAt.scope}&inc=${newIncarnation(new Uint8Array(16).fill(12))}`,`?register=${legacyAt.scope}&inc=${legacyAt.inc}&register=${at.scope}`,`?register=${oldAt.scope}&inc=${oldAt.inc}`,`?register=${legacyAt.scope}`,`?register=${legacyAt.scope}&inc=${legacyAt.inc}&scope=${legacyAt.scope}`])expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer"+query),bindings))).status).toBe(404);
+    for(const query of [`?register=${legacyAt.scope}&inc=${newIncarnation(new Uint8Array(16).fill(12))}`,`?register=${legacyAt.scope}&inc=${legacyAt.inc}&register=${at.scope}`,`?register=${oldAt.scope}&inc=${oldAt.inc}`,`?register=${legacyAt.scope}`,`?register=${legacyAt.scope}&inc=${legacyAt.inc}&scope=${legacyAt.scope}`])expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer"+query),bindings))).status).toBe(404);
     expect(demoCreationConfig(canonicalize({...config,legacy:{register:legacyAt,definition:"platform:register@3"}}),deployment)).toBeNull();
     expect(demoCreationConfig(canonicalize({...config,legacy:[{register:legacyAt,definition:DEMO_REGISTER}]}),deployment)).toBeNull();
     expect(demoCreationConfig(canonicalize({...config,legacy:{register:at,definition:DEMO_REGISTER}}),deployment)).toBeNull();
@@ -73,9 +73,9 @@ test("demo offer exposes only its configured register and admits a previously un
     expect(JSON.stringify(projection)).not.toContain(newcomer.key);
     const wrong={...bindings,DEMO_START_CONFIG:canonicalize({...config,register:{...at,inc:newIncarnation(new Uint8Array(16).fill(11))}})};
     // A separate actual incarnation is not selected by the offer route.
-    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer"),wrong))).status).toBe(404);
-    expect((await lifetime.wait(()=>demoCreationRoute(new Request("https://dap.generalbusiness.ai/v1/demo/founding-offer"),bindings))).status).toBe(404);
-    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/founding-offer?scope="+at.scope),bindings))).status).toBe(404);
+    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer"),wrong))).status).toBe(404);
+    expect((await lifetime.wait(()=>demoCreationRoute(new Request("https://dap.generalbusiness.ai/v1/demo/creation-offer"),bindings))).status).toBe(404);
+    expect((await lifetime.wait(()=>demoCreationRoute(new Request(origin+"/v1/demo/creation-offer?scope="+at.scope),bindings))).status).toBe(404);
     expect(demoCreationConfig(canonicalize({...config,definition:"platform:register@3"}),deployment)).toBeNull();
   } finally {lifetime.release();}
 });

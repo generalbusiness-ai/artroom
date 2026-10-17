@@ -14,7 +14,7 @@
  *   its clause and its confirmation. The genesis of each of the
  *   directory's three children is SCRIPTED: an entry made by hand. It shows the directory's
  *   rows and rules. A founding on scope objects is the scope package's
- *   (`packages/scope/test/founding-real.test.ts`).
+ *   (`packages/scope/test/creation-real.test.ts`).
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";

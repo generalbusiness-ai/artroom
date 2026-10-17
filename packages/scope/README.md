@@ -191,7 +191,7 @@ grant is answered
 
 `platform:destination@1` now has a rule for every mark, including
 `first-head` and `receipt`.
-[test/founding-real.test.ts](test/founding-real.test.ts) creates and
+[test/creation-real.test.ts](test/creation-real.test.ts) creates and
 confirms a destination under the deployed class, reads real rules and
 membership observations, and publishes its first change with a required
 passed check. The Git host and source lane entries are scripted, and no
@@ -541,7 +541,7 @@ so neither of those imports the runtime in its source:
 - `test/conformance.types.ts`: typechecked only. The entrypoint and the
   client's transport satisfy one interface, the contract's `ScopeApi`.
 
-`test/founding-real.test.ts` also creates and confirms the directory's
+`test/creation-real.test.ts` also creates and confirms the directory's
 membership, rules and destination children under the deployed class. The
 destination reads real rules and membership observations and retained
 source entries, reserves the first publication, publishes it and writes

@@ -1,9 +1,9 @@
 /** The demo's HTTP route; the native read-only projection stays with ScopeObject. */
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Binding } from "../../packages/scope/src/namespace.ts";
-import { demoCreationConfig, registerRef, type DemoCreationBindings, type DemoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-founding.ts";
-export { demoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-founding.ts";
-export const DEMO_OFFER_PATH = "/v1/demo/founding-offer";
+import { demoCreationConfig, registerRef, type DemoCreationBindings, type DemoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-creation.ts";
+export { demoCreationConfig, type DemoCreationOffer } from "../../packages/scope/src/demo-creation.ts";
+export const DEMO_OFFER_PATH = "/v1/demo/creation-offer";
 export async function demoCreationRoute(request: Request, env: DemoCreationBindings & { SCOPES: Binding }): Promise<Response> {
   const url = new URL(request.url), settings = demoCreationConfig(env.DEMO_START_CONFIG, env.DEPLOYMENT);
   const reply = (status: number, value: unknown) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });

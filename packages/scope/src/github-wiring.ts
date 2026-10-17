@@ -14,7 +14,7 @@ import { GitHubProvider } from "./github-host.ts";
 import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
 import type { OutsideGiven } from "./object.ts";
 import { NO_OUTSIDE, type EffectRequest, type Outside } from "./operations.ts";
-import { demoCreationConfig, type DemoCreationBindings } from "./demo-founding.ts";
+import { demoCreationConfig, type DemoCreationBindings } from "./demo-creation.ts";
 import { RegisterHost } from "./register-host.ts";
 
 export interface GitHubBindings extends DemoCreationBindings {

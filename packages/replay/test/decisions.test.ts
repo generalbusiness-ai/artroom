@@ -8,7 +8,7 @@ import { MemorySource, verify } from "../src/index.ts";
 import type { Rules, StateView } from "@generalbusiness/dap-derive";
 import type { MemoryScope } from "../src/index.ts";
 import { register, registerRules } from "../../../packages/platform/src/index.ts";
-import { Register, registerPlatform } from "../../../packages/platform/test/support-founding.ts";
+import { Register, registerPlatform } from "../../../packages/platform/test/support-creation.ts";
 import { served } from "./world.ts";
 
 test("replay admission counts the actual register's legacy cleanup closure and preserves scripted external reservations", async () => {

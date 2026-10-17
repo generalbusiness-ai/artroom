@@ -339,7 +339,7 @@ reports missing bytes as `incomplete`. Its definition, grants and outside
 answer are explicitly scripted. `test/decisions.test.ts` witnesses the
 entry-budget check of a bound decision reservation with a judged receiver
 and anchored sender entries. The generic row witnesses use made-up
-platform data. `packages/scope/test/founding-real.test.ts` replays the
+platform data. `packages/scope/test/creation-real.test.ts` replays the
 register, directory, membership, rules and destination histories through
 HTTP after the first publication and its receipt, using the platform
 package's rules and proven grants. Only the four scripted source lane

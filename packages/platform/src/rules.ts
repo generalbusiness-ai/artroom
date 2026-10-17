@@ -63,6 +63,6 @@ export const RULES: RuleTable = {
   // The six rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
   // Every destination mark has its rule, including `first-head` and `receipt`, so `platform:destination@2` is runnable
-  // (`destination.ts`). The real-scope founding and publication witness uses a scripted Git host (`scope/test/founding-real.test.ts`).
+  // (`destination.ts`). The real-scope founding and publication witness uses a scripted Git host (`scope/test/creation-real.test.ts`).
   "platform:destination": destinationRules2,
 };

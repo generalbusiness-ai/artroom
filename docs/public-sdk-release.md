@@ -130,7 +130,7 @@ The capture's original and owned copy are bound to the supplied SHA-256 and
 remain unchanged through the checker. Actual replay reports are kept in its
 result, including coverage, trusts and the negative outcome.
 
-The capture comes from the existing `founding-real.test.ts` first rules
+The capture comes from the existing `creation-real.test.ts` first rules
 publication, before scripted lane facts. Select that whole file alone with
 the existing `DEMO_RECORD=1` flag in the reviewed native capture plan. The
 opt-in block wraps the actual HTTP journal and retained-input source and keeps

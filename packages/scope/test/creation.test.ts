@@ -31,7 +31,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
     // A platform definition is supplied in code, by its name and version. This runtime holds none of that name, so it founds nothing
     // under it. The whole-scope rule for a version that lacks one rule is shown on real scopes in `membership.test.ts`, by a control,
-    // and where a founding stops in `founding-real.test.ts`.
+    // and where a founding stops in `creation-real.test.ts`.
     expect(await stubOf(other.name).create(other.signed, "platform:task@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 

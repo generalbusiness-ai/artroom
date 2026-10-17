@@ -4,7 +4,7 @@ import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import type { PlatformRule, RuleGiven } from "@generalbusiness/dap-derive";
 import { d } from "@generalbusiness/dap-derive/testing";
 import { INVITATION_KEY_COHORT, APPLICATION_COHORT, FILE_PUBLICATION_COHORT, PARTITION_COHORT, COUNTING_COHORT, DEMO_REGISTER, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
-import { rita } from "./support-founding.ts";
+import { rita } from "./support-creation.ts";
 
 // The planner's decision of 2026-10-07: a changed definition carries a new version; a scope pins its version at its genesis and is
 // judged and replayed by it for as long as it exists. Supporting application cohort pins require explicit selection. Plain functions: the rules are called with what a judge would give them, and no scope is run.

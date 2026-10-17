@@ -3,7 +3,7 @@ import { health } from "../../packages/scope/src/health.ts";
 import { mcpRoute, route, type Env, type McpEnv } from "../../packages/scope/src/worker.ts";
 import { admittedRequestUrl } from "../../packages/scope/src/item-query-wire.ts";
 import { credentialInUrl } from "../../packages/scope/src/sessions.ts";
-import { DEMO_OFFER_PATH, demoCreationRoute } from "./demo-founding.ts";
+import { DEMO_OFFER_PATH, demoCreationRoute } from "./demo-creation.ts";
 import { isSite, site } from "../../packages/scope/src/site/route.ts";
 import { isPage, page } from "./page/route.ts";
 import { isCounting, countingPage } from "../counter/src/counting.ts";
