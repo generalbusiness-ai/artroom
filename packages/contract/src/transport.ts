@@ -47,9 +47,9 @@ export interface Beside { texts?: readonly string[]; presented?: Record<string, 
 
 export interface ScopeApi {
   /**
-   * Found a repository's directory. `definition` is a declaration, or the
+   * Create a scope with no creator. `definition` is a declaration, or the
    * digest or platform name of one. `definitions`: the declarations it names
-   * in `create` sends, which the directory retains for its children.
+   * in `create` sends, which the scope retains for its children.
    * `beside`: the detached texts that the creation intent's fields name.
    */
   create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;

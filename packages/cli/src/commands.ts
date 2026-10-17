@@ -15,7 +15,7 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
  *
  * | Command | What it does |
  * |---|---|
- * | `install` | Creates the register by an `install` intent, signed by a new operator key that is also the one creator key. With `--plan`, it signs the intent and prints the register ID it will found, and creates nothing; `--planned` creates that plan. |
+ * | `install` | Creates the register by an `install` intent, signed by a new operator key that is also the one creator key. With `--plan`, it signs the intent and prints the register ID it will create, and creates nothing; `--planned` creates that plan. |
  * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the creator's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
  * | `invite`, `join` | Membership's `invite-member` and `join`. The link carries the invitation's number and secret; the joining key is made and kept locally. |
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
@@ -413,7 +413,7 @@ async function installing(ctx: Context, options: { host?: string; namespace?: st
 
 /**
  * The ID of the register that a creation by this intent, under this version, makes: a scope's ID is a function of its seed, and
- * a register's seed of the creation intent and the version alone (the scope's `found`).
+ * a register's seed of the creation intent and the version alone (the scope's `create` method).
  */
 const registerIdOf = (creation: SignedIntent, definition: PlatformDefinition): ScopeId =>
   scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(creation.intent), ordinal: 0 });
@@ -632,11 +632,11 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
  * then the directory that the claim caused, and the scopes that the
  * directory caused; then membership, where the key has signed `seat`.
  *
- * **Resume.** Keep each exact signed found, seat and first-key before sending
- * it, then keep its accepted fact. An uncertain delivery retries that same
+ * **Resume.** Keep the exact signed native `found`, `seat` and `first-key`
+ * intents before sending each one, then keep its accepted fact. An uncertain delivery retries that same
  * envelope; an accepted step is skipped. Never refresh a saved deadline.
  * Learned child references are kept before enrollment. Only `--again` opens
- * another found. An older digest-only record can continue from its actual
+ * another creation claim. An older digest-only record can continue from its actual
  * admitted directory and checked retained claim; absence or ambiguity never
  * invents its missing signature. No signing key is in config.
  */
@@ -683,7 +683,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       if (offered) {
         definition = offered.definition;
         // Revision selector only: never present this projection as a Summary,
-        // an authenticated roster or authority for the native found judgment.
+        // an authenticated roster or authority for the native `found` judgment.
         items = [{ id: offered.registerItem.id, revision: offered.registerItem.revision, type: "register", state: "open", opened: null, parties: {}, refs: {}, attributed: [], values: { host: offered.registerItem.host, namespace: offered.registerItem.namespace, policy: "open", purpose: "demo-start" } }];
       } else {
         const registered = await summaryOf(R);
@@ -702,7 +702,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
     if (!pending["found"]) {
       // Legacy records did not preserve the envelope. A real admitted
       // directory retains the original claim, so recover that exact signature
-      // as already accepted. Never submit a reconstructed or fresh found.
+      // as already accepted. Never submit a reconstructed or fresh claim.
       const registered = await R.summary();
       // Digest-only records from main used the exact native directory@1.
       // A readable exact register pin can identify a tagged successor;

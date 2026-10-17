@@ -403,8 +403,8 @@ export class Scope {
   }
 
   /**
-   * Found a scope with no creator (section 7.1). Under the register's
-   * platform definition it is the creation register, of the kind `register`,
+   * Create a scope with no creator (section 7.1). Under the register's
+   * platform definition it is the initial register, of the kind `register`,
    * which an `install` intent asks for. Under any other definition it is a
    * directory with no creator, by a `found` intent: the first delivery's
    * stand-in for a register, which stays until a repository's creation by

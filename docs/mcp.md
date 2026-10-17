@@ -1727,4 +1727,4 @@ one job; `--generic` replaces the act tools with the pair.
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
 Worker, in both modes: the creator's subscribed client was told of 7 list
-changes (3 while creation the room), and the second member's of 4.
+changes (3 while creating the room), and the second member's of 4.

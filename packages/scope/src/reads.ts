@@ -56,7 +56,7 @@ const no = (reason: ReadRefusal) => ({ ok: false, reason }) as const;
 const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : (positionOf(cursor) ?? undefined));
 
 /** A outbox ID: the `seq` of an entry and the ordinal of one of its sends. */
-/** The entry and the ordinal a outbox ID names, or null. The form is the bytes package's to judge. */
+/** The entry and the ordinal an outbox ID names, or null. The form is the bytes package's to judge. */
 const outboxItemOf = (outboxId: unknown): [seq: number, n: number] | null => (isOutboxId(outboxId) ? (outboxId.split(".").map(Number) as [number, number]) : null);
 
 /** The entry that opened an operation and its ordinal there, from its ID, or null. The form is the bytes package's to judge. */

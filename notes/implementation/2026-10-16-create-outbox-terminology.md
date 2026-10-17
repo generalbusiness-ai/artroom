@@ -8,12 +8,18 @@ work and outbox names replace duties. Pinned data, signed bytes, retained
 recovery requests and fixed initial Git content preserve their meaning.
 No compatibility method or command alias is added.
 
-The completed spikes slice and its history tag are preserved. The six
-unrelated Jam source lookups and their retained bundle copies remain an
-explicit scope clarification for review. The frozen implementation gate passes at d5e321cd4. Independent Source
-review and normal landing remain outstanding; no approval is claimed. The sections
-below retain the original implementation checkpoints, failed attempts and
-qualified evidence; they are not a union of passing gate results.
+The completed spikes slice and its history tag are preserved. Independent
+review 670198c8 requested changes at be3444d36. The corrections below
+preserve the v1 demo custody key and repair finite active wording. A new
+frozen gate and successor Source review are required; the earlier passing
+gate at d5e321cd4 does not certify this runtime correction. No approval
+or landing is claimed. The sections below retain original checkpoints,
+failed attempts and qualified evidence, not a union of passing results.
+
+The checker assessed the six unrelated Jam source lookups and their
+retained bundle copies as outside scope-making wording. This is not a
+broad exception, a new Jam source/asset review or closure of the parent's
+broader ambiguous condition.
 
 The initial child 1a7c88af / promise 75d700a4 started from Directory
 candidate f45a5ce80. Its mutable artifact basis was later retired, and
@@ -465,7 +471,7 @@ meaning, and both unchanged historical hashes. They are ordinary lookup
 code, not pinned definition literals; requester clarification is pending.
 The original 157/126 checkpoint remains historical preparation above.
 
-## Passing implementation gate and final metadata successor
+## First passing implementation gate and reviewed metadata successor
 
 Original session 87150 at d5e321cd4c70361c33f4b4f9a62a83f708baf5fc,
 tree 30c197fa29d5bd53151b56355a4af916c04ed146, ended CLOSED 0. It
@@ -484,8 +490,8 @@ this result. Native scripted-fault or disposal diagnostics, if present in
 the original step log, are retained rather than converted into a cause,
 drain or leak claim.
 
-The final successor changes this report and the client package's prose
-only: its description now says create and outbox item. Parsed package
+The reviewed be3444d36 successor changes this report and the client
+package's prose only: its description now says create and outbox item. Parsed package
 JSON is exactly equal after removing only description, including exports,
 dependencies, engine, scripts and version. The root manifest and lock are
 unchanged. This is an explicit report/description successor, not a claim
@@ -519,3 +525,53 @@ of the parent's broader ambiguous condition or its other completed slices.
 Git pushes apply only after normal reviewed Main landing under the lifted
 Git freeze. Cloudflare delivery, publication and all provider operations
 remain held. No such operation was performed for this implementation.
+
+
+## First Source review and retained-v1 custody correction
+
+Independent review 670198c8 at be3444d36 requests changes, adopted by
+31fb25a6. That satisfies the review task, not the implementation request.
+All earlier blanket statements that custody keys were unchanged are
+qualified by this finding: scripts/demo-git-host.mjs had renamed the v1
+private-state.json key foundId to creationId without changing its version.
+A file prepared by approved Main could no longer be read. The earlier
+focused checks and passing gate did not witness that old-file boundary.
+
+The writer, validator, public-plan projection and signed native creation
+now explicitly use the retained string key "foundId". Local/API names
+continue to use create/creation. No compatibility method alias or new
+custody version is introduced. Future local demo custody schema 2 must
+preserve the old idempotency identity if its spelling changes. The
+inventory now lists this key: 211 occurrences in 173 file/line/value
+rows, including the five foundId accesses/writes across four rows.
+
+The existing filesystem preparation test is strengthened with an
+independently spelled v1 fixture, genuine generated role keys and a known
+old request ID. Reopening it supplies exactly that ID to the public plan
+and signed native act, uses the old role actor, and leaves the owner-only
+file bytes unchanged. Its accepted install fact is explicitly SCRIPTED;
+no register or provider is exercised by this witness. The original
+pre-fix control in session 95101 ended CLOSED 1 with one pass and one
+failure, private-state-invalid at the old file read. The repaired
+session 13394 log reports two passes and no failures; its terminal handle
+was unavailable on later retrieval, so no terminal status is invented.
+After adding the fresh-writer identity assertion, original final focus
+session 78887 ended CLOSED 0, two passes and no failures. Logs:
+/tmp/artroom-create-outbox-f1-old-state-original-control.log,
+/tmp/artroom-create-outbox-f1-old-state-repaired-focus.log and
+/tmp/artroom-create-outbox-f1-final-v1-custody-focus.log. The pinned
+cached tsx 4.21.0 runner ran from /private/tmp; no package was installed
+in the checkout. Its known Node module.register warning is retained.
+
+The finite F2 correction repairs 18 active prose/comment paths. The
+Worker route table now names the unsigned creation body, the bytes and
+Scope readmes name isOutboxItem and create, and creation comments once
+again distinguish a signed intent with no creator from a child's creator
+request. It repairs repeated creation wording, ordinary legal obligations,
+and grammar, and marks retained native act names as quoted values.
+Fixed initial Git text and signed values are unchanged. Standard active
+documentation checking reports 484 relative links, zero broken; it
+excludes notes. The inventory's source rows are checked separately.
+
+This runtime correction requires a new frozen gate. No earlier gate is
+reused as its passing result. Cloudflare operations remain held.

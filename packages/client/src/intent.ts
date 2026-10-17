@@ -49,7 +49,7 @@ export function newIdempotencyKey(): string {
   return b64url(crypto.getRandomValues(new Uint8Array(16)));
 }
 
-/** What the caller asks for. `to` is null only when creation a repository. */
+/** What the caller asks for. `to` is null only when creating a scope with no creator. */
 export interface Asked {
   to: ScopeRef | null;
   kind: string;

@@ -15,9 +15,9 @@
  * | 5, edge 2 | A kind that no item holds whose `send` has a clause with an effect mark that lists a held kind | `reserve-unbounded` |
  * | 5, edge 3 | The same, for each kind that no item holds below it: every such kind is checked by edges 1 and 2 | `reserve-unbounded` |
  *
- * A definition with a problem `holds` does not validate, and no scope is
- * created or created under it: `unsupported-definition`. The ceiling of a
- * count is R4's to set. Until it does, the bound on the elements of a list
+ * A definition with a problem `holds` does not validate. Creation of a scope
+ * with no creator or of a child under it is refused: `unsupported-definition`.
+ * The ceiling of a count is R4's to set. Until it does, the bound on the elements of a list
  * stands in for it (section 17.2a, check 1).
  *
  * A held kind is in no closure, so held kinds may list each other in a

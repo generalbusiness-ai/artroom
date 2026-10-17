@@ -263,7 +263,7 @@ the designs, and is no review of this source.
   authority asks by the ID alone.
 
 A creation under `platform:register@1` makes a scope of the kind
-`register`, by an `install` intent: the scope's `found` and the Worker
+`register`, by an `install` intent: the scope's `create` method and the Worker
 build the seed's kind from the definition that is named. A creation under
 any other definition makes a directory with no creator, by a `found`
 intent. That earlier creation stays until a repository's creation by its

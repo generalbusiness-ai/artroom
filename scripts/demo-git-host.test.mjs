@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { createPublicKey, verify } from "node:crypto";
-import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { DOMAINS } from "@generalbusiness/dap-contract";
-import { b64url, domainBytes, isScopeId, publicKeyOf, unb64url } from "@generalbusiness/artroom-bytes";
-import { DemoPreparationError, plan, postInstall, prepare } from "./demo-git-host.mjs";
+import { b64url, domainBytes, isScopeId, newIncarnation, publicKeyOf, textDigest, unb64url } from "@generalbusiness/artroom-bytes";
+import { buildCreation, buildPlan, DemoPreparationError, plan, postInstall, prepare, readPrivateState } from "./demo-git-host.mjs";
 const script = fileURLToPath(new URL("./demo-git-host.mjs", import.meta.url));
 const checkout = fileURLToPath(new URL("../", import.meta.url));
 const loader = process.execArgv.filter((argument) => !argument.startsWith("--test"));
@@ -19,6 +19,7 @@ const childRuntime = [...loader, "--disable-warning=DEP0205"];
 // Invariant: actual filesystem preparation preserves private keys on repeat,
 // restricts custody to the owner, and exposes a genuine signed public install
 // whose creator/recovery keys and register pin are stable until its fixed end.
+// Reopening retained v1 custody keeps the same creation request identity.
 test("owner-only exclusive preparation keeps keys off stdout and locks one genuinely signed install plan", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "artroom-demo-host-"));
   const directory = join(scratch, "private");
@@ -45,6 +46,8 @@ test("owner-only exclusive preparation keeps keys off stdout and locks one genui
     assert.equal(verify(null, domainBytes(DOMAINS.intent, signed.intent), pub, unb64url(signed.sig)), true);
     assert.equal(signed.intent.actor, prepared.roleKeys.installer.key);
     assert.deepEqual(signed.intent.fields["founders"], [prepared.roleKeys["founder"].key]);
+    assert.equal(typeof state["foundId"], "string");
+    assert.equal(publicPlan.creation.idempotencyKey, state["foundId"]);
     assert.equal(publicPlan.creation.recoveryKey, prepared.roleKeys.recovery.key);
     assert.equal(publicPlan.creation.branch, "main");
     assert.equal(publicPlan.creation["founderHandle"], "@demo-owner");
@@ -59,6 +62,25 @@ test("owner-only exclusive preparation keeps keys off stdout and locks one genui
     let calls = 0;
     await assert.rejects(postInstall("https://credential@worker.invalid", publicPlan, async () => { calls++; throw new Error("unreachable"); }), { code: "invalid-base-url" });
     assert.equal(calls, 0);
+
+    // Retained v1 fixture, independent of the current writer's property
+    // spelling. The accepted install fact is SCRIPTED: no register or
+    // provider runs. This witnesses old-file recovery and signing identity.
+    const legacyDirectory = join(scratch, "retained-v1");
+    await mkdir(legacyDirectory, { mode: 0o700 });
+    const legacyState = { v: 1, createdAt: state.createdAt, host: state.host, namespace: state.namespace, policy: "keys", branch: "main", "founderHandle": state["founderHandle"], installId: state.installId, "foundId": "demo-found-retained-v1", roles: state.roles };
+    const legacyBytes = `${JSON.stringify(legacyState)}\n`;
+    const legacyPath = join(legacyDirectory, "private-state.json");
+    await writeFile(legacyPath, legacyBytes, { flag: "wx", mode: 0o600 });
+    const reopened = await readPrivateState(legacyDirectory);
+    const resumed = buildPlan(reopened, "2030-01-01T00:10:00Z", now);
+    const fact = { at: { scope: resumed.registerScope, inc: newIncarnation(new Uint8Array(16).fill(2)), kind: "register" }, seq: 0, hash: textDigest("TEST scripted accepted install") };
+    const creation = buildCreation(reopened, resumed, { answer: "accepted", receipt: { fact, definition: resumed.definition } }, 0, "2030-01-01T00:10:00Z", now);
+    assert.equal(resumed.creation.idempotencyKey, "demo-found-retained-v1");
+    assert.equal(creation.intent.idempotencyKey, "demo-found-retained-v1");
+    assert.equal(creation.intent.actor, legacyState.roles["founder"].key);
+    assert.equal(await readFile(legacyPath, "utf8"), legacyBytes);
+    assert.equal((await stat(legacyPath)).mode & 0o777, 0o600);
   } finally { await rm(scratch, { recursive: true, force: true }); }
 });
 

@@ -261,8 +261,8 @@ export interface Ports {
    * `Capabilities`. A value may also hold the rules of a capability's steps
    * (derive's `Steps`), what a hold's entries derive for its workspace, and
    * the binding of a reserved request, and the most that each piece of the
-   * code derives in one entry. Null: it has none. A scope is not created or
-   * created under a definition that uses a form with no rule here, or whose
+   * code derives in one entry. Null: it has none. Neither a scope with no
+   * creator nor a child scope can be created under a definition that uses a form with no rule here, or whose
    * entries, counted with this code, pass the bound on derived effects:
    * `unsupported-definition`.
    */

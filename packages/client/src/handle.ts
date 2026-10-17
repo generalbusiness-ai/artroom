@@ -146,9 +146,9 @@ export class ScopeHandle {
 }
 
 /**
- * Found a repository's directory (section 7.1), and take a handle on it when
- * the creation is accepted. `definitions`: the declarations the directory's
- * definition names in `create` sends, which the directory retains for its
+ * Create a scope with no creator (section 7.1), and take a handle when
+ * creation is accepted. `definitions`: the declarations the scope's
+ * definition names in `create` sends, which the scope retains for its
  * children. `beside`: the detached texts that the creation intent's fields
  * name. A creation is retried with the same signed intent, like an act.
  */

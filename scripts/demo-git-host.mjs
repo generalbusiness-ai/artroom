@@ -94,9 +94,10 @@ async function readOwnerFile(directory, filename) {
   finally { await file?.close(); }
 }
 
+// Retained v1 custody keeps foundId: changing it would lose the original request identity.
 function checkedState(value) {
   try {
-    if (value?.v !== 1 || timeMs(value.createdAt) === null || value.host !== HOST || value.namespace !== NAMESPACE || value.policy !== "keys" || value.branch !== "main" || !isMemberId(value["founderHandle"]) || /[\u0000-\u0020\u007f]/.test(value["founderHandle"]) || typeof value.installId !== "string" || typeof value.creationId !== "string" || value.installId.length === 0 || value.creationId.length === 0) refuse("private-state-invalid");
+    if (value?.v !== 1 || timeMs(value.createdAt) === null || value.host !== HOST || value.namespace !== NAMESPACE || value.policy !== "keys" || value.branch !== "main" || !isMemberId(value["founderHandle"]) || /[\u0000-\u0020\u007f]/.test(value["founderHandle"]) || typeof value.installId !== "string" || typeof value["foundId"] !== "string" || value.installId.length === 0 || value["foundId"].length === 0) refuse("private-state-invalid");
     for (const role of ROLES) {
       const key = value.roles?.[role];
       const secret = typeof key?.secret === "string" ? unb64url(key.secret) : null;
@@ -121,7 +122,7 @@ export async function prepare({ directory, branch, "founderHandle": creatorHandl
     const secret = randomBytes(32);
     return [label, { label, key: keyIdOfSecret(secret), secret: b64url(secret) }];
   }));
-  const state = { v: 1, createdAt: stamp(now), host: HOST, namespace: NAMESPACE, policy: "keys", branch, "founderHandle": creatorHandle, installId: `demo-install-${randomUUID()}`, creationId: `demo-found-${randomUUID()}`, roles };
+  const state = { v: 1, createdAt: stamp(now), host: HOST, namespace: NAMESPACE, policy: "keys", branch, "founderHandle": creatorHandle, installId: `demo-install-${randomUUID()}`, "foundId": `demo-found-${randomUUID()}`, roles };
   await exclusiveFile(join(target, PRIVATE_FILE), state);
   return { event: "prepared", utc: stamp(now), host: HOST, namespace: NAMESPACE, branch, "founderHandle": creatorHandle, roleKeys: publicKeys(state), installId: state.installId };
 }
@@ -135,7 +136,7 @@ export function buildPlan(state, deadline, now = Date.now()) {
   const intent = installIntent(state, deadline);
   const signedInstall = signIntent(intent, unb64url(state.roles.installer.secret));
   const registerSeed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(intent), ordinal: 0 };
-  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, creation: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key, idempotencyKey: state.creationId, requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
+  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, creation: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key, idempotencyKey: state["foundId"], requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
 }
 export async function plan({ directory, deadline }, now = Date.now()) {
   const target = await privateDirectory(directory, true);
@@ -162,7 +163,7 @@ export function buildCreation(state, publicPlan, acceptedInstall, revision, dead
   const fact = acceptedInstall?.receipt?.fact;
   if (acceptedInstall?.answer !== "accepted" || acceptedInstall?.receipt?.definition !== REGISTER || !isFactRef(fact) || fact.seq !== 0 || fact.at.scope !== plan.registerScope || fact.at.kind !== "register" || !Number.isSafeInteger(revision) || revision < 0 || canonicalize(installIntent(state, plan.signedInstall.intent.notAfter)) !== canonicalize(plan.signedInstall.intent)) refuse("invalid-register-receipt");
   deadlineOf(deadline, now);
-  return signIntent({ v: 1, to: fact.at, actor: state.roles["founder"].key, kind: "found", on: null, expected: { register: revision }, fields: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key }, idempotencyKey: state.creationId, notAfter: deadline }, unb64url(state.roles["founder"].secret));
+  return signIntent({ v: 1, to: fact.at, actor: state.roles["founder"].key, kind: "found", on: null, expected: { register: revision }, fields: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key }, idempotencyKey: state["foundId"], notAfter: deadline }, unb64url(state.roles["founder"].secret));
 }
 
 function transport(baseURL, send) {

@@ -13,7 +13,7 @@
  * kind, and has no other member. A member the contract types as an
  * identifier or a fixed form is read by that form's one guard: a digest, a
  * scope ID, an incarnation, a scope kind, a key ID, a member ID, an
- * operation ID, a outbox ID, a definition's name, a timestamp, a signature,
+ * operation ID, an outbox ID, a definition's name, a timestamp, a signature,
  * and a position or count as a safe integer that is not negative. A member
  * the contract types as text (a name an application chose, an idempotency
  * key, a cursor, stored bytes, a retained entry's `under`) is read as text. It says nothing about whether a signature

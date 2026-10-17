@@ -973,7 +973,7 @@ says when access is possible.
   and claims of work done. Custody keeps photos, messages and handover
   evidence.
 
-The workflow organises the exchange. It does not decide legal pending work or
+The workflow organises the exchange. It does not decide legal obligations or
 the technical cause.
 
 ### 17 Planning an energy retrofit and its aftercare

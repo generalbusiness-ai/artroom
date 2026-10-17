@@ -28,7 +28,7 @@ import { health } from "./health.ts";
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the creation register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes` | Create a scope with no creator: under `platform:register@1` the initial register, by an `install` intent; under another definition a directory. Body `{ creation, definition, definitions?, texts? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition has a place. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |

@@ -74,7 +74,7 @@ Both definitions use forms that need the code of the capabilities `hold@1`
 and `git-read@1`. The derive package holds that code as pure functions,
 and the production ports hold it. The validator lists those forms in `ValidDefinition.underived`, and the test
 asserts the list, and that the code has each form. So a scope can be
-created or created under either digest. With only the production defaults
+created with no creator or as a child under either digest. With only the production defaults
 it admits no act and no step, because that authority reads no grant. The
 deployed class reads a lane's grants from the membership scope that the
 lane records. W1 to W5 and the demo story run lanes created by the real

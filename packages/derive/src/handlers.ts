@@ -183,8 +183,8 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
 
 /**
  * The digest of each detached text that an input names (section 6.2): in
- * the fields of an act, of a creation or of a creation, and in the declared
- * fields of a message that a handler receives. The scope keeps the bytes of
+ * the fields of an act, a signed creation intent or a creator's request,
+ * and in the declared fields of a message that a handler receives. The scope keeps the bytes of
  * each as a retained input with the entry that records the input, and a
  * verifier asks for the same ones. A result, a control, a message that no
  * handler receives, and an input that is not an act of the definition name
