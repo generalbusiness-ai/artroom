@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:daa5def1b18ad1a66769c5ab83c2553bc677536c","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/operation-denial.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dad03901d7af42a4fbd345f009c639e63ce9f363","text":"Merge retired a covered predecessor; the successor is at docs/build-a-lending-library.md."}
