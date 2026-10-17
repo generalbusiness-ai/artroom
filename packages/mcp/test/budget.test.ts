@@ -27,7 +27,7 @@ const secret = () => crypto.getRandomValues(new Uint8Array(32));
 interface Served { stand: StandIn; service: McpService; config: McpConfig; clock: { now: number }; key: Uint8Array }
 
 /** A room on the stand-in: the six platform scopes and the given lanes, for a caller of `role` with that role's first actions. */
-function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore } = {}): Served {
+function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore; observe?: (url: string) => void } = {}): Served {
   const key = secret();
   const signer = secretSigner(key);
   const stand = new StandIn(signer.key, role, FIRST_ACTIONS_OF["platform:membership@2"]![role]!);
@@ -38,7 +38,7 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
   for (const lane of lanes) stand.lane(lane);
   const config: McpConfig = { ...stand.config(), repository: { ...stand.config().repository!, inbox: inbox.scope } };
   const clock = { now: START };
-  const service = new McpService({ service: SERVICE, fetch: stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
+  const service = new McpService({ service: SERVICE, fetch: options.observe ? (url, init) => { options.observe!(url); return stand.fetch(url, init); } : stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
     ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
     config: { read: async () => structuredClone(config), addRoot: async (root) => { config.roots = [...(config.roots ?? []), root]; } } });
   return { stand, service, config, clock, key };
@@ -287,7 +287,11 @@ describe("what a call costs, end to end", () => {
     const seq = (token.structuredContent["fact"] as { seq: number }).seq;
     const calls: string[][] = [];
     let got: CallResult;
-    do { const c = await counted(s, () => s.service.call("credential", { entry: seq })); got = c.result; calls.push(c.requests); } while (got.isError && calls.length < 20);
+    do {
+      const c = await counted(s, () => s.service.call("credential", { entry: seq })); got = c.result; calls.push(c.requests);
+      // Later native heads must not reset an immutable opening entry's search.
+      if (got.isError) s.stand.append(s.stand.scopes.get(s.stand.destination.scope)!, { type: "timed", item: 0, rule: "stand-in", due: "2099-01-01T00:00:00Z" } as never);
+    } while (got.isError && calls.length < 20);
     expect(got.isError, JSON.stringify(got.structuredContent)).toBe(false);
     for (const c of calls) expect(entryReads(c).length).toBeLessThanOrEqual(17);
     const searched = calls.flatMap(entryReads).filter((r) => !r.endsWith(`/entries/${seq}`));
@@ -314,6 +318,48 @@ describe("what a call costs, end to end", () => {
     const final = await s.service.call("wait", { scope: 1, item: 108, type: "merge" });
     expect([final.structuredContent["final"], (final.structuredContent["item"] as { id: number }).id, final.structuredContent["polls"]]).toEqual([true, 108, 2]);
     await annotate(`searches: a mint outcome 100 entries on, in ${calls.length} credential calls; a creation 100 entries on, in ${polls} polls of one wait; a final item on page 5, in 2 polls`);
+  });
+
+  // Invariant: progress for a final-item query belongs to that query at its
+  // observed native head; another query or head starts at the first page.
+  // This is the actual MCP service over the labelled HTTP stand-in, not Native.
+  test.each(["query", "head"] as const)("final-page continuation does not cross a different %s", async (change) => {
+    const urls: string[] = [];
+    const s = roomOf("admin", [issueDemo], { observe: url => urls.push(url) });
+    await s.service.page();
+    const lane = laneOf(s, 1);
+    for (let i = 0; i < 9; i++) lane.final.push({ id: 100 + i, type: "merge", state: "published", revision: 0, opened: null, parties: {}, refs: {}, values: {}, attributed: [] } as unknown as Item);
+    const missed = await s.service.call("wait", { scope: 1, item: 999, type: "merge", seconds: 1 });
+    expect(missed.structuredContent["timedOut"]).toBe(true);
+    urls.length = 0;
+    if (change === "query") {
+      const found = await s.service.call("wait", { scope: 1, item: 100, type: "merge", seconds: 1 });
+      expect([found.structuredContent["timedOut"], (found.structuredContent["item"] as Item | undefined)?.id]).toEqual([false, 100]);
+    } else {
+      s.stand.append(lane, { type: "timed", item: 0, rule: "stand-in", due: "2099-01-01T00:00:00Z" } as never);
+      const stillMissing = await s.service.call("wait", { scope: 1, item: 999, type: "merge", seconds: 1 });
+      expect(stillMissing.structuredContent["timedOut"]).toBe(true);
+    }
+    const cursors = urls.map(url => new URL(url)).filter(url => url.pathname.endsWith("/items/merge")).map(url => url.searchParams.get("cursor"));
+    expect(cursors.length).toBeGreaterThan(0);
+    expect(cursors[0], "the new query/head must not send an older continuation").toBeNull();
+    expect(cursors.length).toBeLessThanOrEqual(4);
+  });
+
+  test("a final-item read cannot be labelled with an earlier summary head", async () => {
+    let beforeItems = () => {};
+    const s = roomOf("admin", [issueDemo], { observe: url => { if (new URL(url).pathname.endsWith("/items/merge")) beforeItems(); } });
+    await s.service.page();
+    const lane = laneOf(s, 1);
+    lane.final.push({ id: 100, type: "merge", state: "published", revision: 0, opened: null, parties: {}, refs: {}, values: {}, attributed: [] } as unknown as Item);
+    beforeItems = () => {
+      beforeItems = () => {};
+      s.stand.append(lane, { type: "timed", item: 0, rule: "stand-in", due: "2099-01-01T00:00:00Z" } as never);
+    };
+    const moved = await s.service.call("wait", { scope: 1, item: 100, type: "merge", seconds: 1 });
+    expect([moved.structuredContent["timedOut"], moved.structuredContent["item"]]).toEqual([true, undefined]);
+    const current = await s.service.call("wait", { scope: 1, item: 100, type: "merge", seconds: 1 });
+    expect([current.structuredContent["timedOut"], (current.structuredContent["item"] as Item).id, current.structuredContent["head"]]).toEqual([false, 100, s.stand.head(lane)]);
   });
 
   // Invariant: settle and prepare stay within their bound: each step is a projection of its latest answer, the steps are paged

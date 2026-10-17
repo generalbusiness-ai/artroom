@@ -1624,9 +1624,18 @@ it without changing the generation. A cursor whose layout no longer holds
 is answered with the first page and `restarted`, so no entry is repeated
 or skipped.
 
-The searches of `wait` and `credential` keep their position between polls
-and calls and read at most 16 entries, or 4 pages of final items, each
-time, with no fixed window.
+The searches of `wait` and `credential` retain at most 64 recent entry-search
+positions and 64 recent final-page positions per server. A lookup keeps its
+position recent; the oldest is evicted at the bound. Each poll or call still
+reads at most 16 entries, or 4 pages of final items, with no fixed history
+window. An evicted search restarts those bounded reads. These hints hold
+neither an answer nor a credential and grant no authority.
+
+An entry search belongs to its service and immutable opening entry's full
+scope, position and hash, so appending entries does not reset it. A final-page
+position belongs to its service, full scope, observed head and query. A new
+head or query starts at the first page. If the head changes between summary
+and final-item reads, that poll returns no item; a later poll reads again.
 
 ### Per tool, end to end
 
