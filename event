@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1b157d52ee86c135449561b2fcf70ebf1a590411","text":"Merge retired a covered predecessor; the successor is at packages/cli/README.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1be76112f9403a2831c8016cb17c70577dad82ab","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-cli-runbook-custody-guidance.md."}
