@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:73042b1e9157b22e682c6ec3114cadfecd27ea64","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-16-create-outbox-terminology.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:73280d764896d508ce52c3ad09b37290d3f67c96","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/local-signers.test.ts."}
