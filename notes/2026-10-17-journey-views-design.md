@@ -153,7 +153,7 @@ concepts with the HTML, including the five native desktop dimensions.
 
 A person has a circular marker and an explicit **person** label. An agent
 has a square marker, an **agent** label, and **Controlled by Ari** beside
-each act and work row. A checker has an outlined square and a **checker**
+each act and work row. A checker has an outlined diamond and a **checker**
 label. The marker supplements the words; it never replaces them.
 
 Identity comes from the service's membership data. A model-supplied name,
@@ -340,8 +340,8 @@ remain required for this design.
 
 Start with the [light catalogue](2026-10-17-journey-views-design/index-light.html)
 or [dark catalogue](2026-10-17-journey-views-design/index-dark.html). Each
-lists the 44 states across the five families. There are 88 state pages and
-two catalogues. Every button-shaped link navigates a fictional snapshot;
+lists 51 states across the five families: 44 journey states and seven
+pinned catch-up records. There are 102 state pages and two catalogues. Every button-shaped link navigates a fictional snapshot;
 none sends an act. Comments are read-only sample text. A later snapshot
 can include acts by other members; navigating to it does not impersonate
 them or simulate a live event stream.
@@ -376,7 +376,7 @@ CSP denies connection and form actions. Images and fonts are local assets.
 
 ## Browser and visual evidence
 
-The final run passed 197 checks and produced 200 PNGs, with no reported
+The final run passed 226 checks and produced 240 PNGs, with no reported
 failures. The render index records input hashes, PNG hashes, browser
 version, checks and any failures. It covers every
 state and both catalogues at 1536 × 1024 and 390 × 844 CSS pixels. The
@@ -417,7 +417,7 @@ it does not claim pixel equality with those differently sized bitmaps.
 
 | Comparison | Concept and render evidence | Result or deliberate correction |
 | --- | --- | --- |
-| Needs you structure | `concepts/needs-you-desktop.png`; `renders/needs-you-light-1536-viewport.png` | Same header, catch-up band and three open rows with reason, responsibility and settling act. Titles and three action labels are retained. |
+| Needs you structure | `concepts/needs-you-desktop.png`; `renders/needs-you-light-1536-viewport.png` | Same header, catch-up band and three open rows with reason, responsibility and settling act. Read changes opens the added scoped-entry list; Mark reviewed follows that list. The three obligation action labels are retained. |
 | Work density and terms | `concepts/work-desktop.png`; `renders/work-active-light-1536-viewport.png` | Open sections, three conditions and aligned agent rows retained. Excess row/section spacing was reduced. Entries 221 and 223 correct the generated text. The inapplicable footer offer is removed once both commitments are accepted, preserving current terms. |
 | Decision hierarchy | `concepts/decision-desktop.png`; `renders/decision-requested-light-1536-viewport.png` | Proposal, alternatives, recommendation, requested person, comment and separate controls retained. The long title fits the desktop row. The read-only comment notice is an explicit prototype correction. |
 | Change review | `concepts/change-desktop.png`; `renders/change-review-light-1536-viewport.png` | Pinned commit band and two-column diff/conditions/review layout retained. A flex basis that added sidebar height was removed. Required checks and controller-review rules stay explicit. |
@@ -425,7 +425,8 @@ it does not claim pixel equality with those differently sized bitmaps.
 | Mobile queue | `concepts/needs-you-mobile-dark.png`; `renders/needs-you-dark-390-viewport.png` | Stacked reasons and full-width actions retained. The compact one-row header follows the other mobile references, keeps the actor visible, and makes Read decision fit the first phone viewport. It wraps naturally at 320 pixels. |
 | Mobile recovery | `concepts/change-unknown-mobile-light.png`; `renders/change-unknown-light-390-viewport.png` | Unknown outcome, kept original request and one outcome-check action retained. Full commits is added so Change 9's corrected independent hash is inspectable. |
 | Mobile interdiff | `concepts/interdiff-mobile-light.png`; `renders/file-interdiff-light-390-viewport.png` | Both immutable versions and shared base remain visible. The missing Diff tab is restored. Wrapping keeps one logical gutter number; Back to change remains below the code. |
-| Type, palette and assets | All eight pairs above; `mockups.css`; existing `brand/` assets | Existing Open Runde, Teletype33 and Sometype Mono replace generated approximations. Exact flat bone/ink/forest tokens replace bitmap texture and gradients. Person circle, agent square, outlined checker and cut-corner controls are retained. The dark wordmark uses the existing transparent white SVG. |
+| Scoped catch-up records | `concepts/work-desktop.png`, Recent record pattern; `renders/needs-you-light-1536-changes.png` and `renders/needs-partial-dark-390-changes.png` | The existing record-row pattern now lists every loaded entry by scope, actor and pinned subject. It follows the obligations, with Mark reviewed after the list. |
+| Type, palette and assets | All eight pairs above; `mockups.css`; existing `brand/` assets | Existing Open Runde, Teletype33 and Sometype Mono replace generated approximations. Exact flat bone/ink/forest tokens replace bitmap texture and gradients. Person circle, agent square, outlined diamond for a checker and cut-corner controls are retained. The dark wordmark uses the existing transparent white SVG. |
 
 The above-the-fold copy comparison retains the reference's task names,
 proposal alternatives, actor kinds, controller labels and action names.
@@ -437,11 +438,16 @@ notice; and the independent recovery hash with Full commits. The compact
 phone header reorders the room name into the top row. A version label sits
 beside the title on desktop and below it on phone. Standalone read links
 receive the same minimum target as action controls. The accepted-work
-footer no longer offers an inapplicable historical handoff restart. No marketing copy or
-unrelated product feature was added.
+footer no longer offers an inapplicable historical handoff restart. The planner-requested Since your last review list adds the seven named
+entries, their exact snapshots, scoped ranges and full fixture identities.
+Read changes replaces the old top-of-page Mark reviewed control; Mark
+reviewed now follows the entry list. The checker marker becomes a diamond
+so it does not resemble an unticked checkbox. These are explicit design
+corrections, using the existing Recent record pattern.
 
 The code-native mockups were faithfully verified against the selected
-references and the documented corrections. No material visual mismatch
+references, the documented corrections and the planner-requested catch-up
+list. No material visual mismatch
 remains in the inspected comparisons. This is builder verification;
 checker approval and the planner's read are separate requirements. Host
 theme updates, standard bridge messages, actual service authority, shared
@@ -474,3 +480,66 @@ The reviewed head's render report is retained as
 and PNGs describe the successor. Previous passing browser checks did not
 detect these two issues and do not count as proof of their repair.
 Fresh exact-head checker approval and a planner read remain due.
+
+
+### Planner catch-up correction
+
+Checker approval `9203bb23` covers only `fce231e0`. Planner report
+`360efc4e` then found P1: a count alone showed none of the changes it
+claimed the person had inspected. That earlier approval and browser pass
+do not establish this successor's completion. The planner read remains
+required after a fresh checker approval.
+
+Needs you now has two distinct parts: current open obligations, followed
+by **Since your last review**. The top **Read changes** link reaches the
+entry list. **Mark reviewed** appears after the displayed entries, rather
+than before them. Each scope group names its previous and listed cutoffs
+and exposes the full fictional scope, incarnation and cutoff hash. Each
+entry names its number, actor kind and controller, what happened, and a
+link to that subject at that exact entry. The linked record is a pinned
+snapshot, not the subject's latest version. All identifiers and snapshots
+are synthetic fixtures, not sealed native journals.
+
+| Scope | Previous point | Entries now shown | New point after Mark reviewed |
+| --- | --- | --- | --- |
+| Clear completed | 240 | 241–245 | 245 |
+| Change 18 | 17 | 18 | 18 |
+| Change 9 | 8 | 9 | 9 |
+
+The five issue entries are the interface progress report (241), storage's
+recoverability comment (242), its decision block (243), Ari's comparison
+request (244), and proposal text v2 (245). Change 18's entry 18 proposes
+its second version. Change 9's entry 9 requests publication of its first
+version; that request is not publication confirmation. Each scope retains
+its own entry numbers.
+
+The partial example lists only the first six entries from two scopes. It
+names Change 9 as unread, keeps that scope's saved point at 8, and retains
+all saved points until the remaining scope is loaded. Mark reviewed stays
+disabled there. Load more reaches the complete seven-entry list. In the
+reviewed state, the list says **Nothing new since your review**, shows the
+three new saved points and leaves all three open obligations visible.
+On phone, the list follows the obligations; its entries precede the only
+enabled Mark reviewed control. There is no hidden, unlisted range included
+in that act. These are static snapshots, not a persistence witness.
+
+The catch-up walkthrough in both themes checks all seven entry identities,
+opens each exact snapshot, checks its scope and incarnation, returns to
+the list, and verifies the listed and saved ranges before and after Mark
+reviewed. It also checks the six-entry partial range, the unread point,
+the disabled control and continuation. The render matrix covers the seven
+new record states in both themes at both widths. Twelve additional
+browser-native element captures show complete current, partial and
+reviewed catch-up sections at both widths and themes. They are labelled
+element captures in the index, separate from viewport and full-page PNGs.
+
+The first P1 render failed on two narrow Change 18 snapshot captures
+because a full commit was ordinary unbroken text. It is now a wrapped
+code identifier. That failed report is retained. A following full run
+passed, then two snapshot sentences were tightened before the final run.
+The final index and current PNGs bind the resulting source; both prior P1
+reports remain in `verification/`.
+
+Planner recommendation R1 is also applied: the checker uses an outlined
+diamond, with the explicit checker label and result text retained. It has
+no form-control role or interaction.

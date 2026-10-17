@@ -55,7 +55,7 @@ ul { padding-left: 1.25em; }
 .actor { display: flex; align-items: center; gap: 14px; }
 .actor-mark { flex: 0 0 auto; display: inline-block; width: 28px; height: 28px; background: var(--accent); }
 .actor-mark.person { border-radius: 50%; }
-.actor-mark.checker { background: transparent; border: 2px solid var(--accent); }
+.actor-mark.checker { background: transparent; border: 2px solid var(--accent); width: 22px; height: 22px; margin: 3px; transform: rotate(45deg); }
 .actor-mark.unknown { background: transparent; border: 1px dashed var(--muted); }
 .actor-copy { min-width: 0; }
 .controller { display: block; }
@@ -92,6 +92,10 @@ ul { padding-left: 1.25em; }
 .work-row .block { grid-column: 1 / -1; padding-left: 42px; margin: -10px 0 0; }
 .record-row { display: grid; grid-template-columns: 8em 17em 1fr; gap: 24px; padding: 4px 0; align-items: start; font-size: .85rem; }
 .record-row p { margin: 0; }
+.catchup { margin-top: 32px; scroll-margin-top: 20px; }
+.catchup-scope { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.catchup-scope h3 { margin-bottom: 8px; }
+.catchup-entry { padding-block: 12px; }
 .meta { display: flex; gap: 24px 40px; flex-wrap: wrap; align-items: center; margin: 24px 0; }
 .meta p { margin: 0; }
 .alternatives { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin: 16px 0 20px; }

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from html import escape
+import base64
 import hashlib
 import json
 
@@ -17,6 +18,74 @@ COMMITS = {
     "Change 18 source": "edc3a252bcf84cdd0fb28ea459bf6419106ea223",
 }
 E = escape
+
+
+def fixture_id(seed, prefix, length):
+    return prefix + base64.b32encode(hashlib.sha256(seed.encode()).digest()[:length]).decode().lower().rstrip("=")
+
+
+CATCHUP_SCOPES = {
+    "issue": {"label": "Clear completed", "kind": "lane", "before": 240, "through": 245},
+    "change18": {"label": "Improve empty-list message · Change 18", "kind": "change", "before": 17, "through": 18},
+    "change9": {"label": "Keyboard focus fix · Change 9", "kind": "change", "before": 8, "through": 9},
+}
+for scope_key, scope in CATCHUP_SCOPES.items():
+    scope["scope"] = fixture_id("scope:" + scope_key, "sc_", 32)
+    scope["inc"] = fixture_id("inc:" + scope_key, "in_", 16)
+
+CATCHUP_ENTRIES = [
+    ("issue", 241, "Interface agent", "agent", "Reported progress on the Clear completed button.", "Interface work", "Conditions still name v1, entry 220. The history decision is still waiting."),
+    ("issue", 242, "Storage agent", "agent", "Asked that earlier tasks stay recoverable after clearing.", "History question · comment", "The comment asks for recoverability. It does not revise the proposal text or the work conditions."),
+    ("issue", 243, "Storage agent", "agent", "Blocked storage work on the history decision.", "Storage work · block", "The accepted commitment still names conditions v1. The history decision is the named block."),
+    ("issue", 244, "Ari", "person", "Asked to compare keeping history with permanent deletion.", "History question · comment", "Ari requested the comparison. No approval or decision is recorded by this comment."),
+    ("issue", 245, "Storage agent", "agent", "Revised the proposal to keep completed tasks in history.", "History question · text v2", "Text v2 proposes keeping history and compares permanent deletion. Approval and decision remain separate acts."),
+    ("change18", 18, "Interface agent", "agent", "Proposed version 2 of the empty-list message.", "Change 18 · version 2", "Integration d664779063515feb27b0532f708970d1c4f68008. Version 2 is proposed here. Review and publication are separate records."),
+    ("change9", 9, "Ari", "person", "Requested publication of Keyboard focus fix version 1.", "Change 9 · version 1", "Integration 1faf54e188a46dd8edeb5ead4adb7f9fbee10fb4. Recording the request does not establish publication."),
+]
+
+
+def scope_identity(key, through):
+    scope = CATCHUP_SCOPES[key]
+    head = "sha256:" + hashlib.sha256(f"{key}:entry:{through}".encode()).hexdigest()
+    return f'<details><summary>Full scope identity</summary><dl class="full-commits"><dt>Scope</dt><dd>{scope["scope"]}</dd><dt>Incarnation</dt><dd>{scope["inc"]}</dd><dt>Kind</dt><dd>{scope["kind"]}</dd><dt>Through entry {through} · synthetic fixture hash</dt><dd>{head}</dd></dl></details>'
+
+
+def catchup(theme, state):
+    reviewed, partial = state == "reviewed", state == "partial"
+    content = '<section class="section catchup" id="since-review"><h2>Since your last review</h2>'
+    if reviewed:
+        content += '<p>Nothing new since your review.</p>'
+        for key, scope in CATCHUP_SCOPES.items():
+            content += f'<p class="receipt" data-review-point="{key}" data-through="{scope["through"]}">{E(scope["label"])} · reviewed through entry {scope["through"]}</p>'
+        return content + '</section>'
+    for key, scope in CATCHUP_SCOPES.items():
+        if partial and key == "change9":
+            continue
+        content += f'<section class="catchup-scope" data-catchup-scope="{key}" data-scope="{scope["scope"]}" data-inc="{scope["inc"]}" data-from="{scope["before"] + 1}" data-through="{scope["through"]}"><h3>{E(scope["label"])}</h3><p class="receipt">Previously reviewed through entry {scope["before"]} · listed through entry {scope["through"]}</p>' + scope_identity(key, scope["through"])
+        for entry_key, number, name, kind, happened, subject, detail in CATCHUP_ENTRIES:
+            if entry_key != key:
+                continue
+            content += f'<article class="record-row catchup-entry" data-catchup-entry="{key}:{number}"><span class="receipt">entry {number}</span>{actor(name, kind)}<div><p>{E(happened)}</p>{text_link(f"catchup-{key}-{number}", f"Read subject at entry {number}", theme)}</div></article>'
+        content += '</section>'
+    if partial:
+        content += notice("One scope has not been loaded", "Change 9 has not been read. Its saved point stays at entry 8. No entry from that scope is included in the six loaded entries.")
+        content += '<p class="receipt" data-review-point="change9" data-through="8">Keyboard focus fix · Change 9 · saved through entry 8</p><div class="actions">' + link("needs-you", "Load more", theme, True) + disabled("Mark reviewed") + '<p class="muted">Load the remaining scope before marking this complete catch-up range reviewed. All saved points remain unchanged.</p></div>'
+    else:
+        content += '<div class="actions">' + link("needs-reviewed", "Mark reviewed", theme, True, "mark-reviewed") + '<p class="muted">This records only the listed ranges: Clear completed 241–245, Change 18 entry 18, and Change 9 entry 9. The three open obligations remain.</p></div>'
+    return content + '</section>'
+
+
+def catchup_record(theme, state):
+    key, number = state.rsplit("-", 1)
+    row = next(row for row in CATCHUP_ENTRIES if row[0] == key and row[1] == int(number))
+    _, number, name, kind, happened, subject, detail = row
+    scope = CATCHUP_SCOPES[key]
+    detail_html = E(detail)
+    for commit in COMMITS.values():
+        detail_html = detail_html.replace(commit, f"<code>{commit}</code>")
+    content = heading(f"Entry {number}", scope["label"]) + f'<p class="receipt">Pinned record · {E(scope["label"])} · entry {number}</p>' + actor(name, kind)
+    content += scope_identity(key, number) + f'<section class="section" data-pinned-record="{key}:{number}" data-scope="{scope["scope"]}" data-inc="{scope["inc"]}"><h2>{E(subject)}</h2><p>{E(happened)}</p><p>{detail_html}</p></section><p class="receipt">This is the subject at this entry, not a read of its latest version. All records and identifiers are fictional.</p>'
+    return content + '<a class="button secondary" href="' + url("needs-you", theme) + '#since-review">Back to changes</a>'
 
 
 def url(key, theme):
@@ -70,14 +139,13 @@ def needs(theme, state):
     partial = state == "partial"
     reviewed = state == "reviewed"
     count = "6 new entries loaded; more may remain" if partial else "0 new entries since your last review" if reviewed else "7 new entries since your last review"
-    mark = disabled("Mark reviewed") if partial else link("needs-reviewed", "Mark reviewed", theme, True, "mark-reviewed")
+    mark = '<a class="button secondary" href="#since-review">Read changes</a>'
     if reviewed:
         mark = '<span class="receipt">Review points saved for the inspected scopes</span>'
     checked = "2 of 3 scopes checked" if partial else "3 scopes checked"
     content += f'<section class="band"><strong>{count}</strong><span class="receipt">{checked}</span>{mark}<p class="muted">Reading an item leaves its work open.</p></section>'
     if partial:
         content += notice("More updates have not been loaded", "This read reached its entry limit. One scope has not been read. Its previous review point is retained.")
-        content += '<div class="actions">' + link("needs-you", "Load more", theme, True) + '<p class="muted">Only a complete inspected range can advance its review point.</p></div>'
     rows = [
         ("Keep completed tasks in history?", "Storage agent", "agent", "A product decision is waiting.", "You were asked to approve text v2.", "Review the alternatives and record your choice.", "decision-requested", "Read decision", "question-7"),
         ("Improve empty-list message · version 2", "Interface agent", "agent", "A change is ready for review.", "Your review is requested.", "Review this version before merging.", "change-secondary", "Review change", "change-18"),
@@ -89,7 +157,8 @@ def needs(theme, state):
         for label, value in [("What needs you", what), ("Why you", why), ("What settles it", settles)]:
             content += f'<div><span class="label">{label}</span><p>{E(value)}</p></div>'
         content += link(dest, action, theme) + '</article>'
-    return content + f'<footer class="foot receipt">3 items shown · {checked}</footer>'
+    content += f'<footer class="foot receipt">3 items shown · {checked}</footer>'
+    return content + catchup(theme, state)
 
 
 def conditions(version):
@@ -281,6 +350,7 @@ SPECS = [
     *[(f"decision-{s}", "Decision", s, decision) for s in ["requested", "changes", "approved", "decided", "refused", "unrequested", "stale"]],
     *[(f"change-{s}", "Change", s, change) for s in ["review", "changes", "secondary", "secondary-approved", "secondary-published", "approved", "stale", "no-checks", "check-failed", "unknown", "recovery-unavailable", "published", "keyboard-published"]],
     *[(f"file-{s}", "File and diff", s, reader) for s in ["file", "diff", "interdiff", "truncated", "unavailable", "secondary-diff"]],
+    *[(f"catchup-{key}-{number}", "Needs you", f"{key}-{number}", catchup_record) for key, number, *_ in CATCHUP_ENTRIES],
 ]
 
 
@@ -307,7 +377,7 @@ def main():
         rows = "".join(f'<tr><td>{E(family)}</td><td>{text_link(key, state.replace("-", " "), theme)}</td><td class="receipt">{E(key)}</td></tr>' for key, family, state, _ in SPECS)
         body = heading("Journey design examples") + '<p>Static examples only. Links show sample states; they send no live acts. All identities, records, and commits are fictional.</p><p>' + text_link("index", "Switch to " + ("dark" if theme == "light" else "light"), "dark" if theme == "light" else "light") + '</p><table class="catalogue"><thead><tr><th>View</th><th>State</th><th>Example</th></tr></thead><tbody>' + rows + '</tbody></table>'
         (ROOT / url("index", theme)).write_text(document(theme, "index", "Catalogue", "all states", body))
-    manifest = {"kind": "static-design-fixtures", "noLiveActs": True, "themes": ["light", "dark"], "commits": COMMITS, "pages": pages, "stateCount": len(SPECS), "pageCount": len(pages), "renderStatus": "Generation alone proves no browser result. See renders/render-index.json for separate evidence."}
+    manifest = {"kind": "static-design-fixtures", "noLiveActs": True, "themes": ["light", "dark"], "commits": COMMITS, "catchupScopes": CATCHUP_SCOPES, "catchupEntries": [{"scope": key, "entry": number, "actor": name, "kind": kind, "happened": happened, "subject": subject} for key, number, name, kind, happened, subject, detail in CATCHUP_ENTRIES], "pages": pages, "stateCount": len(SPECS), "pageCount": len(pages), "renderStatus": "Generation alone proves no browser result. See renders/render-index.json for separate evidence."}
     (ROOT / "mockups.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Wrote {len(pages)} static mockups, two catalogues, and fixture metadata. No service calls.")
 

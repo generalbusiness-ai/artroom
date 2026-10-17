@@ -15,6 +15,90 @@
     "Change 18 integration": "d664779063515feb27b0532f708970d1c4f68008",
     "Change 18 source": "edc3a252bcf84cdd0fb28ea459bf6419106ea223"
   },
+  "catchupScopes": {
+    "issue": {
+      "label": "Clear completed",
+      "kind": "lane",
+      "before": 240,
+      "through": 245,
+      "scope": "sc_4cg2kkmnl6koquptolr5kz56zklrrbbuohyxk3azok2svu3louqq",
+      "inc": "in_hobiscq4kjbb5w4yhyd6keckga"
+    },
+    "change18": {
+      "label": "Improve empty-list message \u00b7 Change 18",
+      "kind": "change",
+      "before": 17,
+      "through": 18,
+      "scope": "sc_kg64zq7rjdd3d5x32lxiot5f4cpjl4dmktfy3wkgy6voqahg7jua",
+      "inc": "in_mdlqzgk2pjphrbnepwlt4r547m"
+    },
+    "change9": {
+      "label": "Keyboard focus fix \u00b7 Change 9",
+      "kind": "change",
+      "before": 8,
+      "through": 9,
+      "scope": "sc_ceh3forrt3l3wubtpujmvxoauw76jjt3rbrcguneqxstkmb5mmtq",
+      "inc": "in_u2d4j74sz2k53oohl6urjt4uhi"
+    }
+  },
+  "catchupEntries": [
+    {
+      "scope": "issue",
+      "entry": 241,
+      "actor": "Interface agent",
+      "kind": "agent",
+      "happened": "Reported progress on the Clear completed button.",
+      "subject": "Interface work"
+    },
+    {
+      "scope": "issue",
+      "entry": 242,
+      "actor": "Storage agent",
+      "kind": "agent",
+      "happened": "Asked that earlier tasks stay recoverable after clearing.",
+      "subject": "History question \u00b7 comment"
+    },
+    {
+      "scope": "issue",
+      "entry": 243,
+      "actor": "Storage agent",
+      "kind": "agent",
+      "happened": "Blocked storage work on the history decision.",
+      "subject": "Storage work \u00b7 block"
+    },
+    {
+      "scope": "issue",
+      "entry": 244,
+      "actor": "Ari",
+      "kind": "person",
+      "happened": "Asked to compare keeping history with permanent deletion.",
+      "subject": "History question \u00b7 comment"
+    },
+    {
+      "scope": "issue",
+      "entry": 245,
+      "actor": "Storage agent",
+      "kind": "agent",
+      "happened": "Revised the proposal to keep completed tasks in history.",
+      "subject": "History question \u00b7 text v2"
+    },
+    {
+      "scope": "change18",
+      "entry": 18,
+      "actor": "Interface agent",
+      "kind": "agent",
+      "happened": "Proposed version 2 of the empty-list message.",
+      "subject": "Change 18 \u00b7 version 2"
+    },
+    {
+      "scope": "change9",
+      "entry": 9,
+      "actor": "Ari",
+      "kind": "person",
+      "happened": "Requested publication of Keyboard focus fix version 1.",
+      "subject": "Change 9 \u00b7 version 1"
+    }
+  ],
   "pages": [
     {
       "key": "needs-you",
@@ -22,7 +106,7 @@
       "state": "current",
       "theme": "light",
       "path": "needs-you-light.html",
-      "sha256": "e58b565ea3ad1a640b44fb29d61595364783d64ae0d36de555f605add8d15fdc"
+      "sha256": "0885164566045f25259636695d2573b7108bcd62887ac63a4661a02360107252"
     },
     {
       "key": "needs-reviewed",
@@ -30,7 +114,7 @@
       "state": "reviewed",
       "theme": "light",
       "path": "needs-reviewed-light.html",
-      "sha256": "42e6eb1933252f3f6e65acaf72accd39c029ffd38347dd2e1f675187040ccc0f"
+      "sha256": "637804995ab2dc24013a808cb84efc3dfd9eea1eee0ff8f28f80e78a4ac6bdae"
     },
     {
       "key": "needs-partial",
@@ -38,7 +122,7 @@
       "state": "partial",
       "theme": "light",
       "path": "needs-partial-light.html",
-      "sha256": "f79316b53383a2b400e3345e526a3c9535bfb6daf18b6fe7c30f74f044eb9089"
+      "sha256": "ad52a49d1affaa9b69f2bed76f75d204726e25d805834c182604a766c891c195"
     },
     {
       "key": "needs-empty",
@@ -369,12 +453,68 @@
       "sha256": "cfa24b31520e7d01cacd723018ae4fed9e9f006f31e7d93f5116665b65a3b099"
     },
     {
+      "key": "catchup-issue-241",
+      "family": "Needs you",
+      "state": "issue-241",
+      "theme": "light",
+      "path": "catchup-issue-241-light.html",
+      "sha256": "587f23976a4532e7cabfbf305a304df186e3a4ffe3fabb60d38c3f5961cea1c4"
+    },
+    {
+      "key": "catchup-issue-242",
+      "family": "Needs you",
+      "state": "issue-242",
+      "theme": "light",
+      "path": "catchup-issue-242-light.html",
+      "sha256": "c650a09fed55fba303b949bab7c4f55d81a714fe2318979fad3fba9a8fbfa632"
+    },
+    {
+      "key": "catchup-issue-243",
+      "family": "Needs you",
+      "state": "issue-243",
+      "theme": "light",
+      "path": "catchup-issue-243-light.html",
+      "sha256": "7df8491407c44c193d966afe91aaa7e1f2235c49d036413f315f8f84000a6040"
+    },
+    {
+      "key": "catchup-issue-244",
+      "family": "Needs you",
+      "state": "issue-244",
+      "theme": "light",
+      "path": "catchup-issue-244-light.html",
+      "sha256": "e62275067591955aefabd546243f7b2ffa6331257abeec07d9146364304b377c"
+    },
+    {
+      "key": "catchup-issue-245",
+      "family": "Needs you",
+      "state": "issue-245",
+      "theme": "light",
+      "path": "catchup-issue-245-light.html",
+      "sha256": "f15092562b4eee649dd1bfbef8157287da965f2a0b54288a06b294f5e315ca01"
+    },
+    {
+      "key": "catchup-change18-18",
+      "family": "Needs you",
+      "state": "change18-18",
+      "theme": "light",
+      "path": "catchup-change18-18-light.html",
+      "sha256": "b8a969144ecf9f59b4486e9391f6c6e55d2be82f310ee2dec047df458466c0a7"
+    },
+    {
+      "key": "catchup-change9-9",
+      "family": "Needs you",
+      "state": "change9-9",
+      "theme": "light",
+      "path": "catchup-change9-9-light.html",
+      "sha256": "85cacf1be8bacc0d1ca8ddb880c13fd884578fc33ad03aa8836e23c10ef3d67c"
+    },
+    {
       "key": "needs-you",
       "family": "Needs you",
       "state": "current",
       "theme": "dark",
       "path": "needs-you-dark.html",
-      "sha256": "30c39fae5bfd92c15027635c7c9333a0489f0a32dc4461412538014e12f4ca58"
+      "sha256": "dfc87328fe1c7c770e9d06923776ca13c057a0cbb317977612b3af9d346d3937"
     },
     {
       "key": "needs-reviewed",
@@ -382,7 +522,7 @@
       "state": "reviewed",
       "theme": "dark",
       "path": "needs-reviewed-dark.html",
-      "sha256": "b0e438692d6796f4470a71ec47099a287a33d32a9898d21bad824e503dca6c71"
+      "sha256": "2f988e3989d080186bac68e06069af88658ea4a976603b35c4066019444d1a02"
     },
     {
       "key": "needs-partial",
@@ -390,7 +530,7 @@
       "state": "partial",
       "theme": "dark",
       "path": "needs-partial-dark.html",
-      "sha256": "2dcda740dccc138875def0b1f703a3002cd4a941ff26790822d0df24b39120c2"
+      "sha256": "a355b16bc0706bc2d5b8491ed0c23678946f5369dd0d636f1e0dc488363664c7"
     },
     {
       "key": "needs-empty",
@@ -719,9 +859,65 @@
       "theme": "dark",
       "path": "file-secondary-diff-dark.html",
       "sha256": "04d3166d56edf696ca7c10841b6c0190aae4173dfc2d31544e098e531d7768f8"
+    },
+    {
+      "key": "catchup-issue-241",
+      "family": "Needs you",
+      "state": "issue-241",
+      "theme": "dark",
+      "path": "catchup-issue-241-dark.html",
+      "sha256": "e3d740ba92055cd40aa311526125f5f0345305be13caf1bdce05b9b3f2bca1ec"
+    },
+    {
+      "key": "catchup-issue-242",
+      "family": "Needs you",
+      "state": "issue-242",
+      "theme": "dark",
+      "path": "catchup-issue-242-dark.html",
+      "sha256": "ffa759b784e3e6ce8453d9dbe4b9ec80e7b44fb8ab79f12e3fc3b74e3e62d908"
+    },
+    {
+      "key": "catchup-issue-243",
+      "family": "Needs you",
+      "state": "issue-243",
+      "theme": "dark",
+      "path": "catchup-issue-243-dark.html",
+      "sha256": "5eb349d4dc49f885e224550c1531cdb6e8aa1c42a82069309615bd130b38f723"
+    },
+    {
+      "key": "catchup-issue-244",
+      "family": "Needs you",
+      "state": "issue-244",
+      "theme": "dark",
+      "path": "catchup-issue-244-dark.html",
+      "sha256": "f45ee39bdb590749fb51ccb2fbc1dd1ff26ed2b4b8c1a2826f4e86e02489e887"
+    },
+    {
+      "key": "catchup-issue-245",
+      "family": "Needs you",
+      "state": "issue-245",
+      "theme": "dark",
+      "path": "catchup-issue-245-dark.html",
+      "sha256": "78540980e1de68791c08bba6e0f3a4648e22d5174605e37e8e6abf148b97a2d4"
+    },
+    {
+      "key": "catchup-change18-18",
+      "family": "Needs you",
+      "state": "change18-18",
+      "theme": "dark",
+      "path": "catchup-change18-18-dark.html",
+      "sha256": "4fc8ece103f7cb1de0e22f6b6e23c1f38b2b43919e0cfb3f071b4137d68bcd9d"
+    },
+    {
+      "key": "catchup-change9-9",
+      "family": "Needs you",
+      "state": "change9-9",
+      "theme": "dark",
+      "path": "catchup-change9-9-dark.html",
+      "sha256": "d6a89ed52e156c2e82785a99cb6720d89cf50b50bc1b0c4f0fed31272e832042"
     }
   ],
-  "stateCount": 44,
-  "pageCount": 88,
+  "stateCount": 51,
+  "pageCount": 102,
   "renderStatus": "Generation alone proves no browser result. See renders/render-index.json for separate evidence."
 }

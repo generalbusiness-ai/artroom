@@ -39,7 +39,7 @@ async function state(p,key){assert.equal(await p.locator('body').getAttribute('d
 try{
  await check('All local link and image targets exist',async()=>{
   for(const file of [...manifest.pages.map(p=>p.path),'index-light.html','index-dark.html']){
-   const s=await readFile(path.join(root,file),'utf8');for(const match of s.matchAll(/(?:href|src)="([^"]+)"/g)){assert(!/^[a-z]+:/i.test(match[1]));await access(path.resolve(root,match[1]));}
+   const s=await readFile(path.join(root,file),'utf8');for(const match of s.matchAll(/(?:href|src)="([^"]+)"/g)){assert(!/^[a-z]+:/i.test(match[1]));const [target,fragment]=match[1].split('#');if(target)await access(path.resolve(root,target));if(fragment){const linked=target?await readFile(path.resolve(root,target),'utf8'):s;assert(linked.includes(`id="${fragment}"`),`Missing fragment ${match[1]} in ${file}`);}}
   }
  });
  // Every design state, both themes, at a desktop and a phone width.
@@ -51,6 +51,16 @@ try{
   }
   await c.close();
  }
+ await check('Catch-up list and reviewed ranges at both widths and themes',async()=>{
+  for(const viewport of [{width:1536,height:1024},{width:390,height:844}]){
+   const c=await context(viewport);
+   for(const theme of ['light','dark'])for(const key of ['needs-you','needs-partial','needs-reviewed']){
+    const p=await open(c,key,theme);await clean(p,key);const file=`${key}-${theme}-${viewport.width}-changes.png`;
+    await p.locator('#since-review').screenshot({path:path.join(out,file)});const bytes=await readFile(path.join(out,file));report.renders.push({file,bytes:bytes.length,sha256:hash(bytes),key,theme,viewport,capture:'element',selector:'#since-review'});await p.close();
+   }
+   await c.close();
+  }
+ });
  const primary=[['needs-you','light'],['work-active','light'],['decision-requested','light'],['change-review','light'],['file-diff','light'],['needs-you','dark'],['change-unknown','light'],['file-interdiff','light']];
  await check('Native viewport comparisons and all primary actions',async()=>{
   for(let i=0;i<primary.length;i++){
@@ -82,7 +92,22 @@ try{
  for(const theme of ['light','dark']){
  const c=await context({width:390,height:844});
  await check(`Handoff agents (${theme})`,async()=>{const p=await open(c,'work-ready',theme);await p.locator('.work-row').nth(0).getByRole('link',{name:'Offer work',exact:true}).click();await state(p,'work-offered-interface');await p.locator('.work-row').nth(1).getByRole('link',{name:'Offer work',exact:true}).click();await state(p,'work-offered');assert.equal(await p.getByText('The offeree accepts',{exact:true}).count(),2);await click(p,'Read latest record');await state(p,'work-active');await contains(p,'v1 · accepted');await p.close();});
- await check(`Return and catch up (${theme})`,async()=>{const p=await open(c,'needs-you',theme);await click(p,'Read decision');await click(p,'Needs you');await contains(p,'7 new entries');await click(p,'Mark reviewed');await contains(p,'0 new entries');assert.equal(await p.locator('.needs-row').count(),3);await contains(p,'Keep completed tasks in history?');await p.goto(new URL(`needs-partial-${theme}.html`,base).href);await contains(p,'6 new entries loaded; more may remain');await contains(p,'2 of 3 scopes checked');assert(await p.getByRole('button',{name:'Mark reviewed',exact:true}).isDisabled());await contains(p,'Last known item');await click(p,'Load more');await contains(p,'7 new entries');await p.close();});
+ await check(`Return and catch up (${theme})`,async()=>{
+  const p=await open(c,'needs-you',theme);
+  await click(p,'Read decision');await click(p,'Needs you');await contains(p,'7 new entries');await click(p,'Read changes');
+  const listed=['issue:241','issue:242','issue:243','issue:244','issue:245','change18:18','change9:9'];
+  assert.deepEqual(await p.locator('[data-catchup-entry]').evaluateAll(es=>es.map(e=>e.dataset.catchupEntry)),listed);
+  assert.deepEqual(await p.locator('[data-catchup-scope]').evaluateAll(es=>es.map(e=>[e.dataset.catchupScope,Number(e.dataset.from),Number(e.dataset.through)])),[['issue',241,245],['change18',18,18],['change9',9,9]]);
+  for(const id of listed){const [key,entry]=id.split(':');const row=p.locator(`[data-catchup-entry="${id}"]`);await row.getByRole('link',{name:`Read subject at entry ${entry}`,exact:true}).click();const pinned=p.locator(`[data-pinned-record="${id}"]`);assert.equal(await pinned.getAttribute('data-scope'),manifest.catchupScopes[key].scope);assert.equal(await pinned.getAttribute('data-inc'),manifest.catchupScopes[key].inc);await contains(p,`entry ${entry}`);await click(p,'Back to changes');}
+  assert(await p.getByRole('link',{name:'Mark reviewed',exact:true}).evaluate(e=>!!(document.querySelector('#since-review').compareDocumentPosition(e)&Node.DOCUMENT_POSITION_CONTAINED_BY)));
+  await click(p,'Mark reviewed');await contains(p,'0 new entries');await contains(p,'Nothing new since your review');assert.equal(await p.locator('[data-catchup-entry]').count(),0);
+  assert.deepEqual(await p.locator('[data-review-point]').evaluateAll(es=>es.map(e=>[e.dataset.reviewPoint,Number(e.dataset.through)])),[['issue',245],['change18',18],['change9',9]]);
+  assert.equal(await p.locator('.needs-row').count(),3);await contains(p,'Keep completed tasks in history?');
+  await p.goto(new URL(`needs-partial-${theme}.html`,base).href);await contains(p,'6 new entries loaded; more may remain');await click(p,'Read changes');
+  assert.deepEqual(await p.locator('[data-catchup-entry]').evaluateAll(es=>es.map(e=>e.dataset.catchupEntry)),listed.slice(0,6));assert.equal(await p.locator('[data-catchup-scope="change9"]').count(),0);
+  assert.equal(await p.locator('[data-review-point="change9"]').getAttribute('data-through'),'8');assert(await p.getByRole('button',{name:'Mark reviewed',exact:true}).isDisabled());await contains(p,'Change 9 has not been read');
+  await click(p,'Load more');assert.deepEqual(await p.locator('[data-catchup-entry]').evaluateAll(es=>es.map(e=>e.dataset.catchupEntry)),listed);await click(p,'Mark reviewed');await contains(p,'Nothing new since your review');await p.close();
+ });
  await check(`Review, changes and pinned readers (${theme})`,async()=>{const p=await open(c,'change-review',theme);await click(p,'Read diff');await state(p,'file-diff');await contains(p,'8475e1b');await click(p,'Interdiff');await contains(p,'62a6ace');await contains(p,'6ef5643');assert.deepEqual(await p.locator('.diff-line .new').allTextContents(),['12','','13','14','15','16']);await click(p,'File');await contains(p,'lines 12–16');await click(p,'Back to change');await click(p,'Request changes');await state(p,'change-changes');await contains(p,'Changes requested on version 2');assert(await p.getByRole('button',{name:'Merge version 2',exact:true}).isDisabled());await p.goto(new URL(`change-stale-${theme}.html`,base).href);await contains(p,'older version');assert.equal(await p.getByRole('link',{name:'Approve version 2',exact:true}).count(),0);await click(p,'Read version 2');await state(p,'change-review');await p.close();});
  await check(`Requested person approval and separate revision (${theme})`,async()=>{const p=await open(c,'decision-requested',theme);assert(await p.getByRole('button',{name:'Record decision',exact:true}).isDisabled());await click(p,'Approve text v2');await state(p,'decision-approved');await contains(p,'Conditions are still unchanged');await click(p,'Record decision');await state(p,'decision-decided');await contains(p,'still name v1');await click(p,'Revise the work conditions');await state(p,'work-terms-changed');await contains(p,'Terms v2');await contains(p,'v1 · accepted');await p.locator('.work-row').nth(0).getByRole('link',{name:'Offer current terms',exact:true}).click();await p.locator('.work-row').nth(1).getByRole('link',{name:'Offer current terms',exact:true}).click();await state(p,'work-reoffered');assert.equal(await p.getByText('Old commitment: v1 · still accepted. This offer is a new commitment.',{exact:true}).count(),2);await click(p,'Read latest record');await contains(p,'v2 · accepted');for(const key of ['work-resumed','work-delivered']){await p.goto(new URL(`${key}-${theme}.html`,base).href);await contains(p,'Terms v2');assert.equal(await p.locator('a[href^="work-ready-"]').count(),0);assert.equal(await p.getByRole('link',{name:'Offer work',exact:true}).count(),0);assert.equal(await p.locator('[data-prototype-action=offer]').count(),0);}await p.close();});
  await check(`Confirmed publication retains each change (${theme})`,async()=>{const p=await open(c,'change-review',theme);await click(p,'Approve version 2');await click(p,'Merge version 2');await state(p,'change-published');await contains(p,manifest.commits['Version 2 integration']);await contains(p,'refs/heads/main');await click(p,'Read Work');await contains(p,'Delivered by Change 12');await p.goto(new URL(`needs-you-${theme}.html`,base).href);await click(p,'Review change');await state(p,'change-secondary');await click(p,'Read this change’s diff');await contains(p,'d664779');await click(p,'Back to Change 18');await click(p,'Approve version 2');await click(p,'Merge version 2');await contains(p,manifest.commits['Change 18 integration']);await contains(p,'Change 18');await p.close();});
