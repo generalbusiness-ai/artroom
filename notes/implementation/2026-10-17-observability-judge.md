@@ -278,12 +278,15 @@ Archive Source `6d1a1973` received exact approval `f250f501`, ratified by
 `deccfd55aa75809669789fa427e27a52be3c3c0c`. The normal landing and
 required workroom push completed. The full archive root remains owed.
 
-This Judge candidate now incorporates that actual Main. All thirteen
-archive leaves are exact, and its twenty-one Judge paths keep their
-standalone source bodies except this delivery note. The earlier standalone
+The initial `aeafd364` Judge composition incorporated that actual Main.
+All thirteen archive leaves were exact, and its twenty-one Judge paths
+kept their standalone source bodies except this note. The repaired
+freeze below additionally changes the metrics module and two tests;
+the thirteen archive leaves remain exact. The earlier standalone
 gate did not include the thirteen archive additions. The first composed gate and subsequent repairs are recorded below.
 The earlier standalone gate is historical, not combined validation.
-Source filing requires the repaired composition’s completed gate. The five P3 slices remain separate, with Judge before
+Source review must assess the repaired composition’s actual gate outcome
+and the bounded failures recorded below. The five P3 slices remain separate, with Judge before
 P3 in the latest review order. Calibration and real SQL/health acceptance
 remain owed, and Cloudflare deployment remains held.
 
@@ -346,3 +349,44 @@ W5 assertion (`04fd07`) assumed live comments used the final-item route;
 its failed premise was removed before the valid witnesses and repair.
 All these original outcomes remain recorded. The new source and tests
 require one gate at the repaired immutable freeze before Source review.
+
+## Repaired composition gate and remaining timeout residue
+
+Repaired implementation freeze
+`f286e00dd8b4c0c8f5534fa339923fb6a088a6ad`, tree
+`c50d92340ee772dd4f6e8e2cb0235e2c0b110ab3`, was clean before and
+after original gate session 62660. It exited 1 (`0fb468`): 1,563 Vitest
+cases passed, three failed, and three were skipped. All metric witnesses
+passed. The three failures were original 5,000 ms timeouts in Scope
+`lending.test.ts`, Page `source-preview.scope.test.ts`, and Lanes
+`manifest.scope.test.ts`. The earlier archive timeout did not recur.
+Node and Counter checks were unrun because Vitest failed.
+
+The gate took 554.324 seconds elapsed and 660.537 child CPU seconds on
+macOS 27.0.1 arm64 with 18 logical CPUs. Pre-run load averages were
+2.897, 2.544 and 3.391. The verified dependency stamp skipped
+installation. Typechecking took 7.5 seconds elapsed and 27.3 CPU
+seconds; tests took 546.6 and 633.0. The lock hash is unchanged.
+The private log is `/tmp/artroom-judge-repaired-f286e00d-gate.log`;
+its terminal JSON is beside it. Step logs are in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.78Vpa8opYD`.
+These references grant no access to private logs or adjacent files.
+
+Exactly the three timed-out cases then passed together in original
+session 12575 (`0824ba`), with unchanged source and deadlines: lending
+4,124 ms, source preview 2,514 ms, and manifest 2,431 ms. The outer
+command took 11.78 seconds elapsed and 13.45 CPU seconds. This is
+narrower evidence, not a passing combined gate or a proven cause.
+The bounded residue belongs to the current review’s explicit disposition;
+the broader gate-stability request `1d3a13e3` remains open. No whole
+suite was repeated and no test deadline, assertion or pool was changed.
+
+The complete Source packet discloses both failed composed gates and
+the isolated passes. Exact independent review must decide whether the
+remaining timeout residue blocks this candidate. A gate failure is not
+waived by this note or by the static advisory. Only this delivery note
+changes after the tested freeze; all other 1,457 mode/type/blob/path
+leaves, all thirteen landed archive leaves, and all 123 protected
+contract/platform/client/lock leaves remain exact. No additional gate
+is run for this note-only successor. Actual calibration, live SQL/health
+acceptance and storage reporting remain owed.
