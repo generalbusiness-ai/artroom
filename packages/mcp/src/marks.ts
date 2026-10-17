@@ -17,8 +17,8 @@ import { VERSIONS } from "@generalbusiness/dap-platform";
 
 const BY_NAME: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "platform:register": {
-    "founding-policy": "the register's founding policy allows your key to create a room",
-    "handle-form": "the founder's handle is a handle: @, then letters, digits, dots, dashes or underscores",
+    "founding-policy": "the register's creation policy allows your key to create a room",
+    "handle-form": "the creator's handle is a handle: @, then letters, digits, dots, dashes or underscores",
   },
   "platform:directory": {
     "definition-active": "the definition is active in the rules scope, and its bytes and the definitions it names are at hand",
@@ -27,7 +27,7 @@ const BY_NAME: Readonly<Record<string, Readonly<Record<string, string>>>> = {
     "application-ready": "the application's definition is active in the rules scope and can be established with these values",
   },
   "platform:membership": {
-    "founding-key": "only the founding key may sign, and only before the founder holds a seat and a first key",
+    "founding-key": "only the initial key may sign, and only before the creator holds a seat and a first key",
     "recovery-key": "the recovery key may sign; otherwise your role must hold the action",
     "by-invitation": "the invitation's secret matches and the invitation is still open",
     "invitation": "the invitation named by its number",

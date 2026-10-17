@@ -78,7 +78,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     };
     for (const secret of [unas, pauls, ritas]) await screens(await openRoom(d.as(secret), place));
     const seen = await openRoom(d.as(pauls), place);
-    // This fixture uses the current CLI founding cohort (@3 destination)
+    // This fixture uses the current CLI creation cohort (@3 destination)
     // with the legacy demo change declaration and its one-file manifest.
     // Preparation requires the separately implemented exact compatibility;
     // it does not exercise manifest-list or branch-proposal orchestration.

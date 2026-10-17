@@ -35,10 +35,10 @@ export function preparationView(sql: Pick<Sql, "exec">, snapshot: ScopeState, bu
     scope: () => { budget.spend({ calls: 1 }); return snapshot; },
     page: (...args: Parameters<StateView["page"]>) => { try { return page(...args); } catch { return budget.stop(); } },
     incarnations: (scope: Parameters<StateView["incarnations"]>[0]) => {
-      const found = incarnationEvidence(sql, scope, budget);
+      const matched = incarnationEvidence(sql, scope, budget);
       // A two-incarnation witness is not a complete inventory. Invalid
       // native histories stop this supported callback path explicitly.
-      return found.kind === "none" ? [] : found.kind === "one" ? [found.incarnation] : budget.stop();
+      return matched.kind === "none" ? [] : matched.kind === "one" ? [matched.incarnation] : budget.stop();
     },
   };
   return new Proxy(Object.freeze(methods), { get(target, property) {

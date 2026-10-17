@@ -137,7 +137,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -218,7 +218,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -456,7 +456,7 @@
     },
     {
       "name": "sends",
-      "description": "A page of a scope's sends with their attempts and results; or, with duty (seq.n, as a receipt lists it), the status of that one send.",
+      "description": "A page of a scope's sends with their attempts and results; or, with outboxId (seq.n, as a receipt lists it), the status of that one send.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -467,7 +467,7 @@
             ],
             "description": "A scope ID; one of register, directory, membership, rules, destination, inbox; or an issue or change number."
           },
-          "duty": {
+          "outboxId": {
             "type": "string"
           },
           "cursor": {
@@ -536,7 +536,7 @@
     },
     {
       "name": "wait",
-      "description": "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
+      "description": "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (outboxId) has a result. Returns what it saw and whether it timed out. Never writes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -569,7 +569,7 @@
             "type": "integer",
             "minimum": 0
           },
-          "duty": {
+          "outboxId": {
             "type": "string"
           },
           "seconds": {
@@ -729,7 +729,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -840,7 +840,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -951,7 +951,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1101,7 +1101,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1242,7 +1242,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1379,7 +1379,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1510,7 +1510,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1638,7 +1638,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1768,7 +1768,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1904,7 +1904,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2179,7 +2179,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2290,7 +2290,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2401,7 +2401,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2531,7 +2531,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2656,7 +2656,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2804,7 +2804,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2928,7 +2928,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3047,7 +3047,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3157,7 +3157,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3267,7 +3267,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3397,7 +3397,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3532,7 +3532,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3651,7 +3651,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3770,7 +3770,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3915,7 +3915,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4062,7 +4062,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4190,7 +4190,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4352,7 +4352,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4474,7 +4474,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4585,7 +4585,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4709,7 +4709,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4828,7 +4828,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4960,7 +4960,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5081,7 +5081,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5209,7 +5209,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5346,7 +5346,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5480,7 +5480,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5590,7 +5590,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5712,7 +5712,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5822,7 +5822,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5932,7 +5932,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6056,7 +6056,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6175,7 +6175,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6285,7 +6285,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6404,7 +6404,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6514,7 +6514,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6560,7 +6560,7 @@
     {
       "name": "room.create",
       "title": "found (platform:register)",
-      "description": "found: opens a claim; the rule founding-policy decides who may sign. Fields: branch (required): text up to 256 bytes. founderHandle (required): text up to 256 bytes. recoveryKey (required): text up to 64 bytes. import: text up to 2048 bytes. Guards: the founder's handle is a handle: @, then letters, digits, dots, dashes or underscores (bad-handle).",
+      "description": "found: opens a claim; the rule founding-policy decides who may sign. Fields: branch (required): text up to 256 bytes. founderHandle (required): text up to 256 bytes. recoveryKey (required): text up to 64 bytes. import: text up to 2048 bytes. Guards: the creator's handle is a handle: @, then letters, digits, dots, dashes or underscores (bad-handle).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6644,7 +6644,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6680,7 +6680,7 @@
         "dap/binding": {
           "definition": "platform:register",
           "kind": "found",
-          "declaration": "sha256:3f30b267cadbe7a19a27e7566dd314d6f7e6705c8d80ad310a27b7cff81f2dfd",
+          "declaration": "sha256:5199b8525f9383bc63bd7c225e1d898b3a56d609e61b21b3fcc2a69fd22af50f",
           "digests": [
             "platform:register@3"
           ]
@@ -6769,7 +6769,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6882,7 +6882,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6918,7 +6918,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "first-key",
-          "declaration": "sha256:c596b1d988c9463df7795a45dceead41161e23b37f881664a0d523cc620ec34a",
+          "declaration": "sha256:7c52112ae083ca151725c839873d95c7f0b6d1cd6386975e11273a8c93d21bdf",
           "digests": [
             "platform:membership@2"
           ]
@@ -7001,7 +7001,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7120,7 +7120,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7224,7 +7224,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7260,7 +7260,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "seat",
-          "declaration": "sha256:5f2aa2227bfc40dbbaabc15a79040ae37fe330c29d5feceaf5142eabd48bbaa4",
+          "declaration": "sha256:4907e2f2c80ff8fc2bd3394b7618cde79e93e26e51fe52b48d6fb16da81b9d92",
           "digests": [
             "platform:membership@2"
           ]
@@ -7350,7 +7350,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7476,7 +7476,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7661,7 +7661,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7771,7 +7771,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7927,7 +7927,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"

@@ -34,7 +34,7 @@ import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, OutboxId } from "@generalbusiness/dap-contract";
 import { LATE, b64url, byteOrder, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, activeDirectory, collectItemQuery, partitionIndexes, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
@@ -676,23 +676,23 @@ async function historyOf(handle: ScopeHandle, at: Head): Promise<Entry[]> {
  * the item the same entry opens.
  */
 export function operationsOf(entries: readonly Entry[]): (Operation & { for: number | null })[] {
-  const found = new Map<string, Operation & { for: number | null }>();
+  const matched = new Map<string, Operation & { for: number | null }>();
   for (const entry of entries) {
     const opened = entry.effects.find((effect) => effect.effect === "open");
     for (const effect of entry.effects) {
       if (effect.effect === "operation") {
         const item = effect.for === "self" ? (opened && "item" in opened ? opened.item : null) : (effect.for ?? null);
-        found.set(`${entry.seq}:${effect.k}`, { id: `${entry.seq}:${effect.k}`, kind: effect.kind, attempts: [], for: item });
+        matched.set(`${entry.seq}:${effect.k}`, { id: `${entry.seq}:${effect.k}`, kind: effect.kind, attempts: [], for: item });
       } else if (effect.effect === "attempt") {
         const id = typeof effect.operation === "string" ? effect.operation : `${entry.seq}:${effect.operation.k}`;
-        const operation = found.get(id);
+        const operation = matched.get(id);
         if (!operation) continue;
         if (effect.result === "opened") operation.attempts.push("opened");
         else operation.attempts[effect.attempt - 1] = effect.result;
       }
     }
   }
-  return [...found.values()];
+  return [...matched.values()];
 }
 
 // ---------------------------------------------------------------- the published site
@@ -958,20 +958,20 @@ export async function issueCreation(room: Room, result: Acted, current: () => bo
     const child = row?.refs["scope"];
     if (!row || row.state !== "listed") return unavailable;
     const pending = async (provisional: boolean): Promise<IssueCreation> => {
-      const dutyId: DutyId = `${receipt.fact.seq}.${creates[0]!.n}`;
-      if (!receipt.sends.includes(dutyId)) return unavailable;
+      const outboxId: OutboxId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      if (!receipt.sends.includes(outboxId)) return unavailable;
       if (!current()) return unavailable;
-      const read = await handle.followDuty(dutyId);
+      const read = await handle.followOutbox(outboxId);
       if (!current()) return unavailable;
       if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
-      const duty = read.value;
-      if (duty.duty !== dutyId || duty.class !== "request" || duty.held || canonicalize(duty.to) !== canonicalize(seed) || duty.diagnosis !== null) return unavailable;
+      const outboxItem = read.value;
+      if (outboxItem.outboxId !== outboxId || outboxItem.class !== "request" || outboxItem.held || canonicalize(outboxItem.to) !== canonicalize(seed) || outboxItem.diagnosis !== null) return unavailable;
       const final = await summaryOf(handle);
       if (!current()) return unavailable;
       if (canonicalize(final.summary.scope) !== canonicalize(receipt.fact.at)) return unavailable;
       // A normal listed row has no child reference until create.applied.
       // An applied result can precede the earlier projection or child confirmation.
-      if ((!provisional && duty.result === null) || (duty.result?.clause === "applied" && (provisional || duty.result.seq > at.seq))) return { state: "pending" };
+      if ((!provisional && outboxItem.result === null) || (outboxItem.result?.clause === "applied" && (provisional || outboxItem.result.seq > at.seq))) return { state: "pending" };
       return unavailable;
     };
     if (child === undefined || child === null) return await pending(false);

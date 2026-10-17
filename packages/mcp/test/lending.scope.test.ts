@@ -18,13 +18,13 @@ function libraryRecipe(mode: "default" | "generic"): { tools: string[]; count: n
   return { tools: [...cell.matchAll(/`([a-z][a-z0-9.-]*)`/g)].map((m) => m[1]!), count: Number([...cell.matchAll(/: (\d+)/g)].at(-1)![1]) };
 }
 
-/** A room of the application-publication cohort, founded by rita, with the library's definition active and its actions in the admin role. */
+/** A room of the application-publication cohort, created by rita, with the library's definition active and its actions in the admin role. */
 async function libraryRoom(room: Room): Promise<Agent> {
   const rita = room.agent("rita");
-  const installed = await rita.ok("create", { definition: FILE_PUBLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+  const installed = await rita.ok("create", { definition: FILE_PUBLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: "install" });
   const register = installed["scope"] as ScopeId;
   await room.wireRegister(register);
-  const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
+  const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
   expect(claimed["answer"], JSON.stringify(claimed)).toBe("accepted");
   const w = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as FactRef).seq });
   expect(w["timedOut"], JSON.stringify(w)).toBe(false);
@@ -49,10 +49,10 @@ async function libraryRoom(room: Room): Promise<Agent> {
  */
 async function takePart(taker: Agent, mode: "default" | "generic"): Promise<{ calls: string[]; library: ScopeId; thing: number }> {
   const from = taker.calls.length;
-  const found = ((await taker.ok("room", {}))["applications"] as { definition: string | null; scope: ScopeId | null; state: string }[])
+  const matched = ((await taker.ok("room", {}))["applications"] as { definition: string | null; scope: ScopeId | null; state: string }[])
     .find((a) => a.definition === NAME && a.state === "created");
-  expect(found, "room lists the library among the applications").toBeDefined();
-  const library = found!.scope!;
+  expect(matched, "room lists the library among the applications").toBeDefined();
+  const library = matched!.scope!;
   let digest = "";
   const act = async (kind: string, args: Record<string, unknown>) => {
     if (mode === "default") return taker.ok(`${NAME}.${kind}`, { target: library, ...args });

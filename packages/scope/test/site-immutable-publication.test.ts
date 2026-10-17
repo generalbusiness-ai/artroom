@@ -60,7 +60,7 @@ test("two native publications retain older immutable content and deny pending/co
     const directory = d.config.repository!.directory;
     const repo = await d.wait(() => runInDurableObject(d.D.object, (_instance, state) => { d.active(); return JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'repository'").one().record).values.repository; }));
     expect(await peer.sitePublishedCommit(directory, repo as never, "e".repeat(40))).toEqual({ ok: false, reason: "not-published" });
-    // The default CLI install founds the actual @3 graph, including native
+    // The default CLI install creates the actual @3 graph, including native
     // publication cleanup. These are deliberate folded-state corruptions;
     // restore the exact original column and bytes after each projection check.
     const historicalPublication = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {

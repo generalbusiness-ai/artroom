@@ -50,14 +50,14 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
       const lines = owed.flatMap((item) => {
         const cleanup = item.values["cleanupReason"];
         const independent = cleanup !== null && typeof cleanup === "object" && !Array.isArray(cleanup) ? cleanup as Record<string, unknown> : null;
-        const duties = independent ? [
+        const pendingWork = independent ? [
           { reason: independent["refReason"], attempts: item.values["cleanupAttempts"] },
           { reason: independent["tokenReason"], attempts: independent["tokenAttempts"] },
-        ].filter((duty) => typeof duty.reason === "string") : [{ reason: item.values["cleanupReason"], attempts: item.values["cleanupAttempts"] }];
+        ].filter((work) => typeof work.reason === "string") : [{ reason: item.values["cleanupReason"], attempts: item.values["cleanupAttempts"] }];
         const integration = typeof item.values["integration"] === "string" ? `; integration commit ${item.values["integration"]}` : "";
-        return (duties.length ? duties : [{ reason: "reason not recorded", attempts: null }]).map((duty) => {
-          const reason = typeof duty.reason === "string" ? duty.reason : "reason not recorded";
-          const attempts = typeof duty.attempts === "number" ? String(duty.attempts) : "not recorded";
+        return (pendingWork.length ? pendingWork : [{ reason: "reason not recorded", attempts: null }]).map((work) => {
+          const reason = typeof work.reason === "string" ? work.reason : "reason not recorded";
+          const attempts = typeof work.attempts === "number" ? String(work.attempts) : "not recorded";
           return `Owed cleanup: destination ${target.at.scope}, reservation ${item.id}, entry ${target.seq}: ${reason}; attempts ${attempts}${integration}; custody remains ${reason.includes("unknown") ? "unknown" : "owed"}.`;
         });
       });

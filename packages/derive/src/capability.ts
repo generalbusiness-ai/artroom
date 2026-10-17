@@ -206,8 +206,8 @@ function rulesFor(j: Judging, name: string, form: "guard" | "effect", of: string
  */
 export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unknown }>, item: Item | null): GuardResult {
   const { name, guard, with: written } = g.capability;
-  const found = rulesFor(j, name, "guard", guard);
-  if (!found) return "unavailable";
+  const matched = rulesFor(j, name, "guard", guard);
+  if (!matched) return "unavailable";
   const args: [string, unknown][] = [];
   for (const [arg, from] of Object.entries(written) as [string, CapabilityArg][]) {
     if ("each" in from) {
@@ -221,9 +221,9 @@ export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unkn
       args.push([arg, range.map((i) => slotOf(i, from.slot))]);
     } else args.push([arg, operand(j, from, item)]);
   }
-  const answer = found.rules.guard(found.version, guard, Object.fromEntries(args), given(j));
+  const answer = matched.rules.guard(matched.version, guard, Object.fromEntries(args), given(j));
   if (answer === true) return "pass";
-  if (!own(found.declared.guards, guard)?.refusals.includes(answer)) throw new Error(`${found.version} declares no refusal ${answer} for its guard ${guard}`);
+  if (!own(matched.declared.guards, guard)?.refusals.includes(answer)) throw new Error(`${matched.version} declares no refusal ${answer} for its guard ${guard}`);
   (j.declined ??= new Map()).set(g, answer);
   return "fail";
 }
@@ -234,8 +234,8 @@ export function capabilityGuard(j: Judging, g: Extract<Guard, { capability: unkn
  * no rules for that capability.
  */
 export function capabilityEffect(j: Judging, form: { name: string; do: string; with: Readonly<Record<string, Operand>> }, item: Item | null): Extract<Effect, { effect: "record" }>[] | UnavailableReason {
-  const found = rulesFor(j, form.name, "effect", form.do);
-  if (!found) return "unavailable";
+  const matched = rulesFor(j, form.name, "effect", form.do);
+  if (!matched) return "unavailable";
   const args = Object.fromEntries(Object.entries(form.with).map(([arg, from]) => [arg, operand(j, from, item)]));
   // The subject of each argument that is a slot operand: the form's own subject, the item of a range, or the subject it names.
   const from = Object.fromEntries(Object.entries(form.with).flatMap(([arg, o]): [string, number][] => {
@@ -243,13 +243,13 @@ export function capabilityEffect(j: Judging, form: { name: string; do: string; w
     const of = o.of === undefined ? item : o.of === "each" ? (j.each ?? null) : (j.subjects.get(o.of) ?? null);
     return of ? [[arg, of.id]] : [];
   }));
-  const made = found.rules.effect(found.version, form.do, args, { ...given(j), from });
+  const made = matched.rules.effect(matched.version, form.do, args, { ...given(j), from });
   // Section 6.1, "In the commit": code that returns more than it declared has a fault, and the input is not judged.
-  const most = maximumOf(found.rules, "effect", found.version, form.do);
-  if (most && made.length > most.effects) throw new Error(`${found.version} declares at most ${most.effects} effects for its effect ${form.do}, and it returned ${made.length}`);
+  const most = maximumOf(matched.rules, "effect", matched.version, form.do);
+  if (most && made.length > most.effects) throw new Error(`${matched.version} declares at most ${most.effects} effects for its effect ${form.do}, and it returned ${made.length}`);
   return made.map((r) => {
-    const kind = own(found.declared.records, r.kind);
-    if (!kind?.states.includes(r.state)) throw new Error(`${found.version} declares no record ${r.kind} with the state ${r.state}`);
-    return { effect: "record", capability: found.version, kind: r.kind, key: r.key, state: r.state, values: r.values };
+    const kind = own(matched.declared.records, r.kind);
+    if (!kind?.states.includes(r.state)) throw new Error(`${matched.version} declares no record ${r.kind} with the state ${r.state}`);
+    return { effect: "record", capability: matched.version, kind: r.kind, key: r.key, state: r.state, values: r.values };
   });
 }

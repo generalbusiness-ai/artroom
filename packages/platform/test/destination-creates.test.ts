@@ -6,7 +6,7 @@ import { Branch, HEAD, NEXT, OTHER, handMade, said } from "./support-destination
 import { t } from "@generalbusiness/dap-derive/testing";
 
 // Real destination rules and derive judges, in memory. The bureau, claim
-// and host answers are hand-written; no host, port or founding is reached.
+// and host answers are hand-written; no host, port or creation is reached.
 const WRITTEN = ["write", null, null];
 const BAD_INPUT = ["refused", "bad-input", null];
 const kinds = (b: Branch) => Object.fromEntries(b.last.effects.flatMap((effect) => effect.effect === "operation" ? [[effect.kind, `${b.head.seq}:${effect.k}` as OperationId]] : []));

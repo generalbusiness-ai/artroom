@@ -5,14 +5,14 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, keyIdOfSecret, parseStrict } from "@generalbusiness/artroom-bytes";
 import { judgeTimed, nextDue, owed, prepareRules, validateDefinition } from "@generalbusiness/dap-derive";
 import { evaluateRules, RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
-import { founded, grantOf, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/dap-derive/testing";
+import { created, grantOf, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/dap-derive/testing";
 import { countingCommitments, countingCommitmentsClosure } from "./commitments.ts";
 import { COUNTING_COMMITMENTS_DEFINITION } from "./commitments-pin.ts";
 
 // Authored pure witnesses, not native enrollment/DO/transport/audio evidence.
 // The real evaluator/judges/seal/fold use scripted current grants and memory.
 const make = (target = 100) => {
-  const s = founded(valid(validateDefinition(countingCommitments, PROPOSED_BOUNDS, RULE_PROFILES)), { opener: keys.rita.member, target });
+  const s = created(valid(validateDefinition(countingCommitments, PROPOSED_BOUNDS, RULE_PROFILES)), { opener: keys.rita.member, target });
   s.did(keys.rita, "initialize", { expected: { configuration: s.item(0).revision } });
   return s;
 };

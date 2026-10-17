@@ -21,8 +21,8 @@ export type ItemQueryWire = { ok: true; encoded: string } | { ok: false; reason:
 export function itemQueryWire(request: Pick<Request, "url" | "method" | "body">, scope: string): ItemQueryWire {
   if (!admittedRequestUrl(request.url) || request.url.length > ITEM_QUERY_URL_BYTES || utf8(request.url).length > ITEM_QUERY_URL_BYTES) return { ok: false, reason: "too-large" };
   if (request.method !== "GET" || request.body !== null || !isScopeId(scope)) return { ok: false, reason: "invalid-query" };
-  const found = queryUrl.exec(request.url);
-  if (!found || found[0] !== request.url || found[1] !== scope || !isScopeId(found[1])) return { ok: false, reason: "invalid-query" };
-  const encoded = found[2]!;
+  const matched = queryUrl.exec(request.url);
+  if (!matched || matched[0] !== request.url || matched[1] !== scope || !isScopeId(matched[1])) return { ok: false, reason: "invalid-query" };
+  const encoded = matched[2]!;
   return encoded.length <= ITEM_QUERY_ENCODED_CHARS ? { ok: true, encoded } : { ok: false, reason: "too-large" };
 }

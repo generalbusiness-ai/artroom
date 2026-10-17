@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { SqliteStore } from "../src/index.ts";
-import { found, reader, rita, vic } from "./support.ts";
+import { create, reader, rita, vic } from "./support.ts";
 
 describe("a restart of the scope (sections 2.2 and 5.2)", () => {
   test("the reloaded scope has the same head, items, counts and idempotency index, runs its retained definition, and continues the sequence", async () => {
-    const s = await found();
+    const s = await create();
     const offer = s.offer();
     const first = await s.submit(offer);                       // entry 1: commitment 1
     await s.hold();                                            // entries 2 to 4: commitment 2, assigned under the rule, and hold 4
@@ -26,7 +26,7 @@ describe("a restart of the scope (sections 2.2 and 5.2)", () => {
   });
 
   test("a transaction that stops before its commit wrote nothing", async () => {
-    const s = await found();
+    const s = await create();
     await s.hold();
     const before = await s.summary();
     // On the object's own storage: one transaction writes what a commit writes for the next entry, and stops before it commits.

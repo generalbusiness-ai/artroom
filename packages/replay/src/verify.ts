@@ -701,7 +701,7 @@ class Verifier {
 
     // The actors' signatures.
     if (input.type === "act" && !verifySignedIntent(input.signed)) throw mismatch("the act's signature is not its actor's over its intent");
-    if (input.type === "genesis" && input.founding !== null && !verifySignedIntent(input.founding)) throw mismatch("the founding signature is not its actor's over its intent");
+    if (input.type === "genesis" && input["founding"] !== null && !verifySignedIntent(input["founding"])) throw mismatch("the creation signature is not its actor's over its intent");
     // Section 9.5: a preparation entry carries a signed intent too, and owes the same check in both modes.
     if (input.type === "preparation" && !verifySignedIntent(input.signed)) throw mismatch("the preparation's signature is not its actor's over its intent");
 
@@ -1041,17 +1041,17 @@ class Verifier {
     for (const use of observed) this.#inRun(run, use, where);
     const values: string[] = [];
     for (const { digest, dependency: probe } of observedValueDependencies(run.definition!, { at: where, input: entry.input.type }, observed)) {
-      let found: string | null = null;
+      let matched: string | null = null;
       for (const { domain, key } of probe.choices) {
         const left = this.#limits.bytes - this.#bytes;
         const got = await this.#source.retained(run.id, key.kind, key.digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, "domain" in key ? key.domain : undefined);
         if (!got.ok) { this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`); continue; }
         this.#count(got.bytes);
-        if (domainRetainedJSON(domain, digest, got.input.bytes) !== undefined) found = got.input.bytes;
-        if (found !== null) break;
+        if (domainRetainedJSON(domain, digest, got.input.bytes) !== undefined) matched = got.input.bytes;
+        if (matched !== null) break;
       }
-      if (found === null) throw new Stop("incomplete", `a retained input is missing: the value that an observation of the entry names, ${digest}`, where);
-      values.push(found);
+      if (matched === null) throw new Stop("incomplete", `a retained input is missing: the value that an observation of the entry names, ${digest}`, where);
+      values.push(matched);
     }
     const state = run.state;
     return {
@@ -1331,9 +1331,9 @@ class Verifier {
     switch (input.type) {
       case "genesis": {
         this.#trusts.add("minted");
-        if (input.founding) judged = judgeGenesis(state, definition, { name: run.id, inc: input.inc, seed: input.seed, founding: input.founding }, { ...reading, source: null });
+        if (input["founding"]) judged = judgeGenesis(state, definition, { name: run.id, inc: input.inc, seed: input.seed, creation: input["founding"] }, { ...reading, source: null });
         else {
-          if (!input.source || input.n === null || !input.message) throw mismatch("a genesis has a founding intent or a creation request");
+          if (!input.source || input.n === null || !input.message) throw mismatch("a genesis has a signed creation intent or a request from its creator");
           this.#trusts.add("held");
           const source = copyOf(input.source);
           judged = judgeGenesis(state, definition, { name: run.id, inc: input.inc, to: input.seed, from: input.source, n: input.n, message: input.message }, { ...reading, source: source && { entry: source.entry, under: source.under } });

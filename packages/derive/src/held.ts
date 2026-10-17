@@ -43,11 +43,11 @@ export const NOTHING: Amount = { entries: 0, items: 0, records: 0, bytes: 0, req
 const DIMENSIONS = ["entries", "items", "records", "bytes", "requests"] as const;
 const each = (of: (dimension: (typeof DIMENSIONS)[number]) => number): Amount => ({ entries: of("entries"), items: of("items"), records: of("records"), bytes: of("bytes"), requests: of("requests") });
 
-/** The sum of amounts, by dimension: distinct duties are summed. */
+/** The sum of amounts, by dimension: distinct tasks are summed. */
 export const sum = (...amounts: readonly Amount[]): Amount => each((d) => amounts.reduce((n, a) => n + a[d], 0));
 /** One amount, n times. */
 export const times = (n: number, amount: Amount): Amount => each((d) => n * amount[d]);
-/** The largest of amounts, by dimension: alternatives are counted for one duty. */
+/** The largest of amounts, by dimension: alternatives are counted for one task. */
 export const largest = (...amounts: readonly Amount[]): Amount => each((d) => Math.max(0, ...amounts.map((a) => a[d])));
 
 /** What a mark may start, as its `most` states it (section 17.2, "What a mark may start"). A mark that states no `most` starts nothing by the data. */
@@ -72,7 +72,7 @@ export interface KindStated { attempts: number; most: Starts; send: { once: bool
  * initial state, beside the item itself. `change`: the largest, over the
  * item types and their states, of what an item in a state reserves, which
  * one change of state by a rule counts. Both are the sum of rule 6 of "A
- * marker duty" with no mark completed. `entry`: the stand-in for the static
+ * marker task" with no mark completed. `entry`: the stand-in for the static
  * size of one entry, and for one foreign entry, in bytes. `written`: the
  * largest that the written effects of one result clause can start.
  */

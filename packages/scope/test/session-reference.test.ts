@@ -10,7 +10,7 @@ import { sessionReferencesIn } from "../src/namespace.ts";
 import { mintSession, readerOf, sessionsOf } from "../src/sessions.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { testPorts } from "../src/testing.ts";
-import { at, found, rita, type Lane } from "./support.ts";
+import { at, create, rita, type Lane } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 const sessions = sessionsOf("a synthetic bounded reference test secret", "bounded-reference-test")!;
@@ -42,7 +42,7 @@ function fixture(scope: Lane, state: DurableObjectState, named: PlatformDefiniti
 }
 
 test("small reference receiver admits every current directory cohort, authenticates before SQL and returns only the strict reference witness", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const results = [];
     for (const named of Object.keys(SIBLINGS_OF)) {
@@ -61,7 +61,7 @@ test("small reference receiver admits every current directory cohort, authentica
 });
 
 test("reference receiver refuses wrong identity/repository, expiry, clock drift and duplicate open records without a second body", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const f = fixture(scope, state), otherInc = newIncarnation(new Uint8Array(16).fill(9));
     const refused = [
@@ -79,7 +79,7 @@ test("reference receiver refuses wrong identity/repository, expiry, clock drift 
 
 test("reference request and reply caps, oversized metadata/body and unsupported pins fail closed before unwanted transfer", async () => {
   for (const fault of ["request", "scope", "body", "pin", "reply"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const f = fixture(scope, state, fault === "pin" ? "platform:directory@9999" : "platform:directory@8");
       if (fault === "scope") state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", "x".repeat(4097));
@@ -96,7 +96,7 @@ test("reference request and reply caps, oversized metadata/body and unsupported 
 
 test("reference completion refuses head drift, elapsed final storage and expiry after preparation", async () => {
   for (const fault of ["head", "deadline", "expiry", "remaining"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const f = fixture(scope, state); let metadata = 0;
       f.hook(query => {
@@ -114,7 +114,7 @@ test("reference completion refuses head drift, elapsed final storage and expiry 
 });
 
 test("native sender clamps request and reply bytes and optional capability without summary or source fallback", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(async state => {
     const f = fixture(scope, state); let lookups = 0, calls = 0, fallback = 0, supported = true, answer: unknown = "{}";
     const source = sessionReferencesIn({ idFromName(name) { expect(name).toBe(f.directory.scope); return "opaque fixture ID" as unknown as DurableObjectId; }, get() {

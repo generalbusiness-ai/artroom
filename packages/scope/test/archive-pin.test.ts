@@ -14,11 +14,11 @@ import { START, at, objectOf, rita, stubOf } from "./support.ts";
 
 async function fixture(entries = 8) {
   const named = "platform:task@1" as PlatformDefinition, data = standingData();
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { source: "archive admission fixture" }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: named, creator: null, cause: intentDigest(founding), ordinal: 0 }, name = scopeIdOf(seed);
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { source: "archive admission fixture" }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: named, creator: null, cause: intentDigest(creation), ordinal: 0 }, name = scopeIdOf(seed);
   controls(name, START).bounds = { ...PROPOSED_BOUNDS, scopeEntries: entries };
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: version => version === named ? { data, rules: { "settle-counter": { place: "effect", most: 1, run: () => [] } } } : null } }));
-  return { name, seed, answer: await stubOf(name).found(signIntent(founding, rita.secret), named), close: () => wired.delete(name) };
+  return { name, seed, answer: await stubOf(name).create(signIntent(creation, rita.secret), named), close: () => wired.delete(name) };
 }
 const metadata = (name: string) => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec<{ k: string; v: string }>("SELECT k, v FROM meta ORDER BY k").toArray());
 const put = (name: string, key: string, value: string | null) => runInDurableObject(objectOf(name), (_instance, state) => {

@@ -17,7 +17,7 @@ import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Held, Incarnat
 import { canonicalize, isDigest, isScopeRef, parseStrict } from "@generalbusiness/artroom-bytes";
 import { isObject, MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
-import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import type { Dispatched, OutboxItem, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 import { ARCHIVE_PIN_KEY, archivePinBytes } from "./archive-pin.ts";
 import { LocalSigners, SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 
@@ -193,12 +193,12 @@ export class SqliteStore implements Store {
    * scope retains.
    */
   page(type: string, states: readonly string[], after: number | null, limit: number): Page {
-    const found: Item[] = [];
+    const matched: Item[] = [];
     for (const state of new Set(states)) {
-      for (const row of this.#all("SELECT record FROM item WHERE type = ? AND state = ? AND id > ? ORDER BY id LIMIT ?", type, state, after ?? -1, limit + 1)) found.push(json<Item>(row["record"]));
+      for (const row of this.#all("SELECT record FROM item WHERE type = ? AND state = ? AND id > ? ORDER BY id LIMIT ?", type, state, after ?? -1, limit + 1)) matched.push(json<Item>(row["record"]));
     }
-    found.sort((a, b) => a.id - b.id);
-    return { items: found.slice(0, limit), more: found.length > limit };
+    matched.sort((a, b) => a.id - b.id);
+    return { items: matched.slice(0, limit), more: matched.length > limit };
   }
 
   relation(owner: ScopeRef, name: string, item: number): Relation | null { return this.#folded("relation", canonicalize([owner.scope, owner.inc, name, item])); }
@@ -226,8 +226,8 @@ export class SqliteStore implements Store {
   }
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null { return this.#folded<ObservedHead>("observed", canonicalize([of.scope, of.inc, subject]))?.seq ?? null; }
   incarnations(scope: ScopeId): readonly Incarnation[] {
-    const found = this.#all("SELECT DISTINCT json_extract(value, '$.of.inc') AS inc FROM folded WHERE kind = 'observed' AND json_extract(value, '$.of.scope') = ?", scope).map((row) => row["inc"] as Incarnation);
-    return found.sort(byteOrder);
+    const matched = this.#all("SELECT DISTINCT json_extract(value, '$.of.inc') AS inc FROM folded WHERE kind = 'observed' AND json_extract(value, '$.of.scope') = ?", scope).map((row) => row["inc"] as Incarnation);
+    return matched.sort(byteOrder);
   }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
   prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {
@@ -396,7 +396,7 @@ export class SqliteStore implements Store {
       // A new send is due at once: its first attempt may start at its entry's time.
       this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
     }
-    // Authority note, section 5.4, rule 1: the duty is written before the request that could cause the effect is sent, with a
+    // Authority note, section 5.4, rule 1: the task is written before the request that could cause the effect is sent, with a
     // wake-up. The row of an attempt is written here, in the commit of the entry that opens it, and the driver sends from rows only.
     for (const effect of entry.effects) {
       if (effect.effect !== "attempt" || effect.result !== "opened") continue;
@@ -438,13 +438,13 @@ export class SqliteStore implements Store {
       : this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && (row["size"] as number);
   }
-  duty(seq: number, n: number): Duty | null {
-    const row = this.#one(`SELECT ${DUTY} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
-    return row && dutyOf(row);
+  outboxItem(seq: number, n: number): OutboxItem | null {
+    const row = this.#one(`SELECT ${OUTBOX} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
+    return row && outboxItemOf(row);
   }
-  duties(after: { seq: number; n: number } | null, limit: number): { duties: Duty[]; more: boolean } {
-    const rows = this.#all(`SELECT ${DUTY} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
-    return { duties: rows.slice(0, limit).map(dutyOf), more: rows.length > limit };
+  outboxItems(after: { seq: number; n: number } | null, limit: number): { outboxItems: OutboxItem[]; more: boolean } {
+    const rows = this.#all(`SELECT ${OUTBOX} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
+    return { outboxItems: rows.slice(0, limit).map(outboxItemOf), more: rows.length > limit };
   }
 
   // ---------------------------------------------------------------- the dispatcher's bookkeeping
@@ -516,12 +516,12 @@ function sendingOf(row: Row): Sending {
   return { operation: operationId(row["seq"] as number, row["k"] as number), attempt: row["attempt"] as number, opened: row["opened"] as number, next: row["next"] as number | null, sent: row["sent"] as Timestamp | null };
 }
 
-/** The columns of an outbox row that a read of its duty returns. */
-const DUTY = "seq, n, target, class, held, attempts, ack, result, diagnosis";
+/** The columns of an outbox row that a read of its task returns. */
+const OUTBOX = "seq, n, target, class, held, attempts, ack, result, diagnosis";
 
-function dutyOf(row: Row): Duty {
+function outboxItemOf(row: Row): OutboxItem {
   return {
-    duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as Duty["class"], held: row["held"] === 1,
+    outboxId: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as OutboxItem["class"], held: row["held"] === 1,
     attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
   };
 }

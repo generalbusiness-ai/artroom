@@ -84,10 +84,10 @@ function tokens(text) {
 
 /** Literal module references only; ordinary strings and 'from' data are inert. */
 export function moduleSpecifierSpans(text) {
-  const read = tokens(text), found = [];
+  const read = tokens(text), matched = [];
   const module = token => {
     if (!token || !(token.kind === "string" || token.kind === "template" && !token.substituted)) bad();
-    found.push(literal(text, token));
+    matched.push(literal(text, token));
   };
   for (let i = 0; i < read.length; i++) {
     const token = read[i], next = read[i + 1];
@@ -117,5 +117,5 @@ export function moduleSpecifierSpans(text) {
     }
     if (!complete) bad();
   }
-  return found.sort((a, b) => a.start - b.start);
+  return matched.sort((a, b) => a.start - b.start);
 }

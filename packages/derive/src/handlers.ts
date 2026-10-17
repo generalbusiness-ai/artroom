@@ -50,8 +50,8 @@ export function bound(definition: ValidDefinition, message: Request | Advisory, 
     kind = named;
   } else return null;
   const cls = message.class === "advisory" ? "advisory" : message.type;
-  const found = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
-  const handler = found && (under === undefined || found.from.under === undefined || found.from.under === under) ? found : null;
+  const matched = Object.values(definition.declared.receives).find((h) => h.class === cls && h.message === kind && h.from.kind === from.at.kind) ?? null;
+  const handler = matched && (under === undefined || matched.from.under === undefined || matched.from.under === under) ? matched : null;
   // The mark `self` is read by the type that the handler declares for the field.
   const types = handler?.fields ?? {};
   let fields: Record<string, FieldValue> | null;
@@ -117,7 +117,7 @@ function priorDetachedBounds(definition: ValidDefinition, context: Reading, at: 
     if (input?.type === "act") keep(own(definition.declared.acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
     else if (input?.type === "genesis" && input.decision === "applied") {
       const fields = own(definition.declared.acts, definition.declared.genesis)!.fields;
-      keep(fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, fields) : null);
+      keep(fields, input["founding"] ? input["founding"].intent.fields : input.source ? creationFields(input.message, input.source, fields) : null);
     } else if (input?.type === "delivery" && "decision" in input && input.message.class === "request" && (input.decision === "applied" || (input.decision === "superseded" && input.message.type === "tell"))) {
       const received = bound(definition, input.message, input.from);
       if (received?.handler) keep(received.handler.fields, received.fields);
@@ -139,8 +139,8 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
   if (input.type !== "delivery" || input.message.class !== "request" || input.message.type !== "tell" || !("decision" in input)) return null;
   const scope = view.scope();
   const source = context.facts.find((fact) => same(fact.fact, input.from));
-  const found = bound(definition, input.message, input.from, source?.under);
-  if (!scope || !found?.handler || !found.fields || !(found.handler as unknown as PlatformReceive).bound) return null;
+  const matched = bound(definition, input.message, input.from, source?.under);
+  if (!scope || !matched?.handler || !matched.fields || !(matched.handler as unknown as PlatformReceive).bound) return null;
   if (!source || !isEntryOf(source.entry, input.from)) throw new RuleFault("a decision binding has no retained source entry");
   const unknownSizes = new Set<Digest>();
   const texts = context.texts ? (digest: Digest) => {
@@ -148,7 +148,7 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
     if (size === null) unknownSizes.add(digest);
     return size;
   } : undefined;
-  const ready = prepareHandler(view, definition, { ...context, texts }, scope, found.handler, found.kind, found.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
+  const ready = prepareHandler(view, definition, { ...context, texts }, scope, matched.handler, matched.kind, matched.fields, { source, update: null }, { type: "delivery", from: input.from, n: input.n, message: input.message });
   if (ready.result === "unavailable") throw new RuleFault(`a decision binding cannot reconstruct its field and subject checks: ${ready.reason}`);
   // Owner disposition 4157eaa2: first exhaust structural checks under the
   // ordinary redaction assumptions. An early failure or no remaining
@@ -157,12 +157,12 @@ export function decisionBinding(view: StateView, definition: ValidDefinition, en
   // can still be either an over-max field (no draw) or a later effect
   // refusal (a draw). No later checkpoint may decide between those.
   if (ready.result === "ready" && ready.bound !== undefined && unknownSizes.size > 0 && input.decision === "refused" && input.reason?.code === "bad-field" && input.reason.name === undefined) {
-    const required = detachedBounds(found.handler.fields, ready.j.fields);
+    const required = detachedBounds(matched.handler.fields, ready.j.fields);
     const proven = priorDetachedBounds(definition, context, scope.at, entry.seq);
     const unresolved = new Set([...unknownSizes].filter((digest) => (proven.get(digest) ?? Number.POSITIVE_INFINITY) > (required.get(digest) ?? 0)));
     if (unresolved.size > 0) throw new UnprovenDecisionBinding(unresolved);
   }
-  return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: found.kind } : null;
+  return ready.result === "ready" && ready.bound !== undefined ? { item: ready.bound, message: matched.kind } : null;
 }
 
 /**
@@ -183,8 +183,8 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
 
 /**
  * The digest of each detached text that an input names (section 6.2): in
- * the fields of an act, of a founding or of a creation, and in the declared
- * fields of a message that a handler receives. The scope keeps the bytes of
+ * the fields of an act, a signed creation intent or a creator's request,
+ * and in the declared fields of a message that a handler receives. The scope keeps the bytes of
  * each as a retained input with the entry that records the input, and a
  * verifier asks for the same ones. A result, a control, a message that no
  * handler receives, and an input that is not an act of the definition name
@@ -194,7 +194,7 @@ export function messageFacts(view: StateView, definition: ValidDefinition, messa
 export function inputTexts(definition: ValidDefinition, input: Input, under?: string): Digest[] {
   const { acts, genesis } = definition.declared;
   if (input.type === "act") return textsNamed(own(acts, input.signed.intent.kind)?.fields ?? {}, input.signed.intent.fields);
-  if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input.founding ? input.founding.intent.fields : input.source ? creationFields(input.message, input.source, own(acts, genesis)!.fields) : null);
+  if (input.type === "genesis") return textsNamed(own(acts, genesis)!.fields, input["founding"] ? input["founding"].intent.fields : input.source ? creationFields(input.message, input.source, own(acts, genesis)!.fields) : null);
   return input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory") ? messageTexts(definition, input.message, input.from, under) : [];
 }
 
@@ -212,8 +212,8 @@ export function messageTexts(definition: ValidDefinition, message: Request | Adv
  * the items that existed before the entry at that position.
  */
 function ones(view: StateView, definition: ValidDefinition, type: string, before?: number): Item[] {
-  const found = view.page(type, Object.keys(own(definition.declared.items, type)!.states), null, 2).items;
-  return before === undefined ? [...found] : found.filter((i) => i.id < before);
+  const matched = view.page(type, Object.keys(own(definition.declared.items, type)!.states), null, 2).items;
+  return before === undefined ? [...matched] : matched.filter((i) => i.id < before);
 }
 
 /**
@@ -244,8 +244,8 @@ export function alsoItems(view: StateView, definition: ValidDefinition, also: Re
   select?: (mark: AlsoMark, bound: ReadonlyMap<string, Item>) => Item | null): { ok: true; items: [string, Item][]; marked: ReadonlySet<string> } | { ok: false; detail: string } {
   const marked = new Set<string>();
   /** The subjects that are bound when a rule is run: the primary item, and each name resolved before it. */
-  const bound = (): Map<string, Item> => new Map([...(on ? [["on", on] as const] : []), ...[...found].flatMap(([name, item]) => (item ? [[`also.${name}`, item] as const] : []))]);
-  const found = new Map<string, Item | null>();
+  const bound = (): Map<string, Item> => new Map([...(on ? [["on", on] as const] : []), ...[...matched].flatMap(([name, item]) => (item ? [[`also.${name}`, item] as const] : []))]);
+  const matched = new Map<string, Item | null>();
   let refusal: string | null = null;
   const typed = (name: string, type: string, id: unknown): Item | null => {
     const item = isLocalId(id) ? view.item(id) : null;
@@ -254,10 +254,10 @@ export function alsoItems(view: StateView, definition: ValidDefinition, also: Re
     return null;
   };
   const resolve = (name: string): Item | null => {
-    const known = found.get(name);
+    const known = matched.get(name);
     if (known !== undefined) return known;
     const rule = own(also, name);
-    found.set(name, null);
+    matched.set(name, null);
     let item: Item | null = null;
     if (!rule) return null;
     const mark = markOf(rule) as AlsoMark | null;
@@ -276,7 +276,7 @@ export function alsoItems(view: StateView, definition: ValidDefinition, also: Re
       if (all.length > 1) refusal ??= `${name}: there is more than one ${rule.item}`;
       item = all.length === 1 ? all[0]! : null;
     }
-    found.set(name, item);
+    matched.set(name, item);
     return item;
   };
   const items = Object.keys(also).flatMap((name): [string, Item][] => { const item = resolve(name); return item ? [[name, item]] : []; });
@@ -489,7 +489,7 @@ export function runClause(view: StateView, definition: ValidDefinition, context:
                /** The send of an outcome's mark, which made the request: an outcome entry has no written list to find it in. */
                sent?: SendMark };
   if (input.type === "act" || input.type === "genesis") {
-    const intent = input.type === "act" ? input.signed.intent : input.founding?.intent;
+    const intent = input.type === "act" ? input.signed.intent : input["founding"]?.intent;
     const kind = input.type === "act" ? input.signed.intent.kind : declared.genesis;
     const act = own(declared.acts, kind)!;
     const given = intent ? intent.fields : input.type === "genesis" && input.source ? creationFields(input.message, input.source, act.fields) : null;

@@ -13,18 +13,18 @@ evening before a recording, and again on the morning of it.
 is one command line, called through the CLI with that person's config
 directory, or one read of `git log` or a page. The concurrency shot records
 each of its commands and exits. The people are the
-founder `@hugh`, a member `@una` and a maintainer `@paul`, each with a
+creator `@hugh`, a member `@una` and a maintainer `@paul`, each with a
 fresh config directory.
 
 | Shots | What happens | Script shot |
 |---|---|---|
-| 1 to 3 | The founder plans the install, the operator pins the register, the founder installs as planned and claims a room | 3 |
-| 4 to 6 | The founder publishes the rules (no approval for the source extent; the rules extent needs the controller) and activates the issue and change definitions of the demo profile | the checklist of section 6 |
-| 7 to 10 | The founder invites the member and the maintainer; each joins | 4, 5 |
+| 1 to 3 | The creator plans the install, the operator pins the register, the creator installs as planned and claims a room | 3 |
+| 4 to 6 | The creator publishes the rules (no approval for the source extent; the rules extent needs the controller) and activates the issue and change definitions of the demo profile | the checklist of section 6 |
+| 7 to 10 | The creator invites the member and the maintainer; each joins | 4, 5 |
 | 11, 12 | The member clones with a read token from the room, and reads `git log --oneline` | 6 |
-| 13 to 15 | The member opens issue #1, the maintainer comments, the founder assigns it to the maintainer | 8 |
+| 13 to 15 | The member opens issue #1, the maintainer comments, the creator assigns it to the maintainer | 8 |
 | 16 | The maintainer edits `guide/start.md` with `--closes 1`: published, and the issue closes | 8 |
-| 17 to 19 | The maintainer proposes `AGENTS.md`: refused `rules-not-met:rules`; the founder approves. Before merging it, the maintainer proposes the second file on the same published base, then publishes `AGENTS.md`. Each command and exit is recorded. | 10, 11, concurrency |
+| 17 to 19 | The maintainer proposes `AGENTS.md`: refused `rules-not-met:rules`; the creator approves. Before merging it, the maintainer proposes the second file on the same published base, then publishes `AGENTS.md`. Each command and exit is recorded. | 10, 11, concurrency |
 | 20 | The maintainer merges the already-proposed second file: refused `out-of-date`; the same maintainer re-proposes it as a new change on the new head and publishes it. The refused lane remains in the record. | concurrency |
 | 21 | The maintainer edits `../outside.md`: refused `path-invalid` | 10 |
 | 22, 23 | `dap issues` shows #1 closed; `dap verify --all` reports fourteen scopes consistent | 8, 12 |
@@ -137,7 +137,7 @@ their owner.
 ## Proposing a committed two-file branch
 
 Add `--manifest` to opt in to five shots immediately after shot 16. The
-founder activates the current manifest-list demo definition. In the
+creator activates the current manifest-list demo definition. In the
 member's clone, the runner pulls the room's head, creates `two-pages`,
 writes two UTF-8 Markdown files and commits them with Git. It records
 these local Git commands and their outputs explicitly. The maintainer

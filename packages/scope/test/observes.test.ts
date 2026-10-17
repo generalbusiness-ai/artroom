@@ -36,18 +36,18 @@ interface Script { asked: string[]; silent: Set<string>; required: string[]; bes
 /** The name of what one read asks: `key:…`, `member:…`, `rules` or `holders:…`. */
 const naming = (asked: ObservationRequest): string => ("key" in asked ? `key:${asked.key}` : "member" in asked ? `member:${asked.member}` : "holders" in asked ? `holders:${asked.holders}` : asked.asked);
 
-/** A scope under the made-up data, founded on real storage, with its two scripted scopes. */
+/** A scope under the made-up data, created on real storage, with its two scripted scopes. */
 async function weighing(change: Parameters<typeof weigherWith>[0] = () => {}, first: Parameters<typeof weigherRules>[1] = signers) {
   const data = weigherWith(change).declared;
   const seen: Seen = { rows: [], read: [], named: [] };
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(founding), ordinal: 0 };
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(creation), ordinal: 0 };
   const name = scopeIdOf(seed);
   const c = controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: data as never, rules: weigherRules(seen, first).rules } : null) } }));
-  const founded = await stubOf(name).found(signIntent(founding, rita.secret), MADE);
-  if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
-  const scope = founded.receipt.fact.at;
+  const created = await stubOf(name).create(signIntent(creation, rita.secret), MADE);
+  if (created.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(created)}`);
+  const scope = created.receipt.fact.at;
   const script: Script = { asked: [], silent: new Set(), required: ["c1"], beside: null, after: null };
   const from = { of: membership, head: { seq: 40, hash: d("4") }, definition: "platform:membership@1" };
   const members: Record<string, MemberId> = Object.fromEntries(Object.values(keys).map((who) => [who.key, who.member.member]));
@@ -354,8 +354,8 @@ test("a scope with rows reads the real membership scope of the platform package:
     // The same history, where the record of the holders states one more than membership's history gives at that head.
     const changed = await world();
     rewritten(changed[0]!, outcome.seq, (entry: { input: { observed: { observation: { count?: number } }[] } }) => { entry.input.observed[3]!.observation.count = 3; });
-    const found = await verify(new MemorySource(changed), options);
-    expect([found.report.result, found.report.at?.seq, found.why]).toEqual(["mismatch", outcome.seq, `the retained observation is not what the history of ${of.scope} gives the holders of that action at its entry ${head.seq}`]);
+    const matched = await verify(new MemorySource(changed), options);
+    expect([matched.report.result, matched.report.at?.seq, matched.why]).toEqual(["mismatch", outcome.seq, `the retained observation is not what the history of ${of.scope} gives the holders of that action at its entry ${head.seq}`]);
   } finally {
     wired.delete(s.name);
   }

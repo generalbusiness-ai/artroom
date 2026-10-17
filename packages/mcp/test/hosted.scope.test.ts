@@ -1,7 +1,7 @@
 /**
  * The hosted MCP endpoint on real scopes (notes/2026-10-13-hosted-mcp-endpoint.md, section 6): the registry and the agent
  * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the production app
- * Worker's default fetch, with the pinned MCP client where a client is named. rita founds the room through her own MCP service
+ * Worker's default fetch, with the pinned MCP client where a client is named. rita creates the room through her own MCP service
  * and performs the admin's acts; the agent is created by a control request she signs.
  */
 import { env } from "cloudflare:test";
@@ -19,7 +19,7 @@ import { hostedTest } from "../../scope/test/worker.ts";
 import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
-import { founded } from "./support/story.ts";
+import { created as createRoom } from "./support/story.ts";
 
 /** Production default dispatch, in this isolate. The actual native PLATFORM namespace is this fixture's Scope binding;
  * REGISTRIES and AGENTS keep their existing native subclasses, clocks, custody and control fences. */
@@ -84,7 +84,7 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
   hostedTest.pause = (waiting) => room.pause(waiting);
   try {
     const rita = room.agent("rita");
-    await founded(room, rita, "default", registerDefinition);
+    await createRoom(room, rita, "default", registerDefinition);
     const definition = registerDefinition === "platform:register@10" ? "platform:membership@6" : "platform:membership@2";
     const inviteAgent = (handle: string) => invite(room, rita, handle, definition);
     const M = rita.config.repository!.membership;
@@ -152,7 +152,7 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
   } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
 
-/** A room founded by rita with the issue definition active, and one agent created under `op`; the agent's answer. */
+/** A room created by rita with the issue definition active, and one agent created under `op`; the agent's answer. */
 async function hosted(room: Room, rita: Agent, handle: string, op: string, signer: Uint8Array = rita.secret): Promise<{ agent: string; key: KeyId; bearer: string; link: string }> {
   const M = rita.config.repository!.membership;
   const { link } = await invite(room, rita, handle);
@@ -167,7 +167,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   hostedTest.now = () => room.now();
   hostedTest.pause = (waiting) => room.pause(waiting);
   const rita = room.agent("rita");
-  await founded(room, rita, "default");
+  await createRoom(room, rita, "default");
   expect((await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }))["answer"]).toBe("accepted");
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };

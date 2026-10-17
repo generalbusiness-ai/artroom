@@ -2,11 +2,11 @@ import { describe, expect, test } from "vitest";
 import type { Intent, PlatformDefinition, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { keys, ticketDefinition } from "@generalbusiness/dap-derive/testing";
-import { firstExtents, foundingObjects, platform, repositoryName } from "@generalbusiness/dap-platform";
+import { firstExtents, initialCommitObjects, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { reader } from "./support.ts";
 import { beginSessionFixture } from "./session-settings.ts";
 import { Platform, rita, routed, sam } from "./repository.ts";
@@ -16,13 +16,13 @@ const { paul } = keys;
 const SERVICE = "https://scopes.test";
 
 // Invariant (the planner's decision of 2026-10-07): a scope is judged and replayed by the version that its genesis pinned, for as
-// long as it exists, and a deployment serves every version that its platform package has shipped. A room founded on version 1 runs
+// long as it exists, and a deployment serves every version that its platform package has shipped. A room created on version 1 runs
 // on the code that ships version 2: it has no `read-token`, and every one of its histories replays consistent.
 //
 // | Part | Is |
 // |---|---|
 // | The register, the directory, membership, the rules scope, the destination and the inbox | Real scopes of the namespace `PLATFORM`: the deployed class, the production authority and the platform package's own data and rules, under version 1 of each. |
-// | The Git host | A STAND-IN: `OutsideDouble` answers the one creation request and the founding publication's operations. |
+// | The Git host | A STAND-IN: `OutsideDouble` answers the one creation request and the creation publication's operations. |
 // | The readers and the clock | The test readers and the scripted clock of the namespace. |
 describe("a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN", () => {
   test("a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code", async () => {
@@ -31,7 +31,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
     const fetch = (url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init));
     try {
     const REGISTER_1: PlatformDefinition = "platform:register@1";
-    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER_1, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
     lifetime.wire(R.name, () => ({ outside: {
@@ -39,14 +39,14 @@ describe("a room founded on version 1 of every definition, on the code that ship
       send: (request) => lifetime.wait(() => host.send(request)),
       late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
-    expect((await R.stub.found(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
+    expect((await R.stub.create(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
     // Version 1 of the register seeds the directory under version 1.
-    const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
     const D = lifetime.platform(scopeIdOf(seed));
     lifetime.active();
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
-    expect((await R.stub.submit(found, [])).answer).toBe("accepted");
+    expect((await R.stub.submit(matched, [])).answer).toBe("accepted");
     await effectFixture([R], lifetime.wait);
     await dispatchFixture([R, D], lifetime.wait);
     const sent = (await D.entries())[0]!.sends;
@@ -64,9 +64,9 @@ describe("a room founded on version 1 of every definition, on the code that ship
     // Membership's version 1 gives the admin its first list without `destination.read-token`.
     expect((await M.item(0)).values["adminActions"]).not.toContain("destination.read-token");
 
-    // The founding publication: the first head is version 1's founding commit, the empty tree, with no README.
-    await foundingPublication(G, lifetime);
-    const emptyTree = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!));
+    // The creation publication: the first head is version 1's creation commit, the empty tree, with no README.
+    await initialPublication(G, lifetime);
+    const emptyTree = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!));
     expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: emptyTree.commit } });
 
     // `read-token` is no act of `platform:destination@1`: the scope refuses it by name, and writes nothing.
@@ -91,7 +91,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
     const retainedDefinition = await rules.stub.retained(reader, "definition", ticketDefinition.digest);
     expect(retainedDefinition.ok ? retainedDefinition.value.bytes : null).toBe(definitionBytes);
     // Both native lane-opening acts require their stated bytes; a missing
-    // value is bad-field before any dependency guard or creation duty.
+    // value is bad-field before any dependency guard or creation task.
     const beforeOpening = (await D.summary()).at;
     for (const [kind, fields] of [["open-issue", { conditions: [] }], ["open-pr", { draft: false }]] as const) {
       expect(await D.act(rita, kind, { fields: { definition: ticketDefinition.digest, title: "Native byte place", ...fields } })).toMatchObject({ answer: "refused", reason: "bad-field" });

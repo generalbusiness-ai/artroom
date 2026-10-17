@@ -166,8 +166,8 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
     ok(await run(vic, "claim", "hub", "--handle", "@vic"));
     const hub = ((await lifetime.platform((await lifetime.wait(() => vic.store.config()))!.repository!.destination).item(0)).values["repository"]) as { name: string };
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
-    // Past the intent window of the claim, the founder's key's signed read is refused, and the destination, which has no act yet, is
-    // read with the founder's session: remote and clone go on (the planner's decision ca8ad1cf; the gap the live-ops note's section 4,
+    // Past the intent window of the claim, the creator's key's signed read is refused, and the destination, which has no act yet, is
+    // read with the creator's session: remote and clone go on (the planner's decision ca8ad1cf; the gap the live-ops note's section 4,
     // items 1 and 2, recorded).
     lifetime.advance(16 * 60_000);
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });

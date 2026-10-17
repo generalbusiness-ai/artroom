@@ -22,7 +22,7 @@
  * So a recorded attempt is sent at most once, across restarts. An attempt
  * that is found marked, with no outcome, is one whose process stopped
  * between the send and the outcome. It may have reached the outside system,
- * so it is never sent again: its outcome is `unknown`, and it stays a duty
+ * so it is never sent again: its outcome is `unknown`, and it stays a task
  * until that request's own answer arrives (rule 2). A delivery to a scope is
  * idempotent and is sent again until it is acknowledged. An outside effect
  * is not, so nothing of the dispatcher's retry rule is here. A further try
@@ -221,7 +221,7 @@ export class Operations {
    * request of an attempt left once.
    *
    * They are in memory only. A process that ends loses them: the outside
-   * system's answer is then gone, and the attempt stays `unknown`, a duty,
+   * system's answer is then gone, and the attempt stays `unknown`, a task,
    * as rule 2 requires, until that request's own answer is given again.
    */
   readonly #held = new Map<string, Outcome>();
@@ -304,7 +304,7 @@ export class Operations {
    * leaves an accepted entry first, so its following pass sees that same
    * entry; a pass removes accepted entries and restarts the durable walk. */
   #accepted(remove = true): boolean {
-    let found = false;
+    let matched = false;
     const limit = Math.min(this.#bounds.deliveryBatch, this.#refused.size);
     for (let n = 0; n < limit; n++) {
       const first = this.#refused.entries().next().value;
@@ -313,13 +313,13 @@ export class Operations {
       if (this.#outside.accepts(refused.owner, refused.kind)) {
         if (!remove) return true;
         this.#refused.delete(key);
-        found = true;
+        matched = true;
       } else {
         this.#refused.delete(key);
         this.#refused.set(key, refused);
       }
     }
-    return found;
+    return matched;
   }
 
   /**

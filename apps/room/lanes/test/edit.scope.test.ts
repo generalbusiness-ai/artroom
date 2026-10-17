@@ -4,7 +4,7 @@ import { describe, expect, test, onTestFinished } from "vitest";
 import type { DeclaredDefinition, Entry, FactRef, Item, Read, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents, foundingObjects, platform } from "@generalbusiness/dap-platform";
+import { firstExtents, initialCommitObjects, platform } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE, SqliteStore } from "@generalbusiness/artroom-scope";
 import { ruleAt } from "@generalbusiness/dap-derive";
@@ -158,15 +158,15 @@ async function story(at: Stand, wired: Set<ScopeId>, checkpointMeta?: object): P
   const [D, G] = [new Platform(repository.directory.scope), new Platform(repository.destination)];
   known.push(G);
   await pause([]);
-  // The founding head, pushed by the destination through the port: one README.md that names the repository, the founder and the directory
+  // The creation head, pushed by the destination through the port: one README.md that names the repository, the creator and the directory
   // (`platform:destination@2`).
-  const first = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, (await G.item(0)).refs["claim"] as never, { name: ((await G.item(0)).values["repository"] as { name: string }).name, handle: "@rita", directory: D.name }).commit;
+  const first = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, (await G.item(0)).refs["claim"] as never, { name: ((await G.item(0)).values["repository"] as { name: string }).name, handle: "@rita", directory: D.name }).commit;
   expect([(await G.item(0)).values["head"], host.refs.get("refs/heads/main")]).toEqual([first, first]);
   const siteEnv: SiteEnv = { SCOPES: env.PLATFORM, ...bindings() };
   const page = async (path: string) => { const response = await site(new Request(`${SERVICE}/site/${D.name}/HEAD/${path}`), siteEnv, host.fetch); return { status: response.status, body: await response.text() }; };
-  // The site already serves the founding README, which the first edit replaces.
-  const founded = await page("README.md");
-  expect([founded.status, founded.body.includes("Founded by")]).toEqual([200, true]);
+  // The site already serves the creation README, which the first edit replaces.
+  const created = await page("README.md");
+  expect([created.status, created.body.includes("Founded by")]).toEqual([200, true]);
 
   // paul, a maintainer: he holds change.merge and not rules.publish.
   const link = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
@@ -224,7 +224,7 @@ async function story(at: Stand, wired: Set<ScopeId>, checkpointMeta?: object): P
     expect.stringMatching(new RegExp(`^Published: commit ${head1}, by the merge sc_\\S+:\\d+\\.$`)),
     `Page: ${SERVICE}/site/${D.name}/HEAD/README.md`,
   ]);
-  // The destination recorded the commit the host holds: one parent, the founding head; its tree holds README.md and nothing else.
+  // The destination recorded the commit the host holds: one parent, the creation head; its tree holds README.md and nothing else.
   const git = readerOf(host);
   const commit1 = await git.commit(head1);
   expect([(await G.item(0)).values["head"], commit1.parents, (await git.tree(commit1.tree)).map((e) => new TextDecoder().decode(e.name))]).toEqual([head1, [first], ["README.md"]]);
@@ -267,7 +267,7 @@ async function story(at: Stand, wired: Set<ScopeId>, checkpointMeta?: object): P
   // No token of the host is in any history: every scope's entries, read past the sessions.
   const histories = canonicalize(await Promise.all([R, D, G].map((node) => node.entries())));
   for (const secret of at.secrets()) expect(histories).not.toContain(secret);
-  // The publications are the room's: every push to the branch is the destination's, after the founding one.
+  // The publications are the room's: every push to the branch is the destination's, after the creation one.
   expect(host.pushes.filter((p) => p.ref === "refs/heads/main").map((p) => p.commit)).toEqual([first, head1, head2, head3]);
   const items = await (G.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "publication");
   expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["cleaned", null], ["cleaned", null], ["not-reserved", "rules-not-met:rules"], ["cleaned", null], ["not-reserved", "path-invalid"]]);

@@ -8,10 +8,10 @@ import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes"
 import { d, otherLane } from "@generalbusiness/dap-derive/testing";
 import { editCommit, editObjects, editPath, editTree, type DestinationObject } from "../src/destination-objects.ts";
 import { judgeReservation, type EditFile, type Statement } from "../src/reservation.ts";
-import { FOUND, HEAD, TREE, reading } from "./support-destination.ts";
+import { CREATED, HEAD, TREE, reading } from "./support-destination.ts";
 
 // A one-file edit (i5 edit; plan 025, section 2). The objects are checked against a real local Git repository in each object
-// format: the facts are made up, and no host, push or founding is shown. The judgment is the plain function, with a reading
+// format: the facts are made up, and no host, push or creation is shown. The judgment is the plain function, with a reading
 // written by hand.
 const scope = `sc_${"g".repeat(51)}a` as ScopeId;
 const operation: FactRef = { at: { kind: "lane", scope: `sc_${"l".repeat(51)}a`, inc: `in_${"l".repeat(25)}a` }, seq: 9, hash: `sha256:${"5".repeat(64)}` };
@@ -98,12 +98,12 @@ test("the judgment of a one-file manifest: a bad path is path-invalid before wha
   const statement: Statement = { operation: { at: otherLane, seq: 1, hash: d("a") }, manifest: { at: otherLane, seq: 2, hash: d("a") }, verdicts: [], jobs: [], reports: [], links: [] };
   const commit = "c".repeat(40);
   const read = (over: Partial<EditFile> = {}) => reading(time, { manifest: { base: HEAD, integration: commit, tree: TREE, file: { ...file, ...over }, reports: [], authors: [], complete: true } });
-  const judge = (asked: Partial<Parameters<typeof judgeReservation>[0]> = {}) => judgeReservation({ recorded: HEAD, evidence: FOUND, statement, read: read(), time, file, ...asked });
+  const judge = (asked: Partial<Parameters<typeof judgeReservation>[0]> = {}) => judgeReservation({ recorded: HEAD, evidence: CREATED, statement, read: read(), time, file, ...asked });
   expect(judge()).toEqual({ reserved: true, integration: commit, reason: null });
   // path-invalid: said with no read of the lane, and before the evidence's lack, but after a head that moved.
-  for (const path of ["../a.ts", ".git/hooks/x", ""]) expect(judge({ file: { ...file, path }, read: null, evidence: { ...FOUND, present: false, tree: null, firstParent: null, changes: null } })).toEqual({ reserved: false, reason: "path-invalid" });
+  for (const path of ["../a.ts", ".git/hooks/x", ""]) expect(judge({ file: { ...file, path }, read: null, evidence: { ...CREATED, present: false, tree: null, firstParent: null, changes: null } })).toEqual({ reserved: false, reason: "path-invalid" });
   expect(judge({ file: { ...file, path: "../a.ts" }, recorded: "e".repeat(40) })).toEqual({ reserved: false, reason: "out-of-date" });
-  expect([judge({ read: read({ size: file.size + 1 }) }), judge({ read: read({ digest: d("b") }) }), judge({ evidence: { ...FOUND, changes: { paths: ["src/a.ts", "src/b.ts"], links: [], unreadable: 0 } } }), judge({ evidence: { ...FOUND, firstParent: "e".repeat(40) } })])
+  expect([judge({ read: read({ size: file.size + 1 }) }), judge({ read: read({ digest: d("b") }) }), judge({ evidence: { ...CREATED, changes: { paths: ["src/a.ts", "src/b.ts"], links: [], unreadable: 0 } } }), judge({ evidence: { ...CREATED, firstParent: "e".repeat(40) } })])
     .toEqual(Array(4).fill({ reserved: false, reason: "integration-invalid" }));
   // The caller derives the tree and the commit; without them nothing is reserved.
   expect(judge({ read: reading(time, { manifest: { base: HEAD, integration: null, tree: null, file, reports: [], authors: [], complete: true } }) })).toEqual({ reserved: false, reason: "integration-invalid" });

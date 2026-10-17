@@ -41,7 +41,7 @@ function pack(remote: string, head: string, ofs: boolean): Uint8Array {
 
 /** Independent Node zlib boundary oracle confirms the real Git pack kinds. */
 function kinds(pack: Uint8Array): number[] {
-  const found: number[] = [];
+  const matched: number[] = [];
   let at = 12;
   const count = new DataView(pack.buffer, pack.byteOffset).getUint32(8);
   for (let i = 0; i < count; i++) {
@@ -53,9 +53,9 @@ function kinds(pack: Uint8Array): number[] {
     // Node's typings omit the info:true overload that returns its engine.
     const raw = inflateSync(pack.subarray(at), { info: true }) as unknown as { engine: { bytesWritten: number } };
     at += raw.engine.bytesWritten;
-    found.push(kind);
+    matched.push(kind);
   }
-  return found;
+  return matched;
 }
 
 // Invariant: actual local Git's upload response becomes exact objects for

@@ -47,7 +47,7 @@ async function pinnedSummary(M: ScopeHandle, at: ScopeRef): Promise<{ summary: S
   if (!read.ok || !read.complete || read.next !== undefined || !same(read.value.scope, at) || !isAgentKeyMembership(read.value.definition) || platform(read.value.definition)?.data.name !== "platform:membership") throw blocked();
   return { summary: read.value, definition: read.value.definition };
 }
-/** The directory definitions each membership pin is founded beside: exact pairs of the cohorts, not names. */
+/** The directory definitions each membership pin is created beside: exact pairs of the cohorts, not names. */
 const DIRECTORIES_OF: Readonly<Record<AgentKeyMembership, readonly string[]>> = {
   "platform:membership@2": [DIRECTORY_OF[DEMO_REGISTER]!, WEB_DEMO_COHORT.directory],
   "platform:membership@4": [APPLICATION_COHORT.directory, FILE_PUBLICATION_COHORT.directory],

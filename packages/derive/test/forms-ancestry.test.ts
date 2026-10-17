@@ -12,7 +12,7 @@ const [Z, D, D2, U, I, I2, X, A, B, E, R] = ["0", "d", "9", "1", "2", "4", "a", 
 /** A commit object with those parents: one `tree` line, the `parent` lines, an author and a committer. */
 const commit = (parents: readonly string[], header = ""): GitObject => ({ type: "commit", body: utf8(`tree ${C("7")}\n${parents.map((p) => `parent ${p}\n`).join("")}${header}author A <a@example.org> 0 +0000\ncommitter A <a@example.org> 0 +0000\n\nparent ${X}\n`) });
 type Graph = Record<string, readonly string[] | GitObject>;
-const reader = (graph: Graph) => (id: string): GitObject | null => { const found = { [Z]: [], [D]: [Z], ...graph }[id]; return found === undefined ? null : "type" in found ? found : commit(found); };
+const reader = (graph: Graph) => (id: string): GitObject | null => { const matched = { [Z]: [], [D]: [Z], ...graph }[id]; return matched === undefined ? null : "type" in matched ? matched : commit(matched); };
 
 // S is the staging lane. L2 and L3 are other lanes: only their names in a staged ref are used.
 const [S, L2, L3] = [otherLane, directory, membership];
@@ -30,7 +30,7 @@ function walked(c: Case) {
   });
 }
 /** What a row expects of the record: its `start`, its F, its stops and the count of the parent walk. */
-const found = (c: Case) => { const w = walked(c); return w.result === "recorded" ? [w.record.start, w.record.F, w.record.stops, w.record.visited] : w; };
+const walkResult = (c: Case) => { const w = walked(c); return w.result === "recorded" ? [w.record.start, w.record.F, w.record.stops, w.record.visited] : w; };
 
 describe("the ancestry walk and the guard `ancestry` (authority note, section 6.2; scope contract, section 16.4)", () => {
   test("the cases of the three witness tables, as rows of one table: the start is never a stop, an own ref never hides a foreign one, published history is never listed, and an own root is a stop only on a prior check (T23)", () => {
@@ -70,7 +70,7 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
       [{ name: "a start that is no object ID", graph: {}, commit: X.toUpperCase(), refs: [] }, { result: "unreadable", reason: "bad-object-id", object: X.toUpperCase() }],
       [{ name: "a root that the lane's records do not hold as live for the commit", graph: { [X]: [D] }, commit: X, own: [[5, U]], refs: [[S, X, 5]] }, { result: "unreadable", reason: "no-live-root", object: null }],
     ];
-    expect(rows.map(([c]) => [c.name, found(c)])).toEqual(rows.map(([c, expected]) => [c.name, expected]));
+    expect(rows.map(([c]) => [c.name, walkResult(c)])).toEqual(rows.map(([c, expected]) => [c.name, expected]));
   });
 
   test("the guard: the check record of this intent, recorded, for this commit; what was read still fits the lane's records; and F passes the row of its act", () => {

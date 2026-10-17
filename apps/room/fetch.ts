@@ -3,7 +3,7 @@ import { health } from "../../packages/scope/src/health.ts";
 import { mcpRoute, route, type Env, type McpEnv } from "../../packages/scope/src/worker.ts";
 import { admittedRequestUrl } from "../../packages/scope/src/item-query-wire.ts";
 import { credentialInUrl } from "../../packages/scope/src/sessions.ts";
-import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
+import { DEMO_OFFER_PATH, demoCreationRoute } from "./demo-creation.ts";
 import { isSite, site } from "../../packages/scope/src/site/route.ts";
 import { isPage, page } from "./page/route.ts";
 import { isCounting, countingPage } from "../counter/src/counting.ts";
@@ -21,7 +21,7 @@ export default {
     if (healthy) return healthy;
     const hosted = await mcpRoute(request, env);
     if (hosted) return hosted;
-    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoCreationRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
     });
   },
 };

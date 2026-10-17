@@ -3,7 +3,7 @@ import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { entryHash, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { d } from "@generalbusiness/dap-derive/testing";
 import { repositoryName } from "@generalbusiness/dap-platform";
-import { Register, rita } from "../../../packages/platform/test/support-founding.ts";
+import { Register, rita } from "../../../packages/platform/test/support-creation.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import type { EffectRequest } from "../src/operations.ts";
 import { RegisterHost, type RegisterProvider } from "../src/register-host.ts";
@@ -33,7 +33,7 @@ function fixture() {
   };
   // Construct before the found entry: its reads must stay live.
   const host = new RegisterHost(given, { host: "git.example", namespace: "artroom", provider });
-  expect(register.found(rita).result).toBe("write");
+  expect(register.create(rita).result).toBe("write");
   const request = (operation: OperationId = "1:0", attempt = 1): EffectRequest => {
     const recorded = register.state.operation(operation)!;
     return { scope: register.at, operation, attempt, owner: recorded.owner, kind: recorded.kind, origin: register.own(Number(operation.split(":")[0]))! };

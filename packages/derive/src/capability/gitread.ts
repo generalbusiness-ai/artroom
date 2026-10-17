@@ -352,7 +352,7 @@ const REVOKED = 2 * GIT_READ_ATTEMPTS.revoke;
  * never `live`. `refused` makes it `ended`: nothing was minted. `unknown`
  * leaves it `minting`, and nothing is minted again for that operation. A
  * revocation: its `confirmed` outcome makes the token `ended`, and every
- * other outcome leaves it `revoking`, with the duty.
+ * other outcome leaves it `revoking`, with the task.
  */
 const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
   [GIT_READ_KINDS.mint]: {
@@ -388,7 +388,7 @@ const gitReadReserves = (view: StateView): number => REVOKED * view.recordCount(
 // I3 merge: nothing opens the revocation of a `live` read token. The note gives it to "the entry that decides the job, a `check` or
 // a `check-error`" (section 3.11). Those are rows of the lane's data, and this capability declares no effect that a row could write,
 // so no form lets that entry open an operation (I3 deltas, entry EW7). Until an owner states one, a `live` read token ends by its own
-// end time at the host, its record stays `live`, and its duty stays reserved. Only a mint that is answered after the job is decided
+// end time at the host, its record stays `live`, and its task stays reserved. Only a mint that is answered after the job is decided
 // opens its revocation, above.
 
 /**

@@ -66,17 +66,17 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
     net.hold = net.deaf = null;
     const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
     // A register on Artifacts, and a claim whose creation the stand-in answers.
-    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
     wired.set(R.name, () => ({ outside: host }));
-    expect((await R.stub.found(signIntent(install, paul.secret), REGISTER)).answer).toBe("accepted");
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    expect((await R.stub.create(signIntent(install, paul.secret), REGISTER)).answer).toBe("accepted");
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
     const D = new Platform(scopeIdOf(seed));
     const name = repositoryName(seedDigest(seed), 1);
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: name } } });
-    expect((await R.stub.submit(found, [])).answer).toBe("accepted");
+    expect((await R.stub.submit(matched, [])).answer).toBe("accepted");
     while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
     await settle(R, D);
     const sent = (await D.entries())[0]!.sends;

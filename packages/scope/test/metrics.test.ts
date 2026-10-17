@@ -56,7 +56,7 @@ test("tainted fields and invalid numeric domains reach only the bounded loss sum
 test("bounded aggregation preserves every native end, sums wrote flags and records coarsening, saturation and mixed loss once", () => {
   const { metrics, points, summary } = recorder(6);
   // More than 64 distinct groups force reason, answer, then place coarsening.
-  const turnPlaces = ["acts", "preparations", "found", "rpc:acts", "rpc:preparations", "rpc:found"];
+  const turnPlaces = ["acts", "preparations", "create", "rpc:acts", "rpc:preparations", "rpc:create"];
   const refusalReasons = ["revision-moved", "alias", "duplicate-relation", "required-unset", "scope-full", "bad-intent", "misaddressed", "expired", "scope-refused", "unknown-act", "bad-field", "no-item", "final", "fact-mismatch", "unauthorized", "guard-failed", "capability-refused", "slot-full", "type-full", "entry-too-large"];
   for (const place of turnPlaces) for (const reason of refusalReasons)
     metrics.emit({ kind: "turn", place, end: "answer", answer: "refused", reason, duration: 1, a: 1, b: 1, c: 1, flag: 1 });

@@ -76,7 +76,7 @@ diagnosis, preparation, outcome and checkpoint.
 
 When an act takes effect, the scope returns a **receipt**: the fact
 reference of the entry (scope, position and hash), its effects, and a
-duty ID for each message it sent. The receipt is built after the entry is
+outbox ID for each message it sent. The receipt is built after the entry is
 sealed, so it is not part of the entry's own bytes. A receipt proves what
 this scope recorded. It does not prove that a message took effect in another scope or that a Git host published a commit. Those outcomes are their
 own entries.
@@ -212,12 +212,12 @@ checked inputs to a judgment, not shared storage.
 | Membership | Members, enrolled keys, roles and the authority a scope may observe |
 | Rules | The room's published configuration and review requirements |
 | Lane | The application's work items, versions, reviews and declared messages |
-| Destination | Judging a publication and recording its outside-operation duties |
+| Destination | Judging a publication and recording its outside-operation pending work |
 | Git host adapter | Bounded Git reads and authorized host requests. It reports evidence, not decisions |
 | Replay | Independent checking of a recorded journal, with its stated coverage and trusts |
 
 The outside-operation driver marks each attempt before it sends a
-mutation. A missing reply leaves the outcome unknown and a cleanup duty
+mutation. A missing reply leaves the outcome unknown and a cleanup task
 open. The driver does not send the same mutation again. Private
 credentials are kept apart from the public journal. Deleting a token's
 plaintext does not prove that the provider revoked the token.

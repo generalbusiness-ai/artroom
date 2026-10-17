@@ -15,9 +15,9 @@
  * | 5, edge 2 | A kind that no item holds whose `send` has a clause with an effect mark that lists a held kind | `reserve-unbounded` |
  * | 5, edge 3 | The same, for each kind that no item holds below it: every such kind is checked by edges 1 and 2 | `reserve-unbounded` |
  *
- * A definition with a problem `holds` does not validate, and no scope is
- * founded or created under it: `unsupported-definition`. The ceiling of a
- * count is R4's to set. Until it does, the bound on the elements of a list
+ * A definition with a problem `holds` does not validate. Creation of a scope
+ * with no creator or of a child under it is refused: `unsupported-definition`.
+ * The ceiling of a count is R4's to set. Until it does, the bound on the elements of a list
  * stands in for it (section 17.2a, check 1).
  *
  * A held kind is in no closure, so held kinds may list each other in a
@@ -85,7 +85,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyAmounts" | "markers">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendingWorkAmounts" | "markers">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -187,7 +187,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
   const clausesOf = (send: unknown, path: string): { path: string; starts: ClauseStarts }[] => {
     const result = isObject(send) && isObject(send["result"]) ? send["result"] : {};
     const observes = isObject(send) && isObject(send["observes"]) ? send["observes"] : {};
-    const found: { path: string; starts: ClauseStarts }[] = [];
+    const matched: { path: string; starts: ClauseStarts }[] = [];
     for (const clause of CLAUSES) {
       const effects = own(result, clause);
       const rows = own(observes, clause);
@@ -197,10 +197,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
       const p = at(at(path, "result"), clause);
       const marks = (Array.isArray(effects) ? effects : []).flatMap((e, i) => (marked(e) ? [mostOf(e, at(p, i))] : []));
       for (const mark of marks) if (mark.opens !== null && holderTypes.has(mark.opens)) bad("holds", p, `a type that states holds is opened only by new work, and a clause's mark may open ${mark.opens}`);
-      found.push({ path: p, starts: { marks, retains: retainedBytes(rows) } });
+      matched.push({ path: p, starts: { marks, retains: retainedBytes(rows) } });
     }
-    everyClause.push(...found.map((clause) => clause.starts));
-    return found;
+    everyClause.push(...matched.map((clause) => clause.starts));
+    return matched;
   };
 
   // The kinds of `outcomes`.
@@ -260,11 +260,11 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
   if (kindsWritten && Object.keys(kindsWritten).length === 0 && holderTypes.size === 0 && adds.size === 0) return undefined;
 
   // Rule 11 of "A marker duty": an unnamed item reserves the whole sum of rule 6, with no mark completed. A marked type has no
-  // row in pending: its state duty and each marker duty are counted together by the shared calculator, beside its deadline.
+  // row in pending: its state task and each marker task are counted together by the shared calculator, beside its deadline.
   const markedAmounts = capacity.markers ? markerReservations(capacity.markers) : null;
   const inState = (type: string, state: string): Amount => sum(
-    own(own(capacity.dutyAmounts.deadlines, type), state) ?? NOTHING,
-    own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.dutyAmounts.pending, type), state) ?? NOTHING),
+    own(own(capacity.pendingWorkAmounts.deadlines, type), state) ?? NOTHING,
+    own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.pendingWorkAmounts.pending, type), state) ?? NOTHING),
   );
   const everyState = [...d.types.values()].flatMap((type) => [...type.states.keys()].map((state) => inState(type.name, state)));
   const c: Counting = {
@@ -272,7 +272,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
     initial: (type) => { const of = d.types.get(type); return of ? inState(type, of.initial) : NOTHING; },
     change: largest(...everyState),
     entry: bounds.entryBytes,
-    written: capacity.dutyAmounts.clause,
+    written: capacity.pendingWorkAmounts.clause,
   };
 
   // Checks 4 and 5, for each kind that no item holds, and so for each such kind below another (edge 3).
@@ -290,10 +290,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
   /** The held kinds that one step from a kind reaches: by its mark, and by a clause of its send. */
   const step = (kind: string): string[] => [...(mosts.get(kind)?.operations ?? []), ...(sends.get(kind)?.clauses ?? []).flatMap((clause) => clause.starts.marks.flatMap((mark) => mark.operations))].filter((k) => held.has(k));
   const reachFrom = (first: readonly string[]): string[] => {
-    const found = new Set<string>();
+    const matched = new Set<string>();
     const todo = [...first];
-    for (let k = todo.pop(); k !== undefined; k = todo.pop()) if (!found.has(k)) { found.add(k); todo.push(...step(k)); }
-    return [...found].sort();
+    for (let k = todo.pop(); k !== undefined; k = todo.pop()) if (!matched.has(k)) { matched.add(k); todo.push(...step(k)); }
+    return [...matched].sort();
   };
 
   const req = requestOf(c, everyClause, { item: true });
@@ -336,7 +336,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
     const path = binding.path.slice(0, -".bound".length);
     const handler = Object.entries(handlersWritten).find(([name]) => at("receives", name) === path)?.[1];
     if (!isObject(handler)) continue;
-    const written = own(capacity.dutyAmounts.decisions, path) ?? NOTHING;
+    const written = own(capacity.pendingWorkAmounts.decisions, path) ?? NOTHING;
     // The derived-effect ceiling stands in for the records a handler can
     // change, as entryBytes stands in for the whole static entry size.
     let amount: Amount | null = sum({ ...NOTHING, entries: 1, records: bounds.derivedEffects, bytes: 2 * bounds.entryBytes }, written);

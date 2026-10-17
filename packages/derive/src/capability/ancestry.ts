@@ -294,7 +294,7 @@ function walked({ commit, head, lane, root, roots, checks, inputs, read, bounds,
   const priorOf = (id: string, clean = false): PriorCheck | null => checks.filter((c) => c.commit === id && (!clean || c.foreign === null)).sort((a, b) => b.checked.seq - a.checked.seq)[0] ?? null;
 
   const stops: AncestryCheck["stops"][number][] = [];
-  const found: AncestryCheck["F"][number][] = [];
+  const matched: AncestryCheck["F"][number][] = [];
   const visited = new Set<string>();
   const queue = [...parentsOf(commit)];
   while (queue.length > 0) {
@@ -309,16 +309,16 @@ function walked({ commit, head, lane, root, roots, checks, inputs, read, bounds,
     if (prior && own && (own.state === "live" || own.state === "retiring" || own.state === "retired")) {
       stops.push({ kind: "own-root", commit: at, root: own.number, state: own.state, checked: prior.checked });
       // A stop at a checked own root does not hide what lay under it: what was named for the earlier act must be named again.
-      for (const carried of prior.F) if (!published(carried) && !found.some((f) => "via" in f && f.commit === carried && f.via === at)) found.push({ commit: carried, via: at });
+      for (const carried of prior.F) if (!published(carried) && !matched.some((f) => "via" in f && f.commit === carried && f.via === at)) matched.push({ commit: carried, via: at });
     } else {
       const selected = inputs.find((i) => i.commit === at);
       const staged = snapshot.pairs.find((p) => p.target === at);
       if (selected) stops.push({ kind: "selected-report", commit: at, input: selected.input });
-      else if (staged) found.push({ commit: at, ref: staged.ref });
+      else if (staged) matched.push({ commit: at, ref: staged.ref });
       else queue.push(...parentsOf(at));
     }
     if (stops.length > bounds.stops) tooLarge("stops");
-    if (found.length > bounds.F) tooLarge("F");
+    if (matched.length > bounds.F) tooLarge("F");
   }
 
   const foreign = foreignOn(snapshot.pairs, commit, lane, roots);
@@ -328,10 +328,10 @@ function walked({ commit, head, lane, root, roots, checks, inputs, read, bounds,
     const earlier = priorOf(commit, true);
     const selected = inputs.find((i) => i.commit === commit);
     start = { foreign, basis: earlier ? { kind: "own-check", checked: earlier.checked } : selected ? { kind: "input", input: selected.input } : { kind: "row" } };
-    if (!earlier && !selected) found.unshift({ commit, ref: foreign, start: true });
-    if (found.length > bounds.F) tooLarge("F");
+    if (!earlier && !selected) matched.unshift({ commit, ref: foreign, start: true });
+    if (matched.length > bounds.F) tooLarge("F");
   }
-  return { commit, root: { number: root, state: "live" }, head, snapshot: { digest: snapshot.digest, count: snapshot.count }, start, stops, F: found, visited: visited.size };
+  return { commit, root: { number: root, state: "live" }, head, snapshot: { digest: snapshot.digest, count: snapshot.count }, start, stops, F: matched, visited: visited.size };
 }
 
 /** True when a value has the members of an ancestry record, each of its type. It says nothing of whether the record is right. */

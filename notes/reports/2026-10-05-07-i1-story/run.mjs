@@ -37,7 +37,7 @@ registerHooks({
 });
 
 const { DeployedScope, route } = await import("@generalbusiness/artroom-scope/worker");
-const { found, httpTransport, secretSigner, signedIntent } = await import("@generalbusiness/artroom-client");
+const { create, httpTransport, secretSigner, signedIntent } = await import("@generalbusiness/artroom-client");
 const { main: replay } = await import("@generalbusiness/artroom-replay");
 const { deskDefinition, ticketDefinition, grantOf, keys } = await import("@generalbusiness/artroom-derive/testing");
 const { scopeIdOf } = await import("@generalbusiness/artroom-bytes");
@@ -172,8 +172,8 @@ class Seat {
   }
   async status() { const read = await this.handle.summary(); return read.ok ? `${read.value.status}, head ${read.at.seq}` : read.reason; }
   async item(id) { return (await this.summary()).value.items.find((i) => i.id === id); }
-  async duty(id) {
-    const d = ok(await this.handle.followDuty(id)).value;
+  async outboxItem(id) {
+    const d = ok(await this.handle.followOutbox(id)).value;
     const log = d.attempts.map((a) => a.answer).join(", ") || "none";
     const result = d.result ? `result ${d.result.clause} at ${this.name}.${d.result.seq}` : d.class === "request" ? "no result yet" : "no result is due";
     return `${this.name} duty ${id}: ${d.class}${d.held ? ", held" : ""}; attempts: ${log}; ${d.acknowledged ? `acknowledged with ${fact(d.acknowledged)}` : "not acknowledged"}; ${result}`;
@@ -202,8 +202,8 @@ async function history(seat, from = 0) { for (const sealed of (await seat.entrie
 out(`I1 story. Clock starts at ${time()}. Node ${process.version}.`);
 out();
 out("Step 0. Rita founds a desk D (a directory) over the HTTP routes.");
-const founding = await intent(rita, { to: null, kind: "found", fields: { source: "a repository" } });
-const made = await found(transport, founding, deskDefinition.declared, [ticketDefinition.declared], READER);
+const creation = await intent(rita, { to: null, kind: "found", fields: { source: "a repository" } });
+const made = await create(transport, creation, deskDefinition.declared, [ticketDefinition.declared], READER);
 if (!made.scope) throw new Error(`the desk was not founded: ${JSON.stringify(made.answer)}`);
 const D = new Seat("D", made.scope, deskDefinition.declared);
 await settle();
@@ -219,8 +219,8 @@ await settle();
 await history(D, 1);
 await history(P);
 out(`  P is ${await P.status()}. D item 1 is ${(await D.item(1)).state}.`);
-out(`  ${await P.duty("0.0")}`);
-out(`  ${await P.duty("0.1")}`);
+out(`  ${await P.outboxItem("0.0")}`);
+out(`  ${await P.outboxItem("0.1")}`);
 out(`  una submits approve to P -> ${JSON.stringify(await P.act(una, "approve", { on: 0, expected: { on: 1 } }))}`);
 out("  The hold is lifted and the clock moves 1 second. D's dispatcher sends the confirmation again.");
 world.hold = null;
@@ -228,8 +228,8 @@ await later(1);
 await history(P, 1);
 await history(D, 3);
 out(`  P is ${await P.status()}.`);
-out(`  ${await D.duty("1.0")}`);
-out(`  ${await D.duty("2.0")}`);
+out(`  ${await D.outboxItem("1.0")}`);
+out(`  ${await D.outboxItem("2.0")}`);
 const second = await D.did(rita, "open-issue", { fields: { title: "A slow build" } });
 const I = await D.created(second.fact.seq, "I");
 await settle();
@@ -243,7 +243,7 @@ await settle();
 await history(P, 2);
 await history(I, 2);
 out(`  I item 0 slot "linked" is ${JSON.stringify((await I.item(0)).values.linked)}.`);
-out(`  ${await P.duty(linked.sends[0])}`);
+out(`  ${await P.outboxItem(linked.sends[0])}`);
 const unlinked = await P.did(rita, "unlink", { on: linked.fact.seq, expected: { on: 1 } });
 out(`  rita submits unlink to P -> accepted, receipt for ${fact(unlinked.fact)}, duties ${unlinked.sends.join(", ")}`);
 await settle();
@@ -259,7 +259,7 @@ await settle();
 const told = (await D.entries()).find((s) => s.entry.input.type === "delivery" && s.entry.input.from.seq === asked.fact.seq && s.entry.input.from.at.scope === P.handle.scope);
 const [sent, recorded] = (await P.entries()).slice(6);
 for (const sealed of [sent, told, recorded]) out(line(sealed));
-out(`  ${await P.duty(asked.sends[0])}`);
+out(`  ${await P.outboxItem(asked.sends[0])}`);
 const answered = (await ok(await P.handle.items("request")).value).find((i) => i.id === asked.fact.seq);
 out(`  P item ${asked.fact.seq} is ${answered?.state}. D now has ${(await D.entries()).length} entries and has created ${objects.size - 1} tickets.`);
 

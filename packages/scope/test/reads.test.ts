@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { otherLane } from "@generalbusiness/dap-derive/testing";
 import type { Digest, Read, RetainedInput } from "@generalbusiness/dap-contract";
-import { HOLD, at, definition, found, reader, rita } from "./support.ts";
+import { HOLD, at, definition, create, reader, rita } from "./support.ts";
 
 describe("reads (section 9.1)", () => {
   test("a summary lists live items and counts every item exactly, retained final ones included; a page marked incomplete is not the whole", async () => {
-    const s = await found({}, { retainedItems: 2, historyEntries: 10, retainedBytes: 100 });
+    const s = await create({}, { retainedItems: 2, historyEntries: 10, retainedBytes: 100 });
     const holds = await s.holds(3);                           // entries 1 to 9
     s.c.clock.now = at(HOLD);
     await s.alarm();                                          // entries 10 to 12: every hold has ended, and is retained
@@ -31,11 +31,11 @@ describe("reads (section 9.1)", () => {
       [13, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], false, "10"], [13, [10, 11, 12, 13], true, undefined],
     ]);
 
-    // The outbox has one row for each send of the entry, by its duty ID. Nothing has dispatched them.
-    const duty = { held: false, attempts: [], result: null, diagnosis: null };
+    // The outbox has one row for each send of the entry, by its outbox ID. Nothing has dispatched them.
+    const outboxId = { held: false, attempts: [], result: null, diagnosis: null };
     expect(await s.stub.outbox(reader)).toMatchObject({
       ok: true, at: summary.at, complete: true,
-      value: [{ ...duty, duty: link.sends[0], to: otherLane, class: "request" }, { ...duty, duty: link.sends[1], to: { kind: "lane", creator: s.at, ordinal: 0 }, class: "request" }],
+      value: [{ ...outboxId, outboxId: link.sends[0], to: otherLane, class: "request" }, { ...outboxId, outboxId: link.sends[1], to: { kind: "lane", creator: s.at, ordinal: 0 }, class: "request" }],
     });
     expect(link.sends).toEqual(["13.0", "13.1"]);
 

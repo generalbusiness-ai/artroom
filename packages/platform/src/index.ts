@@ -41,8 +41,8 @@ export { isOf, isStandingDestination, pinnedBy, pinnedOf, versionOf } from "./ve
 export { ACTIONS_MOST, FIRST_ACTIONS, FIRST_ACTIONS_OF, MEMBERSHIP, MEMBERSHIP_1, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, ROLE_TABLE_OF, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, SIBLINGS_OF, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
-export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_5, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, foundingOf, revokedToken } from "./destination.ts";
-export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_5, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, initialCommitOf, revokedToken } from "./destination.ts";
+export { initialCommitObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree, manifestCommit } from "./destination-objects.ts";
 export { PROPOSE_FILE, fileOf, sourcesOf, manifestFiles } from "./destination-reading.ts";
 export { sourceName, applicationPublicationOrigin, publishingLaneOrigin, publishingLaneAffiliation, PUBLISHING_LANE_DIGESTS, ISSUE_LANE_DIGESTS } from "./publishing-provenance.ts";
@@ -129,7 +129,7 @@ export interface Platform {
  * establish original historical admission/source chronology. Version 2 of
  * the register, directory, membership, rules and destination keeps the I5
  * child cohort, version-named observations, the destination's read-token
- * and its role row, and a founding commit with a README. The inbox has
+ * and its role row, and a creation commit with a README. The inbox has
  * one version. A version that is not listed here is one that this package
  * cannot run.
  */
@@ -175,7 +175,7 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
 /** Stable native code objects with the same source policy for runtime and replay. */
 export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName, receiverIdentity: PARTITION_IDENTITY_POLICY }]));
 
-/** Existing default founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
+/** Existing default creation cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {
   "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": "platform:register@3", "platform:directory": "platform:directory@3", "platform:rules": RULES_SCOPE, "platform:destination": "platform:destination@3",
 };

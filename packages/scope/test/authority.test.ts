@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Entry, KeyId, Observation, ObservationUse, ScopeRef } from "@generalbusiness/dap-contract";
 import { WINDOWS, agrees } from "@generalbusiness/dap-derive";
 import { d, membership } from "@generalbusiness/dap-derive/testing";
-import { HOLD, at, definition, found, rita, una, type Lane } from "./support.ts";
+import { HOLD, at, definition, create, rita, una, type Lane } from "./support.ts";
 
 const actions = Object.values(definition.declared.acts).map((a) => a.grant);
 const UNAVAILABLE = { answer: "unavailable", reason: "authority-unavailable" };
@@ -42,7 +42,7 @@ const remark = (text: string) => ({ on: 0, fields: { text } });
 
 describe("the observation read, with a scripted membership, a stand-in (authority note, sections 3.3 and 3.12; section 16.1)", () => {
   test("an observation admits inside its window and is reused there; at its window it is outside, and with membership silent the act is not judged and uses no key; a ten-second kind is read for its one commit, an act or a step of a capability (a scripted step, a stand-in); after a restart nothing read is used", async () => {
-    const s = await found();
+    const s = await create();
     const m = scripted(s);
 
     // Read 1 of the run, begun when the scope's clock read the start. The entry retains the whole observation, in a grant built from it.
@@ -117,7 +117,7 @@ describe("the observation read, with a scripted membership, a stand-in (authorit
   });
 
   test("the order of heads holds across a restart: the folded state holds the highest head that an entry retained for a key and for its member, and a read that is answered from a lower head is discarded in the commit, in a new run too", async () => {
-    const s = await found();
+    const s = await create();
     const m = scripted(s);
     // Entry 1 retains rita's key at head 44 of membership. The fold keeps that head for the key and for its member.
     m.head = 44;
@@ -146,7 +146,7 @@ describe("the observation read, with a scripted membership, a stand-in (authorit
   });
 
   test("a revocation that one read has seen takes effect at once: the held observation that shows the key active is discarded, and the revoked answer stays for the run, whatever its window", async () => {
-    const s = await found();
+    const s = await create();
     const m = scripted(s);
     const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
     s.c.clock.now = at(1);
@@ -180,7 +180,7 @@ describe("the observation read, with a scripted membership, a stand-in (authorit
   });
 
   test("the clock table: an act judges time, so a clock that is behind stops it, and its observation is read again before a retry; a checkpoint and a timed entry read no observation, and are written with membership silent", async () => {
-    const s = await found();
+    const s = await create();
     const m = scripted(s);
     s.c.clock.now = at(100);
     const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;

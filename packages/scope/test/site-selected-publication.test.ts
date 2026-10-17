@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type { Entry, Intent, Seed, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/dap-derive/testing";
-import { DIRECTORY, REGISTER, destinationReceipt, foundingOf, repositoryName } from "@generalbusiness/dap-platform";
+import { DIRECTORY, REGISTER, destinationReceipt, initialCommitOf, repositoryName } from "@generalbusiness/dap-platform";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import { SqliteStore } from "../src/index.ts";
 import { site } from "../src/site/route.ts";
@@ -12,7 +12,7 @@ import type { SiteEnv } from "../src/site/host.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
-import { foundingPublication } from "./publication.ts";
+import { initialPublication } from "./publication.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
 
 // Actual platform rules, real Durable Objects and SQLite. Only the Git host,
@@ -42,34 +42,34 @@ const fetchHost = async (request: Request) => {
   expect(new TextDecoder().decode(await request.arrayBuffer())).toMatch(new RegExp(`want (${published}|${receiptCommit})`));
   return new Response(concat(utf8(pkt("NAK\n")), await buildPack(objects, { maxBytes: 8 * 1024 * 1024 })), { headers: { "content-type": "application/x-git-upload-pack-result" } });
 };
-async function founding(publish: boolean) {
-  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "github.com", namespace: ACCOUNT.login, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+async function creation(publish: boolean) {
+  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "github.com", namespace: ACCOUNT.login, policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const r = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
   roots.push(r.name);
   const host = outsideOf(r.name);
   wired.set(r.name, () => ({ outside: host }));
-  expect(await r.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
-  const found = await r.intent(rita, "found", { expected: await r.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-  const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await r.at(), cause: intentDigest(found.intent), ordinal: 0 };
+  expect(await r.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+  const matched = await r.intent(rita, "found", { expected: await r.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+  const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await r.at(), cause: intentDigest(matched.intent), ordinal: 0 };
   const d = new Platform(scopeIdOf(seed));
   const repo = { name: repositoryName(seedDigest(seed), 1), id: "71" };
   host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: repo } });
-  expect(await r.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+  expect(await r.stub.submit(matched, [])).toMatchObject({ answer: "accepted" });
   await (r.stub as unknown as { effect(): Promise<number> }).effect();
   await settle(r, d);
   const peers = (await d.entries())[0]!.sends.filter(s => (s.to as Seed).kind === "membership" || (s.to as Seed).kind === "rules" || (s.to as Seed).kind === "destination").map(s => new Platform(scopeIdOf(s.to as Seed)));
   await settle(r, d, ...peers);
   const destination = new Platform(((await d.item(0)).refs["destination"] as { scope: ScopeId }).scope);
-  if (publish) await foundingPublication(destination);
+  if (publish) await initialPublication(destination);
   return { r, d, g: destination, repo };
 }
 beforeAll(async () => {
   net.hold = net.deaf = null;
-  const f = await founding(true); R = f.r; D = f.d; G = f.g; repository = f.repo;
+  const f = await creation(true); R = f.r; D = f.d; G = f.g; repository = f.repo;
   const commit = await runInDurableObject(G.object, (_instance, state) => {
     const store = new SqliteStore({ exec: (q, ...b) => state.storage.sql.exec(q, ...b), transaction: (f) => state.storage.transactionSync(f) });
     const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
-    const first = foundingOf(store, own, "sha1");
+    const first = initialCommitOf(store, own, "sha1");
     const receipt = destinationReceipt(store, own, store.page("receipt", ["written"], null, 1).items[0]!, "sha1");
     return { ...first, receipt };
   });
@@ -109,7 +109,7 @@ test("foreign repository ID refused before Git objects despite a recorded public
 });
 // Invariant: refusal is a read only, even on restart with an uncompleted first-head operation.
 test("not-published refusal writes no entries, operation bookkeeping, custody or other SQLite rows and sends nothing (real scopes)", async () => {
-  const f = await founding(false);
+  const f = await creation(false);
   const snapshot = (node: Platform) => runInDurableObject(node.object, (_instance, state) => {
     const tables = state.storage.sql.exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").toArray();
     return tables.map(({ name }) => [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]);

@@ -58,9 +58,9 @@ export type ClauseSet = { subject: string; type: string; state?: string; slot?: 
  * its own effects can set, and the item it opens. `requests`: each request among its send forms, with the most
  * sends that form can make and what each reserved clause can set. `opens`: the declared primary type, if the form may open it;
  * this is distinct from a state/slot change on an existing subject. `mayCreateCopy`: a relate handler can receive a first key,
- * except when its own copy is the duty being settled, which already implies that key.
+ * except when its own copy is the task being settled, which already implies that key.
  */
-export interface Duties {
+export interface PendingWork {
   path: string;
   settles: { subject: string; type: string; states: readonly string[]; slot?: string } | { copy: readonly string[]; name: string; kind: string } | null;
   opens: string | null;
@@ -119,7 +119,7 @@ export interface Defining extends Shapes {
   readonly indexes: RangeIndex[];
   readonly clauseSets: ClauseSet[];         // one for each result clause that is reserved for (section 17.2)
   clause: ClauseSet | null;                 // the list of effects being read, when what it can set is asked: a reserved clause, or the effects of an act or handler
-  readonly duties: Duties[];                // one for each act and handler that was read
+  readonly pendingWork: PendingWork[];                // one for each act and handler that was read
   readonly platform: boolean;               // the platform option: the data of a platform definition, which may hold a mark at seven places (section 6.1)
   readonly marks: MarkPlace[];              // each mark that was read, with its place
   readonly places: Map<string, number>;     // section 6.2, revision 19: each byte domain that a field of an act states for a value, with its one bound

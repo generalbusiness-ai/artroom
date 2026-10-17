@@ -72,7 +72,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
               }
               return original(url, init);
             };
-            return { ...ctx, fetch, trustedFoundingService: { service: SERVICE, fetch } };
+            return { ...ctx, fetch, trustedCreationService: { service: SERVICE, fetch } };
           },
         });
         const failed = rehearsal.shots.find(shot => shot.title === target)!;
@@ -126,7 +126,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
         ]);
         expect(rehearsal.shots[18]!.lines[0]).toMatch(/^Proposed 2 files as change sc_/);
         expect(rehearsal.shots[20]!.lines[1]).toContain("rules-not-met:rules");
-        await concurrencyWitness(people.founder!, rehearsal, at.stand.pushes.filter(push => push.ref === "refs/heads/main").map(push => push.commit));
+        await concurrencyWitness(people["founder"]!, rehearsal, at.stand.pushes.filter(push => push.ref === "refs/heads/main").map(push => push.commit));
         const directory = rehearsal.room.directory!;
         for (const file of branchFiles("two-pages")) {
           const page = await stage.get(`${SERVICE}/site/${directory}/HEAD/${file.path}`);
@@ -148,7 +148,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
 
   // Not a test of a property: the recorder for `scripts/demo-captures.ts --recorded`. It runs only when the root config provides
   // `demoRecord`, which `DEMO_RECORD=1` sets. It rehearses on a fresh room, as the test above does, then reads each screen of the
-  // captures as the browser will, through the page's data functions, signed in as the founder, and asks the Worker's entry for the
+  // captures as the browser will, through the page's data functions, signed in as the creator, and asks the Worker's entry for the
   // page's two files. Each request and its answer is printed, in lines that begin `DEMO-RECORD `, for the script to give the browser
   // in place of a service, as `apps/room/page/test/screens.mjs` does with its own recorder.
   test.skipIf(!inject("demoRecord"))("record the Worker's answers to the page's reads on the rehearsal's room, for demo-captures (runs only with DEMO_RECORD=1)", async () => {
@@ -190,9 +190,9 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
     const actor = path.endsWith("/sessions") ? ` ${(JSON.parse(String(init?.body)) as { request: { actor: string } }).request.actor}` : "";
     return keep(`${init?.method === "POST" ? "POST" : "GET"} ${path}${actor}`, answer);
   }) as unknown as Fetch;
-  const founder = people.founder!;
-  const config = (await founder.store.config())!;
-  const secret = (await founder.store.secret(config.key))!;
+  const creator = people["founder"]!;
+  const config = (await creator.store.config())!;
+  const secret = (await creator.store.secret(config.key))!;
   const place = placeOf(JSON.stringify(config))!;
   const { issue, published, refused } = rehearsal.room as Required<typeof rehearsal.room>;
   // The screens, each as `main.ts` draws it: the room, the issue, the refused change, the published change and the rules; then
@@ -212,9 +212,9 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
   // Readonly claim eligibility is recorded separately for each actual caller.
   // A path-only map cannot reuse the operator's signed read for a member.
-  const founderSession = { service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! };
-  const configured = await allowedClaim(founderSession, config.register!);
-  const founderAnswers = Object.fromEntries(recording);
+  const creatorSession = { service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! };
+  const configured = await allowedClaim(creatorSession, config.register!);
+  const creatorAnswers = Object.fromEntries(recording);
   recording = new Map();
   const member = people.member!;
   const memberConfig = (await member.store.config())!;
@@ -228,11 +228,11 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   try { await allowedClaim(memberSession, config.register!); }
   catch (error) { memberRefusal = error instanceof Error ? error.message : "Eligibility could not be read."; }
   expect(memberRefusal).not.toBe("");
-  const assets = Object.fromEntries(Object.entries(founderAnswers).filter(([key]) => key === "GET /page/" || key === "GET /page/page.js"));
+  const assets = Object.fromEntries(Object.entries(creatorAnswers).filter(([key]) => key === "GET /page/" || key === "GET /page/page.js"));
   const kept = {
-    service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: founderAnswers,
+    service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: creatorAnswers,
     claimWitness: { register: configured.register, definition: configured.definition,
-      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: founderAnswers },
+      "founder": { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: creatorAnswers },
       member: { place: memberPlace, secret: b64url(memberSecret), actor: keyIdOfSecret(memberSecret), answers: { ...assets, ...Object.fromEntries(recording) }, refusal: memberRefusal },
     },
   };
@@ -298,7 +298,7 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
     person: (who) => {
       // The injected transport is this real test Worker at SERVICE, not an
       // arbitrary callback asserted to prove a service's historical source.
-      const context = { store: memoryStore(), fetch, trustedFoundingService: { service: SERVICE, fetch }, now, pause, git, read: async (path: string) => FILES[path] ?? null };
+      const context = { store: memoryStore(), fetch, trustedCreationService: { service: SERVICE, fetch }, now, pause, git, read: async (path: string) => FILES[path] ?? null };
       return (people[who] = context);
     },
     pin: async (planned) => {
@@ -390,9 +390,9 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 
   // Real native genesis and actual creator send entries anchor the capture's
   // lane hints to the full refs kept by claim/join, without a new grant.
-  const births = await observeCaptures(people.founder!, rehearsal.room);
-  const config = (await people.founder!.store.config())!;
-  const observed = { v: 1 as const, source: "test source", service: SERVICE, config: textDigest(canonicalize(config)), actor: keyIdOfSecret((await people.founder!.store.secret(config.key))!), births };
+  const births = await observeCaptures(people["founder"]!, rehearsal.room);
+  const config = (await people["founder"]!.store.config())!;
+  const observed = { v: 1 as const, source: "test source", service: SERVICE, config: textDigest(canonicalize(config)), actor: keyIdOfSecret((await people["founder"]!.store.secret(config.key))!), births };
   const bound = captureBinding(config, observed, SERVICE, { ...rehearsal.room, diagnostic: "not capture metadata" } as typeof rehearsal.room, "test source");
   expect(bound.place).toEqual({ directory: config.repository!.directory.scope, membership: config.repository!.membership });
   expect(bound.room).toEqual(rehearsal.room);
@@ -402,20 +402,20 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   detached.births.published.creator = null;
   expect(() => captureBinding(config, detached, SERVICE, rehearsal.room, "test source")).toThrow("Capture binding");
   let loaded = 0;
-  const noKey: Context = { ...people.founder!, store: { ...people.founder!.store, secret: async () => { loaded++; throw new Error("unexpected key load"); } } };
+  const noKey: Context = { ...people["founder"]!, store: { ...people["founder"]!.store, secret: async () => { loaded++; throw new Error("unexpected key load"); } } };
   await expect(observeCaptures(noKey, { ...rehearsal.room, service: "https://other.test" })).rejects.toThrow("Capture binding");
   await expect(observeCaptures(noKey, { ...rehearsal.room, directory: rehearsal.room.issue! })).rejects.toThrow("Capture binding");
   expect(loaded).toBe(0);
 
   // Each of the shots that the table lists as the script's outcomes is what the room holds: the issue is closed, the branch
-  // holds the three commits after the founding one in order, and the refused change is not on it.
+  // holds the three commits after the creation one in order, and the refused change is not on it.
   const lines = (n: number) => rehearsal.shots[n - 1]!.lines;
   expect(lines(22)[0]).toMatch(/^#1 {2}closed \(completed\) {2}Add a getting-started page; assigned to @paul; lane sc_/);
   const pushed = at.stand.pushes.filter((push) => push.ref === "refs/heads/main").map((push) => push.commit);
   expect([pushed.length, lines(16)[2]!.includes(pushed[1]!), lines(19).some(line => line.startsWith("Published:") && line.includes(pushed[2]!))]).toEqual([4, true, true]);
   expect(lines(23).at(-1)).toBe("All consistent: 14 scopes.");
 
-  await concurrencyWitness(people.founder!, rehearsal, pushed);
+  await concurrencyWitness(people["founder"]!, rehearsal, pushed);
 
   // No secret is in the transcript: neither the invitation links, nor any person's key, nor any credential of the host.
   const links = [rehearsal.shots[6]!, rehearsal.shots[8]!].map((shot) => shot.lines[1]!);
@@ -452,16 +452,16 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 }
 
 /** Real native proposals and retained merges, tied to the command transcript. */
-async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed: string[]): Promise<void> {
+async function concurrencyWitness(creator: Context, rehearsal: Rehearsal, pushed: string[]): Promise<void> {
   // Invariant: reservation check 1 sees the winner and loser on the same old
   // base, keeps the refused lane, and only a distinct new change publishes.
   // The scopes are real; Git host and scheduler remain the stand-ins above.
-  const config = (await founder.store.config())!;
-  const secret = (await founder.store.secret(config.key))!;
-  const session = await requestSession(SERVICE, config.repository!.membership.scope, sessionRequest(config.repository!.membership, secret, timeOf(timeMs(net.clock.now)! + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch: founder.fetch! });
+  const config = (await creator.store.config())!;
+  const secret = (await creator.store.secret(config.key))!;
+  const session = await requestSession(SERVICE, config.repository!.membership.scope, sessionRequest(config.repository!.membership, secret, timeOf(timeMs(net.clock.now)! + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch: creator.fetch! });
   expect(session.ok).toBe(true);
   if (!session.ok) return;
-  const transport = signedReads(httpTransport(SERVICE, { fetch: founder.fetch! }), secretSigner(secret), { now: founder.now! });
+  const transport = signedReads(httpTransport(SERVICE, { fetch: creator.fetch! }), secretSigner(secret), { now: creator.now! });
   const controlled = new ScopeHandle(transport, rehearsal.room.controlled as ScopeId, session.session.reader());
   const stale = new ScopeHandle(transport, rehearsal.room.stale as ScopeId, session.session.reader());
   const replacement = new ScopeHandle(transport, rehearsal.room.reproposed as ScopeId, session.session.reader());

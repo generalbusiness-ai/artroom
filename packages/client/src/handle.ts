@@ -1,7 +1,7 @@
 /**
  * A handle on one scope (scope contract, sections 4.2, 9.1 and 11.5), over a
  * `Transport`. It submits and settles signed intents, makes the bounded
- * reads, and follows a receipt and a duty.
+ * reads, and follows a receipt and a task.
  *
  * It derives no judgment. What a caller may do in a scope it learns by
  * reading: the summary, and the scope's published definition.
@@ -15,7 +15,7 @@
  */
 
 import type {
-  Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
+  Answer, Beside, Cursor, DeclaredDefinition, Digest, OutboxItem, OutboxId, Entry, Created, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
   SignedIntent, Summary, ItemQuery, ItemQueryRead,
 } from "@generalbusiness/dap-contract";
 import { definitionDigest, entryHash, encodeItemQueryParameter, readItemQueryParameter, itemQueryReadFor, within, LATE, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
@@ -81,7 +81,7 @@ export class ScopeHandle {
   }
   history(cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return this.#transport.history(this.scope, this.#reader, cursor); }
   entry(seq: number): Promise<Read<Sealed>> { return this.#transport.entry(this.scope, this.#reader, seq); }
-  outbox(cursor?: Cursor): Promise<Read<readonly Duty[]>> { return this.#transport.outbox(this.scope, this.#reader, cursor); }
+  outbox(cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return this.#transport.outbox(this.scope, this.#reader, cursor); }
 
   /**
    * The scope's published definition: the declaration the scope retains
@@ -117,11 +117,11 @@ export class ScopeHandle {
     const entry = read.value.entry;
     if (entry.at?.scope !== at.scope || entry.at.kind !== at.kind || entry.seq !== seq) return { ok: false, reason: "reference-mismatch" };
     if (entry.at.inc !== at.inc) return { ok: false, reason: "wrong-incarnation" };
-    let found: Digest | null = null;
+    let matched: Digest | null = null;
     try {
-      found = entryHash(entry);
+      matched = entryHash(entry);
     } catch { /* not canonical values */ }
-    if (found !== hash) return { ok: false, reason: "hash-mismatch" };
+    if (matched !== hash) return { ok: false, reason: "hash-mismatch" };
     return { ok: true, at: read.at, entry };
   }
 
@@ -141,20 +141,20 @@ export class ScopeHandle {
     return { ok: false, reason: "unavailable" };
   }
 
-  /** Follow a duty: the outbox status of one send, by the duty ID a receipt lists. */
-  followDuty(duty: DutyId): Promise<Read<Duty>> { return this.#transport.duty(this.scope, this.#reader, duty); }
+  /** Follow a task: the outbox status of one send, by the outbox ID a receipt lists. */
+  followOutbox(outboxId: OutboxId): Promise<Read<OutboxItem>> { return this.#transport.outboxItem(this.scope, this.#reader, outboxId); }
 }
 
 /**
- * Found a repository's directory (section 7.1), and take a handle on it when
- * the founding is accepted. `definitions`: the declarations the directory's
- * definition names in `create` sends, which the directory retains for its
- * children. `beside`: the detached texts that the founding intent's fields
- * name. A founding is retried with the same signed intent, like an act.
+ * Create a scope with no creator (section 7.1), and take a handle when
+ * creation is accepted. `definitions`: the declarations the scope's
+ * definition names in `create` sends, which the scope retains for its
+ * children. `beside`: the detached texts that the creation intent's fields
+ * name. A creation is retried with the same signed intent, like an act.
  */
-export async function found(
-  transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
-): Promise<{ answer: Founded; scope: ScopeHandle | null }> {
-  const answer = await transport.found(founding, definition, definitions, beside);
+export async function create(
+  transport: Transport, creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
+): Promise<{ answer: Created; scope: ScopeHandle | null }> {
+  const answer = await transport.create(creation, definition, definitions, beside);
   return { answer, scope: answer.answer === "accepted" ? new ScopeHandle(transport, answer.receipt.fact.at.scope, reader) : null };
 }

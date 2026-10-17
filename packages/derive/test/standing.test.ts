@@ -7,12 +7,12 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { entryHash, factRefOf } from "@generalbusiness/artroom-bytes";
 import { MemoryState, PROFILES, StandingError, applyEntry, checkStandingEntry, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, owed, standingCounter, standingEntries, checkpointOf, validateDefinition } from "../src/index.ts";
 import type { PlatformRules, StateView } from "../src/index.ts";
-import { arriving, desk, forged, founded, keys, on, valid } from "./fixtures.ts";
+import { arriving, desk, forged, created, keys, on, valid } from "./fixtures.ts";
 
 import { standingData } from "./fixtures-standing.ts";
 const definition = () => valid(validateDefinition(standingData(), PROPOSED_BOUNDS, PROFILES, { platform: true }));
-const total = (s: ReturnType<typeof founded>) => s.head.seq + 1 + owed(s.state, s.definition, s.last.input);
-const projected = (s: ReturnType<typeof founded>, effects: readonly Effect[]) => checkStandingEntry(s.state, s.definition, effects, s.head.seq + 1);
+const total = (s: ReturnType<typeof created>) => s.head.seq + 1 + owed(s.state, s.definition, s.last.input);
+const projected = (s: ReturnType<typeof created>, effects: readonly Effect[]) => checkStandingEntry(s.state, s.definition, effects, s.head.seq + 1);
 
 // Closed metadata is platform-only; exact declaration constraints prevent
 // a mutable/free-form selector or an unsafe reservation product.
@@ -38,7 +38,7 @@ test("standing grammar admits only the closed, safe platform singleton declarati
     (d: any) => { d.standing.entries = Number.MAX_SAFE_INTEGER; },
   ];
   for (const change of invalid) expect(validateDefinition(standingData(change), PROPOSED_BOUNDS, PROFILES, { platform: true }).ok, String(change)).toBe(false);
-  const noDefault = standingData(d => { delete d.items.repo.values.count.default; d.acts.found.effects.push({ value: { slot: "count", from: { const: 0 } } }); });
+  const noDefault = standingData(d => { delete d.items.repo.values.count.default; d.acts["found"].effects.push({ value: { slot: "count", from: { const: 0 } } }); });
   expect(validateDefinition(noDefault, PROPOSED_BOUNDS, PROFILES, { platform: true }).ok).toBe(true);
   const zero = standingData(d => { d.standing.max = 0; d.items.repo.values.count.of.max = 0; d.acts.set.fields.next.max = 0; d.acts.advance.fields.next.max = 0; });
   expect(validateDefinition(zero, PROPOSED_BOUNDS, PROFILES, { platform: true }).ok).toBe(true);
@@ -55,7 +55,7 @@ test("pre-opening absence reserves the full amount, old definitions make no stan
   expect(standingEntries(empty, d)).toBe(6);
   const forbidden = new Proxy({} as StateView, { get() { throw new Error("old definition read state"); } });
   expect(standingEntries(forbidden, valid(validateDefinition(desk, PROPOSED_BOUNDS)))).toBe(0);
-  const s = founded(d), calls: unknown[] = [];
+  const s = created(d), calls: unknown[] = [];
   const bounded = viewWith(s.state, {
     count(type, state) { calls.push(["count", type, state]); return s.state.count(type, state); },
     page(type, states, after, limit) { calls.push(["page", type, states, after, limit]); return s.state.page(type, states, after, limit); },
@@ -72,7 +72,7 @@ test("pre-opening absence reserves the full amount, old definitions make no stan
 });
 
 test("counter/count/page corruption fails closed, including settlement capacity shortcuts", () => {
-  const s = founded(definition());
+  const s = created(definition());
   for (const count of [-1, -0, 0.5, NaN, Infinity, 2]) {
     expect(() => standingCounter(viewWith(s.state, { count: () => count }), s.definition)).toThrow(StandingError);
   }
@@ -90,7 +90,7 @@ test("counter/count/page corruption fails closed, including settlement capacity 
 });
 
 test("global prospective monotonicity checks complete written and marked effects, and independent fold rejects a recorded decrease without writes", () => {
-  const s = founded(definition());
+  const s = created(definition());
   s.did(keys.rita, "set", { ...on(s, 0), fields: { next: 1 } });
   const before = s.state.snapshot();
   expect(s.act(keys.rita, "set", { ...on(s, 0), fields: { next: 0 } })).toEqual({ result: "unavailable", reason: "unavailable" });
@@ -114,7 +114,7 @@ test("global prospective monotonicity checks complete written and marked effects
 });
 
 test("at B a handoff exchanges three standing entries for one entry and two request duties; diagnosis then late result still settle after a bad marked clause", () => {
-  const s = founded(definition()), peer = founded(undefined, undefined, "peer");
+  const s = created(definition()), peer = created(undefined, undefined, "peer");
   let reached = 0, next = 0;
   const platform: PlatformRules = { named: "platform:task@1" as PlatformDefinition, rules: { "settle-counter": { place: "effect", most: 1, run() { reached++; return [{ effect: "value", item: 0, slot: "count", value: next }]; } } } };
   expect(total(s)).toBe(8);
@@ -163,7 +163,7 @@ test("at B a handoff exchanges three standing entries for one entry and two requ
 
 
 test("C1 rejects unsafe/negative operands before summing and before settlement exemption, while a valid above-capacity total is ordinary scope-full", () => {
-  const s = founded(definition());
+  const s = created(definition());
   for (const requests of [-1, -0, 0.5, Infinity, Number.MAX_SAFE_INTEGER]) {
     const bad = viewWith(s.state, { outstanding: () => ({ ...s.state.outstanding(), requests, unavailable: 10 }) });
     expect(() => owed(bad, s.definition, s.last.input)).toThrow(StandingError);
@@ -184,7 +184,7 @@ test("a standing singleton distinct from genesis remains fully reserved until it
     d.items.issue.values.count = { fixed: false, required: true, default: 0, of: { type: "int", min: 0, max: 2 } };
   });
   const d = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
-  const s = founded(d);
+  const s = created(d);
   expect(standingCounter(s.state, d)).toEqual({ item: null, count: 0 });
   expect(total(s)).toBe(8);
   const pending = s.judge(s.intent(keys.rita, "open-issue", { fields: { title: "not a counter advance" } }));
@@ -202,7 +202,7 @@ test("a standing singleton distinct from genesis remains fully reserved until it
 
 
 test("at max the standing term reaches zero, the closing checkpoint releases its own reservation, and later work reserves closing again", () => {
-  const s = founded(definition());
+  const s = created(definition());
   s.did(keys.rita, "set", { ...on(s, 0), fields: { next: 2 } });
   expect(standingEntries(s.state, s.definition)).toBe(0);
   expect(owed(s.state, s.definition, s.last.input)).toBe(1);

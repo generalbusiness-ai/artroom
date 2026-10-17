@@ -77,10 +77,10 @@ function pathEnd(s: string, from: number): number {
   return i;
 }
 
-interface Found { start: number; end: number; href: string }
+interface MatchedLink { start: number; end: number; href: string }
 
 /** A `www.` or scheme link that starts at `at`, or null. `at` must follow the start of the text, a space, or one of `*_~(`. */
-function webAt(s: string, at: number): Found | null {
+function webAt(s: string, at: number): MatchedLink | null {
   const rest = s.slice(at);
   if (rest.startsWith("www.")) {
     const length = domain(rest, false);
@@ -99,7 +99,7 @@ function webAt(s: string, at: number): Found | null {
 }
 
 /** An email address around the `@` at `at`, or null. */
-function emailAt(s: string, at: number): Found | null {
+function emailAt(s: string, at: number): MatchedLink | null {
   let start = at;
   while (start > 0 && (ASCII_ALNUM.test(s[start - 1]!) || ".+-_".includes(s[start - 1]!))) start--;
   if (start === at) return null;
@@ -118,12 +118,12 @@ function emailAt(s: string, at: number): Found | null {
 }
 
 /** Every extended autolink of one text, left to right, none overlapping. */
-function links(s: string): Found[] {
-  const found: Found[] = [];
+function links(s: string): MatchedLink[] {
+  const matched: MatchedLink[] = [];
   let from = 0;
   for (let i = 0; i < s.length; i++) {
     const c = s[i]!;
-    let hit: Found | null = null;
+    let hit: MatchedLink | null = null;
     const boundary = i === 0 || SPACE.test(s[i - 1]!) || "*_~(".includes(s[i - 1]!);
     if (c === "w" && boundary) hit = webAt(s, i);
     else if ((c === "h" || c === "H" || c === "f" || c === "F") && (i === 0 || !ASCII_ALPHA.test(s[i - 1]!))) hit = webAt(s, i);
@@ -132,12 +132,12 @@ function links(s: string): Found[] {
       if (hit && hit.start < from) hit = null;
     }
     if (hit) {
-      found.push(hit);
+      matched.push(hit);
       from = hit.end;
       i = hit.end - 1;
     }
   }
-  return found;
+  return matched;
 }
 
 /** Adjacent text nodes merged into one, in every inline container under `root`. */
@@ -163,13 +163,13 @@ export function extendedAutolinks(root: Node): void {
   }
   for (const node of texts) {
     const s = node.literal;
-    const found = links(s);
-    if (found.length === 0) continue;
+    const matched = links(s);
+    if (matched.length === 0) continue;
     let at = 0;
     let before = node;
     const place = (made: Node) => { before.insertAfter(made); before = made; };
-    node.literal = s.slice(0, found[0]!.start);
-    for (const hit of found) {
+    node.literal = s.slice(0, matched[0]!.start);
+    for (const hit of matched) {
       if (hit.start > at && at > 0) place(new Node("text", s.slice(at, hit.start)));
       const link = new Node("link");
       link.destination = normalizeURI(hit.href);

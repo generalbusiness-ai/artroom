@@ -2,7 +2,7 @@
  * `platform:inbox@1`, as data (authority note, revision 16, section 12.1.6).
  * One inbox for each member. It holds that member's attention items, inside
  * the application. No send leaves it, no timed rule exists and no entry
- * starts a duty.
+ * starts a task.
  *
  * One member is one row of the note's tables. A cell of the note that
  * begins "Code" is a mark in this data, at the place where its rule is run

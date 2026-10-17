@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type PlatformData } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { validateDefinition, type StateView } from "@generalbusiness/dap-derive";
-import { d, founded, keys, on, valid } from "@generalbusiness/dap-derive/testing";
+import { d, created, keys, on, valid } from "@generalbusiness/dap-derive/testing";
 import { View } from "../src/view.ts";
 
 // Made-up platform data, with no marked rules. The fixture's test authority
@@ -22,7 +22,7 @@ const data: PlatformData = {
     },
   },
   acts: {
-    found: { ...form, step: "open", on: "board", grant: "found" },
+    "found": { ...form, step: "open", on: "board", grant: "found" },
     add: {
       ...form, step: "open", on: "row", grant: "add", fields: { key: { ...digest, required: true }, category: { ...digest, required: true } },
       effects: [{ ref: { slot: "key", from: { field: "key" } } }, { value: { slot: "category", from: { field: "category" } } }, { value: { slot: "other", from: { field: "key" } } }],
@@ -36,7 +36,7 @@ test("historical declared indexes return exactly the live and final items of the
   // Invariant: the historical StateView has the same complete declared
   // indexes as the fold at that head, including final items and no future rows.
   const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true }));
-  const history = founded(definition, {});
+  const history = created(definition, {});
   const [x, y, category] = [d("1"), d("2"), d("3")];
   const add = (key: string) => history.did(keys.rita, "add", { fields: { key, category } }).seq;
   const first = add(x);

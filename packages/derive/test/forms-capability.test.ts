@@ -122,12 +122,12 @@ describe("capability forms (section 6.11), with a stand-in for the capability's 
       ["an act kind that has the form of a step kind", (def) => { def.acts["hold@1:check"] = def.acts.ask; }, "shape"],
       ["a capability listed twice", (def) => { def.capabilities = [{ name: "hold", version: 1 }, { name: "hold", version: 1 }]; stage(def).guards.pop(); }, "capability"],
     ];
-    const found = rows.map(([name, change, code]) => {
+    const matched = rows.map(([name, change, code]) => {
       const changed = structuredClone(staging.declared);
       change(changed);
       const checked = validateDefinition(changed, PROPOSED_BOUNDS);
       return [name, checked.ok ? null : [...new Set(checked.problems.map((p) => p.code))], code] as const;
     });
-    expect(found.filter(([, codes, code]) => (code === null ? codes !== null : codes?.length !== 1 || codes[0] !== code)).map(([name, codes]) => [name, codes])).toEqual([]);
+    expect(matched.filter(([, codes, code]) => (code === null ? codes !== null : codes?.length !== 1 || codes[0] !== code)).map(([name, codes]) => [name, codes])).toEqual([]);
   });
 });

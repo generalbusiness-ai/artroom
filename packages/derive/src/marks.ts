@@ -33,7 +33,7 @@ import { isObject, own } from "./values.ts";
  * The input of the entry that is judged, whole, as it arrived (section 6.1,
  * "What a rule is given", item 2): an act's signed intent, whose `actor` is
  * the signing key, with the grant and what was presented beside it; a
- * genesis's seed, with the founding intent or the creation request; a
+ * genesis's seed, with the creation intent or the creation request; a
  * delivery's `from` and message; an outcome's evidence; and a diagnosis's
  * attempt log, for a mark in the `undelivered` clause that it runs.
  *
@@ -43,7 +43,7 @@ import { isObject, own } from "./values.ts";
  */
 export type JudgedInput =
   | { readonly type: "act"; readonly signed: SignedIntent; readonly grant: Grant | null; readonly presented: Readonly<Record<string, unknown>> }
-  | { readonly type: "genesis"; readonly seed: Seed; readonly founding: SignedIntent | null; readonly source: FactRef | null; readonly n: number | null; readonly message: Request | null }
+  | { readonly type: "genesis"; readonly seed: Seed; readonly "founding": SignedIntent | null; readonly source: FactRef | null; readonly n: number | null; readonly message: Request | null }
   | { readonly type: "delivery"; readonly from: FactRef; readonly n: number; readonly message: Message }
   | { readonly type: "outcome"; readonly operation: OperationId; readonly attempt: number; readonly owner: CapabilityName | PlatformDefinition; readonly kind: string; readonly result: "confirmed" | "refused" | "unknown"; readonly evidence: Evidence }
   | { readonly type: "diagnosis"; readonly of: { seq: number; n: number }; readonly attempts: readonly Attempt[] };

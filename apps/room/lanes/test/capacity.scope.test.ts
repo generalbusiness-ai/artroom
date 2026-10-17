@@ -20,7 +20,7 @@ test("T7, pending settlement at full capacity, for a copy: an issue lane that is
   // guard is asked. The count is of entries only: items, records, bytes and pending requests are not counted yet. Not proved: any
   // of those dimensions, or the bound a deployment would configure. Actual
   // Native Directory creation establishes the sender's change role; membership
-  // authority is real. The founding Git host, clock and selected bound are fixtures.
+  // authority is real. The creation Git host, clock and selected bound are fixtures.
   const r = await room({ roster: [] });
   await r.activate(issue, DIGESTS.issue);
   await r.activate(change, DIGESTS.change);
@@ -38,12 +38,12 @@ test("T7, pending settlement at full capacity, for a copy: an issue lane that is
   expect([(await G.entries()).length, (await G.entries()).at(-1)!.input, (await G.state()).relation(C.at, "closes", set)]).toMatchObject([11, { type: "delivery", decision: "applied", from: { seq: removed } }, { state: "removed" }]);
   // It freed nothing for new work: the entry it used was the one reserved. A comment is still refused.
   expect(await G.asks(rita, "comment", { fields: { body: "one more" } })).toBe("scope-full");
-  // A first update for a link that the lane holds no copy of is new work. It is not decided: the sender keeps the duty and offers it again.
+  // A first update for a link that the lane holds no copy of is new work. It is not decided: the sender keeps the task and offers it again.
   const again = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "manual" } })).fact.seq;
   await r.settle();
   net.clock.now = soon(1);
   await r.settle();
-  expect([(await C.duties()).find((d) => d.duty === `${again}.0`), (await G.entries()).length]).toMatchObject([{ attempts: [{ answer: "retry" }, { answer: "retry" }], acknowledged: null, result: null }, 11]);
+  expect([(await C.outboxItems()).find((d) => d.outboxId === `${again}.0`), (await G.entries()).length]).toMatchObject([{ attempts: [{ answer: "retry" }, { answer: "retry" }], acknowledged: null, result: null }, 11]);
   // Nothing else is pending in the issue lane, so its last entry is the closing checkpoint, and it fits.
   expect([await G.stub.checkpoint(), (await G.entries()).length]).toMatchObject([{ answer: "written", fact: { seq: 11 } }, 12]);
 });

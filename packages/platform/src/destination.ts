@@ -31,14 +31,14 @@ import { publicationStandingRecord, publicationStandingKeys, type PublicationSta
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";
 import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane, sourcesOf, manifestFiles } from "./destination-reading.ts";
-import { editCommit, editPath, manifestCommit, foundingObjects, receiptObjects, receiptRef, filePublicationCommit, fileReceiptObjects, fileReceiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { editCommit, editPath, manifestCommit, initialCommitObjects, receiptObjects, receiptRef, filePublicationCommit, fileReceiptObjects, fileReceiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 import { isOf, isStandingDestination, pinnedBy, pinnedOf } from "./versions.ts";
 
 /**
  * The versions of the destination that this package serves. An operation
  * that a destination opens states the scope's own version as its owner (the
  * contract's section 4.3). Version 2 adds the act `read-token`, with its
- * operation `mint-read`, and the founder's handle, which its founding
+ * operation `mint-read`, and the creator's handle, which its creation
  * commit names in a README (`destination2`, below).
  */
 export const DESTINATION_1 = "platform:destination@1" satisfies PlatformDefinition;
@@ -485,11 +485,11 @@ export const destination: PlatformData = {
  * - The act `read-token` (the planner's decision for I5), with the kind of
  *   operation `mint-read` that it opens and the rules of both
  *   (`WRITTEN_2`).
- * - The genesis takes the founder's handle, which the directory's creation
+ * - The genesis takes the creator's handle, which the directory's creation
  *   of version 2 sends, and keeps it in `branch.founderHandle`.
- * - The founding commit writes one file, `README.md`, in place of the empty
+ * - The creation commit writes one file, `README.md`, in place of the empty
  *   tree (`firstHeadCommit`): a heading with the repository's name and one
- *   sentence that names the founder's handle and the directory.
+ *   sentence that names the creator's handle and the directory.
  * - The manifest of a publication may also be a `propose-file` entry of the
  *   change lane (i5 edit): a one-file version of a change.
  */
@@ -501,7 +501,7 @@ export const destination2: PlatformData = {
   ...destination,
   items: {
     ...destination.items,
-    branch: { ...branch1, values: { ...branch1.values, founderHandle: { fixed: true, required: true, of: NAME } } },
+    branch: { ...branch1, values: { ...branch1.values, "founderHandle": { fixed: true, required: true, of: NAME } } },
     // i5 edit: the publication may refer to a one-file manifest.
     publication: { ...publication1, refs: { ...publication1.refs, manifest: { fixed: true, required: false, to: MANIFEST_2 } } },
   },
@@ -509,8 +509,8 @@ export const destination2: PlatformData = {
     ...destination.acts,
     establish: {
       ...establish1,
-      fields: { ...establish1.fields, founderHandle: { ...NAME, required: true } },
-      // The founder's handle, before the mark `declare-first-head`, which stays the last effect.
+      fields: { ...establish1.fields, "founderHandle": { ...NAME, required: true } },
+      // The creator's handle, before the mark `declare-first-head`, which stays the last effect.
       effects: [...establish1.effects.slice(0, -1), { value: { slot: "founderHandle", from: { field: "founderHandle" } } }, ...establish1.effects.slice(-1)],
     },
     // `read-token`: an act on the branch (the planner's decision for I5). Any active member may sign it: its grant,
@@ -674,11 +674,11 @@ const seqOf = (id: OperationId): number => Number(id.slice(0, id.indexOf(":")));
 
 /** The operations that the entry at that position opened, in the order of their records there. Their IDs are that position and an ordinal from 0. */
 function openedIn(state: Pick<StateView, "operation">, seq: number): Operation[] {
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let k = 0; ; k += 1) {
     const operation = state.operation(`${seq}:${k}` as OperationId);
-    if (!operation) return found;
-    found.push(operation);
+    if (!operation) return matched;
+    matched.push(operation);
   }
 }
 
@@ -714,14 +714,14 @@ const ownEntry = (own: Own, seq: number) => {
 function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: Item, before: number): Operation[] {
   const from = publication.values["reservedAt"];
   if (typeof from !== "number") return [];
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const checked = ["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
+    if (about) matched.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
-  return found;
+  return matched;
 }
 
 /**
@@ -733,13 +733,13 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
  * ID to the entry that is written (I3 deltas, entry FA5).
  */
 function receiptWrites(state: Pick<StateView, "operation">, own: Own, receipt: Item, before: number): Operation[] {
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let seq = receipt.id; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const about = seq === receipt.id || (input.type === "act" && input.signed.intent.kind === "resend-receipt" && input.signed.intent.fields["receipt"] === receipt.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.receipt));
+    if (about) matched.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.receipt));
   }
-  return found;
+  return matched;
 }
 
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
@@ -1113,7 +1113,7 @@ const pushDecides: Decides = (given, push) => {
   return { effects: [...token.effects, ...table.effects], opens: [...token.opens, ...table.opens], update: table.update };
 };
 
-/** The first head an operation writes: its import's recorded commit, or the computed founding commit. */
+/** The first head an operation writes: its import's recorded commit, or the computed creation commit. */
 export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write: Operation, format: ObjectFormat): string {
   const branch = branchOf(state);
   if (!branch) throw new Error("a first head belongs to the destination's branch");
@@ -1123,24 +1123,24 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
     if (!isObjectId(commit)) throw new Error("an imported first head names its commit in the update");
     return commit;
   }
-  return foundingOf(state, own, format).commit;
+  return initialCommitOf(state, own, format).commit;
 }
 
 /**
- * The founding commit and its objects, by the version that the scope
+ * The creation commit and its objects, by the version that the scope
  * pinned at its genesis. Version 1: the empty tree. Version 2: one file,
- * `README.md`, with the repository's name, the founder's handle and the
+ * `README.md`, with the repository's name, the creator's handle and the
  * directory's scope ID, each held by the branch since the genesis.
  */
-export function foundingOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
+export function initialCommitOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
   const branch = branchOf(state);
   const claim = branch?.refs["claim"];
   if (!branch || !isFactRef(claim)) throw new Error("a founding first head holds its verified claim");
   const genesis = ownEntry(own, 0);
-  if (pinnedOf(own) === DESTINATION_1) return foundingObjects(format, genesis.at.scope, genesis.time, claim);
+  if (pinnedOf(own) === DESTINATION_1) return initialCommitObjects(format, genesis.at.scope, genesis.time, claim);
   const [repository, handle, directory] = [branch.values["repository"] as { name?: unknown } | null, branch.values["founderHandle"], branch.refs["directory"]];
   if (typeof repository?.name !== "string" || typeof handle !== "string" || !isScopeRef(directory)) throw new Error("a founding of version 2 holds the repository's name, the founder's handle and the directory");
-  return foundingObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
+  return initialCommitObjects(format, genesis.at.scope, genesis.time, claim, { name: repository.name, handle, directory: directory.scope });
 }
 
 /** A receipt's recorded file, commit objects and public ref. Every fact is an own entry or a verified reference held by an item. */
@@ -1937,7 +1937,7 @@ const WRITTEN: Rules = {
   /**
    * Row e, the outcome entries of a `revoke` (P16; the row `revoke` of "What
    * each rule of an outcome yields"). It yields nothing: a failed
-   * revocation is a duty, and decides nothing (section 6.6, step 5).
+   * revocation is a task, and decides nothing (section 6.6, step 5).
    * Another attempt follows `refused` or `unknown`, to 3.
    *
    * The body of every outcome is `{ token }`: the same ID as its mint's. A
@@ -1996,7 +1996,7 @@ const WRITTEN: Rules = {
       derives: (given, push) => { const { effects, opens } = pushDecides(given, push); return { effects, sends: [], opens }; },
     },
   },
-  /** Authority revision 28, row e: the parentless founding commit or the imported commit, with its own receipt. */
+  /** Authority revision 28, row e: the parentless creation commit or the imported commit, with its own receipt. */
   "first-head": createRule(firstHeadSeen, 15, 5),
   /** The same row's receipt column, including its next mint and one deciding read. */
   receipt: createRule(receiptSeen, 5, 3),
@@ -2132,7 +2132,7 @@ const WRITTEN_2: Rules = {
 /**
  * Runtime admission metadata for future, recovered and late publication
  * work. It changes neither platform data nor recorded outcome effects.
- * Cleanup and founding return null; malformed target provenance returns false.
+ * Cleanup and creation return null; malformed target provenance returns false.
  */
 export function publicationOrigin(state: StateView, operation: Operation, own: Own): PublicationOrigin | false | null {
   if (!["judge", "check-judge", "reservation-stage", "push", "mint", "read", "receipt"].includes(operation.kind)) return null;
@@ -2252,19 +2252,19 @@ function cleanupMintUnknown(given: RuleGiven, publication: Item): boolean {
   }
   return false;
 }
-type CleanupDuties = { refReason?: string; tokenReason?: string; tokenAttempts: number; refRemoved: boolean };
-const cleanupDuties = (publication: Item): CleanupDuties => publication.values["cleanupReason"] as unknown as CleanupDuties;
+type CleanupWork = { refReason?: string; tokenReason?: string; tokenAttempts: number; refRemoved: boolean };
+const cleanupWork = (publication: Item): CleanupWork => publication.values["cleanupReason"] as unknown as CleanupWork;
 /** Independent obligations share one bounded record; the deletion budget
  * remains cumulative across all operations and late answers. */
 function cleanupStatus(publication: Item, changed: { ref?: string | null; token?: string | null; deletes?: number; tokenAttempts?: number; removed?: boolean }, tokensClosed = false): RuleEffect[] {
-  const previous = cleanupDuties(publication);
+  const previous = cleanupWork(publication);
   const ref = changed.ref === undefined ? previous.refReason : changed.ref;
   const token = changed.token === undefined ? previous.tokenReason : changed.token;
   const removed = changed.removed ?? previous.refRemoved;
   const state = ref || token ? "cleanup-owed" : removed ? tokensClosed ? "cleaned" : "cleanup-deleted" : publication.state;
-  const duties = { ...(ref ? { refReason: ref } : {}), ...(token ? { tokenReason: token } : {}), tokenAttempts: Math.max(previous.tokenAttempts, changed.tokenAttempts ?? 0), refRemoved: removed };
+  const pendingWork = { ...(ref ? { refReason: ref } : {}), ...(token ? { tokenReason: token } : {}), tokenAttempts: Math.max(previous.tokenAttempts, changed.tokenAttempts ?? 0), refRemoved: removed };
   const deletes = Math.max(publication.values["cleanupAttempts"] as number, changed.deletes ?? 0);
-  return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(duties) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: duties as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
+  return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(pendingWork) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: pendingWork as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
 }
 const generations = (publication: Item, given: RuleGiven): CheckGeneration[] => {
   const value = publication.values["passes"];
@@ -2378,7 +2378,7 @@ export const destinationRules3: Rules = (() => {
     const publication = targetOf(given.state, given.own, operation);
     if (!publication || given.input.type !== "outcome") return NOTHING;
     const body = given.input.evidence.body as { send?: unknown; seen?: unknown; tree?: unknown };
-    if (publication.state === "cleanup-owed" && cleanupDuties(publication).refReason === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
+    if (publication.state === "cleanup-owed" && cleanupWork(publication).refReason === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
       const used = cleanupAttempt(given, publication, operation);
       if (used >= 3) return NOTHING;
       return { effects: cleanupStatus(publication, { ref: "reservation-ref", deletes: used, removed: false }), opens: [opening(given, "reservation-delete", 3 - used, publication.id), opening(given, "mint", 1, publication.id)], update: null };
@@ -2427,12 +2427,12 @@ export const destinationRules3: Rules = (() => {
       const effects: RuleEffect[] = exhausted ? cleanupStatus(target, { token: unknown ? "reservation-token-unknown" : "reservation-token", tokenAttempts: given.input.attempt })
         : earlierFailure ? cleanupStatus(target, { token: earlierFailure, tokenAttempts: 3 })
         : cleanupMintUnknown(given, target) ? cleanupStatus(target, { token: "reservation-token-unknown", tokenAttempts: 1 })
-        : closed && (cleanupDuties(target).refRemoved || cleanupDuties(target).tokenReason) ? cleanupStatus(target, { token: null }, true) : [];
+        : closed && (cleanupWork(target).refRemoved || cleanupWork(target).tokenReason) ? cleanupStatus(target, { token: null }, true) : [];
       return { effects, sends: [], opens: [] };
     } } },
     "reservation-delete": { place: "outcome", rules: {
       selects: false, read: false, most: { effects: 12, requests: 0, operations: 2 },
-      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && cleanupDuties(target).refRemoved !== true && cleanupAttempt(given, target, operation) < 3 && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
+      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && cleanupWork(target).refRemoved !== true && cleanupAttempt(given, target, operation) < 3 && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
       ready: (state, write, attempt) => (mintOf(state, write, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => isObject(evidence.body) && SENDS[result]!.includes(evidence.body["send"] as string) && isSeen(evidence.body["seen"]), unknown: () => ({ send: "unknown", seen: "failed" }),
       derives: (given, operation) => {
@@ -2445,8 +2445,8 @@ export const destinationRules3: Rules = (() => {
         const attempt = cleanupAttempt(given, target, operation);
         const heldUnknownStage = given.input.result === "confirmed" && !stageKnown;
         const exhausted = !removed && given.input.attempt === operation.most;
-        const next = cleanupDuties(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
-        const ref = cleanupDuties(target).refRemoved && !removed ? undefined : exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
+        const next = cleanupWork(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
+        const ref = cleanupWork(target).refRemoved && !removed ? undefined : exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
         const unknownMint = cleanupMintUnknown(given, target);
         const effects: RuleEffect[] = [...token.effects, ...cleanupStatus(target, { ...(ref === undefined ? {} : { ref }), deletes: attempt + (next ? 1 : 0), ...(removed ? { removed: true } : ref ? { removed: false } : {}), ...(unknownMint ? { token: "reservation-token-unknown", tokenAttempts: 1 } : {}) })];
         return { effects, opens: [...token.opens, ...(next ? [opening(given, "mint", 1, target.id)] : [])], sends: [] };
@@ -2752,7 +2752,7 @@ export const destinationRules4: Rules = (() => {
   }));
 })();
 
-/** D1 is an explicit cohort; existing pins and default founding stay put.
+/** D1 is an explicit cohort; existing pins and default creation stay put.
  * Only regular review-backed publication receives the standing contract.
  * Automatic file-publication keeps its separate @4 authority journey. */
 export const DESTINATION_5 = "platform:destination@5" satisfies PlatformDefinition;
@@ -2809,9 +2809,9 @@ function standingTarget(given: RuleGiven, mint: Operation): Item | null {
 function standingKeys(given: RuleGiven, publication: Item): readonly KeyId[] {
   const scope = given.state.scope(), membership = destinationMembership(given.state);
   if (!scope || !membership?.inc) throw new Error("D1 membership incarnation is unavailable");
-  const found = publicationStandingKeys({ at: scope.at, membership: { scope: membership.scope, inc: membership.inc, kind: "membership" }, owner: pinnedBy(given), before: given.resolved.self, own: given.own, operation: id => given.state.operation(id) }, publication);
-  if (!found.ok) throw new Error(`D1 standing provenance ${found.reason}`);
-  return found.keys;
+  const matched = publicationStandingKeys({ at: scope.at, membership: { scope: membership.scope, inc: membership.inc, kind: "membership" }, owner: pinnedBy(given), before: given.resolved.self, own: given.own, operation: id => given.state.operation(id) }, publication);
+  if (!matched.ok) throw new Error(`D1 standing provenance ${matched.reason}`);
+  return matched.keys;
 }
 /** Preserve base provenance on each current-generation update. A fence
  * constructs a new false row with no proof; a successful check captures

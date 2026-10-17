@@ -161,12 +161,12 @@ export function joining(device: DeviceKey, options: { lock: CustodyLock; store: 
   };
 }
 
-export type Found = { ok: true; identity: LendingIdentity } | { ok: false; reason: string };
+export type DiscoveryResult = { ok: true; identity: LendingIdentity } | { ok: false; reason: string };
 /**
  * The room's lending scope, read from the room's directory with this device's own
  * session: the one application that the directory created under the lending pin.
  */
-export async function findLending(seat: Seat, device: DeviceKey, options: { now?: () => number; fetch?: Fetch; deployment?: string } = {}): Promise<Found> {
+export async function findLending(seat: Seat, device: DeviceKey, options: { now?: () => number; fetch?: Fetch; deployment?: string } = {}): Promise<DiscoveryResult> {
   const signer = deviceSigner(device), now = options.now ?? (() => Date.now());
   const signed = await signerSessionRequest(seat.membership, signer, timeOf(now() + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
   const answer = await requestSession(seat.origin, seat.membership.scope, signed, options.fetch ? { fetch: options.fetch } : {});

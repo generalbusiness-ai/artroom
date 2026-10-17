@@ -3,11 +3,11 @@
  * entry of a scope with no creator, which a signed intent asks for, and of
  * a child, which a `create` send of its creator asks for.
  *
- * A scope with no creator is the founding register, which an `install`
- * intent founds under `platform:register` (section 7.1). The first delivery
- * founded a directory with no creator, by a `found` intent, as its stand-in
+ * A scope with no creator is the creation register, which an `install`
+ * intent creates under `platform:register` (section 7.1). The first delivery
+ * created a directory with no creator, by a `found` intent, as its stand-in
  * for a register (section 7.2, "Where each scope reads its closure"). That
- * founding stays, for the scopes of today's tests, and it is never of the
+ * creation stays, for the scopes of today's tests, and it is never of the
  * kind `register` or under the register's definition.
  */
 
@@ -32,12 +32,12 @@ import { isFactRef, isLocalId, isObject, own, same } from "./values.ts";
  * that was reached. `inc` is minted at random by the caller, in the
  * transaction that writes the entry (section 2.2).
  */
-export interface Founding { name: ScopeId; inc: Incarnation; seed: Seed; founding: SignedIntent }
+export interface SignedCreation { name: ScopeId; inc: Incarnation; seed: Seed; creation: SignedIntent }
 
 /** What asks for a child (section 7.2): the delivery of a `create`, which is addressed by its seed. */
 export interface Creation { name: ScopeId; inc: Incarnation; to: Seed; from: FactRef; n: number; message: Request }
 
-/** The name that the founding register's definition states (section 7.1; authority note, section 12.1). */
+/** The name that the creation register's definition states (section 7.1; authority note, section 12.1). */
 const REGISTER = "platform:register";
 
 /**
@@ -59,8 +59,8 @@ function openerOf(source: Entry, message: Request, facts: readonly Fetched[]): E
   const [seq, k] = source.input.operation.split(":").map(Number);
   const fields = isObject(message.body) && isObject(message.body["fields"]) ? Object.values(message.body["fields"]) : [];
   const named = (fact: FactRef): boolean => fields.some((value) => isFactRef(value) && same(value, fact));
-  const found = facts.find(({ fact, entry }) => same(fact.at, source.at) && fact.seq === seq && fact.seq < source.seq && named(fact) && isEntryOf(entry, fact));
-  return found?.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k) ? found.entry : null;
+  const matched = facts.find(({ fact, entry }) => same(fact.at, source.at) && fact.seq === seq && fact.seq < source.seq && named(fact) && isEntryOf(entry, fact));
+  return matched?.entry.effects.some((effect) => effect.effect === "operation" && effect.k === k) ? matched.entry : null;
 }
 
 /**
@@ -93,15 +93,15 @@ function causeOf(source: Entry, message: Request, facts: readonly Fetched[]): Se
  * the check of its place, as for an act (section 4.2). A fault of a rule
  * leaves the genesis not judged, and nothing is written (section 6.1).
  */
-export function judgeGenesis(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {
+export function judgeGenesis(view: StateView, definition: ValidDefinition, asked: SignedCreation | Creation, context: DeliveryContext): Judgment {
   return withinCounts(view, definition, unjudged(() => genesisJudged(view, definition, asked, context)));
 }
 
-function genesisJudged(view: StateView, definition: ValidDefinition, asked: Founding | Creation, context: DeliveryContext): Judgment {
+function genesisJudged(view: StateView, definition: ValidDefinition, asked: SignedCreation | Creation, context: DeliveryContext): Judgment {
   const unverified = (detail: string): Judgment => ({ result: "source-unverified", detail });
   const { clock, bounds } = context;
-  const founding = "founding" in asked ? asked.founding : null;
-  const seed = "founding" in asked ? asked.seed : asked.to;
+  const creation = "creation" in asked ? asked.creation : null;
+  const seed = "creation" in asked ? asked.seed : asked.to;
   if (!isIncarnation(asked.inc)) throw new Error("the caller mints the incarnation");
 
   // Section 2.3: at genesis a scope checks that the digest of the seed equals its own name.
@@ -109,21 +109,21 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
   const existing = view.scope();
   if (existing) {
     // A repeat is answered from the genesis and adds nothing.
-    if (!("founding" in asked)) return judgeDelivery(view, definition, asked, context);
-    return existing.at.scope === asked.name && verifySignedIntent(asked.founding) && intentDigest(asked.founding.intent) === seed.cause ? { result: "repeat", seq: 0 } : unverified("the scope has another genesis");
+    if (!("creation" in asked)) return judgeDelivery(view, definition, asked, context);
+    return existing.at.scope === asked.name && verifySignedIntent(asked.creation) && intentDigest(asked.creation.intent) === seed.cause ? { result: "repeat", seq: 0 } : unverified("the scope has another genesis");
   }
   if (isDigest(seed.definition) && seed.definition !== definition.digest) return unverified("the seed names another definition");
 
   let source: Fetched | null = null;
-  if ("founding" in asked) {
-    // Section 7.1: the founder's signature commits to the inputs of the seed, and the intent's digest is the seed's cause.
-    const intent = asked.founding.intent;
-    if (!verifySignedIntent(asked.founding) || !isIntent(intent)) return unverified("not a signed intent");
-    // The register is founded by an `install` intent, under its own definition and no other. A directory with no creator is the
+  if ("creation" in asked) {
+    // Section 7.1: the creator's signature commits to the inputs of the seed, and the intent's digest is the seed's cause.
+    const intent = asked.creation.intent;
+    if (!verifySignedIntent(asked.creation) || !isIntent(intent)) return unverified("not a signed intent");
+    // The register is created by an `install` intent, under its own definition and no other. A directory with no creator is the
     // first delivery's stand-in, by a `found` intent. No other kind of scope has no creator.
     const asks = seed.kind === "register" ? "install" : seed.kind === "directory" ? "found" : null;
-    if (seed.creator !== null || asks === null || (seed.kind === "register") !== (definition.declared.name === REGISTER) || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this founding intent asks for");
-    if (intent.to !== null || intent.kind !== asks || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: `a founding intent has kind ${asks}, and names no scope and no item` };
+    if (seed.creator !== null || asks === null || (seed.kind === "register") !== (definition.declared.name === REGISTER) || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this creation intent asks for");
+    if (intent.to !== null || intent.kind !== asks || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: `a creation intent has kind ${asks}, and names no scope and no item` };
     const now = timeMs(clock.reading)!;
     const notAfter = timeMs(intent.notAfter)!;
     if (now >= notAfter) return { result: "refused", reason: "expired", detail: "notAfter" };
@@ -139,12 +139,12 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
   }
 
   const at: ScopeRef = { scope: asked.name, inc: asked.inc, kind: seed.kind };
-  const child = "founding" in asked ? null : asked;
+  const child = "creation" in asked ? null : asked;
   const result = (outcome: "applied" | "refused", reason?: Reason): Send[] =>
     (child ? [{ n: 0, to: child.from.at, message: { class: "result", of: { from: child.from, n: child.n }, outcome, ...(reason ? { reason } : {}) } }] : []);
   // Section 4.1: the genesis states its act kind, from the definition that the scope pins. No sender supplies it. A refused genesis holds it too.
   const input = (decision: "applied" | "refused") =>
-    ({ type: "genesis", seed, inc: asked.inc, kind: definition.declared.genesis, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null, decision }) as const;
+    ({ type: "genesis", seed, inc: asked.inc, kind: definition.declared.genesis, "founding": creation, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null, decision }) as const;
   const sourceUse = source ? [useOf(source.fact, source.entry)] : [];
   /**
    * Section 7.2: a refused genesis is written, sends its `refused` result and
@@ -153,17 +153,17 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
    * result a guard read before the refusal.
    */
   const refuse = (reason: Reason, uses: readonly FactUse[] = sourceUse, prepared: readonly Prepared[] = []): Judgment =>
-    ({ result: "write", draft: { input: input("refused"), uses, prepared, effects: [], sends: result("refused", reason), judgesTime: founding !== null } });
+    ({ result: "write", draft: { input: input("refused"), uses, prepared, effects: [], sends: result("refused", reason), judgesTime: creation !== null } });
 
   // The source proved the whole message above. Reserved metadata is separate
   // from domain fields; an invalid opt-in is a terminal refusal, with no
   // declared child sends. An absent marker preserves the legacy judgment.
   if (child && creationContextOf(child.message.body).kind === "invalid") return refuse({ code: "bad-field" });
 
-  // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
-  // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.
+  // The genesis act, with the opener's parties from the creation message, or with the creation intent's fields. It has no signer:
+  // nobody signs for a scope that does not exist yet, and the creation rule is the authority note's.
   const act = own(definition.declared.acts, definition.declared.genesis)!;
-  const given = founding ? founding.intent.fields : creationFields(child!.message, child!.from, act.fields);
+  const given = creation ? creation.intent.fields : creationFields(child!.message, child!.from, act.fields);
   const read = given ? readFields(act.fields, given, bounds) : null;
   if (!read?.ok) return refuse({ code: "bad-field" });
   // A scope has no entry before its genesis, so a fact that names it names nothing: `fact-mismatch`.
@@ -175,16 +175,16 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
   if (named.result !== "read") return refuse({ code: named.result }, uses);
   // Platform data: what a rule of the genesis act is given (section 6.1). Check 7: a field whose type is a mark is checked by its rule.
   const clocked = { clock: false };
-  const judged: JudgedInput = { type: "genesis", seed, founding, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null };
+  const judged: JudgedInput = { type: "genesis", seed, "founding": creation, source: child?.from ?? null, n: child?.n ?? null, message: child?.message ?? null };
   const g = giving(view, context, { at, creator: seed.creator }, 0, judged, clocked, named.fields, named.facts, source ?? undefined);
   if (fieldOutsideType(g, act.fields)) return refuse({ code: "bad-field" }, uses);
   // Section 4.2, "A founding": the genesis of a scope with no creator makes no check 9. When the genesis act's `grant` is a mark,
-  // its rule is run, after the signature and the seed are checked. A founding that the rule does not pass is refused
+  // its rule is run, after the signature and the seed are checked. A creation that the rule does not pass is refused
   // `unauthorized`, and nothing is written: no scope exists on an authority that was not shown. The genesis of a child runs no
   // such rule: its authority is its creator's entry.
-  const mark = founding ? (markOf(act.grant) as GrantMark | null) : null;
+  const mark = creation ? (markOf(act.grant) as GrantMark | null) : null;
   const passed = mark ? grantByRule(g, mark) : null;
-  if (passed && !passed.pass) return { result: "refused", reason: "unauthorized", detail: `the rule ${mark!.code} does not pass the founding key${passed.name === undefined ? "" : `: ${passed.name}`}` };
+  if (passed && !passed.pass) return { result: "refused", reason: "unauthorized", detail: `the rule ${mark!.code} does not pass the initial key${passed.name === undefined ? "" : `: ${passed.name}`}` };
   const signer = passed?.pass && passed.member ? { member: passed.member, principal: null } : null;
 
   const j: Judging = {
@@ -198,5 +198,5 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
   if (ran.result === "unavailable") return ran;
   if (ran.result === "refused") return refuse(reasonOf(ran), uses, ran.prepared);
   // No item exists before a genesis, so no transition is due (section 5.2, step 6.3), and no entry precedes it, so the clock is not behind.
-  return { result: "write", draft: { input: input("applied"), uses, prepared: ran.prepared, effects: ran.effects, sends: [...result("applied"), ...ran.sends], judgesTime: founding !== null || ran.judgesTime } };
+  return { result: "write", draft: { input: input("applied"), uses, prepared: ran.prepared, effects: ran.effects, sends: [...result("applied"), ...ran.sends], judgesTime: creation !== null || ran.judgesTime } };
 }

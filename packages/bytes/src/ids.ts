@@ -6,7 +6,7 @@
  * A timestamp's one guard is `timeMs`, below; the clock rules are derive's.
  */
 
-import type { Base64Url, DutyId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/dap-contract";
+import type { Base64Url, OutboxId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/dap-contract";
 import { wellFormed } from "./canonical.ts";
 import { unb64url } from "./encode.ts";
 import { publicKeyOf } from "./sign.ts";
@@ -44,7 +44,7 @@ export function isOperationId(value: unknown): value is OperationId {
 }
 
 /** One send of one entry: `seq.n`, each a position in its one decimal form. */
-export function isDutyId(value: unknown): value is DutyId {
+export function isOutboxId(value: unknown): value is OutboxId {
   const parts = typeof value === "string" ? value.split(".") : [];
   return parts.length === 2 && parts.every((part) => positionOf(part) !== null);
 }

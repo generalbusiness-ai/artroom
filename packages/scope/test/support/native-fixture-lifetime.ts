@@ -192,7 +192,7 @@ async function fixturePasses(nodes: readonly Platform[], wait: <T>(action: () =>
 export const driveFixture = (nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> => fixturePasses(nodes, wait, "drive");
 /** Dispatch-only settling never starts outside effects earlier than its caller. */
 export const dispatchFixture = (nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> => fixturePasses(nodes, wait, "dispatch");
-/** Effect-only phases never dispatch creation duties before their assertions. */
+/** Effect-only phases never dispatch creation pending work before their assertions. */
 export const effectFixture = (nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> => fixturePasses(nodes, wait, "effect");
 
 

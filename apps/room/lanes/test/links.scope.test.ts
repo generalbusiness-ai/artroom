@@ -19,7 +19,7 @@ const oid = (c: string) => c.repeat(40);
 test("T5a, a link is the change lane's and the issue keeps a copy of it: set then removed, and removed then set, end the same; the older update that arrives late is recorded superseded, each request has one result, and the issue does not move", async () => {
   // Native Directory creation and membership authority establish the lanes'
   // actual roles. Deliveries are real; transport is held to swap their order.
-  // No peer or capability guard is used. The founding Git host and clock
+  // No peer or capability guard is used. The creation Git host and clock
   // remain STAND-INs. This proves no merge; that is T5b.
   const r = await room({ roster: [] });
   await r.activate(issue, DIGESTS.issue);

@@ -14,7 +14,7 @@ import { SERVICE, demo } from "./support/demo.ts";
 // destination's refusal by name and plan 016's state; an act refused by its guard's name with the head unmoved; the acts each
 // member may sign now; and the rules. A key that is no member's reads nothing.
 //
-// The room is `support/demo.ts`: founded by the command line on real scopes, real read sessions under a TEST SECRET, the site
+// The room is `support/demo.ts`: created by the command line on real scopes, real read sessions under a TEST SECRET, the site
 // route, and a STAND-IN Git host (`OwnGit`, under the production wiring of Cloudflare Artifacts). The scheduler is a
 // STAND-IN that the test drives (`pause`). No DOM.
 test("the page's data functions against the Worker's routes as deployed: join with a link and a session from membership; signed reads where no session is given; open an issue with the definition's bytes; an edited README merged, published and read back from the site; AGENTS.md waiting for the controller, refused by name, then published; a refusal by guard name with nothing written; the acts by role; the rules (STAND-IN: the Git host and the scheduler)", async () => {

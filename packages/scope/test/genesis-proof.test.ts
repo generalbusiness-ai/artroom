@@ -7,7 +7,7 @@ import { ProofBytes, type ProofBody, type ProofSource } from "../src/proof-bytes
 import { rootOf } from "../src/signed-reads.ts";
 import { PreparationFlights } from "../src/preparation-flight.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
-import { at, found, rita, una } from "./support.ts";
+import { at, create, rita, una } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 class Timer implements ProofTimer {
@@ -28,7 +28,7 @@ function chain(sample: Entry, act: Entry, count: number): Entry[] {
   const entries: Entry[] = [act]; let previous = act;
   for (let n = 1; n <= count; n++) {
     const seed: Seed = { ...sample.input.seed, creator: previous.at, cause: previous.input.type === "genesis" ? seedDigest(previous.input.seed) : intentDigest(act.input.signed.intent), ordinal: n };
-    const genesis: Entry = { ...sample, at: { ...sample.at, scope: scopeIdOf(seed) }, time: at(n), input: { ...sample.input, seed, founding: null, source: factRefOf(previous), decision: "applied" }, uses: [useOf(factRefOf(previous), previous)] };
+    const genesis: Entry = { ...sample, at: { ...sample.at, scope: scopeIdOf(seed) }, time: at(n), input: { ...sample.input, seed, "founding": null, source: factRefOf(previous), decision: "applied" }, uses: [useOf(factRefOf(previous), previous)] };
     entries.push(genesis); previous = genesis;
   }
   return entries;
@@ -47,7 +47,7 @@ function scripted(entries: readonly Entry[]) {
 }
 
 test("native genesis evidence caches only immutable content and repeats actor/window/request checks", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(async state => {
     let bodyQueries = 0;
     const actual = sqlOf(state), bytes = new ProofBytes({ exec(query, ...args) { if (query.startsWith("SELECT bytes FROM entry")) bodyQueries++; return actual.exec(query, ...args); } });
@@ -71,7 +71,7 @@ test("native genesis evidence caches only immutable content and repeats actor/wi
 // Synthetic canonical chain on real SQLite; the peer is an explicitly gated STAND-IN.
 // The parent owns the deadline/pending slot, and no late helper result performs SQL or caches content.
 test("parent-owned genesis proof inherits remaining time and fences a late peer until its real task settles", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const got = await scope.inside(async state => {
     const store = new SqliteStore(sqlOf(state));
     const entries = chain(JSON.parse(store.stored(0)!.bytes), JSON.parse(store.stored(1)!.bytes), 1), start = entries[1]!;
@@ -110,7 +110,7 @@ test("parent-owned genesis proof inherits remaining time and fences a late peer 
 
 test("exact genesis chain shares rootOf semantics at four steps and separates complete-none from missing/unsupported", async () => {
   for (const depth of [1, 4, 5]) {
-    const scope = await found(); await scope.commitment();
+    const scope = await create(); await scope.commitment();
     const got = await scope.inside(async state => {
       const store = new SqliteStore(sqlOf(state)), entries = chain(JSON.parse(store.stored(0)!.bytes), JSON.parse(store.stored(1)!.bytes), depth), start = entries.at(-1)!;
       install(state, start); const scriptedSource = scripted(entries);
@@ -131,7 +131,7 @@ test("exact genesis chain shares rootOf semantics at four steps and separates co
 });
 
 test("unknown dependency is retried, full content/fact conflict is refused and an incarnation change invalidates content cache", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const got = await scope.inside(async state => {
     const store = new SqliteStore(sqlOf(state)), entries = chain(JSON.parse(store.stored(0)!.bytes), JSON.parse(store.stored(1)!.bytes), 1), start = entries[1]!;
     install(state, start); const fixture = scripted(entries); let missing = true;
@@ -152,7 +152,7 @@ test("unknown dependency is retried, full content/fact conflict is refused and a
 });
 
 test("absolute completion deadline retains single-flight ownership through never-settling and late peer replies", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const got = await scope.inside(async state => {
     const store = new SqliteStore(sqlOf(state)), entries = chain(JSON.parse(store.stored(0)!.bytes), JSON.parse(store.stored(1)!.bytes), 1);
     install(state, entries[1]!); const fixture = scripted(entries), clock = new Timer(), reached = deferred<void>(), late = deferred<ProofBody | null>(); let calls = 0;
@@ -174,7 +174,7 @@ test("absolute completion deadline retains single-flight ownership through never
 
 test("body capacity counts the genesis and repeated uses spend work even when their bodies are cached", async () => {
   for (const mode of ["exact", "extra-body", "repeated-uses", "uses-search", "conflicting-uses"] as const) {
-    const scope = await found(); await scope.commitment();
+    const scope = await create(); await scope.commitment();
     const got = await scope.inside(async state => {
       const store = new SqliteStore(sqlOf(state)), act = JSON.parse(store.stored(1)!.bytes) as Entry;
       const creations = chain(JSON.parse(store.stored(0)!.bytes), act, 1), start = creations[1]!;
@@ -195,7 +195,7 @@ test("body capacity counts the genesis and repeated uses spend work even when th
 });
 
 test("remaining cumulative bytes are offered to the source before another body can be materialized", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const got = await scope.inside(async state => {
     const store = new SqliteStore(sqlOf(state)), sample = JSON.parse(store.stored(0)!.bytes) as Entry, nativeAct = JSON.parse(store.stored(1)!.bytes) as Entry;
     const pad = (entry: Entry): Entry => ({ ...entry, effects: [...entry.effects, { effect: "record", capability: "hold@1", kind: "padding", key: [], state: "padded", values: { text: "x".repeat(600_000) } }] });
@@ -216,7 +216,7 @@ test("remaining cumulative bytes are offered to the source before another body c
 });
 
 test("absolute proof deadline includes the initial bounded scope metadata read", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(async state => {
     const actual = sqlOf(state), clock = new Timer(); let initial = true, bodies = 0;
     const bytes = new ProofBytes({ exec(query, ...args) {
@@ -232,7 +232,7 @@ test("absolute proof deadline includes the initial bounded scope metadata read",
 
 test("final scope metadata cannot return or cache an overdue root with queued or inline timeout", async () => {
   for (const inline of [false, true]) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(async state => {
       const actual = sqlOf(state), clock = new Timer(); let scopes = 0, bodies = 0;
       const bytes = new ProofBytes({ exec(query, ...args) {
@@ -255,7 +255,7 @@ test("final scope metadata cannot return or cache an overdue root with queued or
 
 test("eligibility checks request freshness after final metadata on fresh and cached content", async () => {
   for (const cached of [false, true]) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(async state => {
       const actual = sqlOf(state), clock = new Timer(); let phase = false, reads = 0;
       const finalRead = cached ? 2 : 4;
@@ -274,7 +274,7 @@ test("eligibility checks request freshness after final metadata on fresh and cac
 });
 
 test("eligibility final metadata shares the initial operation deadline and stops further authentication work", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(async state => {
     const actual = sqlOf(state), clock = new Timer(); let reads = 0;
     const bytes = new ProofBytes({ exec(query, ...args) {

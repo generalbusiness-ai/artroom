@@ -5,7 +5,7 @@ import { httpTransport } from "@generalbusiness/artroom-client";
 import { DIGESTS } from "../src/index.ts";
 import { graph, officeDefinition, README, reader, transport } from "./support/graph.ts";
 
-// One dedicated wire founding combination: real SELF HTTP/client transport,
+// One dedicated wire creation combination: real SELF HTTP/client transport,
 // native NET scopes/storage/dispatch; office data/readers/authority and peers
 // remain the graph fixture's labelled stand-ins. No real Git provider.
 test("HTTP office founding retains detached README and both declarations, then confirms issue and change children", async () => {
@@ -31,6 +31,6 @@ test("HTTP office founding retains detached README and both declarations, then c
     const entry = await node.entry(0);
     expect(entry.input).toMatchObject({ type: "genesis", decision: "applied", seed: { definition: digest, creator: g.office.at } });
   }
-  // Only founding crosses SELF; ordinary child creation and reads remain real api.
+  // Only creation crosses SELF; ordinary child creation and reads remain real api.
   expect(crossings).toBe(1);
 });

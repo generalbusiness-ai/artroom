@@ -49,7 +49,7 @@ function answer(s: Scope, operation: OperationId, attempt: number, result: "conf
 }
 /** Each attempt's outcomes in order, with `selected` where it is not null. */
 const shape = (s: Scope, id: OperationId) => s.state.operation(id)!.attempts.map((a) => a.outcomes.map((o) => (o.selected === null ? o.result : `${o.result}, selected ${o.selected}`)));
-/** The entries that the pending duties reserve, with the closures that the made-up owners declare. */
+/** The entries that the pending work reserves, with the closures that the made-up owners declare. */
 const reserved = (s: Scope, given: Owners | null = owners) => owed(s.state, ticketDefinition, s.last.input, given);
 /** The last entry with one effect changed, folded into a copy of the state before it. */
 function forged(s: Scope, change: (entry: Entry) => Entry): () => void {

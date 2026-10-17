@@ -6,7 +6,7 @@ import { sendOnce } from "../src/github-host.ts";
 import type { DestinationProvider } from "../src/destination-host.ts";
 import { SqliteStore, type EffectRequest } from "../src/index.ts";
 import { pushOf, wired } from "./outside.ts";
-import { type Lane, START, found } from "./support.ts";
+import { type Lane, START, create } from "./support.ts";
 import { open } from "./operation-opening.ts";
 
 const surface = (s: Lane) => s.object as unknown as { effect(): Promise<number> };
@@ -21,7 +21,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   // sendOnce and smart Git validation/transport are actual. No host or mint
   // revocation/expiry authority is claimed; no executor design is involved.
   test("post-sent local denial keeps unknown and original bindings; unmarked standalone classification remains not-sent", async () => {
-    const s = await found();
+    const s = await create();
     const built = snapshotCommit([], "post-sent denial fixture\n");
     const remote = "https://git.example/artroom/denial.git";
     let liveAuthorization = true;

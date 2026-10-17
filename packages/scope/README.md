@@ -13,7 +13,7 @@ the runtime", "Composition and transport" and "A child's definition".
 `wrangler.jsonc` supplies the deployment configuration. A scope Worker is
 deployed at <https://artroom-scope.inguz.workers.dev>; the API routes start
 at `/v1/scopes`, and the root URL returns 404. A responding Worker alone
-does not prove the live repository founding, publication, clone or
+does not prove the live repository creation, publication, clone or
 authenticated replay required by Demo gate 1.
 
 ## How it is built
@@ -26,17 +26,17 @@ what a judge drafts, in one storage transaction for each entry.
 
 | Module | Holds |
 |---|---|
-| `store` | `Store`: the storage the core needs. It is derive's `StateView` and `StateWriter`, with `transaction`, `append` (an entry and the row of each send), `retain`, and bounded reads of entries, retained inputs and duties. |
+| `store` | `Store`: the storage the core needs. It is derive's `StateView` and `StateWriter`, with `transaction`, `append` (an entry and the row of each send), `retain`, and bounded reads of entries, retained inputs and pending work. |
 | `sqlite` | `SqliteStore`, the one implementation, over `Sql`: `exec` and `transaction`, which a Durable Object's `ctx.storage.sql.exec` and `ctx.storage.transactionSync` satisfy. It keeps nothing in memory but the list of indexed slots. |
 | `ports` | `Clock`, `Random`, `Authority`, `Resolver`, `Rules`, `Alarm`, `Definitions`, `SentTexts`, `Readers`, the members `capabilities`, `outside` and `owners`, and `production()`, their defaults. |
 | `definitions` | `creates(declared)`: the digests a declaration names in its `create` sends. `namedBy(root, read, validate, limit)`: the declarations a scope retains for its children. |
-| `turn` | `Turns.run(waiting, founding?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
-| `core` | `Scope`: `found`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Founded` and `Checkpointed`. |
+| `turn` | `Turns.run(waiting, creation?)`: section 5.2, steps 3 to 7, and section 5.3. `isSigned` and `fetchFacts`: step 1. `Waiting`, `Verdict`, `End`. |
+| `core` | `Scope`: `create`, `submit`, `settle`, `alarm`, `checkpoint`, `pinned`. `receiptOf`. The answers `Created` and `Checkpointed`. |
 | `sessions` | Read sessions: `sessionsOf`, `mintSession`, `openSession`, `sessionReaders` (the production readers port), `issueSession` (membership's answer to a signed request), `credentialInUrl`, and `Streams` with `relay`, the streams of a scope's head. |
 | `signed-reads` | `checkSignedRead`: a read signed by a key with a recent local signed entry or a recent signed root of this scope's cause chain. `rootOf` follows at most four causes through verified source entries. The read covers summary, genesis, that key's signed and causally rooted entries, and their typed retained inputs. At a register, a recent local signer reads the whole history. It grants no stream. |
 | `limits` | `JoinLimits`: the serving limits of a join at the front of a membership scope. `addressKey`, `isJoin`, `PROPOSED_LIMITS`. |
 | `operator` | `OperatorRecord`: the operator's record of a scope, outside its history. `incidentsOf`, `waitingIn`, and `sendAgain`, the instruction to dispatch a waiting request once more. |
-| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `duty`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input by kind and digest, with a domain for `value`. `ReadBounds` and `READ_BOUNDS`. |
+| `reads` | `Reads`: `summary`, `items`, `history`, `entry`, `outbox`, and `outboxItem`, one send's row; `operations` and `operation`, the outside operations with their attempts and outcomes; `incidents`, a page of the operator's record, and `waiting`, the two lists of requests that wait. For a verifier: `log`, a history page as stored bytes, and `retained`, one retained input by kind and digest, with a domain for `value`. `ReadBounds` and `READ_BOUNDS`. |
 | `delivery` | `Deliveries.deliver(envelope)`: receiving. It reads the source entry through the resolver, checks it against the fact's hash, and runs derive's delivery judge, or its genesis judge for a `create` that reaches an empty store, in the scope's turn. It answers as transport does: `recorded` with a fact, `retry`, `routing` or `source-unverified`. |
 | `outbox` | `Dispatcher.run()`: sending. One pass at a time over the sends that are due: a durable record before each dispatch and after its answer, a retry delay that doubles, and a `diagnosis` input through the turn when a request is given up. `Wakes`: one alarm for the earliest deadline, the next dispatch and the next attempt of an outside operation. |
 | `operations` | `Operations.run()`: the driver of outside effects, beside the dispatcher. An attempt is recorded by its entry, marked durably before its one request leaves, and never sent twice: one that is found marked with no outcome is recorded `unknown`. An answer becomes an `outcome` input through the turn. `Operations.answered()` takes an answer at any later time. `Outside` is the port, and `NO_OUTSIDE`, the default of `production()`, sends nothing. The driver matches owner-declared evidence values by domain, digest and canonical byte bound and retains them with the outcome entry. |
@@ -94,7 +94,7 @@ for a few acts
 | `owners` | The rules of the owners of outside operations that this runtime has code for, by owner and kind: derive's `Owners`. | `CAPABILITY_CODE`: the rules of the operations that `hold@1` and `git-read@1` own. Platform rules can open operations; the default `outside` port sends none, so their attempts stay recorded and not sent. |
 | `diagnoses` | Where a diagnosis goes. | `toConsole`: one JSON line in the runtime's log. |
 
-So a scope with only these defaults can be founded, and then admits no
+So a scope with only these defaults can be created, and then admits no
 act and answers no read. The deployed class, `DeployedScope`, supplies the
 namespace where the table says so, and replaces two more: its authority
 reads the membership scope that a scope records, and its readers port is
@@ -191,7 +191,7 @@ grant is answered
 
 `platform:destination@1` now has a rule for every mark, including
 `first-head` and `receipt`.
-[test/founding-real.test.ts](test/founding-real.test.ts) creates and
+[test/creation-real.test.ts](test/creation-real.test.ts) creates and
 confirms a destination under the deployed class, reads real rules and
 membership observations, and publishes its first change with a required
 passed check. The Git host and source lane entries are scripted, and no
@@ -210,7 +210,7 @@ revision 15 and the authority note's revision 20. It was written while
 both were filed for review. Both are adopted since. The adoption is of
 the designs, and is no review of this source.
 
-- A founding that names a platform definition is run under the platform
+- A creation that names a platform definition is run under the platform
   package's data. That data alone is validated with the validator's
   platform option, which reads a mark at seven places and lists it. A
   declaration that an input, a peer or storage gave is validated without
@@ -225,33 +225,33 @@ the designs, and is no review of this source.
   not judged: an act is answered `unavailable`, a delivery gets `retry`,
   and nothing is written.
 - The rule of the contract's section 6.1 is of the whole scope. A scope
-  is founded under a platform definition only when a rule of the right
+  is created under a platform definition only when a rule of the right
   kind is supplied for every mark of its data. When one is missing, the
-  founding is refused `unsupported-definition`, and nothing is written. A
+  creation is refused `unsupported-definition`, and nothing is written. A
   scope that exists under such a definition admits nothing: an act is
   answered `unavailable`, a delivery gets `retry`, no timed entry is
   written, a read is answered `unsupported-definition`, and the
   operations driver sends nothing outside the service.
 - `platform:inbox@1` has one mark, `notice-source`, among the effects of
   its `notify` handlers, and the platform package has its rule. So the
-  production wiring founds a scope under it. A `notify` writes a notice
+  production wiring creates a scope under it. A `notify` writes a notice
   whose `source` the rule set. `codeLost`, of the testing entry, supplies
   the data with no rule. It stands for a runtime that lacks the code.
 - An act of a row whose `grant` is a mark is judged by the mark's rule in
   place of the grant check. When the rule passes, the entry records
   `authority: []`.
 - A creation under a platform name pins the runtime's own data and
-  rules, as a founding does. Nothing of the definition is read from the
+  rules, as a creation does. Nothing of the definition is read from the
   creator. A version that the runtime cannot run whole is answered
   `unsupported-definition`: transport answers `retry`, and nothing is
   recorded.
 - The platform package holds the data of `platform:register@1` and of
   `platform:directory@1`, with a rule for every mark of each
-  (`notes/implementation/2026-10-05-i3-contract-deltas.md`, section 26). A founding
-  under `platform:register@1` founds a register, by an `install` intent.
+  (`notes/implementation/2026-10-05-i3-contract-deltas.md`, section 26). A creation
+  under `platform:register@1` creates a register, by an `install` intent.
   Its selecting outcome creates the directory, whose genesis creates
   membership, the rules scope and the destination. Every destination mark
-  has a rule, including `first-head` and `receipt`. The real-scope founding
+  has a rule, including `first-head` and `receipt`. The real-scope creation
   witness uses a scripted Git host; no production host is exercised. The
   production outside port sends nothing, so under its default wiring no
   repository is created at a host and a claim stays `pending`.
@@ -262,11 +262,11 @@ the designs, and is no review of this source.
   observations of it that their entries retain: before the first, the
   authority asks by the ID alone.
 
-A founding under `platform:register@1` makes a scope of the kind
-`register`, by an `install` intent: the scope's `found` and the Worker
-build the seed's kind from the definition that is named. A founding under
+A creation under `platform:register@1` makes a scope of the kind
+`register`, by an `install` intent: the scope's `create` method and the Worker
+build the seed's kind from the definition that is named. A creation under
 any other definition makes a directory with no creator, by a `found`
-intent. That earlier founding stays until a repository's founding by its
+intent. That earlier creation stays until a repository's creation by its
 register is whole.
 
 ## A child's definition
@@ -275,7 +275,7 @@ No registry holds a declaration. A declaration is immutable bytes named by
 its digest, and the scope that may create a child under it retains the
 bytes.
 
-- A founding supplies, beside the directory's own declaration, the
+- A creation supplies, beside the directory's own declaration, the
   declarations its definition names in `create` sends, and those they name
   in turn. The directory retains each by its digest, with its genesis.
 - A child, before its genesis turn, reads the declaration its seed names
@@ -338,8 +338,8 @@ Every number is a member of the contract's `Bounds`. The scope's entry
 budget and the alarm's retry delay are temporary values there.
 
 An entry that is new work (a genesis, an act, a delivered request or
-advisory, a `conflict` result, a checkpoint beside a pending duty) is kept
-only if every pending duty still has an entry to settle in. An act or a
+advisory, a `conflict` result, a checkpoint beside a pending task) is kept
+only if every pending task still has an entry to settle in. An act or a
 delivered request that settles what its form declares with `settles` is
 not new work: it is written against what its item or copy reserved. Derive's `owed`
 counts those entries from the folded state, inside the commit. An act that
@@ -393,7 +393,7 @@ that records the confirmation clears the flag. No attempt of it starts.
    fact of the entry that recorded the message. A scope that cannot decide
    yet answers `retry`. A repeat still reads and checks the source entry.
    It reads no further foreign entry and no text, so one that can no longer
-   be had does not hide the answer. A repeated founding is answered the
+   be had does not hide the answer. A repeated creation is answered the
    same way. A message that no handler receives names nothing to fetch.
 
 The source entry's bytes are retained with the entry that used them.
@@ -405,7 +405,7 @@ the contract's own answer.
 
 | Route | Answer | Status |
 |---|---|---|
-| `POST /v1/scopes`, body `{ founding, definition, definitions?, texts? }` | `Founded` | 201 accepted; 422 refused; 503 unavailable |
+| `POST /v1/scopes`, body `{ creation, definition, definitions?, texts? }` | `Created` | 201 accepted; 422 refused; 503 unavailable |
 | `POST /v1/scopes/:scope/acts`, body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field of the intent names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition whose data states a place has one. The rules scope states a place for check configuration | `Answer` | 200 accepted; 403 refused `unauthorized`; 422 refused otherwise; 409 mismatch; 503 unavailable |
 | `POST /v1/scopes/:scope/preparations`, body `{ signed, grants, capability, step }`. One step of a capability, asked for with the signed intent that it prepares for. With no code for the step, as in production, nothing is judged: 503 `unavailable` | `Answer` | as an act |
 | `POST /v1/scopes/:scope/settle`, body `{ signed }` | `Settlement` | as a read |
@@ -414,7 +414,7 @@ the contract's own answer.
 | `GET /v1/scopes/:scope/history?cursor=` | A page of the history | as above |
 | `GET /v1/scopes/:scope/entries/:seq` | One entry | as above |
 | `GET /v1/scopes/:scope/outbox?cursor=` | A page of the outbox | as above |
-| `GET /v1/scopes/:scope/outbox/:duty` | The outbox status of one send, by its duty ID | as above |
+| `GET /v1/scopes/:scope/outbox/:outboxId` | The outbox status of one send, by its outbox ID | as above |
 | `GET /v1/scopes/:scope/log?cursor=` | A page of the history as stored: each entry's canonical bytes and hash, for a verifier | as above |
 | `GET /v1/scopes/:scope/retained/:kind/:digest` | One retained input: a `definition`, an `entry`, a `rule` input, a detached `text` or a `snapshot` of staged refs, by digest. A text that was redacted is `not-found`. For `value`, `?domain=<encoded domain>` is required; another or missing domain is `not-found` | as above; 413 past `ReadBounds.retainedBytes` |
 
@@ -474,7 +474,7 @@ It learns membership's reference before it holds a session.
 | The request | `Authorization: Signed <base64url>`: the unpadded base64url of the canonical JSON of `{ request, sig }`. `request` is `{ v: 1, to, actor, read, arg, notAfter }`: the scope ID, the key, the read (`summary`, `history`, `entry`, `log` or `retained`), its argument (`"summary"`; a page's cursor, `"0"` for the first; an entry's position; `retainedReadArgument(kind, digest, domain)`, the resource hash over the exact kind, digest and domain) and a time. |
 | The signature | Ed25519 by `actor`, as an intent is signed, over the tag `artroom-read-1`, a newline and the canonical JSON of `request`. |
 | The window | The scope's `intentLifetimeSeconds`, 900 by default, on the scope's own clock: the reading is before `notAfter`, and `notAfter` is at most that far ahead. |
-| Who may read | Summary needs a recent local signer or recent genesis-root signer. An entry may instead qualify by its own causal root; history and log require at least one eligible root before revealing the head. Local signers are the actors of acts, preparations and applied founding intents. A child genesis has no signer of its own. |
+| Who may read | Summary needs a recent local signer or recent genesis-root signer. An entry may instead qualify by its own causal root; history and log require at least one eligible root before revealing the head. Local signers are the actors of acts, preparations and applied creation intents. A child genesis has no signer of its own. |
 | The cause chain | Starting at each entry, follow at most four causes through entries verified against their fact references. A child genesis follows its creation cause; an outcome follows the local entry that opened its operation; a diagnosis follows the local entry that made its send; a delivery follows its retained source entry. An outcome or diagnosis of another scope ends the chain. The directory's claim is the root for its membership, rules and destination children. The window is measured at the signed root entry's time. |
 | What it reads | The summary, genesis, the key's own entries and entries whose causal root the key signed within the window; `retained` serves the actual typed inputs carried by eligible entries, never a digest merely quoted in text. History and log pages keep the `next` and `complete` of the unfiltered page. At a register, a recent local signer reads every history entry and its typed retained inputs. |
 | Every other case | `forbidden`, and nothing is written: another read, another argument, another scope, a key with no eligible local or causal signed root, a signature that is not the key's, a time outside the window. A clock behind the previous entry's time: `clock-behind`. No stream. |
@@ -515,7 +515,7 @@ class and real SQLite storage. `test/worker.ts` binds four object classes, each 
 with every production default; and `NetScope` and `PlatformScope`, which
 are `DeployedScope` with test ports and are described below and in the
 file's header. `test/support.ts` holds the one fixture: derive's fixture lane
-with three small changes, founded as a directory. A restart is the pool's
+with three small changes, created as a directory. A restart is the pool's
 `evictDurableObject`.
 
 `test/net.ts` holds the fixture for several scopes: derive's desk and
@@ -541,7 +541,7 @@ so neither of those imports the runtime in its source:
 - `test/conformance.types.ts`: typechecked only. The entrypoint and the
   client's transport satisfy one interface, the contract's `ScopeApi`.
 
-`test/founding-real.test.ts` also creates and confirms the directory's
+`test/creation-real.test.ts` also creates and confirms the directory's
 membership, rules and destination children under the deployed class. The
 destination reads real rules and membership observations and retained
 source entries, reserves the first publication, publishes it and writes

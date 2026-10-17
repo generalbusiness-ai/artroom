@@ -3,7 +3,7 @@ import { DOMAINS } from "@generalbusiness/dap-contract";
 import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import {
   b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest,
-  isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isRetainedInput, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,
+  isOutboxId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isRetainedInput, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,
 } from "../src/index.ts";
 import { cause, definition, directory, entry, intent, message, otherSecret, secret, seed } from "./fixtures.ts";
 
@@ -129,7 +129,7 @@ describe("identifiers", () => {
       [isKeyId, [key], [key.slice(0, -1), `${key}A`, key.replace("key_", "KEY_"), 7]],
       [isMemberId, ["@a", "@Alice Smith"], ["@", "a", "@\ud800", null]],
       [isOperationId, ["0:0", "17:2"], ["op_1", "17", "17:02", "1:2:3", "-1:0", null]],
-      [isDutyId, ["0.0", "17.2"], ["17", "17.02", "1.2.3", "-1.0", 17.2]],
+      [isOutboxId, ["0.0", "17.2"], ["17", "17.02", "1.2.3", "-1.0", 17.2]],
       [isPlatformDefinition, ["platform:directory@1", "platform:directory-partition@1"], ["platform:lane@1", "platform:directory@01", "platform:directory-partition@01", "platform:directory-partitions@1", "directory@1"]],
       [isScopeKind, ["lane", "directory"], ["room", "", null]],
       // Section 9.2, revision 19: a retained value states its domain, and no other kind states one.

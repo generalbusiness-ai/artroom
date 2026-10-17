@@ -4,7 +4,7 @@
  */
 
 import type { Digest, FactRef, MemberRef, PlatformDefinition, ScopeRef, Seed, Timestamp } from "./scope.ts";
-import type { Attempt, DutyId, Entry, Message, Receipt } from "./entry.ts";
+import type { Attempt, OutboxId, Entry, Message, Receipt } from "./entry.ts";
 import type { FieldValue } from "./intent.ts";
 import type { ReadRefusal } from "./result.ts";
 
@@ -25,7 +25,7 @@ export const HISTORY_PAGE_BYTES = 1024 * 1024;
 export const ENTRY_READ_BYTES = 256 * 1024;
 export const COMMENTS_PAGE = 100;
 export const INDEX_PAGE_ROWS = 100;
-export const OUTBOX_PAGE_DUTIES = 100;
+export const OUTBOX_PAGE_ITEMS = 100;
 /** One retained input. The contract's table has no row for it; this is the history page's byte bound, and temporary. */
 export const RETAINED_INPUT_BYTES = 1024 * 1024;
 
@@ -85,8 +85,8 @@ export interface Sealed { entry: Entry; hash: Digest }
 export interface Dispatched { at: Timestamp; answer: Attempt["answer"] | "acknowledged" }
 
 /** One send of one entry, as the outbox holds it (section 7.4). The message itself is in the entry. */
-export interface Duty {
-  duty: DutyId;
+export interface OutboxItem {
+  outboxId: OutboxId;
   to: ScopeRef | Seed;
   class: Message["class"];
   /** Sealed and not to be dispatched: a send of a provisional scope's genesis, until the confirmation (section 7.2). */

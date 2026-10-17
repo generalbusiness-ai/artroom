@@ -136,7 +136,7 @@ const CREATION = "operator_creation_fixture_secret";
 const json = (value: unknown, status = 200): Response => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
 /**
- * STAND-IN for GitHub's REST API and its smart HTTP, as `github-founding.test.ts` scripts them, with reads of every object added:
+ * STAND-IN for GitHub's REST API and its smart HTTP, as `github-creation.test.ts` scripts them, with reads of every object added:
  * a public repository, read with no credential, written with an installation token. Refs and objects are maps. It is no oracle of
  * GitHub's behaviour.
  */

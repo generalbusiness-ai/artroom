@@ -113,9 +113,9 @@ export function operand(d: Defining, v: unknown, path: string, ctx: Ctx, owner: 
         if (t && nascent(o["of"])) return bad("nascent-guard", path, "a guard may not read the item its act opens");
       }
       if (!t) return null;
-      const found = typeof x === "string" ? t.slots.get(x) : undefined;
-      if (!found) return bad("name", path, `names no slot of ${t.name}`);
-      type = found.type;
+      const matched = typeof x === "string" ? t.slots.get(x) : undefined;
+      if (!matched) return bad("name", path, `names no slot of ${t.name}`);
+      type = matched.type;
       if (!("of" in o) && !("part" in o)) slot = x as string;
       break;
     }

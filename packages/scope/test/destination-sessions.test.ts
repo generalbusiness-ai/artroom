@@ -95,7 +95,7 @@ test("destination session preparation accepts only the verified creator's active
 
   // Scripted legacy birth context over the same Branch boundary fixture:
   // the exact @1 child cohort requires @1 directory bytes, never newest @2.
-  // This is no historical @1 founding or namespace/provider proof.
+  // This is no historical @1 creation or namespace/provider proof.
   const legacy = fixture("destination", 1);
   const legacyReader = legacy.token();
   legacy.answer({ ok: true, value: { scope: legacy.branch.bureau.at, definition: DIRECTORY, status: "active", items: [{ type: "repository", state: "open", refs: { membership: MEMBERSHIP } }] } });

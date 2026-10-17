@@ -1,8 +1,8 @@
 import { beginSessionFixture, beginSessionChild, type SessionOwner } from "../../../../../packages/scope/test/session-settings.ts";
 /**
- * The demo room that the page's story and its recorder open: founded by
+ * The demo room that the page's story and its recorder open: created by
  * the command line on real scopes, as `apps/room/lanes/test/edit.scope.test.ts`
- * founds one, with the real read sessions under a TEST SECRET.
+ * creates one, with the real read sessions under a TEST SECRET.
  *
  * | Part | Is |
  * |---|---|
@@ -68,7 +68,7 @@ export interface Demo {
 const ok = (outcome: Outcome): Outcome => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
 /** The editor needs only change; its actual Una invitation stays enabled unless explicitly omitted. */
 export interface DemoSetup { editorOnly?: true; invitation?: false; holdIssueCreation?: () => boolean }
-/** Founds a fresh room. Full setup is the default; `wrap` may stand between the page and the routes. */
+/** Creates a fresh room. Full setup is the default; `wrap` may stand between the page and the routes. */
 export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = (f) => f, parent: SessionOwner | null = null, setup: DemoSetup = {}): Promise<Demo> {
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const sessionOwner = parent ? beginSessionChild(parent, { secret, sessions: true, inspector: null }) : beginSessionFixture({ secret, sessions: true, inspector: null });

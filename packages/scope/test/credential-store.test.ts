@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { OperationId } from "@generalbusiness/dap-contract";
 import { CredentialStore, type ExpectedRevocation, type MintedCredential } from "../src/credential-store.ts";
-import { START, at, found, reader } from "./support.ts";
+import { START, at, create, reader } from "./support.ts";
 
 // The credential IDs, mint references and replies are written by hand: no
 // host runs and no scope judged a mint. Custody uses real Durable Object
@@ -10,7 +10,7 @@ const minted = (mint: string, plaintext = "private-provider-credential"): Minted
 const revoking = (revoke: string, credential: MintedCredential): ExpectedRevocation => ({ revoke: revoke as OperationId, attempt: 1, mint: credential.mint, mintAttempt: credential.attempt, id: credential.id });
 
 test("private custody retains one mint's own reply and secret across a real object restart, uses only its judged live credential, and writes nothing into public state, history or log", async () => {
-  const scope = await found();
+  const scope = await create();
   const credential = minted("1:0");
   const second = { ...minted("2:0", "private-provider-second"), id: "provider-token-2", ends: START };
   const revokeFirst = revoking("3:0", credential);
@@ -61,7 +61,7 @@ test("private custody retains one mint's own reply and secret across a real obje
 });
 
 test("conflicting mint identities cannot replace custody; expiry and rejected custody drop never claim provider revocation or restore a secret", async () => {
-  const scope = await found();
+  const scope = await create();
   const credential = minted("1:0");
   const other = { ...minted("2:0"), id: "provider-token-2" };
   const revoke = revoking("3:0", credential);

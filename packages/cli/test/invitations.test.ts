@@ -3,7 +3,7 @@ import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
 import { join as pathJoin } from "node:path";
 import { tmpdir } from "node:os";
 import { fileStore } from "../src/files.ts";
-import type { Receipt, SignedIntent, Summary, Entry, DutyId, Item } from "@generalbusiness/dap-contract";
+import type { Receipt, SignedIntent, Summary, Entry, OutboxId, Item } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/dap-platform";
@@ -47,7 +47,7 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
         expect(judged.result, "the package's actual membership rules admit the scripted native input").toBe("write");
         if (judged.result !== "write") throw Error("Model admission refused");
         const entry = m.entries.at(-1)!.entry, fact = m.fact(entry.seq);
-        const accepted: Receipt = { intent: digest, fact, definition: named, effects: entry.effects, sends: entry.sends.map((send): DutyId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
+        const accepted: Receipt = { intent: digest, fact, definition: named, effects: entry.effects, sends: entry.sends.map((send): OutboxId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
         receipts.set(digest, accepted); receipt = accepted;
       }
       if (signed.intent.kind === lose) { lose = null; throw Error("SCRIPTED lost accepted reply"); }
@@ -64,7 +64,7 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
       expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
       const at = { scope: scopeIdOf(birth.to), inc: newIncarnation(new Uint8Array(16).fill(33)), kind: "inbox" as const };
       if (path.endsWith("/entries/0")) {
-        const entry: Entry = { v: 1, at, seq: 0, prev: null, time: m.now, clamped: false, epoch: 0, input: { type: "genesis", seed: birth.to, inc: at.inc, kind: "establish", founding: null, source: m.fact(agent!.id), n: birth.n, message: birth.message.class === "request" ? birth.message : null, decision: "applied" }, uses: [], prepared: [], effects: [], sends: [] };
+        const entry: Entry = { v: 1, at, seq: 0, prev: null, time: m.now, clamped: false, epoch: 0, input: { type: "genesis", seed: birth.to, inc: at.inc, kind: "establish", "founding": null, source: m.fact(agent!.id), n: birth.n, message: birth.message.class === "request" ? birth.message : null, decision: "applied" }, uses: [], prepared: [], effects: [], sends: [] };
         return reply({ ok: true, at: { seq: 0, hash: entryHash(entry) }, value: { entry, hash: entryHash(entry) }, complete: true });
       }
       return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED inbox head") }, value: { scope: at, status: "active", definition: "platform:inbox@1", time: m.now, items: [{ id: 0, type: "inbox", state: "open", revision: 1, opened: textDigest("SCRIPTED inbox opening"), attributed: [], values: {}, parties: { owner: agent!.parties["member"] }, refs: { membership: m.at } }], counts: [["inbox", "open", 1]] }, complete: true });

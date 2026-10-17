@@ -131,9 +131,9 @@ export function carried(d: Defining, v: unknown, path: string): boolean {
  * message name, which this check does not read.
  */
 export function stepKind(d: Defining, kind: string, path: string): void {
-  const found = /^([^:@]+)@([^:@]+):(.*)$/.exec(kind);
-  if (!found) return;
-  const version = d.capabilities.get(found[1]!);
-  if (version !== `${found[1]}@${found[2]}` || !own(declaredBy(version)?.steps, found[3]!)) { d.bad("capability", path, "names no step of a capability version that the definition lists"); return; }
+  const matched = /^([^:@]+)@([^:@]+):(.*)$/.exec(kind);
+  if (!matched) return;
+  const version = d.capabilities.get(matched[1]!);
+  if (version !== `${matched[1]}@${matched[2]}` || !own(declaredBy(version)?.steps, matched[3]!)) { d.bad("capability", path, "names no step of a capability version that the definition lists"); return; }
   d.underived.push({ path, capability: version, form: "kind", name: kind });
 }

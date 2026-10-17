@@ -3,13 +3,13 @@
  * office, a membership scope and the inbox of each member, each a Durable
  * Object with its own SQLite storage in the namespace `PLATFORM`, under the
  * production authority. It is partial preparation for the plan's fixture
- * `repository`, and it is labelled as that: it shows nothing of a founding.
+ * `repository`, and it is labelled as that: it shows nothing of a creation.
  *
  * | Part | Is |
  * |---|---|
  * | Membership and the inboxes | Real scopes under `platform:membership@1` and `platform:inbox@1`, written through the turn, the store and the dispatchers. |
  * | Authority | The production authority (`repositoryAuthority`): membership judges its own acts on its own head, and an inbox reads the membership scope that its genesis records, through the namespace. No test authority, and no scripted membership. |
- * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. A register's founding creates the real directory and its membership scope on real scopes in `founding-real.test.ts`. The tests of authority keep the office, which needs no register and no host. |
+ * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. A register's creation creates the real directory and its membership scope on real scopes in `creation-real.test.ts`. The tests of authority keep the office, which needs no register and no host. |
  * | A lane that sends a notice | SCRIPTED: an entry written by hand, read through `net.peers`. It shows the inbox's side of a notice, and nothing about a lane. |
  * | Readers | The test readers, a STAND-IN for read sessions, unless a test sets `platformNet.sessions`: then they are the real read sessions of `sessions.ts`, as `sessions.test.ts` does. |
  * | The clock | The scripted clock of the namespaces. No test waits on the wall clock. |
@@ -24,7 +24,7 @@ import type { Delivered, Item } from "@generalbusiness/dap-derive";
 import { d, keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
 import { officeDefinitionFor } from "@generalbusiness/dap-platform/testing";
-import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
+import type { Delivery, OutboxItem, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
@@ -33,12 +33,12 @@ import { reader } from "./support.ts";
 export const { rita, una, vic, sam } = keys;
 
 interface Surface {
-  found(founding: SignedIntent, definition: unknown): Promise<{ answer: string }>;
+  create(creation: SignedIntent, definition: unknown): Promise<{ answer: string }>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
   entry(reader: unknown, seq: number): Promise<Read<Sealed>>;
-  outbox(reader: unknown): Promise<Read<readonly Duty[]>>;
+  outbox(reader: unknown): Promise<Read<readonly OutboxItem[]>>;
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   deliver(envelope: Delivered): Promise<Delivery>;
   dispatch(): Promise<number>;
@@ -108,18 +108,18 @@ export async function settle(...nodes: readonly Platform[]): Promise<void> {
 }
 
 /**
- * An office that rita founds, a STAND-IN for the creator of a membership scope, and the membership scope that its founding creates.
- * Rita's key is the founding key, and sam's the recovery key. `hold`: the sends that transport does not deliver, until the test
+ * An office that rita creates, a STAND-IN for the creator of a membership scope, and the membership scope that its creation creates.
+ * Rita's key is the creation key, and sam's the recovery key. `hold`: the sends that transport does not deliver, until the test
  * clears `net.hold`.
  */
 export async function office(hold: ((envelope: Delivered) => boolean) | null = null, named: PlatformDefinition = MEMBERSHIP): Promise<{ O: Platform; M: Platform }> {
   const officeDefinition = officeDefinitionFor(named);
   net.hold = hold;
   net.deaf = null;
-  const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const seed: Seed = { v: 1, kind: "directory", definition: officeDefinition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
   const O = new Platform(scopeIdOf(seed));
-  const answer = await O.stub.found(signIntent(intent, rita.secret), officeDefinition.declared);
+  const answer = await O.stub.create(signIntent(intent, rita.secret), officeDefinition.declared);
   if (answer.answer !== "accepted") throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
   const M = await O.created(0);
   await settle(O, M);
@@ -131,7 +131,7 @@ export interface Repository { O: Platform; M: Platform; ritasInbox: Platform; un
 /** Metadata of this fixture's retained creation protocol, never message bodies. */
 export async function inboxConfirmation(repository: Repository) {
   const membership = await repository.M.at(), parent = await repository.M.sealed();
-  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; duty: string; class: Duty["class"]; next: number; alarm: number | null; attempts: Duty["attempts"] }[] = [];
+  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; outboxId: string; class: OutboxItem["class"]; next: number; alarm: number | null; attempts: OutboxItem["attempts"] }[] = [];
   const inboxes = await Promise.all([repository.ritasInbox, repository.unasInbox].map(async inbox => {
     const sealed = await inbox.sealed(), first = sealed[0];
     if (!first || first.entry.input.type !== "genesis") throw new Error("Inbox creation has no retained genesis");
@@ -153,11 +153,11 @@ export async function inboxConfirmation(repository: Repository) {
     for (const [sender, id] of pairs) {
       const read = await sender.stub.outbox(reader);
       if (!read.ok) throw new Error("Creation protocol outbox unavailable");
-      const duty = read.value.find(d => d.duty === id);
-      if (!duty || duty.acknowledged || duty.result || duty.diagnosis || duty.held) continue;
+      const outboxId = read.value.find(d => d.outboxId === id);
+      if (!outboxId || outboxId.acknowledged || outboxId.result || outboxId.diagnosis || outboxId.held) continue;
       const [seq, n] = id.split(".").map(Number);
       const timing = await runInDurableObject(sender.object, async (_instance, state) => ({ next: state.storage.sql.exec<{ next: number }>("SELECT next FROM outbox WHERE seq = ? AND n = ?", seq!, n!).toArray()[0]?.next ?? null, alarm: await state.storage.getAlarm() }));
-      if (timing.next !== null) retries.push({ scope: await sender.at(), inbox: genesis.at, genesis, duty: id, class: duty.class, next: timing.next, alarm: timing.alarm, attempts: duty.attempts.slice(-4) });
+      if (timing.next !== null) retries.push({ scope: await sender.at(), inbox: genesis.at, genesis, outboxId: id, class: outboxId.class, next: timing.next, alarm: timing.alarm, attempts: outboxId.attempts.slice(-4) });
     }
     const summary = await inbox.summary();
     if (canonicalize(summary.value.scope) !== canonicalize(genesis.at)) throw new Error("Inbox view has another full incarnation");
@@ -166,7 +166,7 @@ export async function inboxConfirmation(repository: Repository) {
   return { clock: timeMs(net.clock.now)!, inboxes, retries };
 }
 
-/** Complete only these inbox creation duties, with bounded real retry times. */
+/** Complete only these inbox creation pending work, with bounded real retry times. */
 export async function completeInboxConfirmation(repository: Repository): Promise<void> {
   const began = timeMs(net.clock.now)!;
   for (let round = 0; round < 4; round++) {
@@ -187,7 +187,7 @@ interface RepositoryOptions {
 
 /**
  * A membership scope with two members, each with one device key and an
- * inbox: rita, the founder and an admin, seated on the founding key; and
+ * inbox: rita, the creator and an admin, seated on the creation key; and
  * una, a member, who joined by an invitation of rita's. Each inbox is
  * created by the entry that made its member active, and confirmed.
  */

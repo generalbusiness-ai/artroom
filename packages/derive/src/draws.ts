@@ -128,8 +128,8 @@ export function drawsOf(view: StateView, definition: ValidDefinition, entry: Dra
   else if (input.type === "delivery" && "clause" in input) account = view.account(input.message.of.from.seq, input.message.of.n);
   else if (input.type === "diagnosis") account = view.account(input.of.seq, input.of.n);
 
-  // Each held operation draws on the holder that it is for. A final holder's counts serve its own account's duties only:
-  // another entry cannot draw on them, even when one of its own unfinished duties keeps a positive count alive.
+  // Each held operation draws on the holder that it is for. A final holder's counts serve its own account's pending work only:
+  // another entry cannot draw on them, even when one of its own unfinished tasks keeps a positive count alive.
   const holders = new Map<number, number>();
   for (const effect of operations) {
     const held = isPlatformDefinition(effect.owner) && own(r?.kinds, effect.kind)?.held === true;

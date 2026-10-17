@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Digest, FieldValue, OperationId, RetainedInput, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, newIncarnation, signIntent } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/dap-derive/testing";
-import { DESTINATION_5, destination5, destinationRules5, destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { DESTINATION_5, destination5, destinationRules5, destinationReceipt, initialCommitObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { useOf } from "@generalbusiness/dap-derive";
 import { keys } from "@generalbusiness/dap-derive/testing";
 import { publicationJourney } from "../../platform/test/support-publication-journey.ts";
@@ -12,7 +12,7 @@ import { CredentialStore } from "../src/credential-store.ts";
 import { DestinationHost, type DestinationBinding, type DestinationHostOptions, type DestinationInspection, type DestinationProvider, type DestinationRepository } from "../src/destination-host.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import type { EffectAnswer, EffectRequest } from "../src/operations.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 /** STAND-IN: provider replies and object reads are scripts. No host or transport runs. */
 class Provider implements DestinationProvider {
@@ -75,9 +75,9 @@ const operation = (branch: Branch, kind: string) => {
 };
 
 describe("destination outside adapter; scripted host, platform judgments in memory and private SQLite custody", () => {
-  // Invariant: each write uses only its own durably held and judged mint, and writes exact founding/receipt objects without recording secrets.
+  // Invariant: each write uses only its own durably held and judged mint, and writes exact creation/receipt objects without recording secrets.
   test("founding and receipt sends use each exact mint and the platform's computed objects", async () => {
-    const storage = await found();
+    const storage = await create();
     await storage.inside(async (state) => {
       const f = fixture(state.storage.sql);
       f.branch.confirmed();
@@ -102,9 +102,9 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       expect(written).toMatchObject({ result: "confirmed", evidence: { body: { send: "accepted" } } });
       const sent = f.provider.calls.find((call) => call.kind === "send")!.body as Parameters<DestinationProvider["send"]>[0];
       const genesis = f.branch.own(0)!.entry;
-      // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+      // The creation commit of `platform:destination@2`: one README that names the repository, the creator's handle and the directory.
       const readme = { name: (f.branch.branch.values["repository"] as { name: string }).name, handle: "@rita", directory: (f.branch.branch.refs["directory"] as { scope: ScopeId }).scope };
-      const expected = foundingObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
+      const expected = initialCommitObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
       expect({ commit: sent.commit, objects: sent.objects }).toEqual(expected);
       expect(sent).toMatchObject({ old: null, ref: "refs/heads/main", token: "private-token-1", binding: { mint, write, writeAttempt: 1 } });
       f.record(write, written!);
@@ -172,7 +172,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
 
   // Invariant: async preparation and the actual forwarding boundary both recheck T7 against live state and exact custody.
   test("compromise during object preparation or immediately before forwarding prevents the write", async () => {
-    const storage = await found();
+    const storage = await create();
     await storage.inside(async (state) => {
       for (const where of ["preparing", "forwarding", "expiry"] as const) {
         const f = fixture(state.storage.sql);
@@ -192,7 +192,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
 
   // Invariant: a deciding host read may publish a change, but cannot replace a lost write's own outcome or clean its token.
   test("lost push response stays unknown when its separate deciding read observes publication", async () => {
-    const storage = await found();
+    const storage = await create();
     await storage.inside(async (state) => {
       const f = fixture(state.storage.sql);
       f.branch.ready();
@@ -223,7 +223,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
 
   // Invariant: scope/operation/origin and host namespace must bind before a provider effect, and malformed replies cannot release a secret.
   test("forged requests and mismatched configured repositories never reach the provider", async () => {
-    const storage = await found();
+    const storage = await create();
     await storage.inside(async (state) => {
       const f = fixture(state.storage.sql);
       f.branch.confirmed();
@@ -256,7 +256,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
 
   // Invariant: imported first heads read the imported object closure, and judge inspection names only retained manifest/report facts.
   test("imported head and judge inspection derive their context from recorded facts", async () => {
-    const storage = await found();
+    const storage = await create();
     await storage.inside(async (state) => {
       const f = fixture(state.storage.sql, true);
       f.branch.confirmed();
@@ -288,7 +288,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
 // reservation snapshot behavior for explicit @5, using its record-shaped
 // generations. Creator/lane/membership/provider answers remain stand-ins.
 test("D1 production host inspects automatic files and reads the current fenced checker generation without treating metadata as an array", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async state => {
     const journey = publicationJourney(destination5, DESTINATION_5, destinationRules5);
     const make = () => {

@@ -502,7 +502,7 @@ describe("a rule is run at the check of its mark's place (sections 4.2 and 6.1)"
     const request = { from: s.fact(outcome), n: 0 };
     const child: ScopeRef = { scope: scopeIdOf(seedOf()), inc: newIncarnation(new Uint8Array(16).fill(4)), kind: "lane" };
     const answer: Send = { n: 0, to: s.at, message: { class: "result", of: request, outcome: "applied" } };
-    const source = forged(child, 0, { type: "genesis", seed: seedOf(), inc: child.inc, kind: "establish", founding: null, source: request.from, n: 0, message: s.entries[outcome]!.entry.sends[0]!.message as Request, decision: "applied" }, [answer]);
+    const source = forged(child, 0, { type: "genesis", seed: seedOf(), inc: child.inc, kind: "establish", "founding": null, source: request.from, n: 0, message: s.entries[outcome]!.entry.sends[0]!.message as Request, decision: "applied" }, [answer]);
     const arrival = { ...answer, from: factRefOf(source.entry) };
     const read: unknown[] = [];
     const noted = some((given) => { read.push([given.input.type, given.uses.map((use) => use.fact.hash), given.resolved.subjects.size, given.resolved.signer]); return ticketOf(given); });

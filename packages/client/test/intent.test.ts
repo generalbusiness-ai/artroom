@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { LATE, MAX_DEPTH, canonicalize, isFieldValue, newIncarnation, publicKeyOf, scopeIdOf, takeBytes, textDigest, verifySessionRequest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, signerSessionRequest, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
+import { ScopeHandle, TransportError, bindingTransport, create, httpTransport, signedIntent, signerSessionRequest, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an asynchronous session signer keeps the original membership request and its session domain while caller data changes", async () => {
   const signer = await webCryptoSigner();
@@ -79,8 +79,8 @@ test("each operation of the handle returns a reply only when it has every member
   // A refused delivery records why: a code the contract names and, where the failed guard declares one, a name.
   const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
   // A genesis states its act kind (section 4.1): one text, always present, and never empty.
-  const genesis = (kind: object) => read({ entry: { ...entry, input: { type: "genesis", seed: { v: 1, kind: "lane", definition: d, creator: scope, cause: d, ordinal: 0 }, inc: scope.inc, founding: null, source: fact, n: 0, message: { class: "request", type: "create", body: {} }, decision: "refused", ...kind } }, hash: d });
-  const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
+  const genesis = (kind: object) => read({ entry: { ...entry, input: { type: "genesis", seed: { v: 1, kind: "lane", definition: d, creator: scope, cause: d, ordinal: 0 }, inc: scope.inc, "founding": null, source: fact, n: 0, message: { class: "request", type: "create", body: {} }, decision: "refused", ...kind } }, hash: d });
+  const outboxId = { outboxId: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
   const less = (whole: Record<string, unknown>, member: string) => Object.fromEntries(Object.entries(whole).filter(([name]) => name !== member));
@@ -92,11 +92,11 @@ test("each operation of the handle returns a reply only when it has every member
   const handle = (t: Transport) => new ScopeHandle(t, scope.scope as never);
   const refused = { ok: false, reason: "not-found" };
   const rows: Row[] = [
-    ["found", (t) => found(t, {} as never, d as never).then((f) => f.answer),
+    ["create", (t) => create(t, {} as never, d as never).then((f) => f.answer),
       [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "refused", reason: "source-unverified" }, { answer: "unavailable", reason: "busy" }],
       [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
     ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } },
-      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check is a founding's.
+      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check is a creation's.
       // `unsupported-definition` is now one that an act can meet: a guard that is a mark of a platform definition may refuse with it (the
       // contract's revision 15, section 4.2, the table of refusal reasons).
       ...[{ effect: "state" }, { effect: "vanish" }].map((e) => ({ answer: "accepted", receipt: { ...receipt, effects: [e] } })),
@@ -113,10 +113,10 @@ test("each operation of the handle returns a reply only when it has every member
       // A reason is that record, with a code the contract names: not a text, and not a name alone.
       refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" }),
       genesis({}), genesis({ kind: "" }), genesis({ kind: null })]],
-    ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
-    ["followDuty", (t) => handle(t).followDuty("1.0"),
-      [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
-      [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
+    ["outbox", (t) => handle(t).outbox("c"), [read([outboxId], { next: "c2" })], [...each(outboxId).map((v) => read([v])), read(outboxId)]],
+    ["followOutbox", (t) => handle(t).followOutbox("1.0"),
+      [read(outboxId), read({ ...outboxId, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
+      [...each(outboxId).map((v) => read(v)), read({ ...outboxId, class: "letter" }), read({ ...outboxId, result: { seq: 2 } }), read({ ...outboxId, diagnosis: { seq: 3, finding: "lost" } }), read({ ...outboxId, attempts: [{ at: entry.time }] })]],
   ];
   // The guard is one function, `ANSWERS`, and both transports call it. So the table is run once, through the service binding, which hands a reply over as it is.
   // What belongs to the HTTP transport (its bytes, its deadline) is in the tests below.

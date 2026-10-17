@@ -33,7 +33,7 @@ export interface FieldRecord { readonly [member: string]: FieldValue }
 
 export interface Intent {
   v: 1;
-  to: ScopeRef | null;          // null only when founding a repository
+  to: ScopeRef | null;          // null only when creating a scope with no creator
   actor: KeyId;
   kind: string;
   on: number | null;            // the item the act is on, by its local ID

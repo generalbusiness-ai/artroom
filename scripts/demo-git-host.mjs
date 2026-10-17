@@ -14,7 +14,7 @@
  *
  * Generated role labels do not identify a human or prove their approval. This
  * CLI submits nothing. Future POST helpers require an explicit HTTPS base URL;
- * found also requires the actual register receipt/ref and expected revision.
+ * The creation helper also requires the actual register receipt/ref and expected revision.
  * They implement no read bootstrap, directory journey or first publication.
  */
 import { randomBytes, randomUUID } from "node:crypto";
@@ -94,9 +94,10 @@ async function readOwnerFile(directory, filename) {
   finally { await file?.close(); }
 }
 
+// Retained v1 custody keeps foundId: changing it would lose the original request identity.
 function checkedState(value) {
   try {
-    if (value?.v !== 1 || timeMs(value.createdAt) === null || value.host !== HOST || value.namespace !== NAMESPACE || value.policy !== "keys" || value.branch !== "main" || !isMemberId(value.founderHandle) || /[\u0000-\u0020\u007f]/.test(value.founderHandle) || typeof value.installId !== "string" || typeof value.foundId !== "string" || value.installId.length === 0 || value.foundId.length === 0) refuse("private-state-invalid");
+    if (value?.v !== 1 || timeMs(value.createdAt) === null || value.host !== HOST || value.namespace !== NAMESPACE || value.policy !== "keys" || value.branch !== "main" || !isMemberId(value["founderHandle"]) || /[\u0000-\u0020\u007f]/.test(value["founderHandle"]) || typeof value.installId !== "string" || typeof value["foundId"] !== "string" || value.installId.length === 0 || value["foundId"].length === 0) refuse("private-state-invalid");
     for (const role of ROLES) {
       const key = value.roles?.[role];
       const secret = typeof key?.secret === "string" ? unb64url(key.secret) : null;
@@ -111,9 +112,9 @@ export async function readPrivateState(directory) {
 }
 const publicKeys = (state) => Object.fromEntries(ROLES.map((role) => [role, { label: role, key: state.roles[role].key }]));
 
-export async function prepare({ directory, branch, founderHandle }, now = Date.now()) {
+export async function prepare({ directory, branch, "founderHandle": creatorHandle }, now = Date.now()) {
   runtime();
-  if (branch !== "main" || !isMemberId(founderHandle) || /[\u0000-\u0020\u007f]/.test(founderHandle) || Buffer.byteLength(founderHandle, "utf8") > 256) refuse("invalid-arguments");
+  if (branch !== "main" || !isMemberId(creatorHandle) || /[\u0000-\u0020\u007f]/.test(creatorHandle) || Buffer.byteLength(creatorHandle, "utf8") > 256) refuse("invalid-arguments");
   const target = await privateDirectory(directory);
   try { await mkdir(target, { mode: 0o700 }); await chmod(target, 0o700); }
   catch (failure) { if (failure.code === "EEXIST") refuse("directory-exists"); throw error(failure, "filesystem-failed"); }
@@ -121,13 +122,13 @@ export async function prepare({ directory, branch, founderHandle }, now = Date.n
     const secret = randomBytes(32);
     return [label, { label, key: keyIdOfSecret(secret), secret: b64url(secret) }];
   }));
-  const state = { v: 1, createdAt: stamp(now), host: HOST, namespace: NAMESPACE, policy: "keys", branch, founderHandle, installId: `demo-install-${randomUUID()}`, foundId: `demo-found-${randomUUID()}`, roles };
+  const state = { v: 1, createdAt: stamp(now), host: HOST, namespace: NAMESPACE, policy: "keys", branch, "founderHandle": creatorHandle, installId: `demo-install-${randomUUID()}`, "foundId": `demo-found-${randomUUID()}`, roles };
   await exclusiveFile(join(target, PRIVATE_FILE), state);
-  return { event: "prepared", utc: stamp(now), host: HOST, namespace: NAMESPACE, branch, founderHandle, roleKeys: publicKeys(state), installId: state.installId };
+  return { event: "prepared", utc: stamp(now), host: HOST, namespace: NAMESPACE, branch, "founderHandle": creatorHandle, roleKeys: publicKeys(state), installId: state.installId };
 }
 
 function installIntent(state, deadline) {
-  return { v: 1, to: null, actor: state.roles.installer.key, kind: "install", on: null, expected: {}, fields: { host: HOST, namespace: NAMESPACE, policy: "keys", founders: [state.roles.founder.key] }, idempotencyKey: state.installId, notAfter: deadline };
+  return { v: 1, to: null, actor: state.roles.installer.key, kind: "install", on: null, expected: {}, fields: { host: HOST, namespace: NAMESPACE, policy: "keys", "founders": [state.roles["founder"].key] }, idempotencyKey: state.installId, notAfter: deadline };
 }
 export function buildPlan(state, deadline, now = Date.now()) {
   checkedState(state);
@@ -135,7 +136,7 @@ export function buildPlan(state, deadline, now = Date.now()) {
   const intent = installIntent(state, deadline);
   const signedInstall = signIntent(intent, unb64url(state.roles.installer.secret));
   const registerSeed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(intent), ordinal: 0 };
-  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, founding: { branch: state.branch, founderHandle: state.founderHandle, recoveryKey: state.roles.recovery.key, idempotencyKey: state.foundId, requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
+  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, creation: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key, idempotencyKey: state["foundId"], requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
 }
 export async function plan({ directory, deadline }, now = Date.now()) {
   const target = await privateDirectory(directory, true);
@@ -154,15 +155,15 @@ function checkedPlan(plan) {
   } catch (failure) { throw error(failure, "invalid-plan"); }
 }
 
-/** No read/bootstrap is inferred from a founding receipt. The caller supplies
+/** No read/bootstrap is inferred from a creation receipt. The caller supplies
  * the actual accepted install receipt and current expected register revision. */
-export function buildFound(state, publicPlan, acceptedInstall, revision, deadline, now = Date.now()) {
+export function buildCreation(state, publicPlan, acceptedInstall, revision, deadline, now = Date.now()) {
   checkedState(state);
   const plan = checkedPlan(publicPlan);
   const fact = acceptedInstall?.receipt?.fact;
   if (acceptedInstall?.answer !== "accepted" || acceptedInstall?.receipt?.definition !== REGISTER || !isFactRef(fact) || fact.seq !== 0 || fact.at.scope !== plan.registerScope || fact.at.kind !== "register" || !Number.isSafeInteger(revision) || revision < 0 || canonicalize(installIntent(state, plan.signedInstall.intent.notAfter)) !== canonicalize(plan.signedInstall.intent)) refuse("invalid-register-receipt");
   deadlineOf(deadline, now);
-  return signIntent({ v: 1, to: fact.at, actor: state.roles.founder.key, kind: "found", on: null, expected: { register: revision }, fields: { branch: state.branch, founderHandle: state.founderHandle, recoveryKey: state.roles.recovery.key }, idempotencyKey: state.foundId, notAfter: deadline }, unb64url(state.roles.founder.secret));
+  return signIntent({ v: 1, to: fact.at, actor: state.roles["founder"].key, kind: "found", on: null, expected: { register: revision }, fields: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key }, idempotencyKey: state["foundId"], notAfter: deadline }, unb64url(state.roles["founder"].secret));
 }
 
 function transport(baseURL, send) {
@@ -178,12 +179,12 @@ function transport(baseURL, send) {
 /** Future explicit execution: one POST, no automatic retry or configuration. */
 export async function postInstall(baseURL, publicPlan, send) {
   const plan = checkedPlan(publicPlan);
-  try { return await transport(baseURL, send).found(plan.signedInstall, REGISTER); }
+  try { return await transport(baseURL, send).create(plan.signedInstall, REGISTER); }
   catch (failure) { throw error(failure, "request-unknown"); }
 }
-export async function postFound(baseURL, signedFound, send) {
-  if (!verifySignedIntent(signedFound) || signedFound.intent.kind !== "found" || signedFound.intent.to?.kind !== "register") refuse("invalid-register-receipt");
-  try { return await transport(baseURL, send).submit(signedFound.intent.to.scope, signedFound, []); }
+export async function postCreation(baseURL, signedCreation, send) {
+  if (!verifySignedIntent(signedCreation) || signedCreation.intent.kind !== "found" || signedCreation.intent.to?.kind !== "register") refuse("invalid-register-receipt");
+  try { return await transport(baseURL, send).submit(signedCreation.intent.to.scope, signedCreation, []); }
   catch (failure) { throw error(failure, "request-unknown"); }
 }
 
@@ -210,7 +211,7 @@ export async function main(args = process.argv.slice(2)) {
   const phase = options.positionals[0];
   const allowed = phase === "prepare" ? ["directory", "branch", "founder-handle"] : phase === "plan" ? ["directory", "deadline"] : [];
   if (allowed.length === 0 || Object.keys(options.values).some((key) => !allowed.includes(key))) refuse("invalid-arguments");
-  const value = phase === "prepare" ? await prepare({ directory: options.values.directory, branch: options.values.branch, founderHandle: options.values["founder-handle"] }) : await plan({ directory: options.values.directory, deadline: options.values.deadline });
+  const value = phase === "prepare" ? await prepare({ directory: options.values.directory, branch: options.values.branch, "founderHandle": options.values["founder-handle"] }) : await plan({ directory: options.values.directory, deadline: options.values.deadline });
   process.stdout.write(`${canonicalize(value)}\n`);
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

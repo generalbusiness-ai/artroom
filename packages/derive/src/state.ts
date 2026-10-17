@@ -19,7 +19,7 @@ export interface ScopeState {
   /** The hash of the genesis entry and, for a child, the creation request it answered: the creator's entry and send (section 7.2). */
   genesis: { hash: Digest; source: FactRef | null; n: number | null };
   /**
-   * The ordinals of the genesis entry's sends that are sealed as duties and
+   * The ordinals of the genesis entry's sends that are sealed as pending work and
    * not dispatched: every send of a provisional scope's genesis but its
    * result. The entry that records the confirmation empties it (section 7.2).
    */
@@ -74,7 +74,7 @@ export interface AttemptState { attempt: number; opened: number; outcomes: reado
  * its ordinal there; its owner and kind; `most`, the most attempts its owner
  * allows; the attempts opened so far, in order from 1; and `selected`, the
  * number of the attempt whose result was selected, which is set once and
- * never moves (item 7). An operation with no attempt is a held duty of a
+ * never moves (item 7). An operation with no attempt is a held task of a
  * provisional scope's genesis (item 1).
  *
  * `for` (section 17.2a, "What holds the count"): the holder that the
@@ -102,7 +102,7 @@ export interface Holder { item: number; held: Held }
 export interface Account { seq: number; n: number; item: number }
 
 /**
- * The duties that are open and are not items (section 9.2). `requests`: sent
+ * The pending work outside items (section 9.2). `requests`: sent
  * requests with no result and no diagnosis. `unavailable`: those with a
  * `delivery-unavailable` diagnosis and no result. Of the operations that are
  * not settled (`pendingOf`, in `ledger.ts`): `opened`, attempts with no
@@ -264,7 +264,7 @@ export interface StateView {
    * holds a head for each subject that an entry observed, with its `of`). None: no entry retains an observation of that scope ID.
    */
   incarnations(scope: ScopeId): readonly Incarnation[];
-  /** How many duties are open, for the room they need to settle (section 9.2); see `Outstanding`. */
+  /** How many tasks are open, for the room they need to settle (section 9.2); see `Outstanding`. */
   outstanding(): Outstanding;
   /** What that item still holds (section 17.2a). Null: it holds nothing, or it is no holder. */
   holder(item: number): Held | null;

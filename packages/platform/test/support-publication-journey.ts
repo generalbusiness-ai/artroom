@@ -26,7 +26,7 @@ export function publicationJourney(data: PlatformData = destination4, named: Pla
     if (source.input.type !== "act") throw Error("Scripted source is an act");
     const seed: Seed = { v: 1, kind: "destination", definition: named, creator, cause: intentDigest(source.input.signed.intent), ordinal: 0 };
     const message: Request = { class: "request", type: "create", body: { kind: "establish", fields: { repository: { host: "git.example", namespace: "public-test", name: "bounds", id: "1" }, branch: "main", import: importing,
-      claim: factRefOf(claim) as unknown as FieldValue, directory: creator as ScopeRef & FieldValue, membership: membership.scope, rules: RULES.scope, founderHandle: "@rita" } } };
+      claim: factRefOf(claim) as unknown as FieldValue, directory: creator as ScopeRef & FieldValue, membership: membership.scope, rules: RULES.scope, "founderHandle": "@rita" } } };
     const original = { ...source, sends: [{ n: 0, to: seed, message }] };
     const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(21)), to: seed, from: factRefOf(original), n: 0, message };
     return { source: original, asked, claim, directory: creator };

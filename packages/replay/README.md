@@ -40,7 +40,7 @@ The library runs under Node and under Workers.
   every entry is at one scope and incarnation, times do not go back, and a
   clamped entry has the time of the entry before it;
 - the scope ID is the digest of the genesis's seed;
-- the signature of each act, of a founding and of the signed intent of a
+- the signature of each act, of a creation and of the signed intent of a
   preparation entry.
 
 No judgment is derived again, and the report says so in words. A history
@@ -339,7 +339,7 @@ reports missing bytes as `incomplete`. Its definition, grants and outside
 answer are explicitly scripted. `test/decisions.test.ts` witnesses the
 entry-budget check of a bound decision reservation with a judged receiver
 and anchored sender entries. The generic row witnesses use made-up
-platform data. `packages/scope/test/founding-real.test.ts` replays the
+platform data. `packages/scope/test/creation-real.test.ts` replays the
 register, directory, membership, rules and destination histories through
 HTTP after the first publication and its receipt, using the platform
 package's rules and proven grants. Only the four scripted source lane

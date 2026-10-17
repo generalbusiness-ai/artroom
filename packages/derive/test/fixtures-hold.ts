@@ -146,14 +146,14 @@ export class Staging extends Scope {
 
   /** One record of `hold@1`, in short: its state and its values. */
   record(kind: string, ...key: FieldValue[]) {
-    const found = this.state.record("hold@1", kind, key);
-    return found && { state: found.state, ...found.values };
+    const matched = this.state.record("hold@1", kind, key);
+    return matched && { state: matched.state, ...matched.values };
   }
   /** What a capability rule is given for an input of this scope, with that intent digest. */
   given(over: Partial<CapabilityGiven> = {}): CapabilityGiven {
     return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, snapshot: (digest) => snapshots.get(digest) ?? null, clock: clockOf(this.state, this.now), ...over };
   }
-  /** The entries that the pending duties reserve, with what the capability declares. */
+  /** The entries that the pending work reserves, with what the capability declares. */
   reserved(): number { return owed(this.state, this.definition, this.last.input, cap); }
 }
 

@@ -8,7 +8,7 @@
  * |---|---|
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
- * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. Ordinary office founding uses the same native service operations; a dedicated wire witness founds it over HTTP, and `over` sends one act over that transport. |
+ * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. Ordinary office creation uses the same native service operations; a dedicated wire witness creates it over HTTP, and `over` sends one act over that transport. |
  * | The office | A made-up directory definition that creates the lanes. A test fixture. The separate `room.ts` fixture uses the real platform directory, which creates lanes after the runtime reads its declared active-definition observations from the real rules scope. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
@@ -24,9 +24,9 @@ import { env } from "cloudflare:workers";
 import { SELF, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
+import type { Answer, Bounds, DeclaredDefinition, Digest, OutboxItem, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, intentDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
+import { ScopeHandle, declaredHandle, create, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
 import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { grantOf, keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import type { Checkpointed, Delivery, EffectAnswer, EffectRequest } from "@generalbusiness/artroom-scope";
@@ -46,7 +46,7 @@ export const reader = "a test reader";
  * entrypoint both call and add nothing to), called in the test's isolate:
  * every act and read of the fixture goes through it. `http` is the client's
  * transport over the Worker's HTTP routes, for the few calls that are about
- * a route: one dedicated office founding, an explicit act, and the replay.
+ * a route: one dedicated office creation, an explicit act, and the replay.
  *
  * The reason is cost. In the Workers pool a call through the Worker's
  * entrypoint, by `SELF.fetch` or by a service binding, takes longer the more
@@ -69,8 +69,8 @@ function valid(definition: DeclaredDefinition): ValidDefinition {
 }
 
 /**
- * The office: a made-up directory, and a test fixture. It is founded with a
- * text beside its founding intent. `open-issue` creates a lane under the
+ * The office: a made-up directory, and a test fixture. It is created with a
+ * text beside its creation intent. `open-issue` creates a lane under the
  * pinned `issue` digest, and `open-change` one under the pinned `change`
  * digest. Each clause of a creation moves the row that asked for it.
  */
@@ -92,7 +92,7 @@ export const officeDefinition = {
     },
   },
   acts: {
-    found: {
+    "found": {
       step: "open", on: "repository", grant: "office.found", also: {},
       fields: { readme: { type: "text", max: 4096, detached: true, required: false } },
       guards: [], effects: [{ value: { slot: "readme", from: { field: "readme" } } }], sends: [], attention: [],
@@ -254,7 +254,7 @@ export class Node<D extends DeclaredDefinition> {
   }
   /** One item as it is now: a copy, so that a scenario can compare it with the item later. */
   async item(id: number): Promise<Item> { return structuredClone((await this.state()).item(id)!); }
-  async duties(): Promise<readonly Duty[]> {
+  async outboxItems(): Promise<readonly OutboxItem[]> {
     const read = await this.handle.scope.outbox();
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;
@@ -458,30 +458,30 @@ export class Graph {
   }
 }
 
-/** The text that travels beside the office's founding intent. */
+/** The text that travels beside the office's creation intent. */
 export const README = "The office of a test repository.";
 
 /**
- * A new graph: an office founded by rita, which retains the two lane
+ * A new graph: an office created by rita, which retains the two lane
  * declarations for the lanes it creates. Transport is undisturbed, and the
  * scripted capability refuses every guard, until the scenario says
  * otherwise: `capable` makes the stand-in's guards hold, and `onCode` runs
  * the namespace on the capability's code with no stand-in for it. With no
  * capability code at all, no scope runs under either lane definition: the
- * scope package's founding test shows that.
+ * scope package's creation test shows that.
  */
-export async function graph(foundingTransport: Transport = transport): Promise<Graph> {
+export async function graph(creationTransport: Transport = transport): Promise<Graph> {
   net.hold = net.deaf = null;
   net.capability = {};
   net.outside = null;
-  const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
+  const creation = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
   // Native service by default. The dedicated wire witness supplies HTTP.
   // Both receive the exact declaration closure and detached text beside it.
-  const { answer, scope } = await found(foundingTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
+  const { answer, scope } = await create(creationTransport, creation, officeDefinition, definitions, reader, { texts: [README] });
   expect(answer.answer).toBe("accepted");
   expect(scope).not.toBeNull();
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
-  const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
   expect(answer.receipt.definition).toBe(seed.definition);
   expect(isScopeRef(answer.receipt.fact.at)).toBe(true);
   expect([scope.scope, answer.receipt.fact.at.scope, answer.receipt.fact.at.kind]).toEqual([scopeIdOf(seed), scopeIdOf(seed), "directory"]);

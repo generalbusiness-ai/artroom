@@ -13,8 +13,8 @@
  *   is the register's entry that records the directory's result, with
  *   its clause and its confirmation. The genesis of each of the
  *   directory's three children is SCRIPTED: an entry made by hand. It shows the directory's
- *   rows and rules. A founding on scope objects is the scope package's
- *   (`packages/scope/test/founding-real.test.ts`).
+ *   rows and rules. A creation on scope objects is the scope package's
+ *   (`packages/scope/test/creation-real.test.ts`).
  */
 
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
@@ -47,25 +47,25 @@ function written(judgment: Judgment): Extract<Judgment, { result: "write" }>["dr
   return judgment.draft;
 }
 
-/** The founding intent of a register: an `install`, signed by that key, with `to: null`. */
-export const installing = (who: Actor, policy: "keys" | "open", founders: readonly string[] | undefined, kind = "install"): SignedIntent =>
-  signIntent({ v: 1, to: null, actor: who.key, kind, on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy, ...(founders ? { founders: [...founders] } : {}) }, idempotencyKey: "install", notAfter: t(60) }, who.secret);
+/** The creation intent of a register: an `install`, signed by that key, with `to: null`. */
+export const installing = (who: Actor, policy: "keys" | "open", creators: readonly string[] | undefined, kind = "install"): SignedIntent =>
+  signIntent({ v: 1, to: null, actor: who.key, kind, on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy, ...(creators ? { "founders": [...creators] } : {}) }, idempotencyKey: "install", notAfter: t(60) }, who.secret);
 
 /** The seed of a register that an install intent asks for (the contract's section 7.1). */
 export const registerSeed = (install: SignedIntent, over: Partial<Seed> = {}): Seed => ({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0, ...over });
 
 /**
- * A register in memory, founded by paul's `install` intent, with the policy
- * `keys` and rita's key as the one founder. Its genesis and its `found`
+ * A register in memory, created by paul's `install` intent, with the policy
+ * `keys` and rita's key as the one creator. Its genesis and its `found`
  * acts and the outcomes of its operations are judged by derive's judges
  * with the register's own rules.
  */
 export class Register extends Ledger {
-  constructor(policy: "keys" | "open" = "keys", founders: readonly string[] | undefined = [rita.key]) {
+  constructor(policy: "keys" | "open" = "keys", creators: readonly string[] | undefined = [rita.key]) {
     super(registerDefinition, "platform:register");
-    const install = installing(paul, policy, founders);
+    const install = installing(paul, policy, creators);
     const seed = registerSeed(install);
-    this.seal(written(judgeGenesis(this.state, registerDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: registerPlatform })));
+    this.seal(written(judgeGenesis(this.state, registerDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, creation: install }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: registerPlatform })));
   }
 
   /** An act, judged with the register's rules. No grant is presented: no act of the register is judged on one. */
@@ -73,9 +73,9 @@ export class Register extends Ledger {
     return super.act(who, kind, over, { platform: registerPlatform, grants: [], ...context });
   }
 
-  /** A founding by that key: the `found` act, with the fields of a founding intent. Returns the judgment. */
-  found(who: Actor, more: Record<string, string> = {}, key = "a founding"): ActJudgment {
-    return this.act(who, "found", { expected: { register: this.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...more }, idempotencyKey: key });
+  /** A creation by that key: the `found` act, with the fields of a creation intent. Returns the judgment. */
+  create(who: Actor, more: Record<string, string> = {}, key = "a founding"): ActJudgment {
+    return this.act(who, "found", { expected: { register: this.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key, ...more }, idempotencyKey: key });
   }
 
   /**
@@ -102,7 +102,7 @@ export const scripted = (at: ScopeRef, seq: number, input: Entry["input"], sends
 
 /**
  * A directory in memory, below a SCRIPTED register: see the head of this
- * file. rita founds it. Its genesis, its acts, its handlers, its clauses and
+ * file. rita creates it. Its genesis, its acts, its handlers, its clauses and
  * the outcomes of its import are judged by derive's judges, with the
  * directory's own rules. Its acts are judged on the grants of
  * the test authority: every actor of the key set holds every action here.
@@ -121,19 +121,19 @@ export class Directory extends Ledger {
   constructor(over: { import?: string; confirmed?: boolean; children?: readonly ("membership" | "rules" | "destination")[] } = {}) {
     super(directoryDefinition, "platform:directory");
     const R = (this.register = new Register());
-    const founding = R.intent(rita, "found", { expected: { register: R.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...(over.import === undefined ? {} : { import: over.import }) } });
-    if (R.submit(founding, { platform: registerPlatform, grants: [] }).result !== "write") throw new Error("the founding was not admitted");
-    const found = R.head.seq;
-    this.claim = R.fact(found);
+    const creation = R.intent(rita, "found", { expected: { register: R.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key, ...(over.import === undefined ? {} : { import: over.import }) } });
+    if (R.submit(creation, { platform: registerPlatform, grants: [] }).result !== "write") throw new Error("the founding was not admitted");
+    const matched = R.head.seq;
+    this.claim = R.fact(matched);
     // The selecting outcome, judged with the register's own rules: its send `create-directory` gives the `create` of the directory.
-    const repository = { host: "git.example", namespace: "artroom", name: repositoryName(R.item(found).values["seed"] as Digest, 1), id: "r-1" };
-    written(R.outcome(`${found}:0`, 1, "confirmed", { name: repository.name, id: "r-1" }));
+    const repository = { host: "git.example", namespace: "artroom", name: repositoryName(R.item(matched).values["seed"] as Digest, 1), id: "r-1" };
+    written(R.outcome(`${matched}:0`, 1, "confirmed", { name: repository.name, id: "r-1" }));
     const { to: seed, message: create } = R.last.sends[0] as { to: Seed; message: Request };
     const sent = R.head.seq;
     // The directory's genesis: the real judge, with the fourth cause. The claim's entry is at hand, as a fetched fact.
     const context = () => ({ clock: clockOf(this.state, this.now), bounds: this.bounds, prepared: [], own: this.own, platform: directoryPlatform });
     this.seal(written(judgeGenesis(this.state, directoryDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(8)), to: seed, from: R.fact(sent), n: 0, message: create },
-      { ...context(), facts: [{ fact: this.claim, entry: R.entries[found]!.entry, under: R.under }], source: { entry: R.entries[sent]!.entry, under: R.under } })));
+      { ...context(), facts: [{ fact: this.claim, entry: R.entries[matched]!.entry, under: R.under }], source: { entry: R.entries[sent]!.entry, under: R.under } })));
     if (over.confirmed === false) return;
     // The register records the directory's `applied` result, judged with its own rules: the clause `applied` of the send runs the
     // mark `claim-active`, and the entry sends the confirmation, which makes the directory active.
@@ -165,7 +165,7 @@ export class Directory extends Ledger {
     const send = this.entries[seq]!.entry.sends.find((s) => s.n === n)!;
     const seed = send.to as Seed;
     const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(mint + seed.ordinal)), kind: seed.kind };
-    const genesis = scripted(at, 0, { type: "genesis", seed, inc: at.inc, kind: "establish", founding: null, source: this.fact(seq), n, message: send.message as Request, decision: "applied" },
+    const genesis = scripted(at, 0, { type: "genesis", seed, inc: at.inc, kind: "establish", "founding": null, source: this.fact(seq), n, message: send.message as Request, decision: "applied" },
       [{ n: 0, to: this.at, message: { class: "result", of: { from: this.fact(seq), n }, outcome: "applied" } }], under);
     // A clause reads again each fact that the fields of its origin entry name: for the genesis, the claim's entry, which it retained.
     this.take(genesis, 0, [{ fact: this.claim, entry: this.register.entries[this.claim.seq]!.entry, under: this.register.under }]);

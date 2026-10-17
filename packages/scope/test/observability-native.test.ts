@@ -31,7 +31,7 @@ test("absent, throwing, slow and SQL-faulted telemetry preserve native creation,
     } } };
     const intent: Intent = { v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { source: "a repository" }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
     const seed: Seed = { v: 1, kind: "directory", definition: deskDefinition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
-    const name = scopeIdOf(seed), founding = signIntent(intent, keys.rita.secret);
+    const name = scopeIdOf(seed), creation = signIntent(intent, keys.rita.secret);
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     const worlds = [env.SCOPES, env.METRIC_CONTROL].map((binding, n) => {
@@ -60,12 +60,12 @@ test("absent, throwing, slow and SQL-faulted telemetry preserve native creation,
         if (n === 1 && mode.endsWith("fault")) await runInDurableObject(world.object, (_instance, state) => {
           state.storage.sql.exec(`CREATE TRIGGER fail_operational BEFORE INSERT ON request_index WHEN NEW.${mode === "entry-fault" ? "seq" : "duty"} IS NOT NULL BEGIN SELECT RAISE(FAIL, 'scripted sidecar failure'); END`).toArray();
         });
-        answers.push(await world.peer.observed("found", [founding, deskDefinition.declared, [ticketDefinition.declared]], n ? identity : { request: null, trace: null }));
+        answers.push(await world.peer.observed("create", [creation, deskDefinition.declared, [ticketDefinition.declared]], n ? identity : { request: null, trace: null }));
       }
       expect(answers[1]).toEqual(answers[0]);
-      const founded = answers[0]!.value as { answer: string; receipt: { fact: { at: ScopeRef } } };
-      expect(founded.answer).toBe("accepted");
-      const within = founded.receipt.fact.at;
+      const created = answers[0]!.value as { answer: string; receipt: { fact: { at: ScopeRef } } };
+      expect(created.answer).toBe("accepted");
+      const within = created.receipt.fact.at;
       const asked = signIntent({ v: 1, to: within, actor: keys.rita.key, kind: "open-issue", on: null, expected: {}, fields: { title: "Operational isolation" }, idempotencyKey: "open", notAfter: at(60) }, keys.rita.secret);
       const grants = Object.values(keys).map(who => grantOf(who, within, Object.values(deskDefinition.declared.acts).map(a => a.grant)));
       const opened: { value: unknown; turn: boolean }[] = [];
@@ -113,7 +113,7 @@ test("absent, throwing, slow and SQL-faulted telemetry preserve native creation,
   }
 });
 
-// Invariant: one actual alarm can settle more native duties than the AE cap
+// Invariant: one actual alarm can settle more native pending work than the AE cap
 // without losing a native end or changing any entry/send. Routing replies,
 // authority, clock and deterministic incarnations are labelled stand-ins.
 test("an alarm settles 251 native requests with exact turn multiplicity inside the 250 point cap", async () => {
@@ -130,10 +130,10 @@ test("an alarm settles 251 native requests with exact turn multiplicity inside t
     metricWiring.set(key, () => ({ random: { bytes: size => new Uint8Array(size).fill(61) } }));
     return { binding, id, key, peer: binding.get(id) as unknown as Peer };
   });
-  const founded = await worlds[0]!.peer.found(signed, definition.declared);
-  expect(await worlds[1]!.peer.found(signed, definition.declared)).toEqual(founded);
-  if (founded.answer !== "accepted") throw Error(`Native pressure fixture was not founded: ${JSON.stringify(founded)}`);
-  const within = founded.receipt.fact.at;
+  const created = await worlds[0]!.peer.create(signed, definition.declared);
+  expect(await worlds[1]!.peer.create(signed, definition.declared)).toEqual(created);
+  if (created.answer !== "accepted") throw Error(`Native pressure fixture was not founded: ${JSON.stringify(created)}`);
+  const within = created.receipt.fact.at;
   const grants = [grantOf(keys.rita, within, ["ask"])];
   const missing = { ...within, scope: scopeIdOf({ ...seed, ordinal: 1 }) };
   for (let n = 0; n < count; n++) {
@@ -169,8 +169,8 @@ test("an alarm settles 251 native requests with exact turn multiplicity inside t
 // unavailable end. The definition absence is an explicit port fault; the
 // turn and SQLite store are real and no native history changes.
 test("a missing-definition turn emits its early native end without an entry", async () => {
-  const { found } = await import("./support.ts");
-  const lane = await found(), points: MetricPoint[] = [];
+  const { create } = await import("./support.ts");
+  const lane = await create(), points: MetricPoint[] = [];
   const result = await lane.inside(async state => {
     const store = new SqliteStore({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: closure => state.storage.transactionSync(closure) });
     const wakes = new Wakes(store, { set: () => {} }, false);

@@ -36,23 +36,23 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
     store: wrapped, now: () => Date.parse("2026-10-09T12:00:00Z"),
     fetch: (async (_url, init) => {
       const body = String(init?.body);
-      const request = JSON.parse(body) as { founding: SignedIntent; definition: PlatformDefinition };
+      const request = JSON.parse(body) as { creation: SignedIntent; definition: PlatformDefinition };
       const kept = (await store.config())!;
       if (request.definition === INVITATION_KEY_COHORT.register || request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register || request.definition === FILE_PUBLICATION_COHORT.register) {
         expect(kept.plan?.attempted).toMatch(/^sha256:/);
-        expect(canonicalize(kept.plan?.founding)).toBe(canonicalize(request.founding));
+        expect(canonicalize(kept.plan?.["founding"])).toBe(canonicalize(request.creation));
         expect(kept.plan?.definition).toBe(request.definition);
       }
       bodies.push(body);
       receipt ??= {
-        fact: { at: { kind: "register", scope: scopeIdOf({ v: 1, kind: "register", definition: request.definition, creator: null, cause: intentDigest(request.founding.intent), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(9)) }, seq: 0, hash: textDigest("fake service acknowledgement") },
-        definition: request.definition, intent: intentDigest(request.founding.intent), effects: [], sends: [], epoch: 0,
+        fact: { at: { kind: "register", scope: scopeIdOf({ v: 1, kind: "register", definition: request.definition, creator: null, cause: intentDigest(request.creation.intent), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(9)) }, seq: 0, hash: textDigest("fake service acknowledgement") },
+        definition: request.definition, intent: intentDigest(request.creation.intent), effects: [], sends: [], epoch: 0,
       };
       if (fault === "reply" && !failed) { failed = true; throw new Error("fake accepted reply loss"); }
       return new Response(JSON.stringify({ answer: "accepted", receipt }));
     }) as Fetch,
   };
-  ctx.trustedFoundingService = { service: SERVICE, fetch: ctx.fetch! };
+  ctx.trustedCreationService = { service: SERVICE, fetch: ctx.fetch! };
   return { ctx, store, bodies, metrics: () => ({ saves, keyReads, keyWrites }) };
 }
 
@@ -98,7 +98,7 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
     expect([s.metrics(), s.bodies]).toEqual([metrics, []]);
     expect((await command(s.ctx, ["install", "--planned", "--host", "artifacts", "--cohort", name])).code).toBe(2);
     expect((await command(s.ctx, ["install", "--planned"])).code).toBe(0);
-    expect(canonicalize((await s.store.config())!.plan!.founding)).toBe(canonicalize(original.plan!.founding));
+    expect(canonicalize((await s.store.config())!.plan!["founding"])).toBe(canonicalize(original.plan!["founding"]));
     expect((await s.store.config())!.register!.scope).toBe(original.plan!.register);
 
     // A separate memory store stands for an empty ARTROOM_HOME directory.
@@ -107,7 +107,7 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
     const where = ["--cohort", name, "--host", "artifacts", "--namespace", "room"];
     expect((await command(expired.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
     const expiredConfig = (await expired.store.config())!;
-    const deadline = timeMs(expiredConfig.plan!.founding.intent.notAfter)!;
+    const deadline = timeMs(expiredConfig.plan!["founding"].intent.notAfter)!;
     expired.ctx.now = () => deadline + 1;
     const before = expired.metrics();
     expect((await command(expired.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
@@ -127,9 +127,9 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
     separate.ctx.now = expired.ctx.now;
     expect((await command(separate.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
     const freshPlan = (await separate.store.config())!.plan!;
-    expect([freshPlan.definition, freshPlan.founding.intent.fields]).toEqual([expiredConfig.plan!.definition, { ...expiredConfig.plan!.founding.intent.fields, founders: [freshPlan.founding.intent.actor] }]);
+    expect([freshPlan.definition, freshPlan["founding"].intent.fields]).toEqual([expiredConfig.plan!.definition, { ...expiredConfig.plan!["founding"].intent.fields, "founders": [freshPlan["founding"].intent.actor] }]);
     expect(freshPlan.register).not.toBe(expiredConfig.plan!.register);
-    expect(timeMs(freshPlan.founding.intent.notAfter)!).toBeGreaterThan(separate.ctx.now());
+    expect(timeMs(freshPlan["founding"].intent.notAfter)!).toBeGreaterThan(separate.ctx.now());
     expect((await command(separate.ctx, ["install", "--planned", "--cohort", name])).code).toBe(0);
     expect((await separate.store.config())!.register!.scope).toBe(freshPlan.register);
     expect([await expired.store.config(), expired.bodies]).toEqual([expiredConfig, []]);
@@ -144,14 +144,14 @@ test("selected delivery requires exact plan and attempt readback and recovers th
       expect(first.code).toBe(1);
       const pending = (await s.store.config())!;
       expect([pending.register, pending.plan?.attempted]).toEqual([undefined, expect.stringMatching(/^sha256:/)]);
-      const original = canonicalize(pending.plan!.founding);
+      const original = canonicalize(pending.plan!["founding"]);
       // Expiry cannot replace a possibly delivered or acknowledged original.
-      s.ctx.now = () => timeMs(pending.plan!.founding.intent.notAfter)! + 901_000;
+      s.ctx.now = () => timeMs(pending.plan!["founding"].intent.notAfter)! + 901_000;
       expect((await planInstall(s.ctx, SERVICE, { cohort: name })).code).toBe(0);
       expect(await s.store.config()).toEqual(pending);
       expect((await install(s.ctx, SERVICE, { cohort: name })).code).toBe(0);
       const kept = (await s.store.config())!;
-      expect([kept.register!.scope, canonicalize(kept.plan!.founding), new Set(s.bodies).size]).toEqual([pending.plan!.register, original, 1]);
+      expect([kept.register!.scope, canonicalize(kept.plan!["founding"]), new Set(s.bodies).size]).toEqual([pending.plan!.register, original, 1]);
     }
     // A store that silently drops the attempted marker provides no custody.
     const s = scenario();

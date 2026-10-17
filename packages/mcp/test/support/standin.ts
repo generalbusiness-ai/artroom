@@ -57,7 +57,7 @@ export class StandIn {
     if (typeof definition !== "string") retained.set(`definition ${named}`, canonicalize(definition));
     const s: Scope = { ref, definition: named, entries: [], items, retained, final: [] };
     this.scopes.set(scope, s);
-    this.append(s, { type: "genesis", seed: { v: 1, kind, definition: named, creator: null, cause: textDigest(kind), ordinal: 0 }, inc: ref.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" } as Input);
+    this.append(s, { type: "genesis", seed: { v: 1, kind, definition: named, creator: null, cause: textDigest(kind), ordinal: 0 }, inc: ref.inc, kind: "establish", "founding": null, source: null, n: null, message: null, decision: "applied" } as Input);
     return ref;
   }
 
@@ -91,7 +91,7 @@ export class StandIn {
     const ref: ScopeRef = { scope, inc: newIncarnation(new Uint8Array(16).fill(this.scopes.size + 1)), kind: seed.kind };
     const s: Scope = { ref, definition: seed.definition, entries: [], items, retained: new Map(), final: [] };
     this.scopes.set(scope, s);
-    this.append(s, { type: "genesis", seed, inc: ref.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" } as Input);
+    this.append(s, { type: "genesis", seed, inc: ref.inc, kind: "establish", "founding": null, source: null, n: null, message: null, decision: "applied" } as Input);
     return ref;
   }
 
@@ -147,8 +147,8 @@ export class StandIn {
       }
       case "settle": {
         const signed = body["signed"] as SignedIntent;
-        const found = s.entries.find((e) => e.entry.input.type === "act" && intentDigest(e.entry.input.signed.intent) === intentDigest(signed.intent));
-        return json(found ? this.read(s, this.receipt(s, found)) : { ok: false, reason: "not-found" });
+        const matched = s.entries.find((e) => e.entry.input.type === "act" && intentDigest(e.entry.input.signed.intent) === intentDigest(signed.intent));
+        return json(matched ? this.read(s, this.receipt(s, matched)) : { ok: false, reason: "not-found" });
       }
       case "preparations": return json({ answer: "refused", reason: "capability-refused", name: "not-staged", judgedAt: this.head(s) });
       case "acts": {

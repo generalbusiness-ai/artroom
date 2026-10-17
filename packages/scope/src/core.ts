@@ -3,14 +3,14 @@
  * directory, submit an act, settle an accepted act, run an alarm's turn,
  * and write a checkpoint. Each is a waiting input handed to the turn, or a
  * read of the history. The judges are derive's; this file builds what they
- * are given and turns what they answer into the caller's answer. `Founded`,
- * the answer to a founding, is the contract's, and is exported here again.
+ * are given and turns what they answer into the caller's answer. `Created`,
+ * the answer to a creation, is the contract's, and is exported here again.
  */
 
-import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
+import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, OutboxId, Entry, FactRef, Created, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, retainedValueKey, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/dap-derive";
-import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Clock as Reading, Draft, Fetched, SignedCreation, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
 import { ReceiverReads } from "./receiver-reads.ts";
 import { producerName } from "./receiver-facts.ts";
@@ -19,7 +19,7 @@ import type { Asked, DefinitionRead, Further, Ports, Standing } from "./ports.ts
 import type { Retained, Sealed, Store } from "./store.ts";
 import { LATE, Turns, fetchFacts, isSigned, within, type Verdict } from "./turn.ts";
 
-export type { Founded };
+export type { Created };
 
 /** How a checkpoint is answered (section 9.2). It has no caller outside the scope. */
 export type Checkpointed =
@@ -43,8 +43,8 @@ export interface Supplied { definition: ValidDefinition; platform: PlatformRules
 /** The receipt of a sealed entry: a view, built after sealing (section 4.1). */
 export function receiptOf({ entry, hash }: Sealed, definition: Digest | PlatformDefinition): Receipt {
   const input = entry.input;
-  const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
-  return { fact: { at: entry.at, seq: entry.seq, hash }, definition, intent, effects: entry.effects, sends: entry.sends.map((s): DutyId => `${entry.seq}.${s.n}`), epoch: 0 };
+  const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input["founding"] ? intentDigest(input["founding"].intent) : null;
+  return { fact: { at: entry.at, seq: entry.seq, hash }, definition, intent, effects: entry.effects, sends: entry.sends.map((s): OutboxId => `${entry.seq}.${s.n}`), epoch: 0 };
 }
 
 /** This scope's own sealed entry at a position, from its stored history, for the judges (section 6.2, a local fact). */
@@ -122,14 +122,14 @@ export class Received {
 }
 
 /**
- * The kind of the scope that a founding under that definition makes
- * (section 7.1; I3 delta EP2): the register's platform definition founds a
+ * The kind of the scope that a creation under that definition makes
+ * (section 7.1; I3 delta EP2): the register's platform definition creates a
  * register, and no other definition does. The genesis judge checks the
  * three together: the kind `register`, an intent of the kind `install`, and
  * the register's definition, each only with the other two. The Worker
  * builds the same seed to find the object's name.
  */
-export const foundedKind = (definition: unknown): "register" | "directory" =>
+export const creationKind = (definition: unknown): "register" | "directory" =>
   (isPlatformDefinition(definition) && platformName(definition) === "platform:register" ? "register" : "directory");
 
 /** What came beside an intent, as a caller over a transport sent it: untrusted, so anything that is not a record is nothing. */
@@ -351,7 +351,7 @@ export class Scope {
    * turn under its whole pinned definition, or none". The data holds a mark
    * at each place that is code, and the validator lists the marks. When one
    * mark of that list has no rule, the definition is null: no scope is
-   * founded under it, and a scope that exists under it admits nothing (I3
+   * created under it, and a scope that exists under it admits nothing (I3
    * deltas, entry EC4).
    */
   platform(named: PlatformDefinition): Supplied | null {
@@ -403,11 +403,11 @@ export class Scope {
   }
 
   /**
-   * Found a scope with no creator (section 7.1). Under the register's
-   * platform definition it is the founding register, of the kind `register`,
+   * Create a scope with no creator (section 7.1). Under the register's
+   * platform definition it is the initial register, of the kind `register`,
    * which an `install` intent asks for. Under any other definition it is a
    * directory with no creator, by a `found` intent: the first delivery's
-   * stand-in for a register, which stays until a repository's founding by
+   * stand-in for a register, which stays until a repository's creation by
    * its register is whole (I3 plan, step 10). The seed is built from the
    * signed intent and the definition, and the genesis judge checks that its
    * digest is this object's name. The incarnation is minted in the commit.
@@ -424,17 +424,17 @@ export class Scope {
    * retained, and a creation under it waits. One that is supplied and is not
    * a valid declaration is refused `unsupported-definition`.
    *
-   * `beside`: the detached texts that the founding intent's fields name
+   * `beside`: the detached texts that the creation intent's fields name
    * (section 6.2). Each is checked against its digest and retained with the
    * genesis.
    *
-   * No grant is asked for: who may found a repository is the authority
+   * No grant is asked for: who may create a repository is the authority
    * note's (section 7.1).
    */
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
-    const refused = (reason: Extract<Founded, { answer: "refused" }>["reason"]): Founded => ({ answer: "refused", reason });
+  async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
+    const refused = (reason: Extract<Created, { answer: "refused" }>["reason"]): Created => ({ answer: "refused", reason });
     const name = this.#name;
-    if (!name || !isSigned(founding)) return refused("source-unverified");
+    if (!name || !isSigned(creation)) return refused("source-unverified");
     const { random, resolver } = this.#ports;
     const bounds = this.#bounds;
 
@@ -443,9 +443,9 @@ export class Scope {
     let valid: ValidDefinition | null;
     let platform: PlatformRules | null = null;
     if (typeof definition === "string" && definition.startsWith("platform:")) {
-      // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
+      // Section 6.1: the creation names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
       const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
-      // Null: a mark of the definition has no rule, so nothing is founded under it.
+      // Null: a mark of the definition has no rule, so nothing is created under it.
       if (!supplied) return refused("unsupported-definition");
       ({ definition: valid, platform } = supplied);
     } else {
@@ -466,7 +466,7 @@ export class Scope {
     // What the seed names: the platform name, or the digest of the declaration.
     const names: Digest | PlatformDefinition = bytes === null ? definition as PlatformDefinition : valid.digest;
 
-    // Section 9.2: the declarations this scope retains for its children, from what the founder supplied.
+    // Section 9.2: the declarations this scope retains for its children, from what the creator supplied.
     const supplied = new Map<Digest, string>();
     try {
       for (const declared of Array.isArray(definitions) ? definitions : []) supplied.set(definitionDigest(declared), canonicalize(declared));
@@ -479,25 +479,25 @@ export class Scope {
     }, (text) => this.validate(text), bounds.namedDefinitions);
     if (!children.ok) return refused("unsupported-definition");
 
-    const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
-    // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
+    const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    // Step 1: the facts the creation intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
+    // from the genesis, or refuses it as another creation, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
     const act = own(valid.declared.acts, valid.declared.genesis)!;
-    const fields = readFields(act.fields, founding.intent.fields, bounds);
-    // No scope exists yet, so no fact can name it: every fact a founding names is foreign.
+    const fields = readFields(act.fields, creation.intent.fields, bounds);
+    // No scope exists yet, so no fact can name it: every fact a creation names is foreign.
     const named = fields.ok && !this.#store.scope() ? factsNamed(act.fields, fields.fields, null) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
-    const asked = (inc: Founding["inc"]): Founding => ({ name, inc, seed, founding });
+    const asked = (inc: SignedCreation["inc"]): SignedCreation => ({ name, inc, seed, creation: creation });
     const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
     const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, platform };
-    const answer = (sealed: Sealed): Founded =>
+    const answer = (sealed: Sealed): Created =>
       (sealed.entry.input.type === "genesis" && sealed.entry.input.decision === "applied" ? { answer: "accepted", receipt: receiptOf(sealed, pinned().named) } : refused("scope-refused"));
 
-    const end = await this.#turns.run<Founded>({
+    const end = await this.#turns.run<Created>({
       asks: (view, clock) => prepareRules(view, valid, { genesis: asked(NO_INCARNATION), context: { ...context(clock), prepared: [] } }),
       judge: (view, clock, prepared) => {
         // Section 2.2: the incarnation is minted in the transaction that writes the first entry.
@@ -516,8 +516,8 @@ export class Scope {
           }
           case "source-unverified": return said(refused("source-unverified"));
           case "refused": return said(refused(judged.reason));
-          case "unavailable": return said<Founded>(unavailable(judged.reason));
-          default: return said<Founded>(unavailable("unavailable"));
+          case "unavailable": return said<Created>(unavailable(judged.reason));
+          default: return said<Created>(unavailable("unavailable"));
         }
       },
     }, valid);
@@ -629,7 +629,7 @@ export class Scope {
               },
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
-              // Section 9.2: an act is refused when the duties it would admit, with those already admitted, have no room to settle.
+              // Section 9.2: an act is refused when the pending work it would admit, with that already admitted, has no room to settle.
               full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),
             };
           }
@@ -699,8 +699,8 @@ export class Scope {
       if (standing === null || needs === null || wanted.action !== needs.action || wanted.window.seconds !== needs.window.seconds || wanted.window.once !== needs.window.once) return { result: "unavailable" };
       const held = heldBy(standing, view, clock);
       if (held === null) return { result: "unavailable" };
-      const found = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
-      return found ? { result: "granted", grant: found.grant } : { result: "refused" };
+      const matched = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
+      return matched ? { result: "granted", grant: matched.grant } : { result: "refused" };
     };
 
     const end = await this.#turns.run<Answer>({
@@ -768,9 +768,9 @@ export class Scope {
 
   /**
    * Write a checkpoint through the head (section 9.2). It judges no time, so
-   * it may be written clamped (section 5.3). Written with no other duty
+   * it may be written clamped (section 5.3). Written with no other task
    * pending, it is the closing checkpoint and uses the entry reserved for
-   * one. Written beside a pending duty it is new work and needs a free
+   * one. Written beside a pending task it is new work and needs a free
    * entry (derive's `fits`); without one it is `unavailable` and nothing is
    * written.
    * Reading the whole state is the one read that is not bounded.

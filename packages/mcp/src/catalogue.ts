@@ -225,7 +225,7 @@ export const ACT_OUTPUT: Record<string, unknown> = {
     answer: { type: "string", description: "accepted, refused, unavailable, mismatch, or unknown when the reply was lost" },
     sentence: { type: "string" }, next: { type: "string" },
     scope: { type: "string" }, kind: { type: "string" }, tool: { type: "string" },
-    fact: { type: "object" }, duties: { type: "array", items: { type: "string" } },
+    fact: { type: "object" }, outboxIds: { type: "array", items: { type: "string" } },
     reason: { type: "string" }, name: { type: "string" }, judgedAt: { type: "object" },
     retained: { type: "boolean", description: "true when this is a terminal outcome kept under custody, and nothing was sent" },
   },

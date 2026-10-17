@@ -33,7 +33,7 @@ export interface ClaimStep { signed: SignedIntent; accepted?: FactRef }
  */
 export interface PendingClaim {
   register: ScopeId; intent: Digest; handle: string;
-  found?: ClaimStep;
+  "found"?: ClaimStep;
   repository?: Repository;
   seat?: ClaimStep;
   firstKey?: ClaimStep;
@@ -56,13 +56,13 @@ export interface PendingJoin {
 export interface PendingInvitationIssue { operation: string; request: string; digest: Digest; membership: ScopeRef; actor: import("@generalbusiness/dap-contract").KeyId }
 
 /**
- * An install that `install --plan` prepared and `install --planned` has not founded yet: the signed `install` intent, the version
- * of the register it founds under, and the register ID that they make. The register's seed is a function of these alone, so the
+ * An install that `install --plan` prepared and `install --planned` has not created yet: the signed `install` intent, the version
+ * of the register it creates under, and the register ID that they make. The register's seed is a function of these alone, so the
  * ID is known before the register exists, and the Worker's host setting can pin it first. An intent and its signature are no
  * secret: the register's genesis records both.
  */
 export interface PlannedInstall {
-  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  service: string; definition: PlatformDefinition; "founding": SignedIntent; register: ScopeId;
   /** Saved before possible submission, bound to the exact original plan. */
   attempted?: Digest;
   /** Configured-service acknowledgement, retained for later history verification. */
@@ -75,7 +75,7 @@ export interface Config {
   service: string;
   /** The name of the key that signs this caller's acts. */
   key: string;
-  /** The register this command founded, as its receipt names it. */
+  /** The register this command created, as its receipt names it. */
   register?: ScopeRef;
   /** The original planned install and its retained acknowledgement, including after success. */
   plan?: PlannedInstall;

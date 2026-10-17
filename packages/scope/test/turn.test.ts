@@ -3,11 +3,11 @@ import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/dap-contract";
 import { MemoryState, applyEntry, checkpointOf, stateDigest, timeMs } from "@generalbusiness/dap-derive";
 import { SqliteStore, Turns, Wakes, production } from "../src/index.ts";
 import { variant } from "@generalbusiness/dap-derive/testing";
-import { HOLD, at, definition, found, rita, una, vic } from "./support.ts";
+import { HOLD, at, definition, create, rita, una, vic } from "./support.ts";
 
 describe("the head check (section 5.2, steps 4 to 6)", () => {
   test("a second act commits while the first is in preparation; the first starts again from step 3 and is prepared and judged on the new head", async () => {
-    const s = await found();
+    const s = await create();
     const commitment = await s.commitment();                  // entries 1 and 2: assigned to una, revision 2
     const assign = (to: typeof una, revision: number) => s.intent(rita, "assign", { on: commitment, expected: { on: revision }, fields: { performer: to.member } });
     /** Submit `first`, wait until it is in step 5, at the gate before its rule is evaluated, then commit `second` and let the first go on. */
@@ -36,7 +36,7 @@ describe("the head check (section 5.2, steps 4 to 6)", () => {
 
 describe("a due expiry is written before any other input (section 5.2, steps 3 and 6.3)", () => {
   test("an act whose commit reading is at two holds' deadline stops; the drain writes both ends, the lower item first, and then the act", async () => {
-    const s = await found();
+    const s = await create();
     const [low, high] = await s.holds(2);                     // entries 1 to 6; both holds end at the same time
     expect(await s.alarmAt()).toBe(timeMs(at(HOLD)));         // after a commit, the alarm is at the earliest deadline
     // Step 3 reads one second before the deadline and finds nothing due. Every later reading is the deadline.
@@ -52,7 +52,7 @@ describe("a due expiry is written before any other input (section 5.2, steps 3 a
 
 describe("what follows the head is told of each commit (`Turns.onSealed`)", () => {
   test("a turn tells its listener after each entry that it seals, a timed entry as an input's, at that entry's head and in order; a turn that writes nothing tells nothing; a listener that fails changes no entry. The turns are made by hand over the object's storage", async () => {
-    const s = await found();
+    const s = await create();
     await s.holds(2);                                         // entries 1 to 6; both holds end at the same time
     s.c.clock.now = at(HOLD);
     const told = await s.inside(async (state) => {
@@ -83,7 +83,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
     { due: 2, answer: "accepted", written: 2, left: 0 },
     { due: 3, answer: "busy", written: 2, left: 1 },
   ])("$due due: $written timed entries are written, $left stays due, and the waiting act is $answer", async ({ due, answer, written, left }) => {
-    const s = await found(budget);
+    const s = await create(budget);
     await s.holds(due);
     const head = (await s.head()).seq;
     s.c.clock.now = at(HOLD);
@@ -98,7 +98,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
   });
 
   test("a selection dropped each time, the clock reading the deadline at selection and one second less at commit, ends the turn busy with nothing written", async () => {
-    const s = await found(budget);
+    const s = await create(budget);
     await s.holds(1);
     const head = await s.head();
     s.c.clock.now = at(HOLD);
@@ -111,7 +111,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
   });
 
   test("the restarts of one turn are bounded, here at 1: an act whose every commit finds the hold newly due ends busy with nothing written", async () => {
-    const s = await found({ turnRestarts: 1 });
+    const s = await create({ turnRestarts: 1 });
     await s.holds(1);
     const head = await s.head();
     s.c.clock.now = at(HOLD - 1);
@@ -127,7 +127,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
     // The limit is the turn's own timer, driven by fake timers: the test says when the 10 milliseconds have passed, and nothing waits on the clock.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const s = await found({ preparationSeconds: 0.01 });
+      const s = await create({ preparationSeconds: 0.01 });
       const commitment = (await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
       const head = await s.head();
       const assign = (to: typeof una) => s.act(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: to.member } });
@@ -151,7 +151,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
   });
 
   test("an alarm's turn has the same budget: it writes 2 of 3, leaves the third due and sets the alarm again; the next alarm writes it", async () => {
-    const s = await found(budget);
+    const s = await create(budget);
     await s.holds(3);
     const head = (await s.head()).seq;
     s.c.clock.now = at(HOLD);
@@ -162,7 +162,7 @@ describe("the budget of timed attempts, here 2 for a turn (section 5.2, step 7)"
 
 describe("the clock behind the history (section 5.3)", () => {
   test("with a transition due, nothing is written and every input is answered clock-behind", async () => {
-    const s = await found({ timedAttemptsPerTurn: 1 });
+    const s = await create({ timedAttemptsPerTurn: 1 });
     await s.holds(2);
     // An alarm's turn at the deadline writes the first end and spends its budget. The second hold is due as of that entry's time.
     s.c.clock.now = at(HOLD);
@@ -176,7 +176,7 @@ describe("the clock behind the history (section 5.3)", () => {
   });
 
   test("with nothing due, an act is answered clock-behind and a checkpoint, which judges no time, is written with the previous entry's time, clamped", async () => {
-    const s = await found();
+    const s = await create();
     s.c.clock.now = at(100);
     await s.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
     s.c.clock.now = at(70);
@@ -194,7 +194,7 @@ describe("the clock behind the history (section 5.3)", () => {
 
 describe("the scope's budget (section 9.2), here 12 entries", () => {
   test("an act is refused scope-full when the duties it would admit have no room to settle; every admitted hold's end and the closing checkpoint are then written", async () => {
-    const s = await found({ scopeEntries: 12 });
+    const s = await create({ scopeEntries: 12 });
     const holds = await s.holds(2);                           // entries 1 to 6: two holds, each with a deadline that reserves one entry
     const commitment = await s.commitment();                  // entries 7 and 8: nine entries, and three reserved with the closing checkpoint
     const head = await s.head();
@@ -212,18 +212,18 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     { scopeEntries: 6, beside: { answer: "unavailable", reason: "unavailable" }, closing: 5 },
     { scopeEntries: 7, beside: { answer: "written" }, closing: 6 },
   ])("a checkpoint beside a pending hold is new work, and with $scopeEntries entries it is $beside.answer; the closing checkpoint is entry $closing", async ({ scopeEntries, beside, closing }) => {
-    const s = await found({ scopeEntries });
+    const s = await create({ scopeEntries });
     await s.holds(1);                                         // entries 1 to 3: four written, and two reserved: the hold's end and the closing checkpoint
     // With six entries none is free: written here, it would take the entry the closing checkpoint needs after the hold's end.
     expect(await s.stub.checkpoint()).toMatchObject(beside);
     s.c.clock.now = at(HOLD);
     await s.alarm();
-    // No other duty is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
+    // No other task is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
     expect([await s.stub.checkpoint(), (await s.head()).seq]).toMatchObject([{ answer: "written", fact: { seq: closing } }, scopeEntries - 1]);
   });
 
   test("a report that awaits its acceptance reserves that entry: at a full budget new work is refused, and the acceptance is written", async () => {
-    const s = await found({ scopeEntries: 6 });
+    const s = await create({ scopeEntries: 6 });
     const commitment = await s.commitment();                  // entries 1 and 2
     const report = (await s.did(una, "report", { fields: { commitment }, expected: { commitment: 2 } })).fact.seq;   // entry 3: four written, two reserved
     expect(await s.submit(s.remark())).toMatchObject({ answer: "refused", reason: "scope-full" });
@@ -242,7 +242,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
       def.acts.renew.sends = [{ create: { ...asks.create, result: { applied: [{ value: { slot: "until", from: { time: { plusSeconds: 600 } } } }] } } }];
     });
     expect([asking.pending, asking.clauseEntries]).toEqual([{ report: { reported: 3 } }, 1]);
-    const a = await found({ scopeEntries: 8 }, {}, asking);
+    const a = await create({ scopeEntries: 8 }, {}, asking);
     const under = await a.commitment();
     const reported = (await a.did(una, "report", { fields: { commitment: under }, expected: { commitment: 2 } })).fact.seq;   // four written, four reserved
     expect([await a.submit(a.remark()), await a.act(vic, "accept-report", { on: reported, expected: { on: 1 } }), await a.submit(a.remark())])
@@ -250,7 +250,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
   });
 
   test("after a closing checkpoint nothing is reserved; the next entry that is not a checkpoint is admitted only with a closing checkpoint reserved again", async () => {
-    const s = await found({ scopeEntries: 3 });
+    const s = await create({ scopeEntries: 3 });
     expect(await s.stub.checkpoint()).toMatchObject({ answer: "written", fact: { seq: 1 } });
     // A remark would be the third entry and would reserve a fourth. A checkpoint on a head that is a checkpoint is new work that reserves nothing.
     expect([await s.submit(s.remark()), await s.stub.checkpoint()]).toMatchObject([{ answer: "refused", reason: "scope-full" }, { answer: "written", fact: { seq: 2 } }]);

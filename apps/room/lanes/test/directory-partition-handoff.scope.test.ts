@@ -46,7 +46,7 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
     // Hold the real child's genesis result before sealing. Its actual birth
     // still runs; only the reply to its creator is delayed by test transport.
     let late: Platform | undefined;
-    let lateDuty: string | undefined;
+    let lateSend: string | undefined;
     if (mode === "threshold") {
       net.hold = envelope => "scope" in envelope.to && envelope.to.scope === P.name && envelope.from.at.kind === "lane" && envelope.from.at.scope !== I.name && envelope.message.class === "result";
       const lane = await laneRoom.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "Delayed child result", conditions: ["Settle after seal"] });
@@ -55,9 +55,9 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
       expect(pending).toMatchObject({ values: { number: 2, title: "Delayed child result" } });
       const outbox = await P.stub.outbox("a test reader");
       if (!outbox.ok) return expect.fail("actual partition outbox is unavailable");
-      const create = outbox.value.find(duty => "definition" in duty.to && scopeIdOf(duty.to) === late!.name);
+      const create = outbox.value.find(outboxId => "definition" in outboxId.to && scopeIdOf(outboxId.to) === late!.name);
       expect(create).toMatchObject({ result: null, acknowledged: { at: await late.at(), seq: 0 } });
-      lateDuty = create!.duty;
+      lateSend = create!.outboxId;
     }
     let full = false;
     for (let n = 0; n < 80; n++) {
@@ -109,7 +109,7 @@ test.each(["full", "threshold"] as const)("native partition seal at %s keeps con
       expect(delivered).toMatchObject({ state: "listed", values: { number: 2, title: "Delayed child result" }, refs: { scope: await late!.at() } });
       const settledOutbox = await P.stub.outbox("a test reader");
       if (!settledOutbox.ok) return expect.fail("actual settled outbox is unavailable");
-      const result = settledOutbox.value.find(duty => duty.duty === lateDuty)!.result;
+      const result = settledOutbox.value.find(outboxId => outboxId.outboxId === lateSend)!.result;
       expect(result).toMatchObject({ clause: "applied" });
       expect(result!.seq).toBeGreaterThan(sealed.receipt.fact.seq);
       await I.did(rita, "edit-own", { on: 0, expected: await I.expected({ on: 0 }), fields: { title: "Existing lane after seal" } });

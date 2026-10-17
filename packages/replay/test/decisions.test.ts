@@ -8,7 +8,7 @@ import { MemorySource, verify } from "../src/index.ts";
 import type { Rules, StateView } from "@generalbusiness/dap-derive";
 import type { MemoryScope } from "../src/index.ts";
 import { register, registerRules } from "../../../packages/platform/src/index.ts";
-import { Register, registerPlatform } from "../../../packages/platform/test/support-founding.ts";
+import { Register, registerPlatform } from "../../../packages/platform/test/support-creation.ts";
 import { served } from "./world.ts";
 
 test("replay admission counts the actual register's legacy cleanup closure and preserves scripted external reservations", async () => {
@@ -17,7 +17,7 @@ test("replay admission counts the actual register's legacy cleanup closure and p
   // The signed intents are test inputs; no host runs or answers. These small
   // replay budgets are controlled test inputs, not production capacity claims.
   const scope = new Register();
-  expect(scope.found(keys.rita).result).toBe("write");
+  expect(scope.create(keys.rita).result).toBe("write");
   expect([scope.last.seq, scope.state.outstanding().outcomes]).toEqual([1, [{ owner: registerPlatform.named, kind: "create-repository", entries: 6, unsent: 1 }]]);
   // This legacy kind has no counted attempts in its data. Six possible
   // outcomes each reserve the owner's 12-entry cleanup closure and the
@@ -45,7 +45,7 @@ test("replay admission counts the actual register's legacy cleanup closure and p
 
 /**
  * Made-up platform data. The receiver's entries are judged, including its
- * founding and the refused bound decision. The sender's entries are
+ * creation and the refused bound decision. The sender's entries are
  * stand-ins written by hand, retained and anchored. The real holder ledger
  * funds the decision, and the real verifier derives its draw again.
  */
@@ -57,7 +57,7 @@ const DATA: PlatformData = {
     board: { many: false, max: 1, initial: "open", states: { open: { final: false } }, parties: { opener: { fixed: true, required: true, list: false, author: false } }, refs: {}, values: {} },
     job: { many: false, max: 1, initial: "open", states: { open: { final: false } }, parties: {}, refs: { owner: { fixed: false, required: true, to: { type: "scope", kind: "lane" } } }, values: {}, holds: { decisions: { stop: 1 } } },
   },
-  acts: { found: { ...form, step: "open", on: "board", grant: "found", fields: { opener: { type: "member", required: true } }, effects: [{ party: { slot: "opener", from: { field: "opener" } } }] } },
+  acts: { "found": { ...form, step: "open", on: "board", grant: "found", fields: { opener: { type: "member", required: true } }, effects: [{ party: { slot: "opener", from: { field: "opener" } } }] } },
   receives: {
     start: { ...form, class: "tell", message: "start", from: { kind: "lane" }, opens: "job", effects: [{ ref: { slot: "owner", from: { sender: true } } }] },
     stop: { ...form, class: "tell", message: "stop", from: { kind: "lane" }, opens: null, also: { job: { item: "job", one: true } }, bound: { of: "also.job", where: [{ equals: { a: { sender: true }, b: { slot: "owner", of: "also.job" } } }] }, guards: [{ of: "also.job", equals: { a: { const: true }, b: { const: false } }, reason: "not-ready" }] },
@@ -73,9 +73,9 @@ class Deciding extends Ledger {
   constructor(readonly data: PlatformData = DATA, readonly rules: Rules = {}, memo?: string) {
     super(valid(validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true })));
     if (memo !== undefined) this.texts.set(textDigest(memo), memo);
-    const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member, ...(memo === undefined ? {} : { memo: textDigest(memo) }) }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
-    const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
+    const creation = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member, ...(memo === undefined ? {} : { memo: textDigest(memo) }) }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
+    const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, creation: creation }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     this.seal(judged.draft);
   }
@@ -128,7 +128,7 @@ test("replay and a closing checkpoint preserve the early field refusal and draw 
   expect([replay.report.result, replay.why, guards]).toEqual(["consistent", null, 2]);
 });
 
-/** A larger founding field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
+/** A larger creation field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
 function redacted(text: string, decision: "bare" | "named" | "other" | "applied" | "invalid" | "spent" | "known" = "bare") {
   const data = structuredClone(DATA);
   const memo = { type: "text", max: 16, detached: true } as const;

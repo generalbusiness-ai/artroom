@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { canonicalBytes, canonicalize, digestBytes, intentDigest, signIntent } from "@generalbusiness/artroom-bytes";
 import { Scope, grantOf, laneDefinition } from "@generalbusiness/dap-derive/testing";
-import { at, definition, found, rita, una } from "./support.ts";
+import { at, definition, create, rita, una } from "./support.ts";
 
 describe("the answers to a submitted act, on real storage (section 4.2)", () => {
   test("accepted, with a receipt that an exact retry and a settlement return again; mismatch; refused, which writes nothing and consumes no key; and, with the test authority, a stand-in, silent, a new act is not judged while an accepted key keeps its receipt", async () => {
-    const s = await found();
+    const s = await create();
     const offer = s.offer();
     const accepted = await s.submit(offer);
     expect(accepted).toMatchObject({
@@ -47,7 +47,7 @@ describe("the answers to a submitted act, on real storage (section 4.2)", () => 
 
   test("an act whose entry would pass the size bound is refused and nothing is written", async () => {
     // The smallest bound that still holds the end of a hold with its attention, which the validator requires of the definition.
-    const s = await found({ entryBytes: 4096 });
+    const s = await create({ entryBytes: 4096 });
     const head = await s.head();
     // The entry records the grant that was judged. One whose list of actions is long makes the entry too large.
     const grant = grantOf(rita, s.at, ["offer", "x".repeat(4096)]);
@@ -61,7 +61,7 @@ describe("the answers to a submitted act, on real storage (section 4.2)", () => 
     const entry = l.did(rita, "assign", { on: 2, expected: { on: 1 }, fields: { performer: una.member } });
     const proof = l.fact(entry.seq);
 
-    const s = await found();
+    const s = await create();
     const remark = s.intent(rita, "remark", { on: 0, fields: { text: "see the proof", proof } });
     expect([await s.submit(remark), (await s.head()).seq]).toEqual([{ answer: "unavailable", reason: "dependency-unavailable" }, 0]);
 

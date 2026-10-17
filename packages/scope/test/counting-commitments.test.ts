@@ -20,13 +20,13 @@ const SERVICE = "https://scopes.test";
 // Real native factory, R6/D6/M5, enrollment, membership authority, C1 evaluator,
 // SQLite, HTTP sessions and replay, with one admin person and two independently enrolled agents.
 // Git-host answers and the monotonic clock are
-// labelled stand-ins. No inspector, fabricated grant, child founding or speech:
-// a refused competitor has no native pledge; physical silence is a browser duty.
+// labelled stand-ins. No inspector, fabricated grant, child creation or speech:
+// a refused competitor has no native pledge; physical silence is a browser task.
 test("native Counting admits one competing pledge, fulfills its exact holder, applies current activity and fairness, then expires board before promise and resets without losing proven history", async () => {
   const owner=beginSessionFixture({secret:b64url(crypto.getRandomValues(new Uint8Array(32))),sessions:true,inspector:null});
   const lifetime=nativeFixtureLifetime(owner),fetch=(url:string,init?:RequestInit)=>lifetime.wait(()=>routed(url,init));
   // The bootstrap uses actual signed birth-chain reads, never the fixture inspector.
-  // Later reads use the founder's real requested membership session.
+  // Later reads use the creator's real requested membership session.
   class Native extends Platform {
     reader:string|null=null;
     constructor(name:ScopeId,readonly signer:Actor=rita){super(name);}
@@ -42,12 +42,12 @@ test("native Counting admits one competing pledge, fulfills its exact holder, ap
   }
   const settle=(...nodes:Native[])=>dispatchFixture(nodes,lifetime.wait);
   try {
-    const install:Intent={v:1,to:null,actor:keys.paul.key,kind:"install",on:null,expected:{},fields:{host:"git.example",namespace:"counter-native",policy:"keys",founders:[rita.key]},idempotencyKey:crypto.randomUUID(),notAfter:soon(60)};
+    const install:Intent={v:1,to:null,actor:keys.paul.key,kind:"install",on:null,expected:{},fields:{host:"git.example",namespace:"counter-native",policy:"keys","founders":[rita.key]},idempotencyKey:crypto.randomUUID(),notAfter:soon(60)};
     const R=new Native(scopeIdOf({v:1,kind:"register",definition:COUNTING_COHORT.register,creator:null,cause:intentDigest(install),ordinal:0}),keys.paul);
     const host=outsideOf(R.name);
     lifetime.wire(R.name,()=>({outside:{accepts:()=>{lifetime.active();return host.accepts();},send:request=>lifetime.wait(()=>host.send(request)),late:deliver=>{lifetime.active();host.late(deliver);}}}));
-    expect(await R.stub.found(signIntent(install,keys.paul.secret),COUNTING_COHORT.register)).toMatchObject({answer:"accepted"});
-    const claim=await R.intent(rita,"found",{expected:await R.expected({register:0}),fields:{branch:"main",founderHandle:"@rita",recoveryKey:keys.sam.key}});
+    expect(await R.stub.create(signIntent(install,keys.paul.secret),COUNTING_COHORT.register)).toMatchObject({answer:"accepted"});
+    const claim=await R.intent(rita,"found",{expected:await R.expected({register:0}),fields:{branch:"main","founderHandle":"@rita",recoveryKey:keys.sam.key}});
     const seed:Seed={v:1,kind:"directory",definition:COUNTING_COHORT.directory,creator:await R.at(),cause:intentDigest(claim.intent),ordinal:0};
     const D=new Native(scopeIdOf(seed));
     lifetime.active();host.answer("1:0",1,{result:"confirmed",evidence:{basis:"own-answer",body:{name:repositoryName(seedDigest(seed),1),id:"counter-native-fixture"}}});

@@ -12,7 +12,7 @@ import type { Answer, DeclaredDefinition, Entry, Grant, Intent, Read, Receipt, S
 import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
-import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
+import type { Delivery, OutboxItem, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
 import type { NetScope } from "./worker.ts";
@@ -35,8 +35,8 @@ export const routed = (url: string, init?: RequestInit): Promise<Response> => ro
 /** `seconds` after the shared clock's `now`. */
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);
 
-/** A founding intent signed by rita for a directory under that definition, and the name of the object that holds it. */
-export function founding(definition: ValidDefinition, fields: Intent["fields"]): { signed: SignedIntent; name: ScopeId } {
+/** A creation intent signed by rita for a directory under that definition, and the name of the object that holds it. */
+export function creation(definition: ValidDefinition, fields: Intent["fields"]): { signed: SignedIntent; name: ScopeId } {
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
   return { signed: signIntent(intent, rita.secret), name: scopeIdOf(seed) };
@@ -64,7 +64,7 @@ export class Node {
     return read.value;
   }
   async entries(): Promise<Entry[]> { return (await this.sealed()).map((s) => s.entry); }
-  async duties(): Promise<readonly Duty[]> {
+  async outboxItems(): Promise<readonly OutboxItem[]> {
     const read = await this.stub.outbox(reader);
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;
@@ -128,14 +128,14 @@ export async function later(seconds: number, ...nodes: readonly Node[]): Promise
 }
 
 /**
- * A desk founded by rita, with the declaration of the ticket its definition names in a `create`: the desk retains it,
+ * A desk created by rita, with the declaration of the ticket its definition names in a `create`: the desk retains it,
  * and each ticket reads it from the desk. Transport is undisturbed from here on.
  */
 export async function desk(): Promise<Node> {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(deskDefinition, { source: "a repository" });
+  const { signed, name } = creation(deskDefinition, { source: "a repository" });
   const node = new Node(name, deskDefinition.declared);
-  const answer = await node.stub.found(signed, deskDefinition.declared, [ticketDefinition.declared]);
+  const answer = await node.stub.create(signed, deskDefinition.declared, [ticketDefinition.declared]);
   if (answer.answer !== "accepted") throw new Error(`the desk was not founded: ${JSON.stringify(answer)}`);
   await settle(node);
   return node;

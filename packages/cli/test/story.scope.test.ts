@@ -9,7 +9,7 @@ import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf } from "../../scope/test/outside.ts";
 import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "../../scope/test/support/native-fixture-lifetime.ts";
-import { foundingPublication } from "../../scope/test/publication.ts";
+import { initialPublication } from "../../scope/test/publication.ts";
 import { command, memoryStore, type Context, type Outcome } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
@@ -17,18 +17,18 @@ const SERVICE = "https://scopes.test";
 const reader = "a test reader";
 
 // Invariant: the command's functions, over the Worker's real HTTP routes, the real read sessions and a key kept by the command,
-// found a repository whole, reading by signed reads until the founder holds a seat; invite and join a member; list and take one
+// create a repository whole, reading by signed reads until the creator holds a seat; invite and join a member; list and take one
 // act; show a refusal with its reason and nothing written; and read and verify the histories they wrote.
 //
 // Every scope is a Durable Object of the namespace `PLATFORM`: the deployed class, the production authority and the platform
-// package's own data and rules, as in `packages/scope/test/founding-real.test.ts`. Every request of the command goes through
+// package's own data and rules, as in `packages/scope/test/creation-real.test.ts`. Every request of the command goes through
 // `route`, the Worker's HTTP routes, called in the test's isolate.
 //
 // | Part | Is |
 // |---|---|
 // | The commands, their keys and their intents | Real: `command` of `src/line.ts`, with a store in memory for each person, which stands for the config directory. |
 // | The readers | Real: the read sessions of the scope package's `sessions.ts` and its signed reads, as deployed. The session secret is a TEST SECRET that the test generates, in place of the deployment's. A reader with no session and no signed read reads nothing. |
-// | The Git host | A STAND-IN: `OutsideDouble` of the scope package's `test/outside.ts`, wired as the register's outside port. It answers the one creation request with what the test writes. No repository is created. For the destination's founding publication it is wired as the destination's port (`test/publication.ts`), and answers each request with the commit IDs the platform package computes. Nothing is pushed. |
+// | The Git host | A STAND-IN: `OutsideDouble` of the scope package's `test/outside.ts`, wired as the register's outside port. It answers the one creation request with what the test writes. No repository is created. For the destination's creation publication it is wired as the destination's port (`test/publication.ts`), and answers each request with the commit IDs the platform package computes. Nothing is pushed. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the register's operations driver and the dispatchers of the scopes it waits on, as a deployment's alarms would. No test waits on the wall clock. |
 // | The clock | The scripted clock of the namespaces. The command signs its intents and reads by it. |
 // | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (the fixture inspector), past the read sessions. |
@@ -77,12 +77,12 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   const una: Context = { store: memoryStore(), fetch, now, pause, read: async (path) => { lifetime.active(); return path === "inactive.json" ? utf8(canonicalize(inactive)) : null; } };
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
 
-  // install: the register, by an `install` intent of a new operator key, which is the one founder key.
+  // install: the register, by an `install` intent of a new operator key, which is the one creator key.
   const installed = await run(rita, "install", SERVICE, "--host", "git.example", "--namespace", "artroom");
   expect(installed.code, installed.lines.join("\n")).toBe(0);
   const R = node((await rita.store.config())!.register!.scope);
-  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@3.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
-  // A new register is founded on the newest version, and the room that it creates on the newest version of each definition.
+  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@3.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one creator key\.$/)]);
+  // A new register is created on the newest version, and the room that it creates on the newest version of each definition.
   expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@3" });
   // Before the claim the operator key holds no session, and reads the register by signed reads of the log: its genesis is all there
   // is, and it replays.
@@ -103,7 +103,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   register = R;
 
   // claim: the register's `found`; the command waits until the four scopes are created and confirmed, then takes the seat. Until
-  // the seat it holds no session: each read is a signed read by the founder key, which the scopes answer because the key signed
+  // the seat it holds no session: each read is a signed read by the creator key, which the scopes answer because the key signed
   // `install`, or because the scope's cause chain leads to its claim.
   const claimed = await run(rita, "create", "demo", "--handle", "@rita");
   expect(claimed.code, claimed.lines.join("\n")).toBe(0);
@@ -120,10 +120,10 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   ]);
   expect(outsideOf(R.name).attempts).toEqual(["1:0#1"]);
   lifetime.unWire(R.name);
-  // The destination's founding publication: the first head and its receipt, answered by the STAND-IN host. The destination then
+  // The destination's creation publication: the first head and its receipt, answered by the STAND-IN host. The destination then
   // holds entries that no member signed: the host's outcomes, the receipt's among them.
   const G = node(repository.destination);
-  await foundingPublication(G, lifetime);
+  await initialPublication(G, lifetime);
   const recorded = (await G.item(0)) as { state: string; values: { repository?: { name: string } } };
   expect(recorded.state).toBe("ready");
 
@@ -250,7 +250,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   const membershipAt = await M.at();
   await lifetime.wait(() => runInDurableObject(M.object, (_instance, state) => {
     const record = new OperatorRecord({ exec: (query, ...args) => state.storage.sql.exec(query, ...args) }, { read: () => timeOf(now()) }, () => membershipAt);
-    expect(record.found("bad-input", [{ entry: queuedEntry }])).toBe(true);
+    expect(record.record("bad-input", [{ entry: queuedEntry }])).toBe(true);
   }));
   const beforeCorrelationReads = correlationReads;
   const pendingStatus = await run(rita, "status", "membership");

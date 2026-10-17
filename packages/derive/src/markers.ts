@@ -1,6 +1,6 @@
 /**
- * Marker duties (scope contract, revision 22, section 6.4, "`settles` by a
- * mark" and "Several marks on one item"; section 17.2, "A marker duty";
+ * Pending marker work (scope contract, revision 22, section 6.4, "`settles` by a
+ * mark" and "Several marks on one item"; section 17.2, "A marker task";
  * rows I3-54 and I3-59). An act or a handler may declare `settles: { of,
  * sets, in }`: it settles an item by a mark that its entry sets. The mark
  * is a truth value that only becomes `true`.
@@ -11,19 +11,19 @@
  * what the items of a type with marks reserve. Both use the same code, so
  * the amounts cannot drift.
  *
- * - A marker duty is (item, slot). It is pending while the slot is `false`
+ * - A marker task is (item, slot). It is pending while the slot is `false`
  *   and the item's state is in the `in` of a form that settles that slot
  *   (rules 1 and 2).
  * - The forms that settle one mark in one state are alternatives of one
- *   duty, and the largest counts. A form that settles another mark, or
+ *   task, and the largest counts. A form that settles another mark, or
  *   that settles by state, is no alternative of it (rule 5).
- * - An item reserves a sum: the chain of its deadline, its state duty and
- *   each pending marker duty (rule 6). The chain is counted by `owed` as
+ * - An item reserves a sum: the chain of its deadline, its state task and
+ *   each pending marker task (rule 6). The chain is counted by `owed` as
  *   before, so `awaits` here is the other two.
  * - A mark that is `true` is completed, and is in no later count (rules 4
  *   and 8). So the count of an item with several marks ends.
  * - A timed entry is never refused. So a state from which a timed rule
- *   leads to another counts, for each duty, the larger of what it reserves
+ *   leads to another counts, for each task, the larger of what it reserves
  *   here and there (point DI19).
  *
  * The known amounts include declared future requests and the result's
@@ -91,32 +91,32 @@ export function markerReservations(types: Markers, base: (type: string, form: Ma
     const left = form.sets.filter((state) => form.slot !== null || !form.in.includes(state));
     return sum(base(name, form), largest(form.chainAmount, ...left.map((state) => sum(own(t.heldAmounts, state) ?? NOTHING, awaits(name, state, done)))));
   };
-  /** One duty of an item in a state: the largest over its alternatives there, and over the states that a timed rule leads to (point DI19). `slot` null: the state duty. */
-  const dutyOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): Amount => {
+  /** One task of an item in a state: the largest over its alternatives there, and over the states that a timed rule leads to (point DI19). `slot` null: the state task. */
+  const workOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): Amount => {
     const here = t.forms.filter((form) => form.slot === slot && form.in.includes(state)).map((form) => formOf(name, t, form, slot === null ? done : [...done, slot]));
-    const there = t.moves.filter((move) => move.from.includes(state)).map((move) => dutyOf(name, t, slot, move.to, done));
+    const there = t.moves.filter((move) => move.from.includes(state)).map((move) => workOf(name, t, slot, move.to, done));
     return largest(...here, ...there);
   };
   /**
    * Rule 6, without the chain of the deadline: what an item of that type in
    * that state awaits, where the marks of `done` are `true`. It is the
-   * state duty and each marker duty of a mark that is not completed.
+   * state task and each marker task of a mark that is not completed.
    */
   const awaits = (name: string, state: string, done: readonly string[]): Amount => {
     const t = own(types, name);
     if (!t) return NOTHING;
     const set = completed(t, done);
     const key = JSON.stringify([name, state, set]);
-    const found = known.get(key);
-    if (found !== undefined) return found;
+    const matched = known.get(key);
+    if (matched !== undefined) return matched;
     if (open.has(key)) { cyclic(name, state); return NOTHING; }
     open.add(key);
-    const total = sum(dutyOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => dutyOf(name, t, mark, state, set)));
+    const total = sum(workOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => workOf(name, t, mark, state, set)));
     open.delete(key);
     known.set(key, total);
     return total;
   };
-  /** Rule 2: the marks of an item of that type in that state whose duty is pending, where the marks of `done` are `true`. */
+  /** Rule 2: the marks of an item of that type in that state whose task is pending, where the marks of `done` are `true`. */
   const pending = (name: string, state: string, done: readonly string[]): string[] => {
     const t = own(types, name);
     return t ? t.marks.filter((mark) => !done.includes(mark) && t.forms.some((form) => form.slot === mark && form.in.includes(state))) : [];
@@ -135,7 +135,7 @@ export const marksDone = (type: MarkedType, item: Pick<Item, "values">): string[
 
 /**
  * What one item of a type with marks reserves beside the chain of its
- * deadline, in entries: its state duty and each marker duty that is
+ * deadline, in entries: its state task and each marker task that is
  * pending (rule 6). Zero for an item of a type that has no mark: `owed`
  * counts that from `ValidDefinition.pending`.
  */
@@ -167,12 +167,12 @@ const PAGE = 64;
 /**
  * Section 17.2, row 3, for the types that have marks: the entries that
  * their items reserve for their settlements, from the folded state (rule
- * 10). `owed` adds it to what the other duties reserve.
+ * 10). `owed` adds it to what the other pending work reserves.
  *
  * The items of each live state in which something can be awaited are read,
  * a page at a time, because the amount of one item follows from its marks.
  * That is at most the type's `max` items. The items of a final state are
- * not read: a final state has no marker duty, and its state duty is counted
+ * not read: a final state has no marker task, and its state task is counted
  * at the count of the state with no mark completed, which is never less.
  */
 export function markerOwed(view: StateView, definition: Pick<ValidDefinition, "markers" | "declared">): number {

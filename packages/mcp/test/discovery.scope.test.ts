@@ -6,9 +6,9 @@ import { DEMO_DIGESTS, issueDemo } from "@generalbusiness/dap-lanes";
 import { ListRestart } from "../src/index.ts";
 import { garden } from "./support/garden.ts";
 import { mcpRoom } from "./support/room.ts";
-import { founded } from "./support/story.ts";
+import { created } from "./support/story.ts";
 
-// Invariant: the list is a function of the configured inventory and the caller's standing, never of a connection: a scope founded
+// Invariant: the list is a function of the configured inventory and the caller's standing, never of a connection: a scope created
 // on one connection is listed by a second and by a restarted one; an idle subscribed client is told of an activation made
 // elsewhere at the watch's next run; an ordinary head advance is told nothing and keeps cursors good, while a genuine change is
 // told once and restarts a cursor; and a room with mixed standing lists each scope's acts under its own.
@@ -16,7 +16,7 @@ test("discovery: shared configuration, idle watch, heads against generations, cu
   const room = mcpRoom();
   try {
     const rita = room.agent("rita", { subscribe: true, listPageBytes: 16 * 1024 });
-    await founded(room, rita);
+    await created(room, rita);
     await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
     await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" });
     const opened = await rita.ok("issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "An issue", conditions: ["c"] }, idempotencyKey: "issue-1" });
@@ -24,14 +24,14 @@ test("discovery: shared configuration, idle watch, heads against generations, cu
     await rita.tick(); await rita.tick();
     const baseline = rita.told;
 
-    // A standalone scope founded through one connection. The configuration records it; a second connection of the same
+    // A standalone scope created through one connection. The configuration records it; a second connection of the same
     // configuration, and a restarted one, list its acts.
     const second = room.agent("rita, second connection", { secret: rita.secret, config: rita.config, share: true });
     // The second connection has derived its list once, before the scope exists.
     await second.ok("room", {});
-    const founding = await rita.ok("create", { definition: garden, kind: "start", fields: { opener: "@rita", title: "A garden", conditions: ["it grows"] }, membership: rita.config.repository!.membership, idempotencyKey: "garden" });
-    expect(founding["answer"], JSON.stringify(founding)).toBe("accepted");
-    const root = founding["scope"] as ScopeId;
+    const creation = await rita.ok("create", { definition: garden, kind: "start", fields: { opener: "@rita", title: "A garden", conditions: ["it grows"] }, membership: rita.config.repository!.membership, idempotencyKey: "garden" });
+    expect(creation["answer"], JSON.stringify(creation)).toBe("accepted");
+    const root = creation["scope"] as ScopeId;
     expect(rita.config.roots).toContainEqual({ scope: root, membership: rita.config.repository!.membership });
     // Changed by another connection: the second's next call by a tool name it has not listed finds the new root's act, with no
     // list or room call first.

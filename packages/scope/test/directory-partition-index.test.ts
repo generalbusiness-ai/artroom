@@ -4,12 +4,12 @@ import { canonicalize, entryHash, factRefOf, newIncarnation, scopeIdOf, seedDige
 import { applyEntry, PROFILES, validateDefinition, type RuleGiven } from "@generalbusiness/dap-derive";
 import { directoryPartition1, directoryPartitionRules1, partitionGeneration, partitionLane, partitionNumber, PARTITION_COHORT } from "../../platform/src/directory-partitions.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 // Actual Durable Object SQLite and production lookup code. Item/index rows
 // are explicit storage fixtures; no new factory or Authority path ran here.
 test("directory partition point reads stay bounded beside 3000 unrelated lane rows and refuse an incomplete index", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const actual: Sql = { exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) };
     const store = new SqliteStore(actual), sample = store.item(0)!;

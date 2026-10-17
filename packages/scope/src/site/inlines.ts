@@ -160,8 +160,8 @@ export class InlineParser {
     const ticks = this.match(TICKS_HERE);
     if (ticks === null) return false;
     const after = this.pos;
-    for (let found = this.match(TICKS); found !== null; found = this.match(TICKS)) {
-      if (found === ticks) {
+    for (let matched = this.match(TICKS); matched !== null; matched = this.match(TICKS)) {
+      if (matched === ticks) {
         const contents = this.subject.slice(after, this.pos - ticks.length).replace(/\n/g, " ");
         const strip = contents.length > 0 && /[^ ]/.test(contents) && contents[0] === " " && contents[contents.length - 1] === " ";
         block.appendChild(new Node("code", strip ? contents.slice(1, -1) : contents));
@@ -238,17 +238,17 @@ export class InlineParser {
       const index = key(closer);
       const floor = openersBottom.has(index) ? openersBottom.get(index)! : bottom;
       let opener = closer.previous;
-      let found = false;
+      let matched = false;
       while (opener !== null && opener !== bottom && opener !== floor) {
         const oddMatch = closer.cc !== "~" && (closer.canOpen || opener.canClose) && closer.origdelims % 3 !== 0 && (opener.origdelims + closer.origdelims) % 3 === 0;
         if (opener.cc === closer.cc && opener.canOpen && !oddMatch && (closer.cc !== "~" || opener.origdelims === closer.origdelims)) {
-          found = true;
+          matched = true;
           break;
         }
         opener = opener.previous;
       }
       const oldCloser = closer;
-      if (!found) {
+      if (!matched) {
         closer = closer.next;
       } else {
         const use = closer.cc === "~" ? closer.numdelims : closer.numdelims >= 2 && opener!.numdelims >= 2 ? 2 : 1;
@@ -281,7 +281,7 @@ export class InlineParser {
           closer = next;
         }
       }
-      if (!found) {
+      if (!matched) {
         openersBottom.set(index, oldCloser.previous);
         if (!oldCloser.canOpen) this.removeDelimiter(oldCloser);
       }

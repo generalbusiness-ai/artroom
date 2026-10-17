@@ -108,9 +108,9 @@ export function itemQueryContinuation(value: ItemQuery, scope: ScopeRef, head: H
     if (!checked || !isScopeRef(scope) || !isHead(head)) return { ok: false, reason: "invalid-cursor" };
     if (canonicalize(checked.scope) !== canonicalize(scope)) return { ok: false, reason: "wrong-scope" };
     if (checked.cursor === null) return { ok: true, after: null };
-    const found = readItemQueryCursor(checked.cursor);
-    if (!found) return { ok: false, reason: "invalid-cursor" };
-    if (canonicalize(found.scope) !== canonicalize(scope) || canonicalize(found.head) !== canonicalize(head)) return { ok: false, reason: "stale-cursor" };
-    return found.query === itemQueryDigest(checked) && found.limit === checked.limit ? { ok: true, after: found.last } : { ok: false, reason: "query-mismatch" };
+    const matched = readItemQueryCursor(checked.cursor);
+    if (!matched) return { ok: false, reason: "invalid-cursor" };
+    if (canonicalize(matched.scope) !== canonicalize(scope) || canonicalize(matched.head) !== canonicalize(head)) return { ok: false, reason: "stale-cursor" };
+    return matched.query === itemQueryDigest(checked) && matched.limit === checked.limit ? { ok: true, after: matched.last } : { ok: false, reason: "query-mismatch" };
   } catch { return { ok: false, reason: "invalid-cursor" }; }
 }

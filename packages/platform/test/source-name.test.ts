@@ -79,7 +79,7 @@ test("an issue concern child keeps its authenticated parent's role only with exa
     const message = { class: "request", type: "create", body: { directory,
       fields: { opener: keys.rita.member, title: "Child", conditions: [], origin: marker } } } as const;
     const creator: Entry = { ...base, sends: [{ n: 0, to: seed, message }] };
-    const genesis: Entry = { ...parent.genesis, at, input: { type: "genesis", seed, inc: at.inc, kind: "file", founding: null,
+    const genesis: Entry = { ...parent.genesis, at, input: { type: "genesis", seed, inc: at.inc, kind: "file", "founding": null,
       source: factRefOf(creator), n: 0, message, decision: "applied" } };
     return [{ fact: factRefOf(genesis), entry: genesis, under: "issue" },
       { fact: factRefOf(creator), entry: creator, under: "issue" }, parent.origin[0]!];

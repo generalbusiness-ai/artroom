@@ -119,9 +119,9 @@ export class Lane extends Ledger {
   }
   /** The operation of that kind that an entry opened. */
   opened(seq: number, kind: string): OperationId {
-    const found = this.entries[seq]!.entry.effects.find((e) => e.effect === "operation" && e.kind === kind);
-    if (found?.effect !== "operation") throw new Error(`entry ${seq} opens no operation ${kind}`);
-    return `${seq}:${found.k}`;
+    const matched = this.entries[seq]!.entry.effects.find((e) => e.effect === "operation" && e.kind === kind);
+    if (matched?.effect !== "operation") throw new Error(`entry ${seq} opens no operation ${kind}`);
+    return `${seq}:${matched.k}`;
   }
 
   /** What the lane's object would serve: its entries, its declaration, the directory's two entries that it used, and each snapshot that it retains. */
@@ -162,9 +162,9 @@ const RULES_HEAD = { seq: 12, hash: d("9") } as const;
 const PROOF_DOMAIN = "gate-proof-1";
 
 /**
- * A scope under made-up platform data, founded by `rita`: derive's fixture
+ * A scope under made-up platform data, created by `rita`: derive's fixture
  * `gate`, whose act `enter` opens one operation `probe` by its rule
- * `key-id`. Entry 0 is the founding, entry 1 issues a ticket, entry 2 is
+ * `key-id`. Entry 0 is the creation, entry 1 issues a ticket, entry 2 is
  * `una`'s `enter`, and entry 3 is the `confirmed` outcome of the probe, for
  * which the rule `probe` gives `derives`.
  *
@@ -201,9 +201,9 @@ export class Gate extends Ledger {
     const proof = { seat: 12 };
     this.proof = placed ? { domain: PROOF_DOMAIN, digest: valueDigest(PROOF_DOMAIN, proof), bytes: canonicalize(proof) } : null;
     this.rules = Gate.rulesWith(derives, watched, held ? this.ticket : undefined);
-    const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "gate", notAfter: t(60) }, keys.rita.secret);
-    const seed: Seed = { v: 1, kind: "directory", definition: OWNER, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding };
+    const creation = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member }, idempotencyKey: "gate", notAfter: t(60) }, keys.rita.secret);
+    const seed: Seed = { v: 1, kind: "directory", definition: OWNER, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, creation: creation };
     this.seal(written(judgeGenesis(this.state, this.definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: this.rules })).draft);
     if (this.act(keys.rita, "issue", { fields: { hash: textDigest("one"), ...(this.proof ? { proof: this.proof.digest } : {}) } }, this.proof ? { values: [this.proof.bytes] } : {}).result !== "write") throw new Error("the issue was not written");
     const entered = this.did(keys.una, "enter", { on: 0, expected: { on: this.item(0).revision }, fields: { secret: "one" } });

@@ -111,7 +111,7 @@ test("the membership definition validates whole with the platform option; every 
 });
 
 // The plan's steps 9 and 9c, as the authority note's revision 25 decides them (its "What revision 25 lets the I3 source do next"):
-// "Then `platform:directory@1` lacks no rule", and the register's one rule that every founding waited on is written.
+// "Then `platform:directory@1` lacks no rule", and the register's one rule that every creation waited on is written.
 // Every definition carries its data and every rule of its marks.
 test("every platform definition supplies the rules of its whole pinned data, including destination first-head and receipt", () => {
   /** The marks of one definition's data that the package's table has no rule of the right kind for, by name, once each. */
@@ -120,7 +120,7 @@ test("every platform definition supplies the rules of its whole pinned data, inc
     const checked = validateDefinition(JSON.parse(JSON.stringify(supplied.data)), PROPOSED_BOUNDS, PROFILES, { platform: true });
     if (!checked.ok) return null;
     const missing = checked.definition.marks.filter((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null).map((mark) => mark.code);
-    // `runnable` is the whole-scope rule that a scope's runtime asks before it founds or creates anything under the definition.
+    // `runnable` is the whole-scope rule that a scope's runtime asks before it creates or creates anything under the definition.
     expect(runnable(checked.definition, supplied.rules)).toBe(missing.length === 0);
     return [...new Set(missing)];
   };

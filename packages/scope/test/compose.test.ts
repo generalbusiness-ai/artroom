@@ -30,14 +30,14 @@ describe("creating a child (section 7.2), in two real objects, by the dispatcher
     expect(i[0]!.entry).toMatchObject({ at: { scope: I.name, kind: "lane" }, input: { type: "genesis", source: fact(d[1]!), n: 0, decision: "applied" } });
     expect(d[2]!.entry).toMatchObject({ input: { from: fact(i[0]!), clause: "applied" }, effects: [{ effect: "state", item: 1, state: "created" }], sends: [{ message: { class: "control", genesis: fact(i[0]!) } }] });
     // Provisional: the result was sent and acknowledged with D.2; the index row of the genesis act is held, and no attempt of it started.
-    expect([(await I.summary()).value.status, await I.duties()]).toMatchObject(["provisional", [{ duty: "0.0", held: false, acknowledged: fact(d[2]!) }, { duty: "0.1", held: true, attempts: [], acknowledged: null }]]);
+    expect([(await I.summary()).value.status, await I.outboxItems()]).toMatchObject(["provisional", [{ outboxId: "0.0", held: false, acknowledged: fact(d[2]!) }, { outboxId: "0.1", held: true, attempts: [], acknowledged: null }]]);
     expect(await I.act(una, "approve", approve)).toEqual({ answer: "unavailable", reason: "scope-provisional" });
 
     // The confirmation arrives on its next attempt. I.1 activates the scope, the held send goes out, and an act is accepted.
     net.hold = null;
     await later(1, D, I);
     expect([kinds(await D.entries()), kinds(await I.entries())]).toEqual([["genesis", "act", "result", "advisory"], ["genesis", "control"]]);
-    expect([(await I.summary()).value.status, (await I.duties()).map((duty) => duty.held)]).toEqual(["active", [false, false]]);
+    expect([(await I.summary()).value.status, (await I.outboxItems()).map((outboxId) => outboxId.held)]).toEqual(["active", [false, false]]);
     expect(await I.act(una, "approve", approve)).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 2 } } });
   });
 
@@ -48,7 +48,7 @@ describe("creating a child (section 7.2), in two real objects, by the dispatcher
     const K = await C.created(split.fact.seq);
     await settle(D, C, K);
     // K ran its genesis under the definition that C pins, which no digest in that definition names. C recorded its result and confirmed it.
-    expect([(await K.summary()).value.status, (await C.duties()).find((duty) => duty.duty === `${split.fact.seq}.0`)?.result?.clause]).toEqual(["active", "applied"]);
+    expect([(await K.summary()).value.status, (await C.outboxItems()).find((outboxId) => outboxId.outboxId === `${split.fact.seq}.0`)?.result?.clause]).toEqual(["active", "applied"]);
     // The desk recorded an index row from each lane. K's creator is C, and C recorded none.
     const rows = async (node: Node) => (await node.entries()).flatMap((e) => (e.input.type === "delivery" && e.input.message.class === "advisory" ? [e.input.from.at.scope] : []));
     expect([await rows(D), await rows(C)]).toEqual([[C.name, K.name], []]);
@@ -73,7 +73,7 @@ describe("creating a child (section 7.2), in two real objects, by the dispatcher
     await settle(D, S, ...children);
     expect([seeds[0]!.cause === seeds[1]!.cause, children[0]!.name === children[1]!.name, await Promise.all(children.map(async (c) => (await c.summary()).value.status))]).toEqual([false, false, ["active", "active"]]);
     // Each request got its one result, which ran the `applied` clause of its own send.
-    expect((await S.duties()).filter((duty) => duty.class === "request").map((duty) => duty.result?.clause)).toEqual(["applied", "applied"]);
+    expect((await S.outboxItems()).filter((outboxId) => outboxId.class === "request").map((outboxId) => outboxId.result?.clause)).toEqual(["applied", "applied"]);
 
     // The first envelope again, exactly: D answers with the fact of the entry that decided it, and writes nothing.
     const head = (await D.summary()).at;
@@ -144,7 +144,7 @@ describe("a request that cannot be delivered (section 7.4)", () => {
       { of: unanswered.fact.seq, finding: "delivery-unavailable", log: ["none", wrong, wrong, wrong], effects: [] },
     ]);
     // The second request is still pending: its item has not moved and it has no result. Nothing reached the desk.
-    expect([(await S.item(unanswered.fact.seq))!.state, (await S.duties()).find((duty) => duty.duty === `${unanswered.fact.seq}.0`), (await D.summary()).at]).toMatchObject(["asked", { result: null, diagnosis: { finding: "delivery-unavailable" } }, head]);
+    expect([(await S.item(unanswered.fact.seq))!.state, (await S.outboxItems()).find((outboxId) => outboxId.outboxId === `${unanswered.fact.seq}.0`), (await D.summary()).at]).toMatchObject(["asked", { result: null, diagnosis: { finding: "delivery-unavailable" } }, head]);
   });
 
   test("a forged delivery is `source-unverified` and records nothing: a message the source entry does not hold, and a hash the source entry does not have", async () => {
@@ -172,7 +172,7 @@ describe("a restart of the sender (sections 7.2 and 7.4)", () => {
     const act = await D.did(rita, "open-issue", { fields: { title: "A" } });
     await settle();
     const I = await D.created(act.fact.seq);
-    expect([(await D.duties()).map((duty) => duty.attempts), await D.alarmAt(), await I.stub.summary(reader)]).toEqual([[[]], timeMs(now), { ok: false, reason: "not-found" }]);
+    expect([(await D.outboxItems()).map((outboxId) => outboxId.attempts), await D.alarmAt(), await I.stub.summary(reader)]).toEqual([[[]], timeMs(now), { ok: false, reason: "not-found" }]);
 
     await D.restart();
     // After the reload the alarm dispatches the send. The receiver records it, and the answer is lost on the way back.
@@ -181,10 +181,10 @@ describe("a restart of the sender (sections 7.2 and 7.4)", () => {
     expect(await D.alarm()).toBe(true);
     await settle(D, I);
     const genesis = (await I.sealed())[0]!;
-    expect([(await D.duties())[0], (await I.summary()).at.seq]).toMatchObject([{ attempts: [{ answer: "none" }], acknowledged: null }, 0]);
+    expect([(await D.outboxItems())[0], (await I.summary()).at.seq]).toMatchObject([{ attempts: [{ answer: "none" }], acknowledged: null }, 0]);
     // The next attempt is a duplicate. The receiver answers it with the fact of its genesis and writes nothing.
     await later(1, D, I);
-    expect([(await D.duties())[0], (await I.summary()).at.seq]).toMatchObject([
+    expect([(await D.outboxItems())[0], (await I.summary()).at.seq]).toMatchObject([
       { attempts: [{ answer: "none" }, { answer: "acknowledged" }], acknowledged: { at: genesis.entry.at, seq: 0, hash: genesis.hash } }, 0,
     ]);
   });

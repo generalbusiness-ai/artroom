@@ -1,5 +1,5 @@
 /**
- * The founding commit, a receipt's commit and the commit of a one-file edit,
+ * The creation commit, a receipt's commit and the commit of a one-file edit,
  * byte for byte (authority revision 28, section 12.1.5; the edit is i5's,
  * not the note's). Pure: the port gives the repository's
  * object format before writing; the destination's rule reads it from a
@@ -34,13 +34,13 @@ function commitObject(format: ObjectFormat, scope: ScopeId, time: Timestamp, tre
 }
 
 /**
- * What the founding commit of `platform:destination@2` names in its one
- * file: the repository's name, the founder's handle and the scope ID of the
+ * What the creation commit of `platform:destination@2` names in its one
+ * file: the repository's name, the creator's handle and the scope ID of the
  * room's directory. None of them is a secret.
  */
 export interface Readme { name: string; handle: string; directory: ScopeId }
 
-/** The text of `README.md` in a founding commit of version 2: the repository's name as a heading, and one sentence. */
+/** The text of `README.md` in a creation commit of version 2: the repository's name as a heading, and one sentence. */
 export const readmeText = (readme: Readme): string => `# ${readme.name}\n\nFounded by ${readme.handle} through the room ${readme.directory}.\n`;
 
 /** A tree of one file, `README.md` or `receipt.json`, with that blob. */
@@ -50,11 +50,11 @@ function oneFile(format: ObjectFormat, name: string, blob: DestinationObject): D
 }
 
 /**
- * The parentless founding commit. The time is the destination's genesis
+ * The parentless creation commit. The time is the destination's genesis
  * entry's. Version 1 (`readme` null): the empty tree. Version 2: a tree of
  * one file, `README.md` (`readmeText`).
  */
-export function foundingObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef, readme: Readme | null = null): DestinationCommit {
+export function initialCommitObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, claim: FactRef, readme: Readme | null = null): DestinationCommit {
   const blob = readme === null ? null : object(format, "blob", utf8(readmeText(readme)));
   const tree = blob === null ? object(format, "tree", new Uint8Array()) : oneFile(format, "README.md", blob);
   const commit = commitObject(format, scope, time, tree.id, "Found this repository.", "claim", claim);
@@ -191,18 +191,18 @@ export function editTree(
     }
     const replaced = new Set<TreeRow>(), written: TreeRow[] = [];
     for (const [key, edit] of edits) {
-      const found = byName.get(key) ?? null;
+      const matched = byName.get(key) ?? null;
       let row: TreeRow;
       if (edit.bytes !== undefined) {
-        if (found !== null && !FILE_MODES.includes(found.mode)) return null;
-        row = { mode: found?.mode ?? "100644", name: edit.name, id: keep(object(format, "blob", edit.bytes)) };
+        if (matched !== null && !FILE_MODES.includes(matched.mode)) return null;
+        row = { mode: matched?.mode ?? "100644", name: edit.name, id: keep(object(format, "blob", edit.bytes)) };
       } else {
-        if (found !== null && found.mode !== TREE_MODE) return null;
-        const below = write(found?.id ?? null, edit.children);
+        if (matched !== null && matched.mode !== TREE_MODE) return null;
+        const below = write(matched?.id ?? null, edit.children);
         if (below === null) return null;
         row = { mode: TREE_MODE, name: edit.name, id: below };
       }
-      if (found) replaced.add(found);
+      if (matched) replaced.add(matched);
       written.push(row);
     }
     const next = [...rows.filter((kept) => !replaced.has(kept)), ...written].sort(rowOrder);

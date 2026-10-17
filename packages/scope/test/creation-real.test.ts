@@ -6,7 +6,7 @@ import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, newIncar
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, useOf, validateDefinition, valueDigest, type Fetched, type Item } from "@generalbusiness/dap-derive";
 import { d, keys, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
-import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
+import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, initialCommitObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
 import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
@@ -49,7 +49,7 @@ function lacking(named: string): string[] {
 // |---|---|
 // | The register, the directory, membership and the rules scope | Real scopes, written through the turn, the store, the dispatchers and the operations driver. |
 // | The Git host | A STAND-IN: `OutsideDouble` of `outside.ts`, wired as the register's outside port. It answers the one request of an attempt with what the test wrote. Nothing here creates a repository. |
-// | The change lane | SCRIPTED: a manifest, a job opening, its passed decision and a merge entry, signed and hashed by the test. The integrator and job facts are stated by hand; the checker grant uses a real membership answer. No lane judged them and no checker runner ran. Its progress messages retain duties at the destination. |
+// | The change lane | SCRIPTED: a manifest, a job opening, its passed decision and a merge entry, signed and hashed by the test. The integrator and job facts are stated by hand; the checker grant uses a real membership answer. No lane judged them and no checker runner ran. Its progress messages retain pending work at the destination. |
 // | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. For the reads that are about a session, the readers are the real read sessions, under a TEST SECRET that the test generates. |
 // | Who may install | Nothing checks it: that is the installation design's (N5). paul signs the `install`. |
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
@@ -60,7 +60,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     try {
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
-    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     // STAND-IN: the Git host of this register. It is wired before the object is first reached.
     const host = outsideOf(R.name);
@@ -69,13 +69,13 @@ describe("a founding on real scopes under the deployed class (authority note, se
       send: (request) => lifetime.wait(() => host.send(request)),
       late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
-    expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
+    expect(await R.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
     const register = await R.at();
 
-    // Step 1: the founder's claim. The policy is `keys`, and rita's key is a founder's. No grant judges the act. The entry fixes the
+    // Step 1: the creator's claim. The policy is `keys`, and rita's key is a creator's. No grant judges the act. The entry fixes the
     // directory's seed, and so its scope ID, and opens the creation of a repository, with attempt 1.
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(matched.intent), ordinal: 0 };
     const D = lifetime.platform(scopeIdOf(seed));
     const creation: OperationId = "1:0";
     // What the host answers, which the test writes (section 12.1.1, case c). The reply to attempt 1 is lost: no answer comes. The
@@ -84,7 +84,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     lifetime.active();
     host.answer(creation, 1, null);
     host.answer(creation, 2, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: "repo-7" } } });
-    const claimed: Answer = await R.stub.submit(found, []);
+    const claimed: Answer = await R.stub.submit(matched, []);
     expect(claimed).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 1 } } });
 
     // Steps 2 to 7: the operations driver sends the one request of each attempt and records what came as an outcome entry, and the
@@ -141,13 +141,13 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // the three children that answered.
     expect((await D.item(0))).toMatchObject({
       refs: { register, claim: { at: register, seq: 1 }, membership, rules, destination: branchScope },
-      values: { repository: { host: "git.example", namespace: "artroom", name, id: "repo-7" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key },
+      values: { repository: { host: "git.example", namespace: "artroom", name, id: "repo-7" }, branch: "main", "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key },
     });
 
-    // Before any session (the planner's decisions 61cc5e50 and c6499e91): the founder's claim key reads, by signed reads, the
+    // Before any session (the planner's decisions 61cc5e50 and c6499e91): the creator's claim key reads, by signed reads, the
     // register's summary and the directory's genesis and summary. The readers are the real read sessions, under a TEST SECRET, which
     // refuse the same read with no header. The install's key signed nothing in the directory, and may not read it. From the
-    // directory's repository item the founder learns membership's reference, which its session request below names.
+    // directory's repository item the creator learns membership's reference, which its session request below names.
     const signedPhase = beginSessionChild(owner, { secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true });
     let learned: ScopeRef | null = null;
     try {
@@ -169,12 +169,12 @@ describe("a founding on real scopes under the deployed class (authority note, se
     }
     expect(learned).toEqual(membership);
 
-    // Every declared mark has its production rule, so the third child is created and confirmed too. No duty is held or waiting.
+    // Every declared mark has its production rule, so the third child is created and confirmed too. No task is held or waiting.
     expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@2"), lacking("platform:rules@2"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
-    expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
-    // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
+    expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((outboxId) => outboxId.acknowledged !== null)).toBe(true);
+    // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the creation commit.
     const destinationHost = outsideOf(G.name);
-    const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
+    const firstHead = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
     lifetime.active();
     destinationHost.answer("0:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { send: "accepted", seen: firstHead } } });
     let driving = "mint";
@@ -212,13 +212,13 @@ describe("a founding on real scopes under the deployed class (authority note, se
     lifetime.unWire(R.name);
 
     // Where the rules scope records its membership reference (authority note, revision 25, section 12.1; I3 deltas EM21, EQ7 and
-    // EU6). rita takes her seat in membership, on the founding key, and so is an admin, who holds `rules.publish`.
+    // EU6). rita takes her seat in membership, on the creation key, and so is an admin, who holds `rules.publish`.
     const seat = await membershipScope!.did(rita, "seat", { expected: await membershipScope!.expected({ roster: 0 }) });
     await membershipScope!.did(rita, "first-key", { fields: { member: seat }, expected: await membershipScope!.expected({ roster: 0, member: seat }) });
     // A read session of rita's, issued by membership under a TEST SECRET that this test generates. A scope accepts a session only
     // when it names the membership reference that the scope itself records, with its incarnation. So what a reader with it is
     // answered at the rules scope shows what that scope records, as its own store holds it.
-    // Age every founding history past the 900-second signed bootstrap window.
+    // Age every creation history past the 900-second signed bootstrap window.
     lifetime.advance(901_000);
     owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))) });
     const real = <T>(run: () => Promise<T>): Promise<T> => lifetime.wait(() => owner.required(run));
@@ -227,7 +227,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
     // Birth-session preparation permits the first read without retaining a
     // membership observation or changing grant authority. The rules scope
-    // has had no act; its aged founding can be replayed without anchors.
+    // has had no act; its aged creation can be replayed without anchors.
     const beforeReads = await rulesScope!.entries();
     expect([await reads(D), await reads(rulesScope!), await reads(G)]).toEqual([200, 200, 200]);
     await rulesScope!.restart();
@@ -248,9 +248,9 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // (authority note, revision 28, section 12.1.4; I3 deltas, entries EQ8 and FB10). It is what another scope's object is answered:
     // one call on the object, by the reference or by the scope ID alone. A membership scope answers no such request.
     const observes = async (of: object, asked: string) => { const got = await rulesScope!.stub.observe({ of, asked }); return got && typeof got === "object" && "answer" in got ? got.answer : got; };
-    const founding = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) };
+    const initialRules = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) };
     expect([await observes(rules, "rules"), await observes({ scope: rules.scope, kind: "rules" }, "definitions"), await membershipScope!.stub.observe({ of: membership, asked: "rules" })]).toEqual([
-      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: founding, definition: "platform:rules@2" },
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: initialRules, definition: "platform:rules@2" },
       { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: { asked: "definitions", active: [] }, definition: "platform:rules@2" }, null,
     ]);
     expect(await publish(2)).toMatchObject({ answer: "accepted" });
@@ -320,7 +320,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       expect((await D.summary()).value.definition).toBe(DIRECTORY);
       expect(scopes.find((scope) => scope.scope.scope === target.scope)!.retained).toContainEqual({ kind: "entry", digest: use.content, bytes: canonicalize((await D.entries())[genesis.source.seq]), under: platformName(DIRECTORY) });
       const text = canonicalize({ format: "artroom-native-replay-capture-1", target, scopes, missing: { scope: D.name, fact: genesis.source }, limits,
-        provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/founding-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
+        provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/creation-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
           namespace: "PLATFORM", storedBytes: "native HTTP history and retained-input routes", grants: "proven", anchors: [],
           labels: ["recorded local native fixture; no deployed service", "real Durable Objects, SQLite, production platform rules and membership authority", "Git host OutsideDouble is a stand-in", "clock and transport are test boundaries; reads use a real session under a TEST SECRET", "fixture public keys and signatures only; no reader or secret exported"] },
         observed: replay });
@@ -375,7 +375,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // scope's head. A request that states another incarnation of the rules scope's name is answered by nobody.
     const published = (await rulesScope!.summary()).at;
     expect([await observes(rules, "rules"), (await rulesScope!.item(0)).refs["published"], await observes({ ...rules, inc: register.inc }, "rules")]).toEqual([
-      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...founding, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@2" }, published.seq, null,
+      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...initialRules, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@2" }, published.seq, null,
     ]);
     // A request that states another incarnation of membership's name is answered by nobody, and one by the ID alone is answered.
     const asked = { ...membership, inc: register.inc };
@@ -432,7 +432,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       input: { type: "act", signed: signIntent(factoryIntent, rita.secret), authority: [], presented: {} },
       uses: [], prepared: [], effects: [], sends: [{ n: 0, to: laneSeed, message: creationMessage }] };
     const genesis: Entry = { v: 1, at: otherLane, seq: 0, prev: null, time: timeOf(lifetime.now()), clamped: false, epoch: 0,
-      input: { type: "genesis", seed: laneSeed, inc: otherLane.inc, kind: "open", founding: null,
+      input: { type: "genesis", seed: laneSeed, inc: otherLane.inc, kind: "open", "founding": null,
         source: factRefOf(creator), n: 0, message: creationMessage, decision: "applied" },
       uses: [useOf(factRefOf(creator), creator)], prepared: [], effects: [], sends: [] };
     const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "change" },
@@ -493,7 +493,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect((await storedPublication()).operations.filter((operation) => ["judge", "push", "mint"].includes(operation.kind)).every((operation) => operation.for === publication)).toBe(true);
 
     // The labelled Git host answers the reserved compare-and-swap, then the exact receipt write. The real rules publish, release
-    // the branch slot, finish the receipt and clean up each token. Progress messages to the scripted lane retain their duties.
+    // the branch slot, finish the receipt and clean up each token. Progress messages to the scripted lane retain their pending work.
     await drive("mint");
     await drive("push");
     expect((await storedPublication()).item).toMatchObject({ state: "published", values: { integration } });
@@ -507,14 +507,14 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(finished.held?.decisions ?? {}).toEqual({});
     expect(finished.operations.every((operation) => operation.attempts.every((attempt) => attempt.outcomes.length > 0))).toBe(true);
     const outbox = await G.stub.outbox(reader);
-    expect(outbox.ok && outbox.value.filter((duty) => "scope" in duty.to && duty.to.scope === otherLane.scope).map((duty) => [duty.acknowledged, duty.result, duty.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
+    expect(outbox.ok && outbox.value.filter((outboxId) => "scope" in outboxId.to && outboxId.to.scope === otherLane.scope).map((outboxId) => [outboxId.acknowledged, outboxId.result, outboxId.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
     lifetime.unWire(G.name);
 
     // A verifier reads the five histories as bytes and derives every entry again, with the platform package's data and rules: the
     // register's outcome entry with its creation, the directory's genesis under the fourth cause, the clause of the result, and
     // the grants of the rules scope from their observations, the first of which fixed the incarnation. No grant is taken as current.
     // Only the six explicitly scripted source/origin facts are anchored (no
-    // membership or rules facts). Actual founding and authority entries are
+    // membership or rules facts). Actual creation and authority entries are
     // replayed; the scripted Directory creation anchor supplies no native
     // factory claim, and the separate native-origin witness owns that check.
     const options = { mode: "replay", platform, grants: "proven", anchors: sourceFacts.map((entry) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) })) } as const;

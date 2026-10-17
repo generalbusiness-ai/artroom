@@ -5,7 +5,7 @@
  * compiling. The digests and names are made up.
  */
 
-import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, ObservationUse, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
+import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, OutboxId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, ObservationUse, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
 import { DOMAINS, PROPOSED_BOUNDS, type Bounds, type DomainTag } from "../src/index.ts";
 
 const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -41,7 +41,7 @@ const d17Fact: FactRef = { at: directory, seq: 17, hash: d("7") };
 const lane: ScopeRef = { scope: "sc_issue", inc: "in_i", kind: "lane" };
 const i0: Entry = {
   v: 1, at: lane, seq: 0, prev: null, time, clamped: false, epoch: 0,
-  input: { type: "genesis", seed, inc: lane.inc, kind: "file", founding: null, source: d17Fact, n: 0,
+  input: { type: "genesis", seed, inc: lane.inc, kind: "file", "founding": null, source: d17Fact, n: 0,
            message: { class: "request", type: "create", body: { opener, title: "A flaky test" } }, decision: "applied" },
   uses: [], prepared: [],
   effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: opener }],
@@ -67,9 +67,9 @@ const i1: Entry = {
 };
 
 // The views, built after sealing.
-const duty: DutyId = "17.0";
+const outboxId: OutboxId = "17.0";
 const envelope: Envelope = { to: "sc_issue", from: d17Fact, n: 0, message: d17.sends[0]!.message };
-const receipt: Receipt = { fact: d17Fact, definition: "platform:directory@1", intent: d("a"), effects: d17.effects, sends: [duty], epoch: 0 };
+const receipt: Receipt = { fact: d17Fact, definition: "platform:directory@1", intent: d("a"), effects: d17.effects, sends: [outboxId], epoch: 0 };
 const accepted: Answer = { answer: "accepted", receipt };
 const refused: Answer = { answer: "refused", reason: "revision-moved", judgedAt: { seq: 18, hash: d18Fact.hash } };
 const settled: Read<Receipt> = { ok: true, at: { seq: 18, hash: d18Fact.hash }, value: receipt, complete: true };

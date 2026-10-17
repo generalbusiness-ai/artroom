@@ -59,7 +59,7 @@ The examples are from one run of the test in
 
 **`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments|invitation-key]`**
 creates the register with an `install` intent, signed by a new operator
-key, which is also the one founder key. The host defaults to `github.com`
+key, which is also the one creator key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
 service, use `--host artifacts --namespace artroom-demo`;
 [hosts.md](hosts.md) says what each host needs.
@@ -75,7 +75,7 @@ function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will create,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be created. It keeps the signed intent, the version and the
-ID in the config. This founding intent carries no invitation credential;
+ID in the config. This creation intent carries no invitation credential;
 the register's genesis records it and its signature. Only a definitely unsent legacy plan may
 be replaced. A selected application or Counting plan always retains its
 original envelope, version, register and deadline, including when planning
@@ -205,15 +205,14 @@ an independent review of the code are still required for this follow-up.
 
 **`dap create <name> [--handle @you] [--branch main] [--again]`**
 
-`found` remains an alias for one release and prints `dap create` as the new
-command name. The existing `claim` command remains compatible with retained
-workflows. All three commands use the same creation and recovery code.
+The existing `claim` command remains available for retained workflows.
+Both commands use the same creation and recovery code.
 
 The command signs the register's recorded `found` act. It waits until the
 directory, membership, the rules scope and the destination are created and
-confirmed. Then it takes the founder's seat, their member item, and first key in
+confirmed. Then it takes the creator's seat, their member item, and first key in
 membership,
-which makes the founder the first admin. `<name>` is a label for this
+which makes the creator the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
@@ -479,7 +478,7 @@ publication, `git pull` reads that room commit.
 This command requires a manifest-list change definition and a destination
 at version 3. Existing rooms retain their genesis pins. An older room is
 refused with `version-mismatch`; activation alone cannot upgrade its
-native destination. A founder supplies the authored `change3.json` or
+native destination. A creator supplies the authored `change3.json` or
 `change-demo3.json` bytes to the rules scope, by their exact digest.
 
 The change records one signed `propose-file` source entry per path, then
@@ -516,12 +515,12 @@ started, the fence is refused as `publication-started`; the old job and
 any unresolved send remain recorded. Delayed results count only for the
 destination's acknowledged generation. Cancellation before a push and the
 recorded check deadline release logical publication availability. A staged
-ref remains a separate cleanup duty. Publication moves the branch by its
+ref remains a separate cleanup task. Publication moves the branch by its
 recorded compare-and-swap; deletion of the reservation ref and revocation
 of its tokens must settle before the destination’s publication is final.
 Unknown staging or deletion remains recorded and is never inferred from
 a read alone. A staging mismatch that may leave a ref keeps a live
-`cleanup-aborted` duty; its branch slot can be reclaimed independently
+`cleanup-aborted` task; its branch slot can be reclaimed independently
 of that cleanup. A delete uses the recorded old integration ID and cannot
 remove another writer’s replacement ref. Expiry currently retains `cleanup-aborted`; its explicit
 `resend` cleanup trigger is awaiting the owner’s disposition (`f1b87a0b`).
@@ -693,8 +692,8 @@ be filtered; a sparse page is not complete replay evidence. Replay still states 
 - A member cannot merge their own change: `merge` needs `change.merge`.
 - `invite --acts` is refused: membership's `invite-member` has no list of
   acts for one member.
-- The founder must reach the seat within 15 minutes of the claim: until
-  the seat, the founder reads the new scopes by signed reads only, and
+- The creator must reach the seat within 15 minutes of the claim: until
+  the seat, the creator reads the new scopes by signed reads only, and
   those last for the intent window after the claim. A claim whose
   creation takes longer gives up, and a resumed claim cannot read the
   directory either. See `notes/implementation/2026-10-07-i5-live-ops-delivery.md`,
@@ -702,7 +701,7 @@ be filtered; a sparse page is not complete replay evidence. Replay still states 
 - An act definition has no description text. The line `acts` prints is
   made from the act's step, item and grant.
 - An active member's session reads the destination before its first act,
-  including after the founder's signed-read window. The destination checks
+  including after the creator's signed-read window. The destination checks
   the full confirmed membership reference from its recorded birth directory
   before accepting a session, even before its first retained observation. The first `remote` or `clone`
   need not occur within 15 minutes of the claim. Signed reads without a

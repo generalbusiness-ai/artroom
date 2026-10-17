@@ -23,16 +23,16 @@ test("a value beside an intent, on real storage: the scope reads it only for a p
   const MADE = "platform:task@1" as PlatformDefinition;
   const [DOMAIN, MAX] = ["gate-proof-1", 64];
   const data = gateWith((d) => { d.name = "platform:task"; d.acts.issue.fields.proof = { type: "digest", required: false, value: { domain: DOMAIN, max: MAX } }; }).declared;
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(founding), ordinal: 0 };
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(creation), ordinal: 0 };
   const name = scopeIdOf(seed);
   controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: data as never, rules: gateRules().rules } : null) } }));
   try {
     const stub = stubOf(name);
-    const founded = await stub.found(signIntent(founding, rita.secret), MADE);
-    if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
-    const scope = founded.receipt.fact.at;
+    const created = await stub.create(signIntent(creation, rita.secret), MADE);
+    if (created.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(created)}`);
+    const scope = created.receipt.fact.at;
     const grants = [grantOf(rita, scope, ["gate.issue"])];
     const issue = (secret: string, proof: Digest | null, values?: readonly string[]): Promise<Answer> => {
       const intent: Intent = { v: 1, to: scope, actor: rita.key, kind: "issue", on: null, expected: {}, fields: { hash: textDigest(secret), ...(proof ? { proof } : {}) }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
@@ -86,16 +86,16 @@ test.each(["gate-proof-1", DOMAINS.definition])("an owner's evidence value in %s
     data.outcomes.probe.attempts = 1;
   }).declared;
   const code = gateRules({ "open-proof": { place: "effect", most: 2, run: () => [{ effect: "operation", k: 0, owner: MADE, kind: "probe", attempts: 1 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null }] }, probe: { place: "outcome", rules: probe } });
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(founding), ordinal: 0 };
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(creation), ordinal: 0 };
   const name = scopeIdOf(seed);
   controls(name, START);
   const out = outsideOf(name);
   wired.set(name, () => ({ outside: out, definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => named === MADE ? { data: data as never, rules: code.rules } : null } }));
   try {
-    const founded = await stubOf(name).found(signIntent(founding, rita.secret), MADE);
-    if (founded.answer !== "accepted") return expect.fail(`the scope was not founded: ${JSON.stringify(founded)}`);
-    const scope = founded.receipt.fact.at;
+    const created = await stubOf(name).create(signIntent(creation, rita.secret), MADE);
+    if (created.answer !== "accepted") return expect.fail(`the scope was not founded: ${JSON.stringify(created)}`);
+    const scope = created.receipt.fact.at;
     const issue: Intent = { v: 1, to: scope, actor: rita.key, kind: "issue", on: null, expected: {}, fields: { hash: textDigest("one") }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
     expect((await stubOf(name).submit(signIntent(issue, rita.secret), [grantOf(rita, scope, ["gate.issue"])])).answer).toBe("accepted");
     const operation = "1:0" as OperationId;

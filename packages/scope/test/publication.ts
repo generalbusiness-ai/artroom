@@ -1,5 +1,5 @@
 /**
- * The founding publication of a real destination, with a STAND-IN Git host.
+ * The creation publication of a real destination, with a STAND-IN Git host.
  *
  * A destination that is created with no import opens `first-head` in its
  * genesis, and the outcome of each of its operations opens the next: a
@@ -7,7 +7,7 @@
  * `receipt` write and a `revoke` of each token. `foundingPublication`
  * answers each of them by `OutsideDouble` of `outside.ts`, with the exact
  * commit IDs that the platform package computes, as
- * `founding-real.test.ts` does. The destination, its rules and its store are
+ * `creation-real.test.ts` does. The destination, its rules and its store are
  * real: the stand-in only gives each request the answer that the test
  * writes from the destination's own SQLite records. No host runs, nothing is
  * pushed, and no token is minted.
@@ -16,7 +16,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/dap-platform";
+import { destinationReceipt, initialCommitOf, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";
@@ -25,11 +25,11 @@ import type { Platform } from "./repository.ts";
 import type { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 /**
- * Drive the founding publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
- * written. The first head is the founding commit of the destination's own version, from its own records (`foundingOf`). The
+ * Drive the creation publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
+ * written. The first head is the creation commit of the destination's own version, from its own records (`foundingOf`). The
  * STAND-IN host is wired for the destination while this runs, and unwired after.
  */
-export async function foundingPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
+export async function initialPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
   const wait = <T>(run: () => Promise<T>): Promise<T> => lifetime ? lifetime.wait(run) : run();
   const host = outsideOf(G.name);
   let driving = "";
@@ -47,7 +47,7 @@ export async function foundingPublication(G: Platform, lifetime?: ReturnType<typ
         const body = kind === "mint" ? { token: `token-${operation.id}`, ends: timeOf(timeMs(net.clock.now)! + 60_000) }
           : kind === "revoke" ? { token: revokedToken(store, own, operation) }
           : kind === "receipt" ? { send: "accepted", seen: destinationReceipt(store, own, targetOf(store, own, operation)!, "sha1").commit }
-          : { send: "accepted", seen: foundingOf(store, own, "sha1").commit };
+          : { send: "accepted", seen: initialCommitOf(store, own, "sha1").commit };
         return { operation: operation.id as OperationId, attempt: attempt.attempt, body };
       }));
     }));

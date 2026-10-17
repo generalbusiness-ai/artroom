@@ -28,7 +28,7 @@ import { health } from "./health.ts";
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the founding register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes` | Create a scope with no creator: under `platform:register@1` the initial register, by an `install` intent; under another definition a directory. Body `{ creation, definition, definitions?, texts? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition has a place. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
@@ -70,17 +70,17 @@ import { health } from "./health.ts";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { CONTROL_BODY_BYTES, HostedAgent, HostedRegistry, controlOf, type AgentPorts, type ControlAnswer, type RegistryPorts } from "@generalbusiness/dap-mcp";
 import { PROPOSED_BOUNDS, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-contract";
-import type { FactRef, Entry, ItemQueryRead, ItemQueryRefusal, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
+import type { FactRef, Entry, ItemQueryRead, ItemQueryRefusal, Answer, Beside, Cursor, DeclaredDefinition, Digest, OutboxId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, parseStrict, readItemQueryReply, utf8, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/dap-derive";
-import { foundedKind, type Founded } from "./core.ts";
+import { creationKind, type Created } from "./core.ts";
 import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, sessionReferencesIn, type Binding } from "./namespace.ts";
 import { ScopeObject, type OutsideGiven, type Wiring } from "./object.ts";
 import type { Incident } from "./operator.ts";
 import type { Summary } from "./reads.ts";
 import { credentialInUrl, relay, sessionReaders, sessionsOf, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
-import type { Duty, Sealed } from "./store.ts";
+import type { OutboxItem, Sealed } from "./store.ts";
 import type { ReadCredential } from "./destination-host.ts";
 import { gitHubOutside, type GitHubBindings } from "./github-wiring.ts";
 import { within } from "./turn.ts";
@@ -108,7 +108,7 @@ export interface McpEnv extends Env { REGISTRIES: DurableObjectNamespace; AGENTS
 interface Remote {
   observed?(method: ObservedMethod, args: unknown[], identity: OperationalIdentity, httpPublic?: boolean): Promise<{ value: unknown; turn: boolean }>;
   reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
+  create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
   prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
   settle(signed: SignedIntent): Promise<Settlement>;
@@ -116,8 +116,8 @@ interface Remote {
   items(reader: unknown, type: string, cursor?: Cursor): Promise<Read<readonly Item[]>>;
   history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>>;
   entry(reader: unknown, seq: number): Promise<Read<Sealed>>;
-  outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>>;
-  duty(reader: unknown, duty: DutyId): Promise<Read<Duty>>;
+  outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>>;
+  outboxItem(reader: unknown, outboxId: OutboxId): Promise<Read<OutboxItem>>;
   log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   queryItems(encoded: unknown, reader: unknown): Promise<NativeItemQuery>;
@@ -125,7 +125,7 @@ interface Remote {
   stream(reader: unknown): Promise<Opened | StreamRefusal>;
   release(id: string): Promise<void>;
   incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
-  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly OutboxItem[]>>;
   credential(reader: unknown, handle: string): Promise<Read<ReadCredential>>;
   requests(reader: unknown, request?: string, trace?: string, cursor?: string): Promise<Read<Pick<RequestPage, "rows" | "window">>>;
 }
@@ -139,7 +139,7 @@ export interface Api extends ScopeApi {
   /** The body is the reader's side of the stream (`relay`): cancelling it releases the scope's subscription at once. */
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
   incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>>;
-  waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly OutboxItem[]>>;
   /** A member's read token at a destination, once (I5). */
   credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>>;
   requests(scope: string, reader: unknown, request?: string, trace?: string, cursor?: string): Promise<Read<Pick<RequestPage, "rows" | "window">>>;
@@ -160,7 +160,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     return new Proxy(remote, { get(target, key) {
       if (typeof key !== "string" || !(OBSERVED_METHODS as readonly string[]).includes(key)) return Reflect.get(target, key);
       return async (...args: unknown[]) => {
-        const httpPublic = context.httpPublic && context.place === operationPlace(key as ObservedMethod) && ["found", "submit", "prepare"].includes(key);
+        const httpPublic = context.httpPublic && context.place === operationPlace(key as ObservedMethod) && ["create", "submit", "prepare"].includes(key);
         if (typeof target.observed !== "function") {
           if (httpPublic) unknownTurnMark(context);
           return Reflect.apply(Reflect.get(target, key) as (...args: unknown[]) => unknown, target, args);
@@ -181,19 +181,19 @@ export function api(binding: Binding, address: string | null = null): Api {
      * that name checks both again. `definition` is a declaration, or the
      * digest or platform name of one. `definitions`: the declarations it
      * names in `create` sends, which the directory retains for its children.
-     * `beside`: the detached texts that the founding intent's fields name.
+     * `beside`: the detached texts that the creation intent's fields name.
      */
-    async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> {
+    async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
       let name: ScopeId;
       try {
         const names = typeof definition === "string" ? definition : definitionDigest(definition);
-        // Under the register's platform definition the scope is the founding register, of the kind `register` (I3 delta EP2).
-        const seed: Seed = { v: 1, kind: foundedKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+        // Under the register's platform definition the scope is the creation register, of the kind `register` (I3 delta EP2).
+        const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
         name = scopeIdOf(seed);
       } catch {
         return { answer: "refused", reason: "source-unverified" };   // not values that have canonical bytes
       }
-      return at(name)!.found(founding, definition, definitions, beside);
+      return at(name)!.create(creation, definition, definitions, beside);
     },
     async submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return (await at(scope)?.submit(signed, grants, beside, address)) ?? { answer: "unavailable", reason: "unavailable" }; },
     async prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return (await at(scope)?.prepare(signed, grants, capability, step)) ?? { answer: "unavailable", reason: "unavailable" }; },
@@ -206,8 +206,8 @@ export function api(binding: Binding, address: string | null = null): Api {
     },
     async history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return (await at(scope)?.history(reader, cursor)) ?? MISSING; },
     async entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return (await at(scope)?.entry(reader, seq)) ?? MISSING; },
-    async outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.outbox(reader, cursor)) ?? MISSING; },
-    async duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return (await at(scope)?.duty(reader, duty)) ?? MISSING; },
+    async outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return (await at(scope)?.outbox(reader, cursor)) ?? MISSING; },
+    async outboxItem(scope: string, reader: unknown, outboxId: OutboxId): Promise<Read<OutboxItem>> { return (await at(scope)?.outboxItem(reader, outboxId)) ?? MISSING; },
     async log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return (await at(scope)?.log(reader, cursor)) ?? MISSING; },
     async retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return (await at(scope)?.retained(reader, kind, digest, domain)) ?? MISSING; },
     async session(scope: string, asked: unknown): Promise<SessionAnswer> { return (await at(scope)?.session(asked)) ?? MISSING; },
@@ -218,7 +218,7 @@ export function api(binding: Binding, address: string | null = null): Api {
       return "body" in opened ? relay(opened, () => object.release(opened.id)) : opened;
     },
     async incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return (await at(scope)?.incidents(reader, cursor)) ?? MISSING; },
-    async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
+    async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
     async reservationSnapshot(scope: string, asked: SignedIntent) { return (await at(scope)?.reservationSnapshot(asked)) ?? null; },
     async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
     async requests(scope: string, reader: unknown, request?: string, trace?: string, cursor?: string) { return requestQuery(request, trace, cursor) ? (await at(scope)?.requests(reader, request, trace, cursor)) ?? MISSING : MISSING; },
@@ -232,8 +232,8 @@ const BODY_BYTES = 1024 * 1024;
 
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
-/** The status of an answer to a founding or an act (section 4.2). The body says which. */
-function answered(answer: Founded | Answer, accepted: number): Response {
+/** The status of an answer to a creation or an act (section 4.2). The body says which. */
+function answered(answer: Created | Answer, accepted: number): Response {
   const status = answer.answer === "accepted" ? accepted : answer.answer === "unavailable" ? 503 : answer.answer === "mismatch" ? 409 : answer.reason === "unauthorized" ? 403 : 422;
   return json(status, answer);
 }
@@ -330,7 +330,7 @@ async function routedRequest(request: Request, binding: Binding): Promise<Respon
     if (!given) return json(400, { error: "bad-request" });
     // What travels beside the intent is untrusted, like the rest of the body: the scope reads each text and each presented fact itself.
     const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}), ...("values" in given ? { values: given["values"] } : {}) } as Beside;
-    if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
+    if (scope === undefined) return answered(await scopes.create(given["creation"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
     if (what === "reservation-snapshot") {
       const snapshot = await scopes.reservationSnapshot(scope, given["signed"] as SignedIntent);
       if (snapshot && "refused" in snapshot) return new Response(JSON.stringify(snapshot), { status: 409, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -351,7 +351,7 @@ async function routedRequest(request: Request, binding: Binding): Promise<Respon
   if (what === "history" && which === undefined) return read(await scopes.history(scope, reader, cursor));
   const seq = what === "entries" ? positionOf(which) : null;
   if (seq !== null) return read(await scopes.entry(scope, reader, seq));
-  if (what === "outbox") return read(which === undefined ? await scopes.outbox(scope, reader, cursor) : await scopes.duty(scope, reader, which as DutyId));
+  if (what === "outbox") return read(which === undefined ? await scopes.outbox(scope, reader, cursor) : await scopes.outboxItem(scope, reader, which as OutboxId));
   if (what === "log" && which === undefined) return read(await scopes.log(scope, reader, cursor));
   if (what === "retained") return read(await scopes.retained(scope, reader, which as RetainedInput["kind"], last as Digest, url.searchParams.get("domain") ?? undefined));
   if (what === "incidents") return read(await scopes.incidents(scope, reader, cursor));
@@ -482,7 +482,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
 export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> implements ScopeApi {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
-  found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Founded> { return api(this.scopes()).found(founding, definition, definitions, beside); }
+  create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return api(this.scopes()).create(creation, definition, definitions, beside); }
   submit(scope: string, signed: SignedIntent, grants: readonly Grant[], beside: Beside = {}): Promise<Answer> { return api(this.scopes()).submit(scope, signed, grants, beside); }
   prepare(scope: string, signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return api(this.scopes()).prepare(scope, signed, grants, capability, step); }
   settle(scope: string, signed: SignedIntent): Promise<Settlement> { return api(this.scopes()).settle(scope, signed); }
@@ -491,8 +491,8 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   queryItems(scope: string, reader: unknown, encoded: string): Promise<ItemQueryRead> { return api(this.scopes()).queryItems(scope, reader, encoded); }
   history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return api(this.scopes()).history(scope, reader, cursor); }
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>> { return api(this.scopes()).entry(scope, reader, seq); }
-  outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>> { return api(this.scopes()).outbox(scope, reader, cursor); }
-  duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>> { return api(this.scopes()).duty(scope, reader, duty); }
+  outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return api(this.scopes()).outbox(scope, reader, cursor); }
+  outboxItem(scope: string, reader: unknown, outboxId: OutboxId): Promise<Read<OutboxItem>> { return api(this.scopes()).outboxItem(scope, reader, outboxId); }
   log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return api(this.scopes()).log(scope, reader, cursor); }
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }

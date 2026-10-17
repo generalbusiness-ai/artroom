@@ -140,16 +140,16 @@ type Asking = Pick<StepGiven, "view" | "definition" | "scope" | "intent">;
 
 /** The one hold of this scope that is `held` and whose `under` is that commitment. Null: none, or more than one. */
 function heldUnder(view: StateView, definition: ValidDefinition, commitment: number): Hold | null {
-  const found: Hold[] = [];
+  const matched: Hold[] = [];
   for (const type of definition.holdTypes) {
     const declared = own(definition.declared.items, type);
     if (!declared) continue;
     // A held hold is live, so the type's `max` bounds how many there are (section 6.3): one page holds them all.
     const page = view.page(type, [holdStates(declared).held], null, declared.max);
     if (page.more) return null;
-    for (const item of page.items) if (own(item.refs, UNDER) === commitment) found.push(holdOf(view, definition, item.id)!);
+    for (const item of page.items) if (own(item.refs, UNDER) === commitment) matched.push(holdOf(view, definition, item.id)!);
   }
-  return found.length === 1 ? found[0]! : null;
+  return matched.length === 1 ? matched[0]! : null;
 }
 
 /**
@@ -826,11 +826,11 @@ const OPERATION_RULES: Readonly<Record<string, OperationRules>> = {
       const pin = outcome.result === "confirmed" ? namedBy(view, "pin", ["provisional"], "check", operation) : null;
       const root = pin ? record(view, "root", [pin.values["root"] as number]) : null;
       if (!pin || !root) return NOTHING;
-      const found = (outcome.evidence.body as { record: unknown }).record;
-      return recorded([{ kind: "check", key: [pin.key[1]!, root.key[0]!], state: found === null ? "too-large" : "recorded", values: {
+      const matched = (outcome.evidence.body as { record: unknown }).record;
+      return recorded([{ kind: "check", key: [pin.key[1]!, root.key[0]!], state: matched === null ? "too-large" : "recorded", values: {
         intent: pin.key[1], commit: pin.values["commit"], consumer: pin.key[0], lane: view.scope()!.at, hold: root.values["hold"], instance: root.values["instance"], root: root.key[0],
         // Section 16.3: the attribution list of the source commitment, as it is at the check entry.
-        attribution: view.item(root.values["under"] as number)?.attributed ?? [], record: found,
+        attribution: view.item(root.values["under"] as number)?.attributed ?? [], record: matched,
       } }]);
     },
   },
@@ -967,8 +967,8 @@ export function holdCapability(options: HoldOptions): Capabilities & Steps & Own
     },
     workspace: workspaceEffects,
     bound: (capability, view, at, from, fields) => {
-      const found = capability === HOLD ? boundLicense(view, at, from, fields) : null;
-      return found && licenseRefused(found);
+      const matched = capability === HOLD ? boundLicense(view, at, from, fields) : null;
+      return matched && licenseRefused(matched);
     },
     rules: (owner, kind) => (owner === HOLD ? (own(OPERATION_RULES, kind) ?? null) : null),
     reserves: holdReserves,

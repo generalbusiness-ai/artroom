@@ -4,7 +4,7 @@
  * 15, 18.48, case 10, 18.50, case 11, and 18.52, cases 11 and 12).
  *
  * `Weighing` is a scope under derive's made-up platform data `weigher`,
- * founded by `rita`. Derive's judges wrote every entry, with the made-up
+ * created by `rita`. Derive's judges wrote every entry, with the made-up
  * rules of that fixture.
  *
  * STAND-INS, each written by hand, of which nothing here shows anything:
@@ -68,9 +68,9 @@ export class Weighing extends Ledger {
     super(weigherWith((data) => { if (which === "steps" || which === "absent") { data.outcomes.weigh.origin = "opening"; data.outcomes.weigh.observes = STEP_ROWS; } }));
     const first = which === "weigh" || which === "asked" ? signers : (given: RuleGiven): KeyId[] => [una.key, ...signers(given).slice(2)];
     this.rules = weigherRules(undefined, first);
-    const founding = signIntent({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: "weigh", notAfter: t(60) }, rita.secret);
-    const seed: Seed = { v: 1, kind: "directory", definition: WEIGHER, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding };
+    const creation = signIntent({ v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: "weigh", notAfter: t(60) }, rita.secret);
+    const seed: Seed = { v: 1, kind: "directory", definition: WEIGHER, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, creation: creation };
     this.seal(written(judgeGenesis(this.state, this.definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: this.rules })).draft);
     this.now = t(5);
     if (which === "asked") this.#asked();

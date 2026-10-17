@@ -228,8 +228,8 @@ export const membership: PlatformData = {
       parties: {},
       refs: { directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } },
       values: {
-        foundingKey: { fixed: true, required: true, of: KEY },
-        foundingHandle: { fixed: true, required: true, of: HANDLE },
+        "foundingKey": { fixed: true, required: true, of: KEY },
+        "foundingHandle": { fixed: true, required: true, of: HANDLE },
         recoveryKey: { fixed: false, required: true, of: KEY },
         formerRecovery: { fixed: false, required: false, of: { type: "list", of: KEY, max: 32 } },
         adminActions: { fixed: false, required: true, of: ACTIONS },
@@ -279,8 +279,8 @@ export const membership: PlatformData = {
       step: "open", on: "roster", grant: "membership.establish",
       also: {},
       fields: {
-        founder: { ...KEY, required: true },
-        founderHandle: { ...HANDLE, required: true },
+        "founder": { ...KEY, required: true },
+        "founderHandle": { ...HANDLE, required: true },
         recoveryKey: { ...KEY, required: true },
         directory: { type: "scope", kind: "directory", required: true },
       },
@@ -296,7 +296,7 @@ export const membership: PlatformData = {
       sends: [],
       attention: [],
     },
-    // `seat`: an act, signed by the founding key (Code P13 and P14). It opens the founder's member item, `active`, and creates
+    // `seat`: an act, signed by the creation key (Code P13 and P14). It opens the creator's member item, `active`, and creates
     // that member's inbox.
     seat: {
       step: "open", on: "member", grant: { code: "founding-key", row: "P13" },
@@ -313,8 +313,8 @@ export const membership: PlatformData = {
       sends: [inboxOf()],
       attention: [],
     },
-    // `first-key`: an act, signed by the founding key (Code P13 and P14). It opens the founding key as the first key of the seated
-    // member. The intent names that member, and the two guards hold it to the member that `seat` opened: `active`, with the founding
+    // `first-key`: an act, signed by the creation key (Code P13 and P14). It opens the creation key as the first key of the seated
+    // member. The intent names that member, and the two guards hold it to the member that `seat` opened: `active`, with the creation
     // handle. The note's revision 24 confirms this selection as built (its section 13.14, entry EM10).
     "first-key": {
       step: "open", on: "key", grant: { code: "founding-key", row: "P13" },
@@ -609,7 +609,7 @@ export const membershipRules: Rules = {
   /**
    * Rows 14 and 15, at `grant` of `seat` and `first-key` (P13, P14). It
    * reads `roster.foundingKey`. A pass, with no member, when the signing key
-   * is the founding key that the genesis recorded. Otherwise `unauthorized`.
+   * is the creation key that the genesis recorded. Otherwise `unauthorized`.
    */
   "founding-key": {
     place: "grant", refusals: [],
@@ -717,7 +717,7 @@ export const membershipRules: Rules = {
    * `party` effect on the member that the entry opens: the slot `member` is
    * the member reference of this scope and the handle, as the member's ID.
    * It refuses nothing. A text that is no handle was refused before: by
-   * `handle-form` in the same entry, or by the register's at the founding.
+   * `handle-form` in the same entry, or by the register's at the creation.
    * So a row with no such text is one that no judged entry reaches, and it
    * is a fault of the rule: nothing is written.
    */

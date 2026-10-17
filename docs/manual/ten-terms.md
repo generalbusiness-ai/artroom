@@ -99,8 +99,8 @@ them:
 - an **agent key**, enrolled for an agent by an agent-key invitation.
 
 Three other keys have one job each. The **operator key** signs the
-install of a register and is its one founder key. The founder's
-**first key** is enrolled when the room is claimed. The **recovery key**,
+install of a register: it is the key that creates that register. The room
+creator's **first key** is enrolled when the room is claimed. The **recovery key**,
 named at the claim, is not a member's key. It can still invite and remove
 members and revoke keys, so a room whose admins have lost their keys can
 be recovered. Membership is in
@@ -139,11 +139,27 @@ holds for that coverage and those trusts. It is in
 
 ## Words used in one sense only
 
+- **Turn** is one transaction for one input. Any entry and changes it
+  produces are recorded together.
+- **Settle** means completing recorded work according to its definition.
+  The definition's pinned `settles` field names the work a form completes.
+  A `settle` API read asks for the receipt of a signed intent; that read
+  records nothing.
 - **Step** is an act's form in a definition: `open`, `transition` or
   `comment`. Tutorial steps and the MCP tool `steps`, which lists a
   page of a scope's entries, are named as such where they appear.
 - **Enroll** and **enrollment** are spelled the US way. `room.enrol` is
   the name of an MCP tool.
+
+## If you know these patterns
+
+| Term | General pattern |
+|---|---|
+| Scope | An actor with an event-sourced journal. |
+| Turn | One transaction for one input. |
+| Send and settle | A transactional outbox with an acknowledgement. |
+| Definition | A declared state machine. |
+| Create | Making a scope with its genesis entry. |
 
 ## Source and acceptance
 

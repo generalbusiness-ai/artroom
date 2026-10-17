@@ -14,7 +14,7 @@ const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
 const reader = "a test reader";
 
-// Invariant: the register ID that `install --plan` prints is the one that `install --planned` founds, so the Git host's setting
+// Invariant: the register ID that `install --plan` prints is the one that `install --planned` creates, so the Git host's setting
 // can pin it before the register exists, and a claim then creates its repository with no restart and no second run; a plan
 // whose ID is not the one its intent makes, or whose time is over, is refused by name and nothing is sent; the config never
 // holds a secret.
@@ -66,15 +66,15 @@ async function recovering(): Promise<void> {
       } },
       fetch: (async (url: string, init?: RequestInit) => {
         if (url.includes("/entries/")) entryReads++;
-        const founding = url.endsWith("/v1/scopes") && init?.method === "POST";
-        if (founding) {
+        const creation = url.endsWith("/v1/scopes") && init?.method === "POST";
+        if (creation) {
           expect((await store.config())!.plan!.attempted).toMatch(/^sha256:/);
           submissions.push(String(init!.body));
           if (mode === "unaccepted" && fault) { fault = false; throw new Error("simulated request loss before delivery"); }
         }
         const response = await routed(url, init);
-        if (founding && mode === "reply" && fault) { fault = false; throw new Error("simulated accepted reply loss"); }
-        if (founding && badReceipt) {
+        if (creation && mode === "reply" && fault) { fault = false; throw new Error("simulated accepted reply loss"); }
+        if (creation && badReceipt) {
           const answer = await response.json() as { receipt: Receipt };
           if (badReceipt === "hash") answer.receipt.fact.hash = textDigest("another entry");
           if (badReceipt === "definition") answer.receipt.definition = answer.receipt.definition === "platform:register@1" ? "platform:register@2" : "platform:register@1";
@@ -89,7 +89,7 @@ async function recovering(): Promise<void> {
         return response;
       }) as Fetch,
     };
-    ctx.trustedFoundingService = { service: SERVICE, fetch: ctx.fetch! };
+    ctx.trustedCreationService = { service: SERVICE, fetch: ctx.fetch! };
     return { ctx, store, submissions, entryReads: () => entryReads, receipt: (bad: typeof badReceipt) => { badReceipt = bad; } };
   };
   for (const mode of ["reply", "save"] as const) {
@@ -99,11 +99,11 @@ async function recovering(): Promise<void> {
     // Capture the deliberately injected save failure only for this witness.
     const lost = await command(s.ctx, ["install", "--planned"]).catch(() => ({ code: 1 }));
     const pending = (await s.store.config())!;
-    expect([lost.code, pending.register, pending.plan?.founding]).toEqual([1, undefined, original.founding]);
+    expect([lost.code, pending.register, pending.plan?.["founding"]]).toEqual([1, undefined, original["founding"]]);
     expect(pending.plan?.attempted).toMatch(/^sha256:/);
     // A supported version and its recomputed ID still cannot replace the
     // exact version/ID bound by a prior attempt's marker.
-    const changed = { ...pending.plan!, definition: "platform:register@1" as const, register: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@1", creator: null, cause: intentDigest(original.founding.intent), ordinal: 0 }) };
+    const changed = { ...pending.plan!, definition: "platform:register@1" as const, register: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@1", creator: null, cause: intentDigest(original["founding"].intent), ordinal: 0 }) };
     await s.store.save({ ...pending, plan: changed });
     expect([(await command(s.ctx, ["install", "--planned"])).lines[0]?.split(".")[0], s.submissions.length]).toEqual(["Refused: plan-mismatch", 1]);
     await s.store.save(pending);
@@ -111,10 +111,10 @@ async function recovering(): Promise<void> {
       expect((await command(s.ctx, replacement)).lines[0]).toMatch(/^Refused: install-pending\./);
       expect(await s.store.config()).toEqual(pending);
     }
-    net.clock.now = timeOf(Date.parse(original.founding.intent.notAfter) + 901_000);
+    net.clock.now = timeOf(Date.parse(original["founding"].intent.notAfter) + 901_000);
     const sends = s.submissions.length;
     const untrusted = { ...s.ctx };
-    delete untrusted.trustedFoundingService;
+    delete untrusted.trustedCreationService;
     expect((await command(untrusted, ["install", "--planned"])).lines[0]).toMatch(/^Held: this injected transport/);
     expect([s.submissions.length, await s.store.config()]).toEqual([sends, pending]);
     if (mode === "reply") {
@@ -126,7 +126,7 @@ async function recovering(): Promise<void> {
       s.receipt(null);
     } else {
       // Acceptance was durably retained before the injected final-save loss.
-      expect(pending.plan!.acknowledged).toMatchObject({ status: "service-acknowledged", service: SERVICE, receipt: { definition: original.definition, intent: intentDigest(original.founding.intent) } });
+      expect(pending.plan!.acknowledged).toMatchObject({ status: "service-acknowledged", service: SERVICE, receipt: { definition: original.definition, intent: intentDigest(original["founding"].intent) } });
       for (const field of ["hash", "incarnation"] as const) {
         s.receipt(field);
         expect((await command(s.ctx, ["install", "--planned"])).lines[0]).toMatch(/^Held: the install acknowledgement conflicts/);
@@ -142,21 +142,21 @@ async function recovering(): Promise<void> {
     expect(new Set(s.submissions).size).toBe(1);
     const entries = await new Platform(original.register).entries();
     const genesis = entries[0]!;
-    expect([entries.length, genesis.input.type === "genesis" && canonicalize(genesis.input.founding)]).toEqual([1, canonicalize(original.founding)]);
+    expect([entries.length, genesis.input.type === "genesis" && canonicalize(genesis.input["founding"])]).toEqual([1, canonicalize(original["founding"])]);
     expect(installed.plan!.acknowledged!.receipt.fact).toEqual({ at: genesis.at, seq: 0, hash: entryHash(genesis) });
     expect(timeMs(net.clock.now)! - timeMs(genesis.time)!).toBeGreaterThan(900_000);
   }
   const unsent = scenario("unsent");
   expect((await command(unsent.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
   const unsentPlan = (await unsent.store.config())!.plan!;
-  net.clock.now = timeOf(Date.parse(unsentPlan.founding.intent.notAfter) + 1000);
+  net.clock.now = timeOf(Date.parse(unsentPlan["founding"].intent.notAfter) + 1000);
   expect([(await command(unsent.ctx, ["install", "--planned"])).lines[0]?.split(".")[0], unsent.submissions]).toEqual(["Refused: plan-expired", []]);
 
   const unaccepted = scenario("unaccepted");
   expect((await command(unaccepted.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
   expect((await command(unaccepted.ctx, ["install", "--planned"])).code).toBe(1);
   const unacceptedPlan = (await unaccepted.store.config())!.plan!;
-  net.clock.now = timeOf(Date.parse(unacceptedPlan.founding.intent.notAfter) + 1000);
+  net.clock.now = timeOf(Date.parse(unacceptedPlan["founding"].intent.notAfter) + 1000);
   expect((await command(unaccepted.ctx, ["install", "--planned"])).lines[0]).toMatch(/^Refused: expired/);
   expect([(await unaccepted.store.config())!.register, new Set(unaccepted.submissions).size, unaccepted.submissions.length]).toEqual([undefined, 1, 2]);
 }
@@ -164,7 +164,7 @@ async function recovering(): Promise<void> {
 async function planned(): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
-  const founds = async (R: Platform) => (await R.entries()).filter((entry): entry is Entry & { input: { type: "act" } } => entry.input.type === "act" && entry.input.signed.intent.kind === "found");
+  const creates = async (R: Platform) => (await R.entries()).filter((entry): entry is Entry & { input: { type: "act" } } => entry.input.type === "act" && entry.input.signed.intent.kind === "found");
   const exists = async (name: string) => (await new Platform(name as never).stub.summary(reader)).ok;
   const noSecret = async (ctx: Context) => {
     const text = JSON.stringify(await ctx.store.config());
@@ -175,7 +175,7 @@ async function planned(): Promise<void> {
   };
 
   // A mismatched plan: its kept register ID is not the one its intent makes. Refused by name; nothing is sent, so no register exists.
-  const sam: Context = { store: memoryStore(), fetch, now, trustedFoundingService: { service: SERVICE, fetch } };
+  const sam: Context = { store: memoryStore(), fetch, now, trustedCreationService: { service: SERVICE, fetch } };
   expect((await command(sam, ["install", "--plan", SERVICE, "--host", "git.example", "--namespace", "artroom"])).code).toBe(0);
   const samPlan = (await sam.store.config())!.plan!;
   const other = samPlan.register.replace(/.$/, (c) => (c === "a" ? "b" : "a"));
@@ -183,17 +183,17 @@ async function planned(): Promise<void> {
   const mismatched = await command(sam, ["install", "--planned"]);
   expect([mismatched.code, mismatched.lines[0]?.split(".")[0]]).toEqual([1, "Refused: plan-mismatch"]);
   expect([(await sam.store.config())!.register, await exists(samPlan.register), await exists(other)]).toEqual([undefined, false, false]);
-  // Control: the same plan, unchanged, founds.
+  // Control: the same plan, unchanged, creates.
   await sam.store.save({ ...(await sam.store.config())!, plan: samPlan });
 
   // An expired plan: refused by name before anything is sent.
-  const late: Context = { ...sam, now: () => Date.parse(samPlan.founding.intent.notAfter) };
+  const late: Context = { ...sam, now: () => Date.parse(samPlan["founding"].intent.notAfter) };
   const expired = await command(late, ["install", "--planned"]);
   expect([expired.code, expired.lines[0]?.split(".")[0], await exists(samPlan.register)]).toEqual([1, "Refused: plan-expired", false]);
   const kept = await command(sam, ["install", "--planned"]);
   expect([kept.code, (await sam.store.config())!.register?.scope]).toEqual([0, samPlan.register]);
 
-  // Control: a plan, then a plain install, founds another register than the planned one.
+  // Control: a plan, then a plain install, creates another register than the planned one.
   const paul: Context = { store: memoryStore(), fetch, now };
   expect((await command(paul, ["install", "--plan", SERVICE])).code).toBe(0);
   const paulPlan = (await paul.store.config())!.plan!;
@@ -214,14 +214,14 @@ async function planned(): Promise<void> {
     outsideOf(host.R!.name).answer(request.operation, request.attempt, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: `repo-${entry.seq}` } } });
   };
   const pause = async (waiting: readonly string[]) => { await answering(); await settle(...waiting.map((scope) => new Platform(scope as never))); };
-  const rita: Context = { store: memoryStore(), fetch, now, pause, tries: 3, trustedFoundingService: { service: SERVICE, fetch } };
+  const rita: Context = { store: memoryStore(), fetch, now, pause, tries: 3, trustedCreationService: { service: SERVICE, fetch } };
   const run = (...argv: string[]) => command(rita, argv);
   const plan = await run("install", "--plan", SERVICE, "--host", "git.example", "--namespace", "artroom");
   const kept1 = (await rita.store.config())!;
   expect([plan.code, kept1.register, kept1.plan?.register]).toEqual([0, undefined, expect.stringMatching(/^sc_/)]);
   expect(plan.lines).toEqual([
-    `Planned: register ${kept1.plan!.register}, under ${kept1.plan!.definition}, on host git.example, namespace artroom. The seed's time is ${kept1.plan!.founding.intent.notAfter}.`,
-    `Set registerScope to ${kept1.plan!.register} in the Worker's host setting, then run dap install --planned before ${kept1.plan!.founding.intent.notAfter}.`,
+    `Planned: register ${kept1.plan!.register}, under ${kept1.plan!.definition}, on host git.example, namespace artroom. The seed's time is ${kept1.plan!["founding"].intent.notAfter}.`,
+    `Set registerScope to ${kept1.plan!.register} in the Worker's host setting, then run dap install --planned before ${kept1.plan!["founding"].intent.notAfter}.`,
   ]);
   await noSecret(rita);
 
@@ -233,7 +233,7 @@ async function planned(): Promise<void> {
   host.R = R;
   host.registerDefinition = kept1.plan!.definition;
 
-  // Install as planned: the founded register is the planned one.
+  // Install as planned: the created register is the planned one.
   const installed = await run("install", "--planned");
   expect([installed.code, installed.lines[0], (await rita.store.config())!.register?.scope]).toEqual([0, `Installed: register ${R.name}, under ${kept1.plan!.definition}, as planned.`, R.name]);
   expect((await rita.store.config())!.plan).toMatchObject({ ...kept1.plan!, acknowledged: { status: "service-acknowledged", service: SERVICE } });
@@ -242,8 +242,8 @@ async function planned(): Promise<void> {
   // Claim: one run, no restart, and the creation is sent once.
   const claimed = await run("claim", "demo", "--handle", "@rita");
   expect(claimed.code, `${claimed.lines.join("\n")} sent: ${port.attempts.join(" ")}`).toBe(0);
-  const [found] = await founds(R);
-  expect([(await founds(R)).length, port.attempts]).toEqual([1, [`${found!.seq}:0#1` as OperationId]]);
+  const [matched] = await creates(R);
+  expect([(await creates(R)).length, port.attempts]).toEqual([1, [`${matched!.seq}:0#1` as OperationId]]);
   expect((await rita.store.config())!.handle).toBe("@rita");
   await noSecret(rita);
   wired.delete(R.name);

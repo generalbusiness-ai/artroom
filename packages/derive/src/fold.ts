@@ -61,7 +61,7 @@ export function applyEntry(writer: StateWriter, definition: ValidDefinition, ent
   }
   // Section 7.2: a child is provisional until its creator confirms it; a refused genesis is terminal. A directory has no creator to confirm it.
   let status: Status = scope?.status ?? (input.type === "genesis" && input.decision === "refused" ? "refused" : input.type === "genesis" && input.seed.creator === null ? "active" : "provisional");
-  // Section 7.2: every send of a provisional genesis but its result, at ordinal 0, is a duty that is held until the confirmation.
+  // Section 7.2: every send of a provisional genesis but its result, at ordinal 0, is a task that is held until the confirmation.
   let held: readonly number[] = scope?.held ?? (status === "provisional" ? entry.sends.filter((s) => s.n !== 0).map((s) => s.n) : []);
   const signer = signerOf(entry);
   // Section 17.2a: what the entry does to the counts of the holders, on the state before it. An entry that draws past a count, or

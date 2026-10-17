@@ -119,7 +119,7 @@ export interface Draft {
   /**
    * Section 17.3: the entry settles what its form declares with `settles`.
    * Its subject was in a listed state at the commit, and the entry takes it
-   * out of the listed states. It is then admitted against its own duty's
+   * out of the listed states. It is then admitted against its own task's
    * reservation, and is not asked whether it fits. It is in no entry.
    */
   settles?: boolean;

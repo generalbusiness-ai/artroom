@@ -133,12 +133,12 @@ export const failed = (f: Finding): CallResult => {
 };
 
 /**
- * A native answer, projected for a result: its kind, the fact and the duties of an acceptance, the reason, name and judged head
+ * A native answer, projected for a result: its kind, the fact and the outbox IDs of an acceptance, the reason, name and judged head
  * of a refusal. The receipt's effects are counted, not repeated: `step` reads the entry whole.
  */
 export function projectAnswer(answer: Answer): Record<string, unknown> {
   switch (answer.answer) {
-    case "accepted": return { answer: "accepted", fact: answer.receipt.fact, duties: answer.receipt.sends, effects: answer.receipt.effects.length };
+    case "accepted": return { answer: "accepted", fact: answer.receipt.fact, outboxIds: answer.receipt.sends, effects: answer.receipt.effects.length };
     case "refused": return { answer: "refused", reason: answer.reason, ...(answer.name ? { name: answer.name } : {}), judgedAt: answer.judgedAt };
     default: return { answer: answer.answer, reason: answer.reason };
   }
@@ -310,8 +310,8 @@ export class McpService {
     const at = (scope: ScopeId) => ({ scope, held: held(scope), membership: this.#membershipOf(s, held(scope)) });
     if (typeof named === "string" && isScopeId(named)) return at(named);
     if (typeof named === "string" && (SINGLETON_PLACES as readonly string[]).includes(named)) {
-      const found = s.read.inventory.scopes.find((h) => h.place === named);
-      return found ? at(found.scope) : stop({ error: "target", what: `no ${named} is in the inventory` });
+      const matched = s.read.inventory.scopes.find((h) => h.place === named);
+      return matched ? at(matched.scope) : stop({ error: "target", what: `no ${named} is in the inventory` });
     }
     const number = typeof named === "number" ? named : typeof named === "string" && /^#?\d+$/.test(named) ? Number(named.replace("#", "")) : null;
     if (number !== null && room) {
@@ -356,8 +356,8 @@ export class McpService {
 
   async #definition(s: Snapshot, pinned: Digest | PlatformDefinition, scope: ScopeId, membership: ScopeRef | null): Promise<DefinitionLike> {
     const rules = s.read.room?.rules;
-    const found = await definitionOf(this.reads, this.kept, pinned, [{ scope, membership }, ...(rules ? [{ scope: rules.scope, membership: s.read.room!.membership }] : [])]);
-    return found ?? stop({ error: "read", scope, reason: "unsupported-definition" });
+    const matched = await definitionOf(this.reads, this.kept, pinned, [{ scope, membership }, ...(rules ? [{ scope: rules.scope, membership: s.read.room!.membership }] : [])]);
+    return matched ?? stop({ error: "read", scope, reason: "unsupported-definition" });
   }
 
   // ---------------------------------------------------------------- an act, under custody
@@ -456,7 +456,7 @@ export class McpService {
   #answerOf(answer: Answer, at: { scope: string; kind: string; tool: string; retained: boolean; said: { sentence: string; next: string }; phase: string }): Record<string, unknown> {
     const base = { answer: answer.answer, sentence: at.retained ? `${at.said.sentence} This outcome was kept under custody; nothing was sent.` : at.said.sentence, next: at.retained && answer.answer === "refused" ? `${at.said.next} To send the same envelope again, deliberately: resubmit: true.` : at.said.next, scope: at.scope, kind: at.kind, tool: at.tool, retained: at.retained, phase: at.phase };
     switch (answer.answer) {
-      case "accepted": return { ...base, fact: answer.receipt.fact, duties: answer.receipt.sends };
+      case "accepted": return { ...base, fact: answer.receipt.fact, outboxIds: answer.receipt.sends };
       case "refused": return { ...base, reason: answer.reason, ...(answer.name ? { name: answer.name } : {}), judgedAt: answer.judgedAt };
       default: return { ...base, reason: answer.reason };
     }
@@ -497,12 +497,12 @@ export class McpService {
         { scope: scopeArg, seq: { type: "integer", minimum: 0 }, offset: { type: "integer", minimum: 0 } }, ["scope", "seq"], READ, (a) => this.#step(a)),
       tool("record", "A page of the history as stored: each entry's canonical bytes and hash, for a verifier or an exact comparison.",
         { scope: scopeArg, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#record(a)),
-      tool("sends", "A page of a scope's sends with their attempts and results; or, with duty (seq.n, as a receipt lists it), the status of that one send.",
-        { scope: scopeArg, duty: { type: "string" }, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#sends(a)),
+      tool("sends", "A page of a scope's sends with their attempts and results; or, with outboxId (seq.n, as a receipt lists it), the status of that one send.",
+        { scope: scopeArg, outboxId: { type: "string" }, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#sends(a)),
       tool("text", "A retained input by scope, kind and digest: a definition, a foreign entry, a rule's input, a detached text, a snapshot, or a value in its byte domain; paged by bytes with offset.",
         { scope: scopeArg, kind: { enum: ["definition", "entry", "rule", "text", "snapshot", "value"] }, digest: { type: "string" }, domain: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope", "kind", "digest"], READ, (a) => this.#text(a)),
-      tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
-        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, duty: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
+      tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (outboxId) has a result. Returns what it saw and whether it timed out. Never writes.",
+        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, outboxId: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
       tool("settle", "What is known about the envelope under idempotencyKey on target (or the creation of definition): the act's phase and kept outcome, the scope's settlement for an act that is not final, and each preparation step apart. Signs nothing and sends no act.",
         { target: scopeArg, definition: { type: ["string", "object"] }, idempotencyKey: keyArg, cursor: { type: "string" } }, ["idempotencyKey"], READ, (a) => this.#settle(a)),
       tool("credential", "The one-time read credential for a read-token act your key signed (entry: its seq at the destination), read once from the destination's credential route with your session. Its result is a secret: the credential is in the structured field credential only, with the remote URL beside it. Use it with Git; it is not kept here.",
@@ -653,9 +653,9 @@ export class McpService {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
     const reader = await this.#reads.reader(membership);
-    if (typeof args["duty"] === "string") {
-      const read = await this.#reads.transport.duty(scope, reader, args["duty"] as `${number}.${number}`);
-      return read.ok ? ok({ scope, duty: read.value, head: read.at }, BOUNDS.large) : failed({ error: "read", scope, reason: read.reason });
+    if (typeof args["outboxId"] === "string") {
+      const read = await this.#reads.transport.outboxItem(scope, reader, args["outboxId"] as `${number}.${number}`);
+      return read.ok ? ok({ scope, outboxItem: read.value, head: read.at }, BOUNDS.large) : failed({ error: "read", scope, reason: read.reason });
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
     const read = await this.#reads.transport.outbox(scope, reader, cursor?.c);
@@ -739,12 +739,12 @@ export class McpService {
     } else return failed({ error: "target", what: "give target, or definition for a creation" });
     const settled = await this.custody.settle(identity, async (envelope) => {
       if (envelope.creation) {
-        // A creation settles by the scope it founded: its genesis carries the founding intent.
+        // A creation settles by the scope it created: its genesis carries the creation intent.
         const kind = isPlatformDefinition(envelope.creation.definition) && envelope.creation.definition.startsWith("platform:register@") ? "register" : "directory";
         const definition = typeof envelope.creation.definition === "string" ? envelope.creation.definition : definitionDigest(envelope.creation.definition);
-        const founded = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
+        const created = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
         try {
-          const read = await this.#reads.transport.settle(founded, envelope.signed);
+          const read = await this.#reads.transport.settle(created, envelope.signed);
           return read.ok ? read.value : null;
         } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
       }
@@ -770,7 +770,7 @@ export class McpService {
       : answer === "refused" ? `The act under key ${String(key)} was refused; the refusal is kept.`
       : answer === "mismatch" ? `The key ${String(key)} is on another intent of your key at that scope.`
       : `The outcome under key ${String(key)} is unknown: the scope gave no receipt for the exact envelope. The record stays unknown.`;
-    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ? { at: last.at, ...projectAnswer(last.answer) } : null, steps, ...(nextStep !== null ? { cursor: cursorOf({ i: nextStep }), more: `Steps ${fromStep + 1} to ${nextStep} of ${allSteps.length}; call settle with cursor for the rest.` } : {}) });
+    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, outboxIds: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ? { at: last.at, ...projectAnswer(last.answer) } : null, steps, ...(nextStep !== null ? { cursor: cursorOf({ i: nextStep }), more: `Steps ${fromStep + 1} to ${nextStep} of ${allSteps.length}; call settle with cursor for the rest.` } : {}) });
   }
 
   async #membershipRef(given: unknown): Promise<ScopeRef | null> {
@@ -809,18 +809,18 @@ export class McpService {
       let shaped: { fields: Record<string, FieldValue>; texts: string[] };
       try { shaped = shapeFields(act, fieldsGiven, textsGiven, membership); }
       catch (error) { if (error instanceof Unshaped) return stop({ error: "shape", field: error.field, what: error.what, declared: error.declared }); throw error; }
-      // A founding intent's kind is the founding's, not the genesis act's: `install` for a register, `found` for any other scope
+      // A creation intent's kind is the creation's, not the genesis act's: `install` for a register, `found` for any other scope
       // with no creator (the scope contract, section 7.1). The genesis act then applies with the intent's fields.
-      const founding = data!.name === "platform:register" ? "install" : "found";
-      const signed = await signedIntent(this.#port.signer, { to: null, kind: founding, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
+      const creation = data!.name === "platform:register" ? "install" : "found";
+      const signed = await signedIntent(this.#port.signer, { to: null, kind: creation, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
       return { binding: { definition: data!.name, kind, declaration: null, pinned: named }, envelope: { signed, beside: shaped.texts.length > 0 ? { texts: shaped.texts } : {}, creation: { definition, definitions } } as Envelope };
     };
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try {
-        const founded = await this.#reads.transport.found(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
-        // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
-        return founded.answer === "refused" ? { answer: "refused", reason: founded.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : founded as Answer;
+        const created = await this.#reads.transport.create(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
+        // A creation has no mismatch and its refusal names no head: give it the shape of an act's answer.
+        return created.answer === "refused" ? { answer: "refused", reason: created.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : created as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: bytesOf({ definition: args["definition"], fields: fieldsGiven, texts: textsGiven, definitions }) });
     if ("lost" in kept) return failed({ error: "transport", scope: "the creation", submitted: true });
@@ -898,9 +898,9 @@ export class McpService {
     const pause = this.#port.pause ?? (() => new Promise<void>((resolve) => { setTimeout(resolve, 1000); }));
     let waiting: ScopeId[] = [scope];
     const poll = async (): Promise<Record<string, unknown> | null> => {
-      if (typeof args["duty"] === "string") {
-        const read = await this.#reads.transport.duty(scope, await this.#reads.reader(membership), args["duty"] as `${number}.${number}`);
-        return read.ok && (read.value.result !== null || read.value.diagnosis !== null) ? { duty: read.value } : null;
+      if (typeof args["outboxId"] === "string") {
+        const read = await this.#reads.transport.outboxItem(scope, await this.#reads.reader(membership), args["outboxId"] as `${number}.${number}`);
+        return read.ok && (read.value.result !== null || read.value.diagnosis !== null) ? { outboxItem: read.value } : null;
       }
       if (typeof args["entry"] === "number") return this.#created(scope, membership, args["entry"], (w) => { waiting = [scope, ...w]; });
       const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));
@@ -919,8 +919,8 @@ export class McpService {
           for (let n = 0; n < SEARCH_PAGES; n++) {
             const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string, cursor));
             if (!final.ok) break;
-            const found = final.value.find(match);
-            if (found) { this.#pages.delete(key); return { item: found, head: read.at, final: true }; }
+            const matched = final.value.find(match);
+            if (matched) { this.#pages.delete(key); return { item: matched, head: read.at, final: true }; }
             cursor = final.next;
             if (cursor === undefined) break;
           }

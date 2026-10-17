@@ -9,7 +9,7 @@
 
 import type { SignedIntent } from "@generalbusiness/dap-contract";
 import { judgeDelivery, type Delivered, type DeliveryContext } from "./delivery.ts";
-import { judgeGenesis, type Creation, type Founding } from "./genesis.ts";
+import { judgeGenesis, type Creation, type SignedCreation } from "./genesis.ts";
 import type { RuleInput } from "./guards.ts";
 import { judgeAct, type JudgeContext } from "./judge.ts";
 import type { StateView } from "./state.ts";
@@ -19,7 +19,7 @@ import type { ValidDefinition } from "./validate/index.ts";
 export type Judged =
   | { act: SignedIntent; context: JudgeContext }
   | { delivery: Delivered; context: DeliveryContext }
-  | { genesis: Founding | Creation; context: DeliveryContext };
+  | { genesis: SignedCreation | Creation; context: DeliveryContext };
 
 /**
  * For each `rule` guard the input would meet over this state: the rule, its

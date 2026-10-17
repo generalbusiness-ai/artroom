@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { SELF } from "cloudflare:test";
 import { expect, test } from "vitest";
-import { ScopeHandle, bindingTransport, found, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
+import { ScopeHandle, bindingTransport, create, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
 import { newIncarnation } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "@generalbusiness/dap-derive";
 import { deskDefinition, grantOf, ticketDefinition } from "@generalbusiness/dap-derive/testing";
@@ -19,8 +19,8 @@ test.each(transports)("a scope handle over %s: an act returns its receipt; the e
   net.hold = () => true;
   const signer = secretSigner(rita.secret);
   const now = timeMs(net.clock.now)!;
-  const founding = await signedIntent(signer, { to: null, kind: "found", fields: { source: "a repository" } }, { now });
-  const { answer, scope } = await found(transport(), founding, deskDefinition.declared, [ticketDefinition.declared], reader);
+  const creation = await signedIntent(signer, { to: null, kind: "found", fields: { source: "a repository" } }, { now });
+  const { answer, scope } = await create(transport(), creation, deskDefinition.declared, [ticketDefinition.declared], reader);
   if (answer.answer !== "accepted" || !scope) throw new Error(`not founded: ${JSON.stringify(answer)}`);
   const at = answer.receipt.fact.at;
   expect(scope).toBeInstanceOf(ScopeHandle);
@@ -43,6 +43,6 @@ test.each(transports)("a scope handle over %s: an act returns its receipt; the e
   // A fact with the true position and hash and another incarnation, or another kind, is not a fact of this history either.
   const elsewhere = (over: object) => scope.followReceipt({ ...receipt, fact: { ...receipt.fact, at: { ...at, ...over } } });
   expect([await elsewhere({ inc: newIncarnation(new Uint8Array(16).fill(7)) }), await elsewhere({ kind: "lane" })]).toEqual([{ ok: false, reason: "wrong-incarnation" }, { ok: false, reason: "reference-mismatch" }]);
-  expect(await scope.followDuty(receipt.sends[0]!)).toMatchObject({ ok: true, value: { duty: "1.0", class: "request", held: false, result: null } });
+  expect(await scope.followOutbox(receipt.sends[0]!)).toMatchObject({ ok: true, value: { outboxId: "1.0", class: "request", held: false, result: null } });
   net.hold = null;
 });

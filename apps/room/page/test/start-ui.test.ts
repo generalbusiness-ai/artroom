@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { b64url, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
-import type { FoundingOffer } from "@generalbusiness/artroom-client";
+import type { CreationOffer } from "@generalbusiness/artroom-client";
 import type { StartedRoom, StartOptions, StartStatus } from "../src/start-custody.ts";
 
 class Element {
@@ -81,7 +81,7 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   const register = ref("register"), directory = ref("directory"), membership = ref("membership");
   const legacyRegister = { ...register, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@7", creator: null, cause: textDigest("SCRIPTED retained UI register"), ordinal: 0 }) };
   let selectedDirectory = directory;
-  const offer: FoundingOffer = { v: 1, origin: location.origin, register, definition: "platform:register@8", at: { seq: 0, hash: textDigest("SCRIPTED head") }, registerItem: { id: 0, revision: 1, state: "open", host: "artifacts", namespace: "SCRIPTED", policy: "open", purpose: "demo-start" } };
+  const offer: CreationOffer = { v: 1, origin: location.origin, register, definition: "platform:register@8", at: { seq: 0, hash: textDigest("SCRIPTED head") }, registerItem: { id: 0, revision: 1, state: "open", host: "artifacts", namespace: "SCRIPTED", policy: "open", purpose: "demo-start" } };
   const seed = new Uint8Array(32).fill(63), key = keyIdOfSecret(seed);
   const values = new Map<string, string>(), blobs: Blob[] = [];
   let original: StartStatus | null = null, verified = false, complete = false, redraw!: () => void;
@@ -94,15 +94,15 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   });
   const files = vi.fn(async () => ({ config: JSON.stringify({ repository: { directory: selectedDirectory, membership }, handle: "@founder" }), key: b64url(seed) + "\n" }));
   const recovery = vi.fn(async () => { if (original) original = { ...original, recoverySaved: true }; return b64url(seed) + "\n"; });
-  let finishOffer!: (value: FoundingOffer) => void;
-  const offerRead = vi.fn(() => new Promise<FoundingOffer>(resolve => { finishOffer = resolve; }));
+  let finishOffer!: (value: CreationOffer) => void;
+  const offerRead = vi.fn(() => new Promise<CreationOffer>(resolve => { finishOffer = resolve; }));
   const start = vi.fn(async (_origin: string, _storage: unknown, _options: StartOptions): Promise<StartedRoom> => {
     original = { key, configured: _options.mode === "new" ? { register, definition: "platform:register@8" } : original!.configured, handle: "@founder", label: "Personal intent", operation: "original", state: complete ? "complete" : "pending" };
     return { key, configured: original.configured, handle: "@founder", operation: "original", label: "Personal intent", pending: !complete, repository: complete ? { directory: selectedDirectory, membership, rules: directory.scope, destination: membership.scope } : null, outcome: { code: complete ? 0 : 1, lines: ["SCRIPTED original pending"] }, ...(complete ? { secret: seed.slice() } : {}) };
   });
   const save = vi.fn((name: string, text: string) => { values.set(name, text); });
-  vi.doMock("@generalbusiness/artroom-client", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-client")>("@generalbusiness/artroom-client"), foundingOffer: offerRead }));
-  vi.doMock("../src/connection-custody.ts", () => ({ connectInvitation: issue, originalConnection: () => connection, founderConnectionFiles: files, saveFounderRecoveryOnce: recovery }));
+  vi.doMock("@generalbusiness/artroom-client", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-client")>("@generalbusiness/artroom-client"), creationOffer: offerRead }));
+  vi.doMock("../src/connection-custody.ts", () => ({ connectInvitation: issue, originalConnection: () => connection, creatorConnectionFiles: files, saveCreatorRecoveryOnce: recovery }));
   vi.doMock("../src/start-custody.ts", () => ({ originalStart: () => original, startRoom: start }));
   vi.doMock("../src/data.ts", async () => ({ ...await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts"), openRoom: async (session: { service: string; secret: Uint8Array }) => ({ session, directory: selectedDirectory.scope, membership, key, name: "Recorded host name", me: verified ? { handle: "@founder", role: "admin", actions: [], ref: { membership, member: "@founder" } } : null }) }));
   vi.doMock("../src/view.ts", async () => ({ ...await vi.importActual<typeof import("../src/view.ts")>("../src/view.ts"), h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [k, v] of Object.entries(attrs)) element.setAttribute(k, v); element.children = children.flat().filter(child => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; } }));
@@ -150,7 +150,7 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
     expect(root.textContent).toContain("SCRIPTED original custody remains unavailable");
     find("form").fire("submit"); await flush(); expect(start.mock.calls.at(-1)![2].mode).toBe("continue");
     expect(original!.configured).toEqual({ register: legacyRegister, definition: "platform:register@7" });
-    const selectOriginal = start.mock.calls.at(-1)![2].foundingOffer!;
+    const selectOriginal = start.mock.calls.at(-1)![2].creationOffer!;
     const selectedOffer = selectOriginal(legacyRegister);
     expect(offerRead.mock.calls.at(-1)).toEqual([location.origin, { register: legacyRegister }]);
     finishOffer({ ...offer, register: legacyRegister, definition: "platform:register@7" });

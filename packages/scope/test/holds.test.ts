@@ -26,16 +26,16 @@ test("a reservation that an item holds, on real storage: the entry that opens th
   // The rule of an outcome reads what the ticket still holds, to stay inside it (section 6.1, "A rule may read what an item still holds").
   const again = ({ state }: RuleGiven) => ({ effects: [], sends: [], opens: (state.holder(TICKET)?.operations?.["probe"] ?? 0) > 0 ? [{ owner: MADE, kind: "probe", attempts: 1, for: TICKET }] : [] });
   const rules = gateRules({ "key-id": { place: "effect", most: 2, run: (() => opens) as never }, probe: { place: "outcome", rules: { selects: false, read: false, retries: () => false, derives: again } } }).rules;
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(founding), ordinal: 0 };
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(creation), ordinal: 0 };
   const name = scopeIdOf(seed);
   const c = controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: definition.declared as never, rules } : null) } }));
   try {
     const stub = stubOf(name);
-    const founded = await stub.found(signIntent(founding, rita.secret), MADE);
-    if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
-    const scope = founded.receipt.fact.at;
+    const created = await stub.create(signIntent(creation, rita.secret), MADE);
+    if (created.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(created)}`);
+    const scope = created.receipt.fact.at;
     const said = (answer: Answer) => [answer.answer, "reason" in answer ? answer.reason : null];
     const act = (who: typeof rita, kind: string, over: Partial<Intent>): Promise<Answer> => {
       const intent: Intent = { v: 1, to: scope, actor: who.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: at(60), ...over };
@@ -50,7 +50,7 @@ test("a reservation that an item holds, on real storage: the entry that opens th
       return { holder: store.holder(TICKET), holders: store.holders(), for: store.operationsFor(TICKET).map((operation) => [operation.id, operation.for]), none: store.operationsFor(0), outcomes: store.outstanding().outcomes, snapshot: store.all() };
     });
 
-    // The founding is 1 entry, and reserves the closing checkpoint. The ticket's entry is 1 more, and its 2 probes are 4 entries.
+    // The creation is 1 entry, and reserves the closing checkpoint. The ticket's entry is 1 more, and its 2 probes are 4 entries.
     // With a budget of 6 entries the taking entry does not fit, and nothing is written. With 7 it is admitted, with the whole.
     await budget(6);
     expect([said(await issue()), (await stored()).holders]).toEqual([["refused", "scope-full"], []]);

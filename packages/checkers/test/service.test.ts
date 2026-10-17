@@ -199,15 +199,15 @@ describe("the checker service (authority note, section 3.11; I3 plan, T35). The 
       const later = made(w);
       await new Outcomes(later.durable).start(later.w.fact, "a-run", null);
       later.runner.records.set("a-run", value);
-      const found = [await told(later), await told(later), later.runner.asked.length];
+      const matched = [await told(later), await told(later), later.runner.asked.length];
       // The run's name is the one thing that the two records of what ran do not share.
       const run = first.runner.asked[0]?.run ?? "no run";
       const again = kept(later).details;
-      expect({ answers, runs: first.runner.asked.length, sent, record: kept(first).details, found, again, same: again === null ? null : { ...again.provenance, run } }, name).toEqual({
+      expect({ answers, runs: first.runner.asked.length, sent, record: kept(first).details, "found": matched, again, same: again === null ? null : { ...again.provenance, run } }, name).toEqual({
         answers: ["check-error report-malformed, kept, ran", "kept", "check-error report-malformed, admitted"], runs: 1,
         sent: Array(3).fill([true, "check-error", "report-malformed", detailsDigest({ provenance: safe(first, run) })]),
         record: { provenance: safe(first, run) },
-        found: ["check-error report-malformed, admitted", "nothing: closed", 0], again: { provenance: safe(later, "a-run") }, same: safe(first, run),
+        "found": ["check-error report-malformed, admitted", "nothing: closed", 0], again: { provenance: safe(later, "a-run") }, same: safe(first, run),
       });
     }
     // One reading: a report whose member gives another value at each read is judged and recorded from the same reading. Here the image is

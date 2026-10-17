@@ -36,7 +36,7 @@ export function bindingTransport(service: ServiceBinding): Transport {
     return answer;
   };
   return {
-    found: (founding, definition, definitions = [], beside = {}) => call("found", () => service.found(founding, definition, definitions, beside)),
+    create: (creation, definition, definitions = [], beside = {}) => call("create", () => service.create(creation, definition, definitions, beside)),
     submit: (scope, signed, grants, beside = {}) => call("submit", () => service.submit(scope, signed, grants, beside)),
     prepare: (scope, signed, grants, capability, step) => call("prepare", () => service.prepare(scope, signed, grants, capability, step)),
     settle: (scope, signed) => call("settle", () => service.settle(scope, signed)),
@@ -53,7 +53,7 @@ export function bindingTransport(service: ServiceBinding): Transport {
     history: (scope, reader, cursor) => call("history", () => service.history(scope, reader, cursor)),
     entry: (scope, reader, seq) => call("entry", () => service.entry(scope, reader, seq)),
     outbox: (scope, reader, cursor) => call("outbox", () => service.outbox(scope, reader, cursor)),
-    duty: (scope, reader, duty) => call("duty", () => service.duty(scope, reader, duty)),
+    outboxItem: (scope, reader, outboxId) => call("outboxItem", () => service.outboxItem(scope, reader, outboxId)),
     log: (scope, reader, cursor) => call("log", () => service.log(scope, reader, cursor)),
     retained: (scope, reader, kind, digest, domain) => call("retained", () => service.retained(scope, reader, kind, digest, domain)),
   };

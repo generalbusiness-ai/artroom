@@ -108,8 +108,8 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // The other intent's check gets no answer: `unknown`, and its one attempt opens no other. Another read in its place settles
     // nothing. The read's own answer, when it arrives late, is recorded, and writes the check record (section 5.7, the evidence
     // table; section 5.4, rule 2).
-    const found = { record: clean(s.at, X, 1) };
-    expect([shape(s.outcome("12:0", "unknown")), s.outcome("12:0", "confirmed", found, "read"), shape(s.outcome("12:0", "confirmed", found)), s.record("check", intentDigest(other.intent), 1)?.state]).toEqual([
+    const matched = { record: clean(s.at, X, 1) };
+    expect([shape(s.outcome("12:0", "unknown")), s.outcome("12:0", "confirmed", matched, "read"), shape(s.outcome("12:0", "confirmed", matched)), s.record("check", intentDigest(other.intent), 1)?.state]).toEqual([
       ["unknown"], "refused bad-input", ["confirmed", "check recorded"], "recorded",
     ]);
 
@@ -118,7 +118,7 @@ describe("the records of `hold@1` (scope contract, section 6.11; authority note,
     // report, and never the pin of the other intent.
     const third = s.intent(una, "report", { expected: { commitment: s.item(s.commitment).revision }, fields: source });
     const check = s.asked(third, "check") as Entry;
-    s.outcome(`${check.seq}:0`, "confirmed", found);
+    s.outcome(`${check.seq}:0`, "confirmed", matched);
     const reports = [other, third].map((signed) => { expect(s.submit(signed, { capabilities: cap }).result).toBe("write"); return s.last.seq; }) as [number, number];
     const pins = () => [other, third].map((signed) => { const pin = s.record("pin", s.at, intentDigest(signed.intent)) as Record<string, unknown>; return [pin["state"], pin["admitted"], pin["by"]]; });
     const refuse = (report: number) => { expect(s.act(rita, "refuse-report", { on: report, expected: { on: 1 } }, { capabilities: cap }).result).toBe("write"); return shape(s.last); };

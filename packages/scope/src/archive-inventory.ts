@@ -97,9 +97,9 @@ export function inventoryArchive(sql: Sql, at: ScopeRef, through: Head, bounds: 
           // Native convention: root plus at most namedDefinitions children.
           if (asked.size > bounds.namedDefinitions) return stop("limit");
           asked.add(digest); nodes.push(digest);
-          const found = declaration(digest);
-          if (!found) { complete = false; continue; }
-          queue.push(...creates(found.definition.declared));
+          const matched = declaration(digest);
+          if (!matched) { complete = false; continue; }
+          queue.push(...creates(matched.definition.declared));
         }
         const value = { root, nodes, complete }; closures.set(root, value); return value;
       };
@@ -167,16 +167,16 @@ export function inventoryArchive(sql: Sql, at: ScopeRef, through: Head, bounds: 
         const closure = closures.get(digest);
         if (!closure?.complete) return stop("incomplete");
         for (const node of closure.nodes) {
-          const found = metadata.get(node);
-          if (!found) return stop("incomplete");
-          add({ kind: "definition", digest: node }, found.bytes, node === digest ? consumer : requiredDependency(consumer.origin, "definition-child", { kind: "definition", digest: node }));
+          const matched = metadata.get(node);
+          if (!matched) return stop("incomplete");
+          add({ kind: "definition", digest: node }, matched.bytes, node === digest ? consumer : requiredDependency(consumer.origin, "definition-child", { kind: "definition", digest: node }));
         }
       };
       if (isDigest(prefix.pin.seed.definition)) selectClosure(prefix.pin.seed.definition, requiredDependency(rootOrigin, "declaration", { kind: "definition", digest: prefix.pin.seed.definition }));
       else for (const child of platformClosure!.nodes) {
-        const found = metadata.get(child);
-        if (!found) return stop("incomplete");
-        add({ kind: "definition", digest: child }, found.bytes, requiredDependency(rootOrigin, "definition-child", { kind: "definition", digest: child }));
+        const matched = metadata.get(child);
+        if (!matched) return stop("incomplete");
+        add({ kind: "definition", digest: child }, matched.bytes, requiredDependency(rootOrigin, "definition-child", { kind: "definition", digest: child }));
       }
       for (const { origin, plan } of plans) {
         for (const { dependency, max } of plan.dependencies) {

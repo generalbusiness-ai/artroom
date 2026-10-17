@@ -6,7 +6,7 @@ import { change, change3 } from "@generalbusiness/dap-lanes";
 import { declarationDigest, variantOf, type DefinitionLike, type Tool } from "../src/index.ts";
 import { issueLike, roomLike } from "./support/collisions.ts";
 import { mcpRoom, type Agent } from "./support/room.ts";
-import { exercises, founded } from "./support/story.ts";
+import { exercises, created } from "./support/story.ts";
 
 /** The tools of an agent's list, with the binding each records. */
 async function tools(agent: Agent): Promise<Tool[]> {
@@ -21,9 +21,9 @@ async function tools(agent: Agent): Promise<Tool[]> {
 }
 const bindingOf = (t: Tool) => t._meta?.["dap/binding"] as { definition: string; kind: string; declaration: string; digests: string[] } | undefined;
 const toolFor = (list: Tool[], definition: string, kind: string, digest?: string): Tool => {
-  const found = list.find((t) => bindingOf(t)?.definition === definition && bindingOf(t)?.kind === kind && (digest === undefined || bindingOf(t)!.digests.includes(digest)));
-  expect(found, `a tool for ${definition} ${kind}`).toBeDefined();
-  return found!;
+  const matched = list.find((t) => bindingOf(t)?.definition === definition && bindingOf(t)?.kind === kind && (digest === undefined || bindingOf(t)!.digests.includes(digest)));
+  expect(matched, `a tool for ${definition} ${kind}`).toBeDefined();
+  return matched!;
 };
 
 // Invariant: a tool is bound to exact declarations: same-name definitions whose rows differ get two variant tools, each refusing
@@ -35,7 +35,7 @@ test("binding: variants, stale descriptors, retirement, collisions and controls"
   const room = mcpRoom();
   try {
     const rita = room.agent("rita");
-    await founded(room, rita);
+    await created(room, rita);
     await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
     for (const [key, definition] of [["change", change], ["change3", change3], ["issue-like", issueLike], ["room-like", roomLike]] as const) {
       const activated = await rita.ok("rules.activate", { fields: { digest: definitionDigest(definition), name: definition.name }, values: [canonicalize(definition)], idempotencyKey: `activate-${key}` });

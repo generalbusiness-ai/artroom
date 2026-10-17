@@ -20,7 +20,7 @@ import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/dap-co
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { capabilities, type Underived } from "./capability.ts";
-import { capacityOf, type DutyAmounts, type PendingCopy } from "./capacity.ts";
+import { capacityOf, type PendingWorkAmounts, type PendingCopy } from "./capacity.ts";
 import { mark, marked, type Defining, type MarkPlace, type RangeIndex } from "./context.ts";
 import { acts, receives } from "./handlers.ts";
 import { heldUnderBytes, holdForms, holdTypes } from "./hold.ts";
@@ -71,8 +71,8 @@ export interface ValidDefinition {
   readonly pending: Readonly<Record<string, Readonly<Record<string, number>>>>;
   /** Section 17.2, row 4: each relationship whose copies await a settlement, with the states and the entries a copy in one of them reserves. */
   readonly pendingCopies: readonly PendingCopy[];
-  /** Known declared duty terms, including future requests and their result-source bytes. Other axes/retention remain partial. */
-  readonly dutyAmounts: DutyAmounts;
+  /** Known declared task terms, including future requests and their result-source bytes. Other axes/retention remain partial. */
+  readonly pendingWorkAmounts: PendingWorkAmounts;
   /**
    * Section 6.11: each form that this package reads and does not derive by
    * itself, with the capability version whose own code derives it. A runtime
@@ -97,7 +97,7 @@ export interface ValidDefinition {
   readonly reserving?: Reserving;
   /**
    * Section 17.2, "A marker duty" (revision 22): each item type that some
-   * form settles by a mark, with what the amounts of its duties are derived
+   * form settles by a mark, with what the amounts of its pending work is derived
    * from (`markers.ts`). An item of such a type reserves by its state and
    * by the marks that are `true`, so `pending` has no row for the type.
    * Absent: no form of the definition settles by a mark.
@@ -179,7 +179,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const d: Defining = {
     ...read, bounds, name: typeof top["name"] === "string" ? top["name"] : null, typeNames: new Set(isObject(top["items"]) ? Object.keys(top["items"]) : []), types: new Map(), rules: new Set(), holds: false, holdTypes: new Set(),
     capabilities: new Map(), underived: [],
-    indexes: [], clauseSets: [], clause: null, duties: [], platform, marks: [], places: new Map(), valueSets: [], bindings: [], observing: false,
+    indexes: [], clauseSets: [], clause: null, pendingWork: [], platform, marks: [], places: new Map(), valueSets: [], bindings: [], observing: false,
   };
 
   const profile = rec(top["profile"], "profile", ["name", "version"]);

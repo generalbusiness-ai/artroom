@@ -69,7 +69,7 @@ shows where a count is taken, drawn and released, and nothing about a
 count or a rule of a platform definition. The destination now states
 `holds` for its branch and publication types;
 `packages/platform/test/destination-creates.test.ts` checks their cleanup
-and receipt duties with the package's real rules.
+and receipt pending work with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a
@@ -95,7 +95,7 @@ rules: a test of real authority runs there, in the namespace `PLATFORM`
 
 The register and the directory have no stand-in rule: every mark of the
 data of each has its rule in the platform package. Two fixtures are in
-`packages/platform/test/support-founding.ts`. `Register` is a register in
+`packages/platform/test/support-creation.ts`. `Register` is a register in
 memory, created by an install intent. `Directory` is a directory in memory
 that such a register created by its own rules: the claim, the selecting
 outcome with its `create`, the directory's genesis and the register's
@@ -103,7 +103,7 @@ record of the result are all judged. The genesis of each child and each
 lane's entry are scripted, made by hand. A test that uses one says so. It
 shows the rows and the rules of the two definitions as judgments in
 memory. A creation on scope objects is
-`packages/scope/test/founding-real.test.ts`, in the namespace `PLATFORM`:
+`packages/scope/test/creation-real.test.ts`, in the namespace `PLATFORM`:
 the deployed class, the production authority and the package's own rules,
 with a labelled stand-in for the Git host. The destination has a rule for
 every mark, including `first-head` and `receipt`; its creation no longer needs substitute rules. The real-scope
@@ -147,7 +147,7 @@ changed-set value and its holder counts are the package's code. These
 tests show its judgments from scripted inputs, and no live host, gateway
 or push.
 
-`packages/scope/test/founding-real.test.ts` runs the register, directory,
+`packages/scope/test/creation-real.test.ts` runs the register, directory,
 membership, rules and destination as real Durable Objects under the
 deployed class and the platform package's rules. The directory creates
 and confirms all three children. The destination records its first head

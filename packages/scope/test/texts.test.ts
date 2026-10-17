@@ -5,9 +5,9 @@ import type { DeclaredDefinition, Digest, Entry, Seed } from "@generalbusiness/d
 import { scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "@generalbusiness/dap-derive";
 import { grantOf, variant } from "@generalbusiness/dap-derive/testing";
-import { found, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
+import { create, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
-import { Node, founding, later, net, rita, routed, settle } from "./net.ts";
+import { Node, creation, later, net, rita, routed, settle } from "./net.ts";
 import { reader } from "./support.ts";
 
 /**
@@ -47,7 +47,7 @@ test("a detached text over the real route: the entry holds its digest and the sc
   const signer = secretSigner(rita.secret);
   const now = timeMs(net.clock.now)!;
   const transport = httpTransport("https://scopes.test", { fetch: routed });
-  const { answer, scope } = await found(transport, await signedIntent(signer, { to: null, kind: "found" }, { now }), notes.declared, [], reader);
+  const { answer, scope } = await create(transport, await signedIntent(signer, { to: null, kind: "found" }, { now }), notes.declared, [], reader);
   if (answer.answer !== "accepted" || !scope) throw new Error(`not founded: ${JSON.stringify(answer)}`);
   const at = answer.receipt.fact.at;
   const grants = [grantOf(rita, at, ["write", "strike"])];
@@ -98,9 +98,9 @@ test("a detached text over the real route: the entry holds its digest and the sc
 
 test("a detached text in a creation message: the child reads the bytes from its creator and keeps them; when the creator has redacted the text first, the creation is not decided", async () => {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(notes, {});
+  const { signed, name } = creation(notes, {});
   const P = new Node(name, notes.declared);
-  expect(await P.stub.found(signed, notes.declared)).toMatchObject({ answer: "accepted" });
+  expect(await P.stub.create(signed, notes.declared)).toMatchObject({ answer: "accepted" });
   const write = async (text: string) => {
     const answer = await P.stub.submit(await P.intent(rita, "write", { fields: { body: textDigest(text) } }), await P.grants(), { texts: [text] });
     if (answer.answer !== "accepted") throw new Error(`not accepted: ${JSON.stringify(answer)}`);
@@ -132,7 +132,7 @@ test("a detached text in a creation message: the child reads the bytes from its 
   expect([await asks.text(copied.fact.seq, textDigest(shared)), await asks.text(a, textDigest(shared))]).toEqual([JSON.stringify(shared), null]);
 
   // The send is held, and P redacts the text before it is delivered. The child cannot read the bytes, so it records nothing, and
-  // P keeps the duty. What ends such a duty is not decided by the contract.
+  // P keeps the task. What ends such a task is not decided by the contract.
   const b = await write("A body that is struck first.");
   net.hold = () => true;
   const late = await P.did(rita, "copy", { on: b, expected: { on: 1 } });
@@ -141,15 +141,15 @@ test("a detached text in a creation message: the child reads the bytes from its 
   await later(1, P);
   const L = await child(late.fact.seq);
   expect(await L.stub.summary(reader)).toMatchObject({ ok: false });
-  const duty = (await P.duties()).find((d) => d.duty === `${late.fact.seq}.0`)!;
-  expect([duty.result, duty.diagnosis, duty.acknowledged, duty.attempts.at(-1)?.answer]).toEqual([null, null, null, "retry"]);
+  const outboxId = (await P.outboxItems()).find((d) => d.outboxId === `${late.fact.seq}.0`)!;
+  expect([outboxId.result, outboxId.diagnosis, outboxId.acknowledged, outboxId.attempts.at(-1)?.answer]).toEqual([null, null, null, "retry"]);
 });
 
 test("a repeat of a decided send is answered from the entry that recorded it, and writes nothing, after both scopes have redacted the text that the message carries", async () => {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(notes, {});
+  const { signed, name } = creation(notes, {});
   const P = new Node(name, notes.declared);
-  expect(await P.stub.found(signed, notes.declared)).toMatchObject({ answer: "accepted" });
+  expect(await P.stub.create(signed, notes.declared)).toMatchObject({ answer: "accepted" });
   const text = "A body that is told.";
   const wrote = await P.stub.submit(await P.intent(rita, "write", { fields: { body: textDigest(text) } }), await P.grants(), { texts: [text] });
   if (wrote.answer !== "accepted") throw new Error(`not accepted: ${JSON.stringify(wrote)}`);

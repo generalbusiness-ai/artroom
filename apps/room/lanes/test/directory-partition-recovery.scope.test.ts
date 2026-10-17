@@ -36,7 +36,7 @@ test("native root abandons only terminal routing generations and opens a fresh s
         await D.stub.dispatch();
         const outbox = await D.stub.outbox("a test reader");
         if (!outbox.ok) return expect.fail("actual outbox unavailable");
-        if (outbox.value.find(duty => duty.duty === `${opened.receipt.fact.seq}.0`)?.diagnosis?.finding === "undelivered") break;
+        if (outbox.value.find(outboxId => outboxId.outboxId === `${opened.receipt.fact.seq}.0`)?.diagnosis?.finding === "undelivered") break;
         net.clock.now = soon(PROPOSED_BOUNDS.dispatchRetryMaxSeconds + 1);
       }
       const row = await runInDurableObject(D.object, (_instance, storage) => {
@@ -79,11 +79,11 @@ test("native root keeps a lost create answer pending and explicitly resends its 
     const opened = await D.stub.submit(signed, []);
     expect(opened).toMatchObject({ answer: "accepted" });
     if (opened.answer !== "accepted") return expect.fail("actual root creation was refused");
-    const duty = `${opened.receipt.fact.seq}.0`;
+    const outboxId = `${opened.receipt.fact.seq}.0`;
     const outbox = async () => {
       const read = await D.stub.outbox("a test reader");
       if (!read.ok) throw new Error("actual Root outbox is unavailable");
-      return read.value.find(row => row.duty === duty)!;
+      return read.value.find(row => row.outboxId === outboxId)!;
     };
     // Dispatch the child only once while its result is held. Its later
     // retry remains due, ready for explicit release after Root recovery.
@@ -106,7 +106,7 @@ test("native root keeps a lost create answer pending and explicitly resends its 
     expect(sent).toHaveLength(4);
     expect((await D.summary()).at).toEqual(before.at);
     recovering = true;
-    expect(await (D.object as unknown as { resend(duty: unknown): Promise<Resent> }).resend(duty)).toEqual({ sent: true, answer: "acknowledged" });
+    expect(await (D.object as unknown as { resend(outboxId: unknown): Promise<Resent> }).resend(outboxId)).toEqual({ sent: true, answer: "acknowledged" });
     expect(sent).toHaveLength(5);
     expect(sent[4]).toEqual(sent[0]);
     expect((await D.summary()).at).toEqual(before.at);

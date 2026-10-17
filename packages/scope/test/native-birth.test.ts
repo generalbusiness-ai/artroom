@@ -6,17 +6,17 @@ import { intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbus
 import { readNativeBirth, type NativeBirth } from "../src/native-birth.ts";
 import { namespace } from "../src/namespace.ts";
 import { controls } from "../src/testing.ts";
-import { at, definition, found, rita, type Remote } from "./support.ts";
+import { at, definition, create, rita, type Remote } from "./support.ts";
 type Peer = Remote & { nativeBirth(at: unknown, milliseconds: number, maxBytes?: number): Promise<NativeBirth | null> };
 
 // Actual native register genesis, preparation, code pin and SQLite. Clock/key
 // fixtures are the existing test ports. No new partition factory is claimed.
 test("native raw birth reads the exact accepted pin without an activation turn, writes, authority or a derived under label", async () => {
-  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "birth-test", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
+  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "birth-test", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
   const name = scopeIdOf({ v: 1, kind: "register", definition: "platform:register@3", creator: null, cause: intentDigest(intent), ordinal: 0 });
   controls(name);
   const object = env.SCOPES.get(env.SCOPES.idFromName(name)), peer = object as unknown as Peer;
-  const answer = await peer.found(signIntent(intent, rita.secret), "platform:register@3");
+  const answer = await peer.create(signIntent(intent, rita.secret), "platform:register@3");
   if (answer.answer !== "accepted") return expect.fail("native register was not founded");
   const ref = answer.receipt.fact.at;
   const snapshot = () => runInDurableObject(object, (_instance, state) => ({ entries: state.storage.sql.exec("SELECT seq,hash,bytes FROM entry ORDER BY seq").toArray(), outbox: state.storage.sql.exec("SELECT * FROM outbox ORDER BY seq,n").toArray(), meta: state.storage.sql.exec("SELECT * FROM meta ORDER BY k").toArray() }));
@@ -34,7 +34,7 @@ test("native raw birth reads the exact accepted pin without an activation turn, 
 });
 
 test("declared raw birth retains its actual name without promoting identity; oversized genesis is refused before its body is selected", async () => {
-  const scope = await found(), peer = scope.object as unknown as Peer;
+  const scope = await create(), peer = scope.object as unknown as Peer;
   const birth = await peer.nativeBirth(scope.at, 10000);
   expect(birth).toMatchObject({ named: definition.digest, declarationName: definition.declared.name, native: false });
   expect(readNativeBirth({ ...birth, under: "issue" }, scope.at)).toBeNull();

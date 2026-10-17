@@ -13,7 +13,7 @@
 
 import type { Entry, RetainedInput } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { born, deliver, fields, founded, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
+import { born, deliver, fields, created, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, hashOfBytes, type MemoryScope } from "../src/index.ts";
 
 function written(judgment: { result: string }): void {
@@ -22,7 +22,7 @@ function written(judgment: { result: string }): void {
 
 /** The three ledgers that wrote the good histories, made anew. */
 export function histories(): Record<"D" | "P" | "I", Ledger> {
-  const D = founded();
+  const D = created();
   const ticket = (title: string, mint: number): Ledger => {
     const act = D.did(keys.rita, "open-issue", fields({ title }));
     const { child, judgment } = born(D, act.seq, 0, mint);

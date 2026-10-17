@@ -52,7 +52,7 @@ test.each([{ name: "application", cohort: APPLICATION_COHORT }, { name: "applica
   const store = memoryStore();
   await lifetime.wait(() => store.keep("operator", rita.secret));
   const fetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
-  const context: Context = { store, fetch, trustedFoundingService: { service: SERVICE, fetch },
+  const context: Context = { store, fetch, trustedCreationService: { service: SERVICE, fetch },
     now: () => { lifetime.active(); return timeMs(soon(0))!; } };
   const run = (...argv: string[]) => lifetime.wait(() => command(context, argv));
   const planned = await run("install", "--plan", SERVICE, "--cohort", name, "--host", "git.example", "--namespace", "application");
@@ -60,8 +60,8 @@ test.each([{ name: "application", cohort: APPLICATION_COHORT }, { name: "applica
   const pending = await lifetime.wait(() => store.config());
   const plan = pending?.plan;
   if (!plan) throw new Error("The CLI must retain the original application install plan.");
-  expect([pending?.register, plan.definition, plan.founding.intent.actor]).toEqual([undefined, cohort.register, rita.key]);
-  expect(plan.register).toBe(scopeIdOf({ v: 1, kind: "register", definition: cohort.register, creator: null, cause: intentDigest(plan.founding.intent), ordinal: 0 }));
+  expect([pending?.register, plan.definition, plan["founding"].intent.actor]).toEqual([undefined, cohort.register, rita.key]);
+  expect(plan.register).toBe(scopeIdOf({ v: 1, kind: "register", definition: cohort.register, creator: null, cause: intentDigest(plan["founding"].intent), ordinal: 0 }));
   const R = new OwnedPlatform(plan.register);
   let D: Platform | undefined, C: Platform | undefined;
   try {
@@ -76,10 +76,10 @@ test.each([{ name: "application", cohort: APPLICATION_COHORT }, { name: "applica
     expect(kept?.register).toEqual(await R.at());
     expect(kept?.plan).toMatchObject({ ...plan, acknowledged: { status: "service-acknowledged", service: SERVICE } });
     expect((await R.summary()).value).toMatchObject({ definition: cohort.register, status: "active" });
-    const founding = (await R.entries())[0]!.input;
-    if (founding.type !== "genesis") throw new Error("The CLI install must produce a native genesis.");
-    expect(founding.founding).toEqual(plan.founding);
-    const claim = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
+    const creation = (await R.entries())[0]!.input;
+    if (creation.type !== "genesis") throw new Error("The CLI install must produce a native genesis.");
+    expect(creation["founding"]).toEqual(plan["founding"]);
+    const claim = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
     D = new OwnedPlatform(scopeIdOf(directorySeed));
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(directorySeed), 1), id: "application-fixture" } } });

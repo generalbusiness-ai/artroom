@@ -166,7 +166,7 @@ export function decodeEntity(reference: string): string {
 
 /** Backslash escapes and entity references replaced by what they stand for. */
 export function unescapeString(text: string): string {
-  return text.includes("\\") || text.includes("&") ? text.replace(ESCAPE_OR_ENTITY, (found) => (found[0] === "\\" ? found[1]! : decodeEntity(found))) : text;
+  return text.includes("\\") || text.includes("&") ? text.replace(ESCAPE_OR_ENTITY, (matched) => (matched[0] === "\\" ? matched[1]! : decodeEntity(matched))) : text;
 }
 
 /** A link label's key: its inner text with whitespace collapsed, case folded. */

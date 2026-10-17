@@ -1,6 +1,6 @@
 # Local room label browser evidence
 
-The production Page ran against actor-bound native readonly answers for an existing room. The browser settings contain the explicit local-label fixture `Field notebook`, bound to that room's exact directory, membership reference and configured register. No claim completion is invented and no founding or native name mutation is submitted.
+The production Page ran against actor-bound native readonly answers for an existing room. The browser settings contain the explicit local-label fixture `Field notebook`, bound to that room's exact directory, membership reference and configured register. No claim completion is invented and no creation or native name mutation is submitted.
 
 At 320 CSS pixels in both light and dark schemes, one visible room switch shows the local label above the actual recorded repository name. Its target is 50px high; editable text is 16px and there is no horizontal overflow. Changing only the label's membership incarnation makes the Page ignore the stale label on reload, while its actual configured room and native name remain unchanged.
 

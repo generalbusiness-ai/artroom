@@ -1,9 +1,9 @@
-/** Native founding through the existing CLI workflow, with private browser recovery.
+/** Native creation through the existing CLI workflow, with private browser recovery.
  * A typed label is local intent, not the repository name selected by the host.
  * This module never installs a register or imports an operator key. */
 import type { PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, parseStrict, unb64url } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, httpTransport, secretSigner, signedReads, isFoundingOffer, type Fetch } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedReads, isCreationOffer, type Fetch } from "@generalbusiness/artroom-client";
 import { claim, checkClaim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/dap-cli";
 import { DIRECTORY_OF } from "@generalbusiness/dap-platform";
 import type { Session } from "./data.ts";
@@ -15,7 +15,7 @@ export interface ClaimStorage { getItem(key: string): string | null; setItem(key
 /** Exclusive across all callers/tabs sharing the private record. Production
  * uses Web Locks; a test supplies its explicitly labelled lock stand-in. */
 export interface ClaimLocks { request<T>(name: string, run: () => Promise<T>): Promise<T> }
-export interface ClaimOptions extends Pick<Context, "pause" | "tries" | "foundingOffer"> {
+export interface ClaimOptions extends Pick<Context, "pause" | "tries" | "creationOffer"> {
   handle?: string;
   /** Only settle/follow the exact saved stages; never Continue or prepare. */
   readOnlyCheck?: boolean;
@@ -43,7 +43,7 @@ export interface ClaimedRoom {
 interface Kept { v: 1; binding: string; label: string; config: Config; recovery?: string; completed?: PendingClaim }
 interface Journal { v: 2; binding: string; active: string; claims: Record<string, string>; originalLegacy?: string }
 export interface ClaimStatus { operation: string; label: string; state: "pending" | "complete" }
-/** A client storage bound, not native founding permission or capacity. No
+/** A client storage bound, not native creation permission or capacity. No
  * archived or unknown operation is evicted to admit another one. */
 const MAX_CLAIMS = 64;
 const operationId = (id: string): boolean => id === "legacy" || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
@@ -156,8 +156,8 @@ export async function allowedClaim(session: Session, register: ScopeRef): Promis
   if (!read.complete || read.next !== undefined || canonicalize(read.value.scope) !== canonicalize(register) || !DIRECTORY_OF[read.value.definition]) throw new Error("The register read does not match the complete configured reference and a supported pinned version. Nothing was submitted.");
   const registers = read.value.items.filter((item) => item.type === "register" && item.state === "open");
   const policy = registers[0]?.values["policy"];
-  const founders = registers[0]?.values["founders"];
-  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(founders) && founders.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's creation policy. Nothing was submitted.");
+  const creators = registers[0]?.values["founders"];
+  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(creators) && creators.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's creation policy. Nothing was submitted.");
   return { register, definition: read.value.definition as PlatformDefinition };
 }
 
@@ -208,9 +208,9 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
         if (verified.code !== 0) return { outcome: verified, operation: active, label: kept.label, repository: null, pending: true };
       }
       checkCurrent();
-      const eligible = options.foundingOffer ? await (async () => {
-        const offer = await options.foundingOffer!(configured.register);
-        if (!isFoundingOffer(offer, session.service, configured.register)) throw new Error("The founding offer does not match this exact origin and register. Nothing was submitted.");
+      const eligible = options.creationOffer ? await (async () => {
+        const offer = await options.creationOffer!(configured.register);
+        if (!isCreationOffer(offer, session.service, configured.register)) throw new Error("The creation offer does not match this exact origin and register. Nothing was submitted.");
         return { definition: offer.definition };
       })() : await allowedClaim(session, configured.register);
       if (eligible.definition !== configured.definition) throw new Error("The register read does not match the configured pinned version. Nothing was submitted.");

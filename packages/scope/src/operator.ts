@@ -13,7 +13,7 @@
  * - **It holds no credential and no private text.** A row is a kind from a
  *   fixed list and references of fixed forms: a position and a hash of this
  *   scope's history, an operation's ID with an attempt's number, and a
- *   send's duty ID. It has no member that takes free text, and `found`
+ *   send's outbox ID. It has no member that takes free text, and `record`
  *   refuses a row of any other form.
  * - **Bounded.** It keeps the latest `rows` rows and drops the oldest.
  *
@@ -21,7 +21,7 @@
  * finding writes one, and always here. `incidentsOf` reads a sealed entry
  * and says what incident it holds, and `follow` writes those rows as the
  * history grows, from a mark that it keeps beside the record. A finding
- * that writes no entry is told to `found` by the component that made it.
+ * that writes no entry is told to `record` by the component that made it.
  *
  * | Kind | Found by | Entry |
  * |---|---|---|
@@ -34,8 +34,8 @@
  * `hold@1` that is not built (I3 deltas, entry ES12).
  */
 
-import type { Digest, DutyId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize, isDigest, isDutyId, isOperationId } from "@generalbusiness/artroom-bytes";
+import type { Digest, OutboxId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
+import { canonicalize, isDigest, isOutboxId, isOperationId } from "@generalbusiness/artroom-bytes";
 import { isObject, timeMs } from "@generalbusiness/dap-derive";
 import type { Clock, Transport } from "./ports.ts";
 import type { Sql } from "./sqlite.ts";
@@ -52,7 +52,7 @@ const KINDS: ReadonlySet<string> = new Set<IncidentKind>([
 ]);
 
 /** A reference to a fact in conflict. Each is a position or an ID of this scope, and none is text that a member or an outside system wrote. */
-export type IncidentRef = { entry: number; hash?: Digest } | { operation: OperationId; attempt: number } | { duty: DutyId };
+export type IncidentRef = { entry: number; hash?: Digest } | { operation: OperationId; attempt: number } | { outboxId: OutboxId };
 
 /** One row of the operator's record. `n` numbers the rows of this scope's record, from 1. */
 export interface Incident { n: number; time: Timestamp; scope: ScopeRef | null; kind: IncidentKind; refs: readonly IncidentRef[] }
@@ -64,7 +64,14 @@ function isRef(v: unknown): v is IncidentRef {
   if (keys === "entry") return position(v["entry"]);
   if (keys === "entry,hash") return position(v["entry"]) && isDigest(v["hash"]);
   if (keys === "attempt,operation") return position(v["attempt"]) && isOperationId(v["operation"]);
-  return keys === "duty" && isDutyId(v["duty"]);
+  return keys === "outboxId" && isOutboxId(v["outboxId"]);
+}
+
+/** Read the old bookkeeping key without accepting it on new writes. No journal bytes use this projection. */
+function retainedRef(value: unknown): IncidentRef {
+  if (isRef(value)) return value;
+  if (isObject(value) && Object.keys(value).length === 1 && isOutboxId(value["duty"])) return { outboxId: value["duty"] };
+  throw Error("Unavailable incident reference");
 }
 
 /** The most rows one scope's record keeps. Configuration: no text states a number (I3 deltas, entry ES12). */
@@ -107,7 +114,7 @@ export class OperatorRecord {
   }
 
   /** Write one row. A kind or a reference of another form is not written: false. */
-  found(kind: IncidentKind, refs: readonly IncidentRef[]): boolean {
+  record(kind: IncidentKind, refs: readonly IncidentRef[]): boolean {
     if (!KINDS.has(kind) || refs.length > 8 || !refs.every(isRef)) return false;
     const scope = this.#scope();
     this.#sql.exec("INSERT INTO operator_record (time, scope, kind, refs) VALUES (?, ?, ?, ?)", this.#clock.read(), scope ? canonicalize(scope) : null, kind, canonicalize(refs)).toArray();
@@ -127,7 +134,7 @@ export class OperatorRecord {
     const from = (this.#sql.exec("SELECT v FROM operator_mark WHERE k = 'next'").toArray()[0]?.["v"] as number | undefined) ?? 0;
     const rows = store.storedFrom(from, FOLLOW_ENTRIES);
     if (rows.length === 0) return;
-    for (const row of rows) for (const incident of incidentsOf(JSON.parse(row.bytes) as Entry, row.hash)) this.found(incident.kind, incident.refs);
+    for (const row of rows) for (const incident of incidentsOf(JSON.parse(row.bytes) as Entry, row.hash)) this.record(incident.kind, incident.refs);
     this.#sql.exec("INSERT INTO operator_mark (k, v) VALUES ('next', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", from + rows.length).toArray();
   }
 
@@ -136,7 +143,7 @@ export class OperatorRecord {
     const rows = this.#sql.exec("SELECT n, time, scope, kind, refs FROM operator_record WHERE n > ? ORDER BY n LIMIT ?", after ?? 0, limit + 1).toArray();
     const incidents = rows.slice(0, limit).map((row): Incident => ({
       n: row["n"] as number, time: row["time"] as Timestamp, scope: row["scope"] === null ? null : JSON.parse(row["scope"] as string) as ScopeRef,
-      kind: row["kind"] as IncidentKind, refs: JSON.parse(row["refs"] as string) as IncidentRef[],
+      kind: row["kind"] as IncidentKind, refs: (JSON.parse(row["refs"] as string) as unknown[]).map(retainedRef),
     }));
     return { incidents, more: rows.length > limit };
   }
@@ -145,17 +152,17 @@ export class OperatorRecord {
 // ---------------------------------------------------------------- a request that waits
 
 /** Which of the two lists of section 12, G17, a waiting request is in, or null: it is in neither. */
-export function waitingIn(duty: { class: string; held: boolean; acknowledged: unknown; result: unknown; diagnosis: { finding: string } | null }): "diagnosed" | "unanswered" | null {
-  if (duty.class !== "request" || duty.held || duty.result !== null) return null;
+export function waitingIn(outboxItem: { class: string; held: boolean; acknowledged: unknown; result: unknown; diagnosis: { finding: string } | null }): "diagnosed" | "unanswered" | null {
+  if (outboxItem.class !== "request" || outboxItem.held || outboxItem.result !== null) return null;
   // A request with a `delivery-unavailable` diagnosis.
-  if (duty.diagnosis) return duty.diagnosis.finding === "delivery-unavailable" ? "diagnosed" : null;
+  if (outboxItem.diagnosis) return outboxItem.diagnosis.finding === "delivery-unavailable" ? "diagnosed" : null;
   // A request that transport acknowledged and that has no result.
-  return duty.acknowledged !== null ? "unanswered" : null;
+  return outboxItem.acknowledged !== null ? "unanswered" : null;
 }
 
 /**
  * How an instruction to send again ended. `sent`: the one dispatch was
- * made, and `answer` is how transport answered it. Not sent: the duty ID
+ * made, and `answer` is how transport answered it. Not sent: the outbox ID
  * names no send of this scope; the send is in neither list; or this scope
  * has no transport.
  */
@@ -163,7 +170,7 @@ export type Resent = { sent: true; answer: Dispatched["answer"] | "source-unveri
 
 /**
  * The operator's instruction to send one waiting request again (G17,
- * "Sending again"). It names the duty by its entry and ordinal. The runtime
+ * "Sending again"). It names the task by its entry and ordinal. The runtime
  * dispatches the same envelope again, once: the same source entry, ordinal
  * and message, so the request keeps its identity and a late result settles
  * it. It is bookkeeping: it writes no entry, reserves nothing and offers no
@@ -175,10 +182,10 @@ export type Resent = { sent: true; answer: Dispatched["answer"] | "source-unveri
  * timer and no policy calls this: an automatic policy is not designed.
  */
 export async function sendAgain(
-  store: Pick<Store, "duty" | "stored" | "scope" | "attempted" | "acknowledge">, transport: Transport | null, clock: Clock, record: OperatorRecord, duty: unknown, seconds: number,
+  store: Pick<Store, "outboxItem" | "stored" | "scope" | "attempted" | "acknowledge">, transport: Transport | null, clock: Clock, record: OperatorRecord, outboxId: unknown, seconds: number,
 ): Promise<Resent> {
-  const at = isDutyId(duty) ? (duty.split(".").map(Number) as [number, number]) : null;
-  const row = at ? store.duty(at[0], at[1]) : null;
+  const at = isOutboxId(outboxId) ? (outboxId.split(".").map(Number) as [number, number]) : null;
+  const row = at ? store.outboxItem(at[0], at[1]) : null;
   const kept = at ? store.stored(at[0]) : null;
   const scope = store.scope();
   const send = kept ? (JSON.parse(kept.bytes) as Entry).sends.find((s) => s.n === at![1]) : undefined;
@@ -189,7 +196,7 @@ export async function sendAgain(
   const time = clock.read();
   const now = timeMs(time)!;
   const logged = (answer: Dispatched["answer"]): Dispatched[] => [...row.attempts, { at: time, answer }];
-  record.found("sent-again", [{ duty: row.duty }]);
+  record.record("sent-again", [{ outboxId: row.outboxId }]);
   // As the dispatcher does: the attempt is recorded before it is sent, as unanswered. The send is in no list of sends that are due, so no retry follows.
   store.attempted(seq, n, logged("none"), now);
   const answer = await within(() => transport.send({ to: send.to, from: { at: scope.at, seq, hash: kept.hash }, n, message: send.message }), seconds);

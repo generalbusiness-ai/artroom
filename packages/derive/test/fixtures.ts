@@ -337,7 +337,7 @@ export const desk: DeclaredDefinition = {
     },
   },
   acts: {
-    found: act({ step: "open", on: "repo", grant: "found", fields: { source: { ...text, required: true } }, effects: [{ value: { slot: "source", from: { field: "source" } } }] }),
+    "found": act({ step: "open", on: "repo", grant: "found", fields: { source: { ...text, required: true } }, effects: [{ value: { slot: "source", from: { field: "source" } } }] }),
     "open-issue": act({
       step: "open", on: "issue", grant: "open-issue", fields: { title: { ...text, required: true } }, effects: [{ value: { slot: "title", from: { field: "title" } } }],
       sends: [{ create: { ...makeTicket, fields: { opener: { signer: true }, title: { field: "title" } }, result: { applied: [{ state: "created" }], refused: [{ state: "refused" }], conflict: [{ state: "conflicted" }] } } }],
@@ -480,7 +480,7 @@ export class Scope extends Ledger {
     const slot = Object.keys(declared.items[type]!.parties)[0]!;
     this.fold({
       v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0,
-      input: { type: "genesis", seed, inc: at.inc, kind: declared.genesis, founding: null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
+      input: { type: "genesis", seed, inc: at.inc, kind: declared.genesis, "founding": null, source, n: 0, message, decision: "applied" }, uses: [], prepared: [],
       effects: [{ effect: "open", item: 0, type, state: declared.items[type]!.initial }, { effect: "party", item: 0, slot, member: opener }],
       sends: [{ n: 0, to: directory, message: { class: "result", of: { from: source, n: 0 }, outcome: "applied" } }],
     });
@@ -497,15 +497,15 @@ export class Scope extends Ledger {
 // ---------------------------------------------------------------- entries passed between scopes
 
 /**
- * A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or
+ * A directory created by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or
  * a desk with a change, or with `given` another definition and the fields of its genesis act. `key` tells two foundings apart.
  */
-export function founded(definition: ValidDefinition = deskDefinition, given: Intent["fields"] = { source: "a repository" }, key = "found"): Ledger {
+export function created(definition: ValidDefinition = deskDefinition, given: Intent["fields"] = { source: "a repository" }, key = "found"): Ledger {
   const ledger = new Ledger(definition);
-  const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: given, idempotencyKey: key, notAfter: t(60) }, keys.rita.secret);
-  const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  const creation = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: given, idempotencyKey: key, notAfter: t(60) }, keys.rita.secret);
+  const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
   const context = { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null };
-  const judgment = judgeGenesis(ledger.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, context);
+  const judgment = judgeGenesis(ledger.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, creation: creation }, context);
   if (judgment.result !== "write") throw new Error(`the directory was not founded: ${JSON.stringify(judgment)}`);
   ledger.seal(judgment.draft);
   return ledger;

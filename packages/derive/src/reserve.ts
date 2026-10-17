@@ -1,8 +1,8 @@
 /**
  * Room to settle (scope contract, sections 9.2 and 17, in the entries
- * dimension): a scope that admits a duty must still be able to record how
- * that duty ends. This file counts, from the folded state and the head
- * entry alone, the entries the pending duties reserve, and says whether an
+ * dimension): a scope that admits a task must still be able to record how
+ * that task ends. This file counts, from the folded state and the head
+ * entry alone, the entries the pending work reserves, and says whether an
  * entry leaves room for them. The runtime asks inside the commit, after the
  * fold; a verifier asks the same question of the same state.
  *
@@ -39,7 +39,7 @@
  *   counts from the folded records (`Owners.reserves`). For `hold@1` that is
  *   `holdReserves`, in `capability/hold.ts`;
  * - the closing checkpoint: one entry, once for the scope, from the genesis
- *   on, except while the head entry is a checkpoint and no other duty is
+ *   on, except while the head entry is a checkpoint and no other task is
  *   pending.
  *
  * From revision 20 of the contract (section 17.2a), under platform data:
@@ -93,7 +93,7 @@ export function heldEntries(view: StateView, definition: ValidDefinition): numbe
 }
 
 /**
- * The entries the pending duties of this state reserve. `head` is the input
+ * The entries reserved by the pending work of this state. `head` is the input
  * of the head entry. `owners`: the rules of the owners of outside
  * operations, which declare the closure of an outcome. With none, no
  * outcome is judged, so none has a closure.
@@ -119,7 +119,7 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
   for (const [type, states] of Object.entries(definition.pending)) {
     for (const [state, reserved] of Object.entries(states)) add(product(reserved, view.count(type, state)));
   }
-  // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves its state duty and each marker duty
+  // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves its state task and each marker task
   // that is pending, by its own marks. A definition with no such form has none, and counts as it did.
   add(markerOwed(view, definition));
   for (const copy of definition.pendingCopies) add(product(copy.entries, view.copies(copy.name, copy.kind, copy.states)));
@@ -156,7 +156,7 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
  * Section 17.3, the rule of admission, asked of the state as the entry just
  * folded left it. `input` is that entry's input.
  *
- * A settling entry was reserved by its duty, and is not asked: a timed
+ * A settling entry was reserved by its task, and is not asked: a timed
  * entry, a diagnosis, an outcome, a delivery of a control or of a
  * request's result, and an act or a delivery of a request that settles what
  * its form declares, which its judge says in `settles`. Everything else is
@@ -165,7 +165,7 @@ export function owed(view: StateView, definition: ValidDefinition, head: Input, 
  * delivery of a request or an advisory, a `conflict` result of a creation,
  * and a checkpoint.
  *
- * A checkpoint written while another duty is pending leaves the closing
+ * A checkpoint written while another task is pending leaves the closing
  * checkpoint reserved, so it needs a free entry. A checkpoint written with
  * nothing else pending is the closing checkpoint: after it nothing is
  * reserved, and it fits because its entry was. The next entry that is not a

@@ -3,7 +3,7 @@ import { canonicalize, definitionDigest, intentDigest } from "@generalbusiness/a
 import { PROPOSED_BOUNDS, type DeclaredDefinition, type MemberRef } from "@generalbusiness/dap-contract";
 import { runnable, validateDefinition, type RuleGiven } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
-import { Directory, rita } from "./support-founding.ts";
+import { Directory, rita } from "./support-creation.ts";
 import { definitionClosure } from "../src/definition-input.ts";
 import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, NEWEST, applicationValues, applicationPublicationValues, directoryRules8, DIRECTORY_OF, SIBLINGS_OF, platform } from "../src/index.ts";
 

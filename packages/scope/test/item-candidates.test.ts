@@ -2,14 +2,14 @@ import { expect, test } from "vitest";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 import { itemCandidates, ITEM_CANDIDATE_BOUNDS as B } from "../src/item-candidates.ts";
 import type { Sql } from "../src/sqlite.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 const allowance = { rows: B.rows, candidates: B.candidates, metadataBytes: B.metadataBytes };
 
 // Real pinned workerd Durable Object SQLite. Rows below are explicitly
 // synthetic item records inserted only into this isolated test scope.
 test("native item metadata seeks bound state candidates and UTF8 sizes without transferring record bodies", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = state.storage.sql;
     const write = (id: number, type: string, status: string, record: string) => sql.exec("INSERT INTO item (id,type,state,record) VALUES (?,?,?,?)", id, type, status, record).toArray();
@@ -53,7 +53,7 @@ test("native item metadata seeks bound state candidates and UTF8 sizes without t
 });
 
 test("native sparse item IDs use primary-key seeks and empty IDs never broaden into state scans", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = state.storage.sql;
     state.storage.transactionSync(() => {

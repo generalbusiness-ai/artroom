@@ -58,8 +58,8 @@ export async function within<T>(work: () => Promise<T>, seconds: number): Promis
  */
 export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: readonly FactRef[]): Promise<Fetched[] | null> {
   const read = await Promise.all(named.map(async (fact): Promise<Fetched | null> => {
-    const found = await within(() => resolver.read(fact, bounds.fetchSeconds), bounds.fetchSeconds);
-    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? carryProducerName({ fact, entry: found.entry, under: found.under }, found) : null;
+    const matched = await within(() => resolver.read(fact, bounds.fetchSeconds), bounds.fetchSeconds);
+    return matched !== LATE && matched !== null && "entry" in matched && isEntryOf(matched.entry, fact) ? carryProducerName({ fact, entry: matched.entry, under: matched.under }, matched) : null;
   }));
   return read.every((f) => f !== null) ? read : null;
 }
@@ -69,7 +69,7 @@ export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: read
 /** What the commit does with the waiting input (step 6). */
 export type Verdict<A> =
   /** Write the draft. `retain`: the inputs it names by digest. `sealed` builds the answer from the sealed entry. `unfit` answers for a draft that cannot be an entry: over the size bound, or not canonical values. */
-  /** `full` answers for an entry that admits new duties and would leave no room for them to settle (section 9.2). Nothing is written then. */
+  /** `full` answers for an entry that admits new pending work and would leave no room for it to settle (section 9.2). Nothing is written then. */
   | { verdict: "write"; draft: Draft; retain: readonly Retained[]; facts?: readonly Fetched[]; sealed(sealed: Sealed): A; unfit(why: "size" | "form"): A; full(head: Head): A }
   /** Step 6.3: a transition is due. Nothing is written, and the turn goes back to step 3. */
   | { verdict: "stop" }
@@ -187,36 +187,36 @@ export class Turns {
    * is used only while the scope has no genesis; after that the pinned
    * definition is.
    */
-  async run<A>(waiting: Waiting<A> | null, founding?: ValidDefinition): Promise<End<A>> {
+  async run<A>(waiting: Waiting<A> | null, creation?: ValidDefinition): Promise<End<A>> {
     const current = operational();
-    if (!current && this.#measurement) return measured(this.#measurement(), () => this.run(waiting, founding));
+    if (!current && this.#measurement) return measured(this.#measurement(), () => this.run(waiting, creation));
     const context = current, started = performance.now();
     if (context) context.turn.entered = true;
     const turn: Counts = { attempts: 0, restarts: 0, timed: 0, wrote: false, last: null };
     const failures = { count: 0 };
-    const end = await (context ? inOperation({ ...context, entryFailures: failures }, () => this.#run(waiting, founding, turn)) : this.#run(waiting, founding, turn));
+    const end = await (context ? inOperation({ ...context, entryFailures: failures }, () => this.#run(waiting, creation, turn)) : this.#run(waiting, creation, turn));
     if (failures.count) context!.invocation.metrics.sidecar(true, ["busy", "clock-behind", "unavailable"].includes(end.end), failures.count);
-    const answer = end.end === "answer" && ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations"].includes(context?.place ?? "") && end.answer !== null && typeof end.answer === "object" ? end.answer as { answer?: unknown; reason?: unknown } : null;
+    const answer = end.end === "answer" && ["create", "acts", "preparations", "rpc:create", "rpc:acts", "rpc:preparations"].includes(context?.place ?? "") && end.answer !== null && typeof end.answer === "object" ? end.answer as { answer?: unknown; reason?: unknown } : null;
     metric({ kind: "turn", place: context?.place ?? "alarm", end: end.end, answer: typeof answer?.answer === "string" ? answer.answer : "none", reason: typeof answer?.reason === "string" ? answer.reason : "none", duration: Math.max(0, Math.floor(performance.now() - started)), a: turn.restarts, b: turn.attempts, c: turn.timed, flag: turn.wrote ? 1 : 0 });
     return end;
   }
-  async #run<A>(waiting: Waiting<A> | null, founding: ValidDefinition | undefined, turn: Counts): Promise<End<A>> {
+  async #run<A>(waiting: Waiting<A> | null, creation: ValidDefinition | undefined, turn: Counts): Promise<End<A>> {
     let resume: Attempt | null = null;
     for (;;) {
       const attempt: Attempt | null = resume;
-      const step: End<A> | Attempt = await this.#queue.run(() => this.#section(founding, waiting, turn, attempt));
+      const step: End<A> | Attempt = await this.#queue.run(() => this.#section(creation, waiting, turn, attempt));
       if ("end" in step) return step;
       // Step 5: the rules are evaluated over the snapshot, within the time limit. The queue is free meanwhile.
       const prepared = await within(() => this.#ports.rules.evaluate(step.asks), this.#bounds.preparationSeconds);
-      if (prepared === LATE) return this.#queue.run(() => this.#close<A>(this.#definition(founding), turn, { end: "unavailable" }));
+      if (prepared === LATE) return this.#queue.run(() => this.#close<A>(this.#definition(creation), turn, { end: "unavailable" }));
       resume = { ...step, prepared };
     }
   }
 
-  /** The definition this section runs under: the pinned one, or before the genesis the one the founding asks for. */
-  #definition(founding: ValidDefinition | undefined): ValidDefinition | null | undefined {
+  /** The definition this section runs under: the pinned one, or before the genesis the one the creation asks for. */
+  #definition(creation: ValidDefinition | undefined): ValidDefinition | null | undefined {
     const pinned = this.#pinned();
-    return pinned === undefined ? founding : pinned;
+    return pinned === undefined ? creation : pinned;
   }
 
   /**
@@ -224,8 +224,8 @@ export class Turns {
    * turn ends or has rules to evaluate. Nothing here waits but the alarm at
    * the end.
    */
-  async #section<A>(founding: ValidDefinition | undefined, waiting: Waiting<A> | null, turn: Counts, resume: Attempt | null): Promise<End<A> | Attempt> {
-    const definition = this.#definition(founding);
+  async #section<A>(creation: ValidDefinition | undefined, waiting: Waiting<A> | null, turn: Counts, resume: Attempt | null): Promise<End<A> | Attempt> {
+    const definition = this.#definition(creation);
     if (!definition) return { end: "unavailable" };
     for (let attempt = resume; ; attempt = null) {
       if (!attempt) {
@@ -308,7 +308,7 @@ export class Turns {
     try {
       return this.#telling(() => this.#store.transaction((): End<A> | "stopped" => this.#judged(definition, waiting, turn, attempt, (answer) => { full = answer; })));
     } catch (error) {
-      // The entry would have left an admitted duty no room to settle. The transaction wrote nothing.
+      // The entry would have left an admitted task no room to settle. The transaction wrote nothing.
       if (error instanceof Full && full) return { end: "answer", answer: (full as () => A)() };
       if (error instanceof StandingError) return { end: "unavailable" };
       throw error;
@@ -332,9 +332,9 @@ export class Turns {
       });
       try {
         const sealed = this.#seal(definition, verdict.draft, clock, [...verdict.retain, ...rules], verdict.facts);   // 6.5
-        // Section 9.2: an entry that admits duties is kept only if every admitted duty still has room to settle. The count is of
+        // Section 9.2: an entry that admits pending work is kept only if every admitted task still has room to settle. The count is of
         // the state the fold just wrote, so it is under the head check, and a verifier derives the same number. Section 17.3: an
-        // entry that settles what its form declares is written against its own duty's reservation, and is not asked.
+        // entry that settles what its form declares is written against its own task's reservation, and is not asked.
         if (!fits(this.#store, definition, this.#bounds, sealed.entry.input, verdict.draft.settles, this.#owners())) {
           refuse(() => verdict.full(head ?? { seq: sealed.entry.seq, hash: sealed.hash }));
           throw new Full();

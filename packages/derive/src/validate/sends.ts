@@ -4,7 +4,7 @@ import type { Notify } from "@generalbusiness/dap-contract";
 import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
-import { mark, marked, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
+import { mark, marked, subject, type ClauseSet, type Ctx, type Defining, type PendingWork, type Type } from "./context.ts";
 import { effects } from "./effects.ts";
 import { guards, range } from "./guards.ts";
 import { clauseObserves } from "./observes.ts";
@@ -113,7 +113,7 @@ function alsoRead(v: unknown): string[] {
  * written, which holds each type's `max`. `requests` takes each request
  * form, for the reservations of section 17.2.
  */
-export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec, requests: Duties["requests"]): number {
+export function sends(d: Defining, v: unknown, path: string, ctx: Ctx, top: Rec, requests: PendingWork["requests"]): number {
   const { bounds, problems, bad, rec, form, list, str } = d;
   const relations = new Set<string>();
   /** For each message kind: whether its form always sends once, has clause work, and the identity of that work. */

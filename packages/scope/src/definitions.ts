@@ -6,7 +6,7 @@
  *
  * - A scope retains its own declaration, and the declaration of every
  *   definition its own names in a `create` send, and of every definition
- *   those name in turn. They are supplied when a directory is founded, and
+ *   those name in turn. They are supplied when a directory is created, and
  *   read from the creator when a child is created.
  * - A child, before its genesis turn, reads the declaration its seed names
  *   from its creator, by digest, and checks the digest.
@@ -46,15 +46,15 @@ export async function namedBy(root: ValidDefinition, read: (digest: Digest) => P
     if (asked.has(digest)) continue;
     if (asked.size > limit) return { ok: false, reason: "unsupported-definition" };
     asked.add(digest);
-    const found = await read(digest);
-    if (!found.ok) {
-      if (found.reason === "unavailable") return { ok: false, reason: "unavailable" };
+    const matched = await read(digest);
+    if (!matched.ok) {
+      if (matched.reason === "unavailable") return { ok: false, reason: "unavailable" };
       continue;
     }
-    const valid = validate(found.bytes);
+    const valid = validate(matched.bytes);
     if (valid?.digest !== digest) return { ok: false, reason: "unsupported-definition" };
     // The retained bytes are the canonical bytes, whose digest in the definition domain is the name.
-    retain.push({ kind: "definition", digest, bytes: canonicalize(parseStrict(found.bytes)) });
+    retain.push({ kind: "definition", digest, bytes: canonicalize(parseStrict(matched.bytes)) });
     queue.push(...creates(valid.declared));
   }
   return { ok: true, retain };

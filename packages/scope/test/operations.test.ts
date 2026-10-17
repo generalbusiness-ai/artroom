@@ -13,7 +13,7 @@ import { operational, type Operational } from "../src/operational.ts";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { open } from "./operation-opening.ts";
-import { HOLD, Lane, START, at, definition, found, founding, reader, rita, stubOf } from "./support.ts";
+import { HOLD, Lane, START, at, definition, create, creation, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
 const RETRY = PROPOSED_BOUNDS.dispatchRetrySeconds;
@@ -39,7 +39,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   // Actual Operations.#answer registers its late callback under the alarm's ALS
   // context. A short fixture deadline ends that invocation before release.
   test("a late original send answer under a closed invocation writes its native outcome and a fresh dispatch turn", async () => {
-    const s = await found({ dispatchSeconds: 0.01 });
+    const s = await create({ dispatchSeconds: 0.01 });
     const points: MetricPoint[] = [];
     metricBindings.set(s.object.id.toString(), { DEPLOYMENT: "inherited-late-test", METRICS: { writeDataPoint: p => points.push(structuredClone(p)) } });
     let release!: (answer: EffectAnswer) => void;
@@ -61,7 +61,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   });
 
   test("T19: an attempt is recorded before it is sent, and sent at most once; a stop between the send and the outcome leaves `unknown`, which a restart, elapsed time, a later attempt that succeeds, a new ref and a listing do not settle, and its own late answer does", async () => {
-    const s = await found();
+    const s = await create();
     const out = outsideOf(s.name);
     const [op] = await open(s, pushOf(3)) as [OperationId];
     const opening = (await s.sealed(1))[0]!;
@@ -95,7 +95,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await s.alarm(), await surface(s).effect()]).toEqual([false, 0]);
     // A listing that shows the commit, offered as attempt 1's answer, is not that attempt's own answer.
     expect(await late(s, out, op, 1, { result: "confirmed", evidence: { basis: "read", body: { listed: ["c2"] } } })).toEqual({ recorded: "refused", detail: "only that attempt's own answer follows an unknown outcome" });
-    // None of these settled attempt 1: the operation is not settled, and it is in the list of the duties this scope holds.
+    // None of these settled attempt 1: the operation is not settled, and it is in the list of the pending work this scope holds.
     const held = await surface(s).operations(reader, undefined, true);
     expect([(await s.head()).seq, out.sent.length, held.ok && held.value.map((o) => [o.operation.id, o.state, outcomes(o)])]).toEqual([3, 2, [[op, "unknown", [["unknown at 2"], ["confirmed at 3"]]]]]);
 
@@ -118,7 +118,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
 
   test("T20: an idle ledger writes nothing; a port that sends nothing leaves the attempt recorded and visible; an outcome is written at a scope with no free room; an operation opens at most its stated attempts and then none by itself; a retry is a new operation; an outside factory reads the committed opening from the current record", async () => {
     // A budget in which the entry that opens two attempts, and what it reserves, exactly fit: 2 entries written, 4 for the attempts and 1 for the closing checkpoint.
-    const s = await found({ scopeEntries: 7 });
+    const s = await create({ scopeEntries: 7 });
     const out = outsideOf(s.name);
     expect([await s.alarmAt(), await surface(s).effect(), (await s.head()).seq]).toEqual([null, 0, 0]);
     // Three attempts would reserve two entries more, so that opening is refused, and nothing of it is recorded.
@@ -137,7 +137,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(op, 1, { result: "refused", evidence: { basis: "own-answer", body: { status: 409 } } });
     await s.restart();
     expect([await surface(s).effect(), out.attempts, (await s.head()).seq, await s.alarmAt()]).toEqual([1, [`${op}#1`], 2, timeMs(START)! + RETRY * 1000]);
-    // Attempt 2 gets no answer. The stated attempts are used: no attempt is opened, no wake-up is asked for, and the duty stays visible.
+    // Attempt 2 gets no answer. The stated attempts are used: no attempt is opened, no wake-up is asked for, and the task stays visible.
     out.answer(op, 2, null);
     s.c.clock.now = at(RETRY);
     expect(await s.alarm()).toBe(true);
@@ -200,7 +200,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     // read owner rejects unknown outcomes, as the destination's real read
     // owner does. Its host and rules are stand-ins; the operation rows,
     // send mark, alarm clock and restart below are real SQLite/runtime.
-    const recovering = await found({ deliveryBatch: 1 });
+    const recovering = await create({ deliveryBatch: 1 });
     const originals: EffectRequest[] = [];
     const reads: EffectRequest[] = [];
     const diagnoses: string[] = [];
@@ -284,7 +284,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
 
   test("a late answer that arrives while the scope's turn is unavailable is kept in hand, and the driver writes it at the next wake-up, after the attempt's row is closed; the request is not sent again", async () => {
     // A turn writes one timed entry. Two holds end at one time, so a turn at that time leaves one due and is `busy`.
-    const s = await found({ timedAttemptsPerTurn: 1 });
+    const s = await create({ timedAttemptsPerTurn: 1 });
     const out = outsideOf(s.name);
     await s.holds(2);
     const [op] = await open(s, pushOf(1)) as [OperationId];
@@ -306,7 +306,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
 
   test("an answer in hand that stays unavailable for a reason of its own owner holds back no other: with a batch of 1 the answer behind it is written at the second pass, and the first stays in hand, of its attempt and with its evidence, and its operation stays a duty", async () => {
     // Three holds end at one time, and a turn writes one timed entry. The owner of a mint declares no cleanup, and a confirmed mint would open one.
-    const s = await found({ timedAttemptsPerTurn: 1, deliveryBatch: 1 });
+    const s = await create({ timedAttemptsPerTurn: 1, deliveryBatch: 1 });
     const out = outsideOf(s.name);
     mint.closure = 0;
     await s.holds(3);
@@ -321,7 +321,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, older, 1, minted), await late(s, out, later, 1, own("c1")), (await s.head()).seq]).toEqual([{ recorded: "unavailable" }, { recorded: "unavailable" }, 14]);
     // The first pass offers the mint's answer. The turn is free, and the answer is still not written: its owner's fault. It goes behind the other.
     expect([await s.alarm(), (await s.head()).seq]).toEqual([true, 15]);
-    // The second pass, after the delay, writes the push's answer. The mint's is in hand: the driver asks for the next wake-up, and the operation is a duty with what it reserved.
+    // The second pass, after the delay, writes the push's answer. The mint's is in hand: the driver asks for the next wake-up, and the operation is a task with what it reserved.
     s.c.clock.now = at(HOLD + PROPOSED_BOUNDS.drainRetrySeconds);
     expect([await s.alarm(), (await s.sealed(16))[0]?.entry.input, (await seen(s, later)).state, await seen(s, older), await s.alarmAt()]).toMatchObject([
       true, { type: "outcome", operation: later, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled",
@@ -337,7 +337,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   });
 
   test("after a restart the driver walks every attempt that nothing could send, one page at a pass: an attempt that still cannot be sent holds back none after it, and what is due does not use the page up", async () => {
-    const s = await found({ deliveryBatch: 1 });
+    const s = await create({ deliveryBatch: 1 });
     const out = outsideOf(s.name);
     // Three attempts that the port does not send. A pass looks at one, and leaves it recorded with no wake-up.
     out.accepting = false;
@@ -362,7 +362,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   // and no alarm, and the sent mark keeps it from being sent again. This is the register whose create-repository attempt was
   // recorded before the Git host's settings existed: the settings are added and the Worker restarted.
   test("an attempt recorded while the outside port refused is sent after a restart with a port that accepts, at the first call, which is a read: no commit and no alarm come before it, and it is sent exactly once", async () => {
-    const s = await found();
+    const s = await create();
     const out = outsideOf(s.name);
     out.accepting = false;
     const [op] = await open(s, pushOf(1)) as [OperationId];
@@ -389,7 +389,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   // unsupported prefix; only the later enabled attempt leaves, once.
   // Generic owner/kind acceptance is scripted, not a native host policy.
   test("an attempt recorded while the outside port refused is sent, with no restart, after bounded reads find its later accepted kind beyond an unsupported prefix; it is sent exactly once", async () => {
-    const s = await found({ deliveryBatch: 1 });
+    const s = await create({ deliveryBatch: 1 });
     const out = outsideOf(s.name);
     let enabled = false;
     let asked = 0;
@@ -444,12 +444,12 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
     // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
     const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });
-    const { signed, name } = founding(at(60), staged);
+    const { signed, name } = creation(at(60), staged);
     const c = controls(name, START);
     c.capability = {};
-    const founded = await stubOf(name).found(signed, staged.declared);
-    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed);
+    const created = await stubOf(name).create(signed, staged.declared);
+    if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+    const s = new Lane(name, c, created.receipt.fact.at, created.receipt, signed);
     const out = outsideOf(name);
     const [op] = await open(s, pushOf(1)) as [OperationId];
 
@@ -466,7 +466,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   });
 
   test("a stream that waits is sent the head of an entry that a late answer wrote, when it is committed: no caller's request, no further write and no alarm follows that entry; and the head of a checkpoint in the same way. The test readers, the outside system and the opening entry are stand-ins", async () => {
-    const s = await found();
+    const s = await create();
     const out = outsideOf(s.name);
     const [op] = await open(s, pushOf(1)) as [OperationId];
     // The one attempt is sent and gets no answer: its outcome is `unknown`, in entry 2. It was the last attempt, so nothing is left to send.

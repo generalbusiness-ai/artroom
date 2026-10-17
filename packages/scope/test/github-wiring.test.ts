@@ -4,12 +4,12 @@ import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, sco
 import { MemoryState, PROFILES, clockOf, judgeGenesis, judgeOutcome, validateDefinition } from "@generalbusiness/dap-derive";
 import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
 import { DEMO_REGISTER, WEB_DEMO_REGISTER, DESTINATION, DIRECTORY, REGISTER, directoryIdOf, platform, repositoryName } from "@generalbusiness/dap-platform";
-import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-founding.ts";
+import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-creation.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import { outsideOf } from "../src/worker.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import { NO_OUTSIDE, type EffectRequest } from "../src/operations.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 const ACCOUNT = { id: 285042784, login: "generalbusiness-ai", type: "Organization" } as const;
 const CONFIG = { issuer: "Iv1.scripted", installationId: 99, account: ACCOUNT, maxBytes: 1024 * 1024, privateRepositories: true, publicReads: false, credentialIdentity: "adapter-attempt" };
@@ -32,7 +32,7 @@ function registerFixture(installKey = "install", demo: typeof DEMO_REGISTER | ty
   const intent = installing(paul, "keys", [rita.key]).intent;
   const install = signIntent({ ...intent, idempotencyKey: installKey, fields: demo ? { host: "github.com", namespace: ACCOUNT.login, policy: "open", purpose: "demo-start" } : { ...intent.fields, host: "github.com", namespace: ACCOUNT.login } }, paul.secret);
   const seed: Seed = { v: 1, kind: "register", definition: demo ? demo : REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
-  const genesis = judgeGenesis(register.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules });
+  const genesis = judgeGenesis(register.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, creation: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules });
   expect(genesis.result).toBe("write");
   if (genesis.result === "write") register.seal(genesis.draft);
   const given: OutsideGiven = {
@@ -41,8 +41,8 @@ function registerFixture(installKey = "install", demo: typeof DEMO_REGISTER | ty
     clock: { read: () => register.now }, random: { bytes: (length) => new Uint8Array(length) },
   };
   const claim = () => {
-    const found = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }, { platform: rules, grants: [] });
-    expect(found.result).toBe("write");
+    const matched = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } }, { platform: rules, grants: [] });
+    expect(matched.result).toBe("write");
     const operation = register.state.operation("1:0")!;
     return { scope: register.at, operation: operation.id, attempt: 1, owner: operation.owner, kind: operation.kind, origin: register.own(1)! } satisfies EffectRequest;
   };
@@ -62,7 +62,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
   const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(3)), kind: "destination" };
   const entry: Entry = {
     ...register.own(0)!.entry, at,
-    input: { type: "genesis", seed, inc: at.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" },
+    input: { type: "genesis", seed, inc: at.inc, kind: "establish", "founding": null, source: null, n: null, message: null, decision: "applied" },
     uses: [{ fact: claim, content }], effects: [], sends: [],
   };
   const hash = entryHash(entry);
@@ -80,7 +80,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
 // Invariant: production configuration routes a real bound register request to
 // exactly one explicitly authorized provider creation and records only metadata.
 test("explicit factory configuration creates the claim's exact name through scripted HTTP and retains no secret in the judged entry", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const f = registerFixture();
     const requests: Request[] = [];
@@ -137,7 +137,7 @@ test("explicit factory configuration creates the claim's exact name through scri
 // Invariant: authority and visibility are never defaulted; unusable or missing
 // operator configuration leaves the factory disabled before a provider request.
 test("absent, malformed or contradictory configuration disables effects, and absent creation authority leaves creation unavailable", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const f = registerFixture();
     const request = f.claim();

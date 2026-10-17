@@ -2,14 +2,14 @@
  * retains signed stages and the separate internal recovery key. */
 import type { KeyId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isRecord, isScopeRef, keyIdOfSecret, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
-import { isFoundingOffer, type FoundingOffer, type Fetch } from "@generalbusiness/artroom-client";
+import { isCreationOffer, type CreationOffer, type Fetch } from "@generalbusiness/artroom-client";
 import { claimRoom, claimStatus, type ClaimOptions, type ClaimRegister, type ClaimStorage, type ClaimedRoom } from "./claim.ts";
 
 interface KeptStart { v: 1; origin: string; secret: string; configured: ClaimRegister; label: string; handle: "@founder"; operation?: string; recoverySaved?: true }
 export interface StartStatus { key: KeyId; configured: ClaimRegister; label: string; handle: "@founder"; state: "prepared" | "pending" | "complete"; operation?: string; recoverySaved?: true }
-export interface StartOptions extends Pick<ClaimOptions, "locks" | "current" | "pause" | "tries" | "foundingOffer"> {
+export interface StartOptions extends Pick<ClaimOptions, "locks" | "current" | "pause" | "tries" | "creationOffer"> {
   mode: "new" | "continue" | "check";
-  offer?: FoundingOffer;
+  offer?: CreationOffer;
   label?: string;
   fetch?: Fetch;
   now?: () => number;
@@ -75,7 +75,7 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
     let row = read(origin, storage);
     if (options.mode === "new") {
       if (row) throw new Error("An original Start is already retained. Check status or explicitly Continue that original creation.");
-      if (!options.offer || !isFoundingOffer(options.offer, origin) || options.offer.definition !== "platform:register@8") throw new Error("A current same-origin register8 demo founding offer is required. Nothing was submitted.");
+      if (!options.offer || !isCreationOffer(options.offer, origin) || options.offer.definition !== "platform:register@8") throw new Error("A current same-origin register8 demo creation offer is required. Nothing was submitted.");
       const label = options.label?.trim() ?? "";
       if (!label || label.length > 256) throw new Error("Enter a personal room label of at most 256 characters.");
       const secret = crypto.getRandomValues(new Uint8Array(32));
@@ -91,9 +91,9 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
       if (!stillCurrent()) throw unavailable();
       if (options.mode === "check" && !status.operation) return { key: status.key, configured: status.configured, handle: held.handle, operation: "", label: held.label, repository: null, pending: true, outcome: { code: 1, lines: ["The Start key is retained, but no original claim has been prepared. Check sent nothing. Continue explicitly to prepare the first request."] } };
       const result = await claimRoom({ service: origin, secret, ...(options.fetch ? { fetch: options.fetch } : {}), ...(options.now ? { now: options.now } : {}) }, held.configured, storage, held.label, {
-        ...(options.pause ? { pause: options.pause } : {}), ...(options.tries !== undefined ? { tries: options.tries } : {}), ...(options.foundingOffer ? { foundingOffer: async (register: ClaimRegister["register"]) => {
-          const offered = await options.foundingOffer!(register);
-          if (!isFoundingOffer(offered, origin, held.configured.register) || offered.definition !== held.configured.definition) throw unavailable();
+        ...(options.pause ? { pause: options.pause } : {}), ...(options.tries !== undefined ? { tries: options.tries } : {}), ...(options.creationOffer ? { creationOffer: async (register: ClaimRegister["register"]) => {
+          const offered = await options.creationOffer!(register);
+          if (!isCreationOffer(offered, origin, held.configured.register) || offered.definition !== held.configured.definition) throw unavailable();
           return offered;
         } } : {}), mode: status.operation ? "resume" : "new", ...(status.operation ? { operation: status.operation } : {}),
         handle: held.handle, readOnlyCheck: options.mode === "check", locks,
@@ -110,7 +110,7 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
 }
 
 /** One optional recovery-download attempt, separately from CLI connection files.
- * The caller must first reverify the enrolled founder; this binds that public
+ * The caller must first reverify the enrolled creator; this binds that public
  * key/operation and reads back the once marker before releasing key bytes. */
 export async function recoveryKeyOnce(origin: string, storage: ClaimStorage, expected: { key: KeyId; operation: string }, options: Pick<StartOptions, "locks" | "current"> = {}): Promise<string> {
   originOf(origin);
@@ -123,7 +123,7 @@ export async function recoveryKeyOnce(origin: string, storage: ClaimStorage, exp
     const row = read(origin, storage);
     if (!row) throw unavailable();
     const status = publicOf(row, storage);
-    if (status.state !== "complete" || status.key !== expected.key || status.operation !== expected.operation || row.recoverySaved) throw new Error("The optional recovery file was already offered or its verified founder context changed. No key was exported.");
+    if (status.state !== "complete" || status.key !== expected.key || status.operation !== expected.operation || row.recoverySaved) throw new Error("The optional recovery file was already offered or its verified creator context changed. No key was exported.");
     const saved = save({ ...row, recoverySaved: true }, storage, guard);
     return saved.secret + "\n";
   });

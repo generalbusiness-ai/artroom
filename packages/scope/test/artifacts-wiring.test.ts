@@ -4,14 +4,14 @@ import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, sco
 import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/dap-derive";
 import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/dap-platform";
-import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-founding.ts";
+import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-creation.ts";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside, type ArtifactsBindings } from "../src/artifacts-wiring.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import { NO_OUTSIDE, type EffectAnswer, type EffectRequest } from "../src/operations.ts";
 import { outsideOf } from "../src/worker.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 // Cloudflare Artifacts is a STAND-IN here: a scripted binding
 // double whose every answer the test writes. No repository or token exists.
@@ -54,7 +54,7 @@ function registerFixture(host: string, namespace: string, installKey = "install"
   const intent = installing(paul, "keys", [rita.key]).intent;
   const install = signIntent({ ...intent, idempotencyKey: installKey, fields: { ...intent.fields, host, namespace } }, paul.secret);
   const seed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
-  const genesis = judgeGenesis(register.state, registerDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: registerPlatform });
+  const genesis = judgeGenesis(register.state, registerDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, creation: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: registerPlatform });
   expect(genesis.result).toBe("write");
   if (genesis.result === "write") register.seal(genesis.draft);
   const given: OutsideGiven = {
@@ -67,8 +67,8 @@ function registerFixture(host: string, namespace: string, installKey = "install"
     return { scope: register.at, operation, attempt, owner: opened.owner, kind: opened.kind, origin: register.own(Number(operation.split(":")[0]))! };
   };
   const claim = () => {
-    const found = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }, { platform: registerPlatform, grants: [] });
-    expect(found.result).toBe("write");
+    const matched = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } }, { platform: registerPlatform, grants: [] });
+    expect(matched.result).toBe("write");
     return request("1:0");
   };
   const judge = (request: EffectRequest, reply: EffectAnswer) => {
@@ -89,7 +89,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
   const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(3)), kind: "destination" };
   const entry: Entry = {
     ...register.own(0)!.entry, at,
-    input: { type: "genesis", seed, inc: at.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" },
+    input: { type: "genesis", seed, inc: at.inc, kind: "establish", "founding": null, source: null, n: null, message: null, decision: "applied" },
     uses: [{ fact: claim, content }], effects: [], sends: [],
   };
   const hash = entryHash(entry);
@@ -110,7 +110,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
 // Another register, and a destination not born of this register's claim,
 // get nothing.
 test("explicit configuration creates the claim's exact name through the scripted binding, revokes its write token at once, and records host artifacts with no secret", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const f = registerFixture("artifacts", NAMESPACE);
@@ -146,10 +146,10 @@ test("explicit configuration creates the claim's exact name through the scripted
 });
 
 // Invariant: a creation token whose revocation is not confirmed becomes the
-// register's duty, `revoke-credential`; its send revokes the privately held
+// register's task, `revoke-credential`; its send revokes the privately held
 // plaintext once, and the history holds only the nonsecret handle.
 test("a creation token whose revocation fails is owed: the register opens revoke-credential, and its send revokes the held token", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const f = registerFixture("artifacts", NAMESPACE);
@@ -180,7 +180,7 @@ test("a creation token whose revocation fails is owed: the register opens revoke
 // Invariant: a taken name is a refusal naming it; an unknown failure is no
 // answer. Neither is sent twice.
 test("a taken name is a refusal that says so, an unknown failure is no answer, and neither is sent twice", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const f = registerFixture("artifacts", NAMESPACE);
@@ -199,7 +199,7 @@ test("a taken name is a refusal that says so, an unknown failure is no answer, a
 // Invariant: nothing takes effect without the binding and a complete,
 // explicit setting.
 test("absent or malformed configuration, or a missing binding, gives NO_OUTSIDE and sends nothing", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const f = registerFixture("artifacts", NAMESPACE);
@@ -256,7 +256,7 @@ test("absent or malformed configuration, or a missing binding, gives NO_OUTSIDE 
 // the deployed outside routes each scope by its recorded host; a host that
 // no wiring serves gets nothing.
 test("each wiring serves only its own recorded host, and the Worker's outside routes each register by its recorded host", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const fetched: string[] = [];
@@ -300,7 +300,7 @@ test("each wiring serves only its own recorded host, and the Worker's outside ro
 // setting that appears in an object's life takes effect at the next call;
 // one that is removed stops it.
 test("the Worker's outside port reads the setting at each call: a register refused with no setting is accepted once the setting appears, with no new port, and refused again once it is removed", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const s = service();
     const f = registerFixture("artifacts", NAMESPACE);

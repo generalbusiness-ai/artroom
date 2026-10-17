@@ -54,10 +54,10 @@ test("a request that may have been sent is never sent again: only a read settles
     const none = bench(kept(phase, e));
     expect(await advance(none.store, identity, none.ports, e)).toEqual({ status: "unknown" });
     expect([none.calls, none.phase()]).toEqual([["settle"], phase]);
-    const found = bench(kept(phase, e));
-    found.script.settle = receipt;
-    expect(await advance(found.store, identity, found.ports, e)).toEqual({ status: "recorded" });
-    expect(found.calls).toEqual(["settle", "recorded", "save recorded"]);
+    const matched = bench(kept(phase, e));
+    matched.script.settle = receipt;
+    expect(await advance(matched.store, identity, matched.ports, e)).toEqual({ status: "recorded" });
+    expect(matched.calls).toEqual(["settle", "recorded", "save recorded"]);
   }
   // Check reads and sends nothing, even for a request that was certainly never sent.
   const unsent = bench(kept("prepared", e));

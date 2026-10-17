@@ -427,19 +427,19 @@ export function settle(rows: readonly Listed[], g: Settling): Settled {
     for (const subject of subjects) listedNames.add(subjectName(subject));
     if (over) { status.set(n, "over"); continue; }
     const recorded = row.of === "rules" || row.of === "definitions" ? rules : membership;
-    const found: { name: string; use: ObservationUse; values: ValueRead[] }[] = [];
+    const matched: { name: string; use: ObservationUse; values: ValueRead[] }[] = [];
     let whole = true;
     for (const subject of subjects) {
       const name = subjectName(subject);
       const picked = chosen.get(name);
       if (picked === "grant" && grantServes(subject, row)) { served.add(name); continue; }
-      let serving: (typeof found)[number] | null = null;
+      let serving: (typeof matched)[number] | null = null;
       for (const use of bySubject.get(name) ?? []) {
         const answer = answers.get(n)?.get(use) ?? serves(use, row, g, recorded);
         if (typeof answer === "string") { if (!unserved.has(use)) unserved.set(use, answer); continue; }
         if (use === picked) serving = { name, use, values: answer.values };
       }
-      if (serving) { found.push(serving); continue; }
+      if (serving) { matched.push(serving); continue; }
       whole = false;
       // What the scope asks so that every row which gives the subject can be whole: within the shortest of their windows, and `fresh`
       // where one of them states `once`.
@@ -455,7 +455,7 @@ export function settle(rows: readonly Listed[], g: Settling): Settled {
     }
     status.set(n, whole ? "whole" : "absent");
     if (!whole) continue;
-    for (const { name, use, values: named } of found) {
+    for (const { name, use, values: named } of matched) {
       if (!kept.has(name)) kept.set(name, use);
       for (const value of named) if (kept.get(name) === use && !values.some((held) => held.domain === value.domain && held.digest === value.digest)) values.push(value);
     }

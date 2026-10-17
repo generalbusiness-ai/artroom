@@ -7,7 +7,7 @@
  * the entries whose cause chain leads to one of those, and the retained
  * inputs that those entries name. At a register, a recent local signer
  * reads every entry and its carried inputs. So the operator key that signed `install` reads the register,
- * and a founder's key that signed `found` reads the register's summary,
+ * and a creator's key that signed `found` reads the register's summary,
  * the directory that the claim caused, and membership, the rules scope and
  * the destination, which the directory caused; it learns membership's ID
  * from the directory, and asks there for a session once it holds a seat.
@@ -80,13 +80,13 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
   return {
     // Delegate with the original receiver, including prototype methods and
     // methods that read class-private fields; object spread loses those.
-    found: (...args) => transport.found(...args),
+    create: (...args) => transport.create(...args),
     submit: (...args) => transport.submit(...args),
     prepare: (...args) => transport.prepare(...args),
     settle: (...args) => transport.settle(...args),
     items: (...args) => transport.items(...args),
     outbox: (...args) => transport.outbox(...args),
-    duty: (...args) => transport.duty(...args),
+    outboxItem: (...args) => transport.outboxItem(...args),
     summary: async (scope, reader) => transport.summary(scope, await as(reader, scope, "summary")),
     queryItems: async (scope, reader, encoded) => {
       const query = readItemQueryParameter(encoded), argument = query && itemQueryArgument(query);

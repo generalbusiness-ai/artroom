@@ -18,7 +18,7 @@ export function exact(value: unknown, keys: readonly string[]): Record<string, u
 }
 
 /** The creator is the actual directory derived by this verified register claim,
- * not an independently founded directory that merely cites the same claim. */
+ * not an independently created directory that merely cites the same claim. */
 export function destinationBirth(given: OutsideGiven, registerScope: ScopeId): boolean {
   try {
     const genesis = given.own(0)?.entry;

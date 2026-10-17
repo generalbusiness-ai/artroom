@@ -4,7 +4,7 @@
 //   node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> \
 //     --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace] [--manifest]
 //
-// It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the founder,
+// It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the creator,
 // a member and a maintainer, each with a fresh config directory under the scratch directory (`founder`, `member`, `maintainer`).
 // The local files the commands read, and the member's clone, are in `work` under it. After the plan it prints the register ID
 // and waits for Enter while the operator pins it in the Git host's setting; `--setting-set` skips that wait.
@@ -150,9 +150,9 @@ async function main(argv: readonly string[]): Promise<number> {
   const rehearsal = await rehearse(stage);
   const how = `Run by scripts/demo-run.ts under Node ${process.version}, room ${given.name}, config directories under ${given.scratch}.`;
   writeFileSync(join(given.out, "transcript.md"), transcript(rehearsal, { service: given.service, host: given.host, namespace: given.namespace, started, how }));
-  writeFileSync(join(given.out, "room.json"), `${JSON.stringify({ ...rehearsal.room, name: given.name, homes: { founder: join(given.scratch, "founder"), member: join(given.scratch, "member"), maintainer: join(given.scratch, "maintainer") } }, null, 2)}\n`);
+  writeFileSync(join(given.out, "room.json"), `${JSON.stringify({ ...rehearsal.room, name: given.name, homes: { "founder": join(given.scratch, "founder"), member: join(given.scratch, "member"), maintainer: join(given.scratch, "maintainer") } }, null, 2)}\n`);
   if (rehearsal.ok) {
-    const births = await observeCaptures(people.founder!, rehearsal.room);
+    const births = await observeCaptures(people["founder"]!, rehearsal.room);
     for (const who of ["founder", "member", "maintainer"] as const) await keepCaptureObservations(join(given.scratch, who), people[who]!, rehearsal.room, births);
   }
   const failed = rehearsal.shots.filter((shot) => !shot.match).map((shot) => shot.n);

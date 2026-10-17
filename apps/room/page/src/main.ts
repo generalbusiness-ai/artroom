@@ -18,8 +18,8 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
-import { foundingOffer } from "@generalbusiness/artroom-client";
-import { connectInvitation, originalConnection, founderConnectionFiles, saveFounderRecoveryOnce, type FounderBinding } from "./connection-custody.ts";
+import { creationOffer } from "@generalbusiness/artroom-client";
+import { connectInvitation, originalConnection, creatorConnectionFiles, saveCreatorRecoveryOnce, type CreatorBinding } from "./connection-custody.ts";
 import { originalStart, startRoom, type StartedRoom } from "./start-custody.ts";
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
@@ -620,7 +620,7 @@ function startScreen(): HTMLElement {
     } catch { blocked = true; name.setAttribute("disabled", ""); submit.setAttribute("disabled", ""); check.setAttribute("disabled", ""); tell("Original Start custody is unavailable. Nothing will be replaced.", true); }
   };
   restore();
-  if (original) tell("Your original Start and founder key are retained. Check status only reads; Continue creation explicitly resumes its original requests.");
+  if (original) tell("Your original Start and creator key are retained. Check status only reads; Continue creation explicitly resumes its original requests.");
   name.addEventListener("input", () => { startDraft = name.value; });
   const download = (filename: string, text: string, type: string) => {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -635,8 +635,8 @@ function startScreen(): HTMLElement {
       const place: Place = { directory: result.repository.directory.scope, membership: result.repository.membership };
       const room = await openRoom({ service: location.origin, secret }, place);
       if (!current()) return;
-      if (!verifiedRoom(room) || room.key !== result.key || room.me.handle !== result.handle) { tell("The created room has not verified this original founder key. Check status before opening it.", true); return; }
-      // This is the actual enrolled founder seed; the journal's internal
+      if (!verifiedRoom(room) || room.key !== result.key || room.me.handle !== result.handle) { tell("The created room has not verified this original creator key. Check status before opening it.", true); return; }
+      // This is the actual enrolled creator seed; the journal's internal
       // recovery key is never exposed as a usable member/device key.
       const encoded = b64url(secret);
       const next: Settings = { place, secret: encoded, register: result.configured.register,
@@ -648,7 +648,7 @@ function startScreen(): HTMLElement {
         if (!keep(next)) { tell("The room is verified, but connection storage could not be read back. Check the saved original before another request.", true); return; }
         opened.clear(); startDraft = ""; location.hash = "#/"; void draw(true);
       });
-      const expected: FounderBinding = { key: result.key, operation: result.operation, membership: result.repository.membership };
+      const expected: CreatorBinding = { key: result.key, operation: result.operation, membership: result.repository.membership };
       const connectionPanel = h("section", { class: "start-connection-panel", hidden: "", "aria-live": "polite" });
       const connectionOptions = { current };
       const showConnection = (kind: "person" | "agent-key") => {
@@ -694,7 +694,7 @@ function startScreen(): HTMLElement {
               const copy = h("button", { type: "button", class: "link-button" }, "Copy invitation link");
               copy.addEventListener("click", () => { if (!current()) return; if (!navigator.clipboard) { answer.textContent = "Select the private invitation link to copy it yourself."; return; } void navigator.clipboard.writeText(issued.link!).catch(() => { if (current()) answer.textContent = "Copy was unavailable. Select the private invitation link to copy it yourself."; }); });
               const instructions = issued.kind === "agent-key" ? h("div", {},
-                h("p", {}, "On the agent’s computer, use a new owner-only ARTROOM_HOME directory so it creates its own key. Do not use the founder’s config or key."),
+                h("p", {}, "On the agent’s computer, use a new owner-only ARTROOM_HOME directory so it creates its own key. Do not use the creator’s config or key."),
                 h("pre", {}, "dap join <private invitation link>"),
                 h("p", {}, "If its reply is lost, check the exact original without submitting:"), h("pre", {}, "dap join <same-private-link> --check")) : null;
               linkHost.replaceChildren(privateLink, copy, ...(instructions ? [instructions] : []));
@@ -717,13 +717,13 @@ function startScreen(): HTMLElement {
         button.addEventListener("click", action);
         return h("div", { class: "start-connection" }, h("div", {}, h("h2", {}, title), h("p", {}, description)), button);
       };
-      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void founderConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original founder connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
+      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void creatorConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original creator connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
       const recovery = h("button", { type: "button", class: "link-button" }, "Save a recovery file");
       try { if (originalStart(location.origin, localStorage)?.recoverySaved) recovery.setAttribute("disabled", ""); } catch { recovery.setAttribute("disabled", ""); }
       recovery.addEventListener("click", () => {
         if (!current() || connectionBusy || recovery.hasAttribute("disabled")) return;
         connectionBusy = true; recovery.setAttribute("disabled", "");
-        void saveFounderRecoveryOnce(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) download("recovery.key", value, "text/plain"); }).catch(error => tell(error instanceof Error ? error.message : "The recovery file could not be saved. Its original key remains in private custody.", true)).finally(() => { connectionBusy = false; });
+        void saveCreatorRecoveryOnce(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) download("recovery.key", value, "text/plain"); }).catch(error => tell(error instanceof Error ? error.message : "The recovery file could not be saved. Its original key remains in private custody.", true)).finally(() => { connectionBusy = false; });
       });
       form.setAttribute("hidden", ""); check.setAttribute("hidden", "");
       heading.textContent = "Your room is ready"; intro.setAttribute("hidden", "");
@@ -746,17 +746,17 @@ function startScreen(): HTMLElement {
       // choosing another first-run task. Read-only Start Check remains safe.
       const enrollment = originalJoin(location.origin, localStorage);
       if (mode !== "check" && enrollment && ["prepared", "unknown"].includes(enrollment.status)) throw new Error("An original invitation enrollment remains unresolved. Check that original join before starting another room.");
-      const offer = mode === "new" ? await foundingOffer(location.origin).catch(() => { throw new Error("This service is not set up to create rooms. Nothing was sent."); }) : undefined;
+      const offer = mode === "new" ? await creationOffer(location.origin).catch(() => { throw new Error("This service is not set up to create rooms. Nothing was sent."); }) : undefined;
       if (!current()) return;
       const result = await startRoom(location.origin, localStorage, { mode, ...(offer ? { offer } : {}), label: name.value,
-        foundingOffer: async register => { const offered = await foundingOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
+        creationOffer: async register => { const offered = await creationOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
       await showResult(result);
     } catch (error) { tell(error instanceof Error ? error.message : "The original creation remains unresolved. Check status without replacing its key.", true); }
     finally { connectionBusy = false; if (current()) { restore(); if (!blocked) { submit.removeAttribute("disabled"); check.removeAttribute("disabled"); } } }
   };
   form.addEventListener("submit", event => { event.preventDefault(); void run(original ? "continue" : "new"); });
   check.addEventListener("click", () => { void run("check"); });
-  const about = h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your founder key when you explicitly start. Keep the recovery file to reconnect to the same room."));
+  const about = h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your creator key when you explicitly start. Keep the recovery file to reconnect to the same room."));
   return h("main", { class: "screen entry-screen entry-start" }, h("a", { class: "entry-back", href: "#/join" }, "‹", "Back"),
     heading, intro, form, message, check, ready, about);
 }

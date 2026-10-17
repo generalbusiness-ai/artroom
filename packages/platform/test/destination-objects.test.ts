@@ -5,10 +5,10 @@ import { spawnSync } from "node:child_process";
 import { expect, test } from "vitest";
 import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
-import { foundingObjects, importRef, readmeText, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat, type Readme } from "../src/destination-objects.ts";
+import { initialCommitObjects, importRef, readmeText, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat, type Readme } from "../src/destination-objects.ts";
 
 // A real local Git repository in each object format. Facts are made up:
-// this checks the byte forms and Git's names, and shows no host or founding.
+// this checks the byte forms and Git's names, and shows no host or creation.
 const scope = `sc_${"g".repeat(51)}a` as ScopeId;
 const claim: FactRef = { at: { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` }, seq: 7, hash: `sha256:${"1".repeat(64)}` };
 const time = "2026-10-03T02:40:00Z" as Timestamp;
@@ -26,7 +26,7 @@ for (const format of ["sha1", "sha256"] as const) test(`Git ${format} gives the 
       for (const object of made.objects) expect(git(["hash-object", "-w", "--stdin", "-t", object.kind], object.body)).toBe(object.id);
       expect(git(["rev-parse", `${made.commit}^{tree}`])).toBe(made.objects.find((object) => object.kind === "tree")!.id);
     };
-    const first = foundingObjects(format, scope, time, claim);
+    const first = initialCommitObjects(format, scope, time, claim);
     write(first);
     const commit = first.objects.at(-1)!;
     expect(commit.body.length).toBe(format === "sha1" ? 512 : 536);
@@ -63,7 +63,7 @@ test("a receipt's object format is a stated input, and neither a retry nor anoth
   expect(receiptObjects("sha1", scope, "2026-10-03T02:40:01Z", operation, file).commit).not.toBe(inFormat("sha1").commit);
 });
 
-// The planner's decision of 2026-10-07: the founding commit of `platform:destination@2` writes one file, `README.md`, so that a
+// The planner's decision of 2026-10-07: the creation commit of `platform:destination@2` writes one file, `README.md`, so that a
 // room's first page has content; version 1 keeps the empty tree. Made-up facts, in a real local Git repository.
 test("Git gives version 2's founding commit with one file, README.md, holding the repository's name as a heading and the founding sentence; its ID is stable, and version 1's stays the empty tree", () => {
   const directory = mkdtempSync(join(tmpdir(), "artroom-readme-"));
@@ -75,7 +75,7 @@ test("Git gives version 2's founding commit with one file, README.md, holding th
   const readme: Readme = { name: "demo-1", handle: "@rita", directory: `sc_${"d".repeat(51)}a` as ScopeId };
   try {
     git(["init", "--bare", "--object-format=sha1"]);
-    const [one, two] = [foundingObjects("sha1", scope, time, claim), foundingObjects("sha1", scope, time, claim, readme)];
+    const [one, two] = [initialCommitObjects("sha1", scope, time, claim), initialCommitObjects("sha1", scope, time, claim, readme)];
     for (const made of [one, two]) for (const object of made.objects) expect(git(["hash-object", "-w", "--stdin", "-t", object.kind], object.body)).toBe(object.id);
     // Version 2: the tree lists exactly README.md, whose text is the heading and the one sentence, and nothing secret.
     expect([git(["ls-tree", "--name-only", two.commit]), git(["show", `${two.commit}:README.md`])]).toEqual(["README.md", "# demo-1\n\nFounded by @rita through the room " + readme.directory + "."]);
@@ -85,7 +85,7 @@ test("Git gives version 2's founding commit with one file, README.md, holding th
     expect([git(["log", "-1", "--format=%s", two.commit]), git(["log", "-1", "--format=%s", one.commit])]).toEqual(["Found this repository.", "Found this repository."]);
     // Stable: the same inputs give the same IDs, pinned here; another handle, name or directory gives another commit.
     expect([one.commit, two.commit]).toEqual(["2de22fdd8dcb8cfca58b57d88fbb3be98a534d04", "fd320962f5cbb89dd5df314f66be0660b45c1530"]);
-    expect([foundingObjects("sha1", scope, time, claim, readme).commit, ...(["name", "handle", "directory"] as const).map((part) => foundingObjects("sha1", scope, time, claim, { ...readme, [part]: `${readme[part]}x` }).commit === two.commit)])
+    expect([initialCommitObjects("sha1", scope, time, claim, readme).commit, ...(["name", "handle", "directory"] as const).map((part) => initialCommitObjects("sha1", scope, time, claim, { ...readme, [part]: `${readme[part]}x` }).commit === two.commit)])
       .toEqual([two.commit, false, false, false]);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

@@ -32,7 +32,7 @@ import { ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import type { Alarm, Clock, Transport } from "./ports.ts";
 import type { Dispatched, Outgoing, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
-import { dutyCorrelation, metric } from "./operational.ts";
+import { outboxCorrelation, metric } from "./operational.ts";
 
 interface DispatchCounts { attempted: number; acknowledged: number; diagnosed: number }
 
@@ -136,11 +136,11 @@ export class Dispatcher {
       const now = timeMs(this.#clock.read())!;
       const due = this.#store.outgoing(now, this.#bounds.deliveryBatch);
       if (due.length === 0) break;
-      for (const duty of due) {
+      for (const send of due) {
         // The retry policy of section 7.5: so many routing refusals, and a request is given up. The number is never the proof.
-        const refused = duty.attempts.filter((a) => ROUTING.includes(a.answer)).length;
-        if (duty.message.class === "request" && refused >= this.#bounds.routingRefusals) await this.#giveUp(duty, now, counts);
-        else await this.#dispatch(duty, now, counts);
+        const refused = send.attempts.filter((a) => ROUTING.includes(a.answer)).length;
+        if (send.message.class === "request" && refused >= this.#bounds.routingRefusals) await this.#giveUp(send, now, counts);
+        else await this.#dispatch(send, now, counts);
         made++;
       }
     }
@@ -155,20 +155,20 @@ export class Dispatcher {
   }
 
   /** One dispatch of one send, with its record before and after. */
-  async #dispatch(duty: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
-    const { seq, n } = duty;
+  async #dispatch(send: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
+    const { seq, n } = send;
     const store = this.#store;
     const at: Timestamp = timeOf(now);
-    const logged = (answer: Dispatched["answer"]): Dispatched[] => [...duty.attempts, { at, answer }];
-    const next = now + this.#delay(duty.attempts.length + 1);
+    const logged = (answer: Dispatched["answer"]): Dispatched[] => [...send.attempts, { at, answer }];
+    const next = now + this.#delay(send.attempts.length + 1);
     // Section 7.4: the attempt is recorded before it is sent, as unanswered. The alarm is set for its retry before the send
     // leaves, so a scope that stops here is woken and sends again.
     store.attempted(seq, n, logged("none"), next);
     counts.attempted++;
-    dutyCorrelation(`${seq}.${n}`);
+    outboxCorrelation(`${seq}.${n}`);
     await this.#wakes.set();
     const scope = store.scope()!;
-    const envelope = { to: duty.to, from: { at: scope.at, seq, hash: duty.hash }, n, message: duty.message };
+    const envelope = { to: send.to, from: { at: scope.at, seq, hash: send.hash }, n, message: send.message };
     const answer = await within(() => this.#transport.send(envelope), this.#bounds.dispatchSeconds);
     // No answer in time, or none at all: the record stays as it was written.
     if (answer === LATE || answer === null) return;
@@ -182,7 +182,7 @@ export class Dispatcher {
     const attempts = logged(answer.answer === "routing" ? answer.reason : "retry");
     const refused = attempts.filter((a) => ROUTING.includes(a.answer)).length;
     // A request that has now met the retry policy is given up in this pass, not after the delay.
-    store.attempted(seq, n, attempts, duty.message.class === "request" && refused >= this.#bounds.routingRefusals ? now : next);
+    store.attempted(seq, n, attempts, send.message.class === "request" && refused >= this.#bounds.routingRefusals ? now : next);
   }
 
   /**
@@ -191,14 +191,14 @@ export class Dispatcher {
    * the request leaves the outgoing sends. Not written now, as when the
    * scope is busy, it is offered again after the drain's retry delay.
    */
-  async #giveUp(duty: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
-    const { seq, n } = duty;
+  async #giveUp(send: Outgoing, now: number, counts: DispatchCounts): Promise<void> {
+    const { seq, n } = send;
     const store = this.#store;
     const bounds = this.#bounds;
     const definition = this.#scope.pinned()?.definition;
     const kept = store.stored(seq);
     // The log as the contract's entry holds it. A request that was acknowledged is never given up.
-    const attempts = duty.attempts.map((a): Attempt => ({ at: a.at, answer: a.answer === "acknowledged" ? "none" : a.answer }));
+    const attempts = send.attempts.map((a): Attempt => ({ at: a.at, answer: a.answer === "acknowledged" ? "none" : a.answer }));
     let written = false;
     if (definition && kept) {
       const origin = JSON.parse(kept.bytes) as Entry;
@@ -220,7 +220,7 @@ export class Dispatcher {
       });
       written = end.end === "answer" && end.answer;
     }
-    if (!written) store.attempted(seq, n, duty.attempts, now + bounds.drainRetrySeconds * 1000);
+    if (!written) store.attempted(seq, n, send.attempts, now + bounds.drainRetrySeconds * 1000);
     else counts.diagnosed++;
   }
 }

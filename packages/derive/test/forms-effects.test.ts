@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { ActType, Bounds, DeclaredDefinition, EffectForm, FieldValue, Guard, MemberRef, Notify, Send } from "@generalbusiness/dap-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { clockOf, deriveEffects, judgeDelivery, judgeGuards, validateDefinition, type ActJudgment, type Judging, type ProblemCode } from "../src/index.ts";
-import { Scope, arriving, deliver, desk, fields, forged, founded, keys, member, on, ticket, ticketDefinition, valid, variant, type Actor, type Over } from "./fixtures.ts";
+import { Scope, arriving, deliver, desk, fields, forged, created, keys, member, on, ticket, ticketDefinition, valid, variant, type Actor, type Over } from "./fixtures.ts";
 
 const { rita, una, vic, paul, sam } = keys;
 
@@ -266,7 +266,7 @@ describe("effects in a handler and in a result clause (sections 6.6 and 7.4)", (
       d.items.repo.refs.asked = { fixed: false, required: false, to: { type: "fact", kind: [kind], under } };
       d.receives.audit = { message: "audit", class: "tell", from: { kind: "lane" }, fields: { repo: { type: "item", of: "repo", required: true } }, opens: null, also: { repo: { item: "repo", by: "repo" } }, guards: [], effects: [{ of: "also.repo", ref: { slot: "asked", from: { source: "ref" } } }], sends: [], attention: [] };
     });
-    const D = founded();
+    const D = created();
     const X = new Scope(ticketDefinition);
     X.did(una, "ask", fields({ desk: D.at }));   // X.2: an `ask` act of a ticket
     const tell: Send = { n: 0, to: D.at, message: { class: "request", type: "tell", body: { message: "audit", fields: { repo: 0 } } } };
@@ -353,7 +353,7 @@ describe("the validator: effect forms (section 6.6)", () => {
       ["a source of a timed rule whose type only the commit knows", timed({ value: { slot: "text", from: { scope: true } } }), "timed-partial"],
       ["a timed rule that copies one slot of its item into another, and empties a third", timed({ party: { slot: "helper", from: { slot: "owner" } } }, { value: { slot: "text", from: null } }), null],
       // Sources.
-      ["an opening whose only effect on a required slot empties it", refusal((d) => { d.acts.found.effects[0].value.from = null; }, desk), "required-unset"],
+      ["an opening whose only effect on a required slot empties it", refusal((d) => { d.acts["found"].effects[0].value.from = null; }, desk), "required-unset"],
       ["a source that is none", edit({ value: { slot: "text", from: { none: true } } }), "shape"],
       ["a constant that is not a value of the slot", edit({ value: { slot: "size", from: { const: "big" } } }), "shape"],
       ["a position into a slot that is no integer", refusal((d) => { d.acts.rank.effects[0].value.slot = "text"; }), "name"],
@@ -370,6 +370,6 @@ describe("the validator: effect forms (section 6.6)", () => {
       ["a further source over each element of a value that is no list", attributed({ each: { field: "staffed" }, as: "e", list: { element: "e" } }), "name"],
       ["a further source whose list holds no members", attributed({ list: { field: "earlier" } }), "name"],
     ];
-    expect(rows.filter(([, found, code]) => (code === null ? found !== null : found?.length !== 1 || found[0] !== code)).map(([name, found]) => [name, found])).toEqual([]);
+    expect(rows.filter(([, matched, code]) => (code === null ? matched !== null : matched?.length !== 1 || matched[0] !== code)).map(([name, matched]) => [name, matched])).toEqual([]);
   });
 });

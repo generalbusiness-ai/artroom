@@ -5,9 +5,9 @@
  * Four things here are STAND-INS, and each is labelled where it is used.
  *
  * - `registrar`: a made-up directory that creates one rules scope at its
- *   founding, with the fields that the directory's genesis sends (authority
+ *   creation, with the fields that the directory's genesis sends (authority
  *   note, section 12.1, "Messages between scopes"). It stands for the real
- *   directory, below a register. It shows nothing of a founding.
+ *   directory, below a register. It shows nothing of a creation.
  * - `asker`: a made-up lane that tells a rules scope `rules-wanted`. It
  *   stands for the change lane's side of that message, which is the lane
  *   design's.
@@ -26,7 +26,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/dap-derive";
 import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/dap-derive";
-import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
+import { Ledger, Scope, T0, arriving, creation, d, created, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
 import { RULES_SCOPE, platform } from "../src/index.ts";
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
@@ -34,7 +34,7 @@ const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition
   return result.definition;
 };
 
-/** STAND-IN: a made-up directory, for the creator of a rules scope. Its founding creates one, and it has no other act and no handler. */
+/** STAND-IN: a made-up directory, for the creator of a rules scope. Its creation creates one, and it has no other act and no handler. */
 export const registrar: DeclaredDefinition = {
   format: "artroom-definition-1",
   name: "registrar",
@@ -104,7 +104,7 @@ export const rules: PlatformRules = { named: RULES_SCOPE, rules: platform(RULES_
 export const BRANCH = "refs/heads/main";
 
 /**
- * A rules scope in memory, below a stand-in registrar that rita founded:
+ * A rules scope in memory, below a stand-in registrar that rita created:
  * its genesis, by the registrar's `create`, and the registrar's
  * confirmation. The membership scope that it records is the made-up
  * reference `membership` of derive's fixture set, by its ID, unless the
@@ -126,7 +126,7 @@ export class Rulebook extends Ledger {
     const creator = named === RULES_SCOPE ? registrarDefinition : checked(validateDefinition({
       ...registrar, acts: { ...registrar.acts, open: { ...registrar.acts["open"]!, sends: registrar.acts["open"]!.sends.map(send => "create" in send ? { create: { ...send.create, definition: named } } : send) } },
     }, PROPOSED_BOUNDS));
-    this.registrar = founded(creator, { branch: BRANCH, membership: of });
+    this.registrar = created(creator, { branch: BRANCH, membership: of });
     const { asked, source } = creation(this.registrar, 0);
     this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.#platform }));
     if (!confirmed) return;

@@ -49,7 +49,7 @@ export interface Reason { code: RefusalReason; name?: string }
 export type Input =
   | { type: "genesis"; seed: Seed; inc: Incarnation;
       kind: string;                             // the genesis act of the pinned definition (section 4.1)
-      founding: SignedIntent | null;            // a repository's directory only
+      "founding": SignedIntent | null;            // a repository's directory only
       source: FactRef | null; n: number | null; // the creator's entry and send, for a child
       message: Request | null;                  // the creation request, for a child
       decision: "applied" | "refused" }
@@ -161,8 +161,8 @@ export type Effect =
 // Views of an entry, built after sealing. None is part of the entry's bytes (section 3, point 5).
 
 /** One send of one entry: `seq.n`. */
-export type DutyId = `${number}.${number}`;
+export type OutboxId = `${number}.${number}`;
 export interface Envelope { to: ScopeId; from: FactRef; n: number; message: Message }
 export interface Receipt { fact: FactRef; definition: Digest | PlatformDefinition;
                            intent: Digest | null; effects: readonly Effect[];
-                           sends: readonly DutyId[]; epoch: 0 }
+                           sends: readonly OutboxId[]; epoch: 0 }

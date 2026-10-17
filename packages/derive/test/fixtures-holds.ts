@@ -137,7 +137,7 @@ export class Works extends Scope {
     };
   }
 
-  /** The entries that the pending duties reserve. */
+  /** The entries that the pending work reserves. */
   reserved(): number { return owed(this.state, this.definition, this.last.input); }
   /** Used plus reserved, in entries. */
   total(): number { return this.entries.length + this.reserved(); }

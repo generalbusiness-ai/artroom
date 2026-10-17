@@ -7,9 +7,9 @@
  * Membership's own rules are all the platform package's: it has none here.
  *
  * - `office`: a made-up directory that creates one membership scope at its
- *   founding. It stands for the creator of a membership scope, which is the
+ *   creation. It stands for the creator of a membership scope, which is the
  *   real directory's genesis, below a register (authority note, section
- *   12.1). It shows nothing of a founding.
+ *   12.1). It shows nothing of a creation.
  * - `Roster`: a membership scope in memory, below such an office. Its acts
  *   are judged by derive's real judges, with the grant that membership's
  *   own answer gives at its head.
@@ -19,7 +19,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { DeclaredDefinition, KeyId, ObservationUse, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { PROFILES, clockOf, grantFrom, judgeDelivery, judgeGenesis, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Judgment, PlatformRules, Presented, ValidDefinition } from "@generalbusiness/dap-derive";
-import { Ledger, T0, creation, founded, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
+import { Ledger, T0, creation, created, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, membership, platform, standingOf, type Platform } from "../src/index.ts";
 
 /**
@@ -34,7 +34,7 @@ export const lacking = (named: PlatformDefinition, without: string | null): Plat
 
 /**
  * STAND-IN: a made-up directory, for the creator of a membership scope.
- * Its founding creates one membership scope, with the fields that the
+ * Its creation creates one membership scope, with the fields that the
  * directory's genesis sends (authority note, section 12.1, "Messages
  * between scopes"). It has no other act and no handler, so a `compromised`
  * notice that reaches it is refused `unknown-message`.
@@ -55,12 +55,12 @@ export const office: DeclaredDefinition = {
   acts: {
     open: {
       step: "open", on: "repository", grant: "office.open", also: {},
-      fields: { founder: { type: "text", max: 64, required: true }, founderHandle: { type: "text", max: 256, required: true }, recoveryKey: { type: "text", max: 64, required: true } },
+      fields: { "founder": { type: "text", max: 64, required: true }, "founderHandle": { type: "text", max: 256, required: true }, recoveryKey: { type: "text", max: 64, required: true } },
       guards: [], effects: [],
       sends: [{
         create: {
           kind: "membership", definition: MEMBERSHIP,
-          fields: { founder: { field: "founder" }, founderHandle: { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
+          fields: { "founder": { field: "founder" }, "founderHandle": { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
           result: { applied: [{ ref: { slot: "membership", from: { sender: true } } }] },
         },
       }],
@@ -91,9 +91,9 @@ export const rules: PlatformRules = { named: MEMBERSHIP, rules: platform(MEMBERS
 export const { rita, una, vic, paul, sam } = keys;
 
 /**
- * A membership scope in memory, below a stand-in office that rita founded:
+ * A membership scope in memory, below a stand-in office that rita created:
  * its genesis, by the office's `create`, and the office's confirmation.
- * rita's key is the founding key, with the handle `@rita`, and sam's key is
+ * rita's key is the creation key, with the handle `@rita`, and sam's key is
  * the recovery key. Each act is judged by derive's judge of an act, with
  * membership's rules.
  */
@@ -111,7 +111,7 @@ export class Roster extends Ledger {
     this.named = named;
     this.platformRules = { named, rules: code.rules };
     const parent = officeDefinitionFor(named);
-    this.office = founded(parent, { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key });
+    this.office = created(parent, { "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key });
     const { asked, source } = creation(this.office, 0);
     this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.platformRules }));
     // The office records the `applied` result and sends the confirmation, which makes the membership scope active.
@@ -141,7 +141,7 @@ export class Roster extends Ledger {
     return super.act(who, kind, over, { platform: this.platformRules, membership: this.at, grants: this.held(who.key), ...context });
   }
 
-  /** rita is seated and holds the founding key as her first key: items 2 and 3. The inbox that `seat` creates is not made. */
+  /** rita is seated and holds the creation key as her first key: items 2 and 3. The inbox that `seat` creates is not made. */
   seated(): this {
     this.did(rita, "seat", { expected: { roster: 1 } });
     this.did(rita, "first-key", { fields: { member: 2 }, expected: { roster: 1, member: this.item(2).revision } });

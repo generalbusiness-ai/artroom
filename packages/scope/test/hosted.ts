@@ -27,7 +27,7 @@ import { TokenHost, Vault } from "../../git/test/support/tokens.ts";
 import { CAPABILITY_CODE, type Diagnosis, type EffectAnswer, type EffectRequest, type OperationStatus, type Outside } from "../src/index.ts";
 import { controls } from "../src/testing.ts";
 import { wired } from "./outside.ts";
-import { Lane, START, at, definition, founding, reader, stubOf, una } from "./support.ts";
+import { Lane, START, at, definition, creation, reader, stubOf, una } from "./support.ts";
 
 /** The fixture lane with one form of `hold@1`, so that its holds have a workspace, and a report that names its commit, as `report` of `issue` does. */
 export const staged = variant(definition.declared, (def) => {
@@ -59,7 +59,7 @@ export class Hosted {
   readonly log: string[] = [];
   /** The driver of the object's present life. A restart makes another, which holds nothing. */
   driver!: TokenDriver;
-  /** The founded lane. */
+  /** The created lane. */
   s!: Lane;
 
   /** The ports of one life of the object. */
@@ -82,8 +82,8 @@ export class Hosted {
     if (!read.ok) throw new Error(`no operation ${id}: ${read.reason}`);
     return read.value;
   }
-  /** The operations that are not settled: the duties this scope holds. */
-  async duties(): Promise<string[]> {
+  /** The operations that are not settled: the pending work this scope holds. */
+  async outboxItems(): Promise<string[]> {
     const read = await this.surface.operations(reader, undefined, true);
     if (!read.ok) throw new Error(`no operations: ${read.reason}`);
     return read.value.map((o) => `${o.operation.id} ${o.operation.kind} ${o.state}`);
@@ -109,21 +109,21 @@ export class Hosted {
 export const C = (digit: string): string => digit.repeat(40);
 
 /**
- * A founded lane on the capability's code, with a held hold of una's, its
+ * A created lane on the capability's code, with a held hold of una's, its
  * current instance `i1`, and the entry of the step `stage` for a report of
  * commit `a`: a root that is `creating`, the two tokens of attempt 1, each
- * `minting`, and their operations. `before` runs when the scope is founded
+ * `minting`, and their operations. `before` runs when the scope is created
  * and nothing is opened, so a test can set the host's faults first: the
  * driver sends what an entry opened as soon as that entry is committed.
  */
 export async function hosted(before: (h: Hosted) => void = () => undefined): Promise<{ h: Hosted; prepared: Entry; stage: OperationId; mints: [OperationId, OperationId] }> {
-  const { signed, name } = founding(at(60), staged);
+  const { signed, name } = creation(at(60), staged);
   const c = controls(name, START);
   const h = new Hosted();
   wired.set(name, () => h.ports());
-  const founded = await stubOf(name).found(signed, staged.declared);
-  if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-  const lane = (h.s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed));
+  const created = await stubOf(name).create(signed, staged.declared);
+  if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+  const lane = (h.s = new Lane(name, c, created.receipt.fact.at, created.receipt, signed));
   before(h);
   const commitment = await lane.commitment();
   const hold = (await lane.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } })).fact.seq;
