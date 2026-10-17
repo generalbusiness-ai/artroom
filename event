@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at apps/counter/definition.test.ts","body":{"commit":"55e1970a5f7a87a9aeeda92542b3e98ad0088a10","path":"apps/counter/definition.test.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at apps/counter/src/counting-assets.ts","body":{"commit":"55e1970a5f7a87a9aeeda92542b3e98ad0088a10","path":"apps/counter/src/counting-assets.ts"}}
