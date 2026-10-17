@@ -385,3 +385,32 @@ for changed error words. The generated literal table's 126 file/line/value
 rows are independently checked against the current source. The normal
 484-link check excludes notes by design, so its zero broken links is not
 claimed as validation of that new inventory table.
+
+## Original frozen gate and retained-plan reader repair
+
+The original gate at 0a0c1f9c80c154207cd9f3ff4c21ad7724e2a526,
+tree 325c17d6f54ad643cc1ab368bd1b427283824323, started with a clean
+checkout and ended CLOSED 1 in original session 54121. Installation
+passed in 2.3 seconds (3.5 CPU), whitespace passed in 0.1 seconds (0.1
+CPU), and typecheck failed in 6.1 seconds (21.2 CPU). The Vitest, Node
+and Counting gate stages were not run. Original log:
+/tmp/artroom-create-outbox-0a0c1f9c8-first-gate.log; step logs are in
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.2b5B2nTTpz.
+
+The failure identified plannedOperator's plan.creation access. That helper
+reads retained CLI config.plan, whose digested founding key must remain;
+it does not read the demo helper's newly named unsigned public projection.
+The access is restored to plan["founding"] with a clarifying comment.
+The existing rehearsal-stop witnesses and lane compiler pass in
+/tmp/artroom-create-outbox-retained-plan-reader-repair-focus.log and
+/tmp/artroom-create-outbox-retained-plan-reader-repair-types.log. This is
+an implementation repair requiring a new frozen gate; no part of the
+failed gate is claimed as a passing union.
+
+The original 0a0c1f9c8 line count is 142,572 across 815 code files, up
+63 physical lines from exact Main 9a1238b7: tests +27, source +6 and
+retained tooling +30; generated line count unchanged. That is a measured
+physical-line change, not a reduction claim. The final repaired head's
+count is recorded separately after freezing it. The gate environment was
+Node 26.12.0, npm 11.20.0, arm64; observed load 1.30 / 1.46 / 1.59.
+No causal performance claim is made from that one load sample.
