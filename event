@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a0c9a2549ea97b1487b25341dc2d7969b25163b1","text":"Merge retired a covered predecessor; the successor is at apps/jam/test/managed-assets.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a152a8ddb7b8be076ec7afd44f73ae1ae329c176","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/site/autolinks.ts."}
