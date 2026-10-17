@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a19ed2fdf962b25fa3f4b8a0ab3c9121cef86122","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/commands.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a2ebb72d90343c3756d7f115d3d16aad895aaf42","text":"Merge retired a covered predecessor; the successor is at apps/counter/browser-build/counting.js."}
