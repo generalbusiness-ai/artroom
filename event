@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b1c18e1af633c041249d61b7d9e335e0e4e097fd","text":"Merge retired a covered predecessor; the successor is at apps/counter/src/counting-assets.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b2c1023b2d8435419a4377c5ab47e926e79cbad7","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/judge.ts."}
