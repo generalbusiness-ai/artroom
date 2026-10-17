@@ -1015,3 +1015,33 @@ corrected focused command and workspace typecheck pass. Navigation types
 required the item-query overload and the fixture mapping partition place
 to directory kind; no contract ScopeKind was added. No Source gate or
 provider action has run.
+
+## Native retained editor across a handoff
+
+The new native specimen activates unchanged changeDemo3 through actual R3,
+creates its actual partition-born source lane, collects one exact file and
+freezes its actual source fact. Page opens with a real member session.
+Preparation binds stable Root as context and the actual opening partition
+as target. Test HTTP transport discards only the next accepted open-pr
+reply. The loaded task keeps that original signed request and becomes
+unknown. An explicit native seal then creates and confirms the successor.
+
+Continue while unknown sends no second opening or next signature. Checking
+the original request recovers its accepted receipt. Continuing follows the
+original partition's deciding entry and completes ask-rules, collection and
+freeze, with all four exact receipts verified. The new lane's actual genesis
+still names the old partition; the successor has no lane row. The destination
+head stays unchanged: this is a retained proposal, with no merge or provider
+push. Git, scripted clock, scheduler and one lost HTTP acknowledgment remain
+stand-ins; no rendered browser journey is claimed.
+
+The native case passes in
+/tmp/artroom-directory-native-retained-editor-first-focus.log. Initial types
+required the fixture's actual Response cast before cancelling its body;
+corrected lane typecheck passes. A focused control changes only the follow-up
+read to reselect the now-active successor. Its baseline passes; its mutant
+cannot read the original creation there and fails the final recorded-state
+assertion. The source is restored. The distinguishing log is
+/tmp/artroom-directory-native-editor-successor-retarget-control.log.
+This completes the native retained-editor witness left open above; it does
+not change unknown handling or authorize automatic replacement requests.
