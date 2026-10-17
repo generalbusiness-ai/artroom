@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4c0d634cccc3c10b1ba57a8eabe523a86ebd119d","text":"Merge retired a covered predecessor; the successor is at packages/platform/src/partition-provenance.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4c7dab804dd10fe215181c1f3a13e18e0155fe45","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/native-birth.ts."}
