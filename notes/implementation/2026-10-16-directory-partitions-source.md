@@ -901,3 +901,37 @@ move the actual control into a new state. Both controls distinguish and
 restore their source. Logs are /tmp/artroom-directory-seal-standing-marker-control.log
 and /tmp/artroom-directory-post-seal-membership-control.log. No gate,
 Source approval or provider operation is claimed here.
+
+## Native lost create acknowledgment and explicit recovery
+
+The actual Root creates an actual partition, but test transport discards
+that first recorded acknowledgment. Three later attempts are routing
+not-found. The authentic child's result is held separately. Root records
+delivery-unavailable, retains its one creating generation and refuses
+another open with partition-pending. A restart and an hour of scripted
+clock advancement produce no automatic retry and no Root entry.
+
+The actual operator resend dispatches the byte-identical original envelope
+exactly once and receives the original genesis acknowledgment. It adds no
+Root entry. Releasing the authentic child's result after its existing retry
+delay records applied and makes the original generation active with that
+child's exact incarnation. It opens no second generation. Removing only
+the creating-count term of P1 makes the second open accepted, failing the
+assertion; the control distinguishes and restores source.
+
+One further, explicitly pure boundary check uses the actual stored Root
+state and actual child genesis, changing only that genesis's incarnation
+in memory. The real clause judge returns conflict with precisely one
+effect: set that partition row's conflict flag. It sends no confirmation
+and proposes no state or scope replacement. The draft is never written.
+One namespace cannot produce that second incarnation, so this is not a
+Native second-birth attestation or an actual persisted conflict claim.
+
+Logs use /tmp/artroom-directory-lost-answer-: first-focus retained the
+incorrect three-total-attempt expectation (actual: one unknown plus three
+routing refusals); second-focus retained release before the child's retry
+was due; third-focus passes native recovery. conflict-fourth-focus passes
+with the pure clause boundary, and conflict-second-types passes lane
+typecheck after correcting a nonexistent private helper import. The focused
+pending-guard-control log records the distinguishing P1 result. No gate,
+Source approval or provider action has occurred.
