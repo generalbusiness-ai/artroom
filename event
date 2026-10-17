@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aa68cd601cf8401212139ebda2c8f3c0318b3d01","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/signed-reads.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aae4b1e4b24e40c625191f7ad124447ea215f937","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-16-create-outbox-protected-literals.md."}
