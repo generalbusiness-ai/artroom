@@ -1,1 +1,1 @@
-{"kind":"assert","text":"15:17 survey: views design LANDED 92bedfda (builder, pushed); main and GitHub agree. Parent a9a3585c reconciled: ratified c57da7c6, retired in favour of the landed child b410d2f0 (8c43e323), reported cd9f74be. Capacity runtime continues on its branch (checkpoint a24ac0a4). Order: capacity to its witnesses, archive A2/A3 on fixtures, J3 with the evidence-rules slice; the S2 view kit may start from the landed design."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cd9f74bec5b15b9663392f2e6fec8e9cdfd2b0df"}
