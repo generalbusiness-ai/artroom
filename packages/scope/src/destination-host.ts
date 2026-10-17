@@ -420,9 +420,9 @@ export class DestinationHost implements Outside {
     } else if (write.kind === DESTINATION_KINDS.firstHead) {
       commit = firstHeadCommit(state, own, write, format);
       // The founding commit of the scope's own version: the empty tree at version 1, a README at version 2.
-      const founding = initialCommitOf(state, own, format);
-      objects = commit === founding.commit ? founding.objects : await this.#options.provider.objects(repository, commit);
-      if (commit === founding.commit) { expectedTree = founding.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
+      const creation = initialCommitOf(state, own, format);
+      objects = commit === creation.commit ? creation.objects : await this.#options.provider.objects(repository, commit);
+      if (commit === creation.commit) { expectedTree = creation.objects.find((object) => object.kind === "tree")!.id; requireParentless = true; }
     } else if (write.kind === "reservation-stage") {
       if (!target) return null;
       const list = this.#list(target);

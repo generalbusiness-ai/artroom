@@ -133,8 +133,8 @@ export class GenesisProofs {
       if (bodies >= GENESIS_PROOF_BOUNDS.bodies) throw new Error("proof-unavailable");
       const remaining = GENESIS_PROOF_BOUNDS.bytes - bytes;
       if (same(use.fact.at, own.at)) {
-        const entry = ownEntry(use.fact.seq), found = cache.get(key);
-        if (!found || found.content !== use.content) throw new Error("proof-unavailable");
+        const entry = ownEntry(use.fact.seq), matched = cache.get(key);
+        if (!matched || matched.content !== use.content) throw new Error("proof-unavailable");
         return entry;
       }
       const local = this.#bytes.retained(use, remaining);

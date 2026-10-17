@@ -156,8 +156,8 @@ const isOperation = (value: unknown): value is OperationId => typeof value === "
 
 /** The `token` record of that owner in the sealed entry that names the operation in the member `by`. Null: the entry holds none, or more than one. */
 function tokenOf(entry: Entry, owner: string, by: "mint" | "revocation", operation: OperationId): Recorded | null {
-  const found = entry.effects.filter((e): e is Recorded => e.effect === "record" && e.capability === owner && e.kind === "token" && e.values[by] === operation);
-  return found.length === 1 && position(found[0]!.key[0]) ? found[0]! : null;
+  const matched = entry.effects.filter((e): e is Recorded => e.effect === "record" && e.capability === owner && e.kind === "token" && e.values[by] === operation);
+  return matched.length === 1 && position(matched[0]!.key[0]) ? matched[0]! : null;
 }
 
 /**

@@ -102,16 +102,16 @@ async function open(next: Remembered): Promise<void> {
 const rememberedContext = (value: Remembered | null) => value === null ? null : canonicalize({ key: value.device.publicKey, seat: value.seat ?? null, identity: value.identity ?? null });
 async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Promise<void> {
   const previous = rememberedContext(memory ?? { v: 1, device });
-  const found = await findLending(seat, device);
+  const matched = await findLending(seat, device);
   if (expectedEpoch !== epoch) return;
   await browserLock.run(async () => {
     if (expectedEpoch !== epoch) return;
     const stored = await remembered.load();
     if (expectedEpoch !== epoch || rememberedContext(stored) !== previous || stored?.device.publicKey !== device.publicKey) return;
-    const next: Remembered = { v: 1, device, seat, ...(found.ok ? { identity: found.identity } : {}) };
+    const next: Remembered = { v: 1, device, seat, ...(matched.ok ? { identity: matched.identity } : {}) };
     await remembered.save(next);
     if (expectedEpoch !== epoch) return;
-    if (!found.ok) notice = { kind: "plain", text: found.reason };
+    if (!matched.ok) notice = { kind: "plain", text: matched.reason };
     // Every remembered writer takes this lock. Open the committed context before releasing it.
     await open(next);
   });

@@ -287,27 +287,27 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
 
   const files: Record<string, Uint8Array> = { "change3.json": utf8(canonicalize(activeChange)), "one.md": utf8("# One\n"), "two.md": utf8("# Two\n") };
   const person = (): Context => ({ store: memoryStore(), fetch, now, pause, read: async (path) => files[path] ?? null });
-  const founder = person(), checker = person();
+  const creator = person(), checker = person();
   const run = (who: Context, ...argv: string[]) => command(who, argv);
   const ok = (outcome: Outcome) => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
-  ok(await run(founder, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
-  R = new Platform((await founder.store.config())!.register!.scope); wire(R.name); await R.restart(); known.push(R);
+  ok(await run(creator, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
+  R = new Platform((await creator.store.config())!.register!.scope); wire(R.name); await R.restart(); known.push(R);
   net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
-  ok(await run(founder, "claim", "tree", "--handle", "@rita"));
-  const repository = (await founder.store.config())!.repository!;
+  ok(await run(creator, "claim", "tree", "--handle", "@rita"));
+  const repository = (await creator.store.config())!.repository!;
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
   const first = host.refs.get("refs/heads/main")!;
   if (receiptRecoveryOnly) {
-    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
-    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
-    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: host.refs.get("refs/heads/main")!, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
+    ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: host.refs.get("refs/heads/main")!, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
     for (const outcome of ["confirmed", "refused"] as const) {
       receiptMode = outcome === "confirmed" ? "hold" : "refused";
       spendPush = outcome === "confirmed";
       const before = await G.summary();
       const knownPublications = new Set(before.value.items.filter(item => item.type === "publication").map(item => item.id));
-      const proposed = await run(founder, "propose", `receipt-${outcome}`);
+      const proposed = await run(creator, "propose", `receipt-${outcome}`);
       if (spendPush) {
         expect(proposed.code).toBe(1);
         expect(proposed.lines.some(line => line.startsWith("Accepted merge:"))).toBe(true);
@@ -328,7 +328,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
         expect(outcomes).toEqual([[1, "refused"], [2, "refused"], [3, "unknown"]]);
         const head = (await G.summary()).at.seq;
         spendPush = false;
-        ok(await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id)));
+        ok(await run(creator, "act", "resend", "--on", "destination", "--target", String(publication.id)));
         const resend = (await G.entries()).slice(head + 1).find(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "resend")!;
         expect(resend.effects.filter(effect => effect.effect === "operation").map(effect => effect.effect === "operation" ? [effect.kind, effect.attempts, effect.for] : null)).toEqual([["push", 1, publication.id], ["mint", 1, publication.id]]);
         await pause([repository.destination]);
@@ -355,7 +355,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   }
   if (proposalFault) {
     files["docs/two.md"] = utf8("# Second source\n");
-    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
     if (proposalFault === "custom-required") {
       // Generic activation legitimately accepts this complete custom schema.
       // The fixed CLI cannot provide its new input, so it must stop BEFORE
@@ -364,17 +364,17 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       custom.acts["ask-rules"]!.fields["requiredNote"] = { type: "text", max: 32, required: true };
       expect(validateDefinition(custom, PROPOSED_BOUNDS).ok).toBe(true);
       files["custom.json"] = utf8(canonicalize(custom));
-      ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(custom)}`, "--set", "name=change", "--value", "custom.json"));
+      ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(custom)}`, "--set", "name=change", "--value", "custom.json"));
       const D = new Platform(repository.directory.scope), before = (await D.summary()).at;
       let posts = 0;
       const watched = (async (url: string, init?: RequestInit) => { if (init?.method === "POST" && new URL(url).pathname.endsWith("/acts")) posts++; return routed(url, init); }) as unknown as Fetch;
-      founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
-      const result = await command({ ...founder, fetch: watched }, ["propose", "custom-input"]);
+      creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
+      const result = await command({ ...creator, fetch: watched }, ["propose", "custom-input"]);
       expect([result.code, result.lines[0], posts, (await D.summary()).at]).toEqual([1, expect.stringContaining("unsupported-workflow"), 0, before]);
       expect(host.refs.get("refs/heads/main")).toBe(first);
       return;
     }
-    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
     const accepted: { kind: string; path?: string; fact: FactRef }[] = [];
     let sourceRequests = 0;
     const faultFetch = (async (url: string, init?: RequestInit) => {
@@ -395,8 +395,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       if (sourceRequests === 2 && intent?.kind === "propose-file" && proposalFault === "source-reply" || intent?.kind === "propose-manifest" && proposalFault === "manifest-reply") throw new Error("TEST private partial-proposal transport detail");
       return response;
     }) as unknown as Fetch;
-    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["docs/two.md"]! }] }) };
-    const result = await command({ ...founder, fetch: faultFetch }, ["propose", "partial"]);
+    creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["docs/two.md"]! }] }) };
+    const result = await command({ ...creator, fetch: faultFetch }, ["propose", "partial"]);
     expect(result.code, result.lines.join("\n")).toBe(1);
     expect(accepted.some((entry) => entry.kind === "open-pr"), result.lines.join("\n")).toBe(true);
     const opening = accepted.find((entry) => entry.kind === "open-pr")!.fact;
@@ -417,9 +417,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   }
   if (linkFault) {
     files["issue-demo.json"] = utf8(canonicalize(issueDemo));
-    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
-    for (const [name, definition, file] of [["issue", issueDemo, "issue-demo.json"], ["change", changeDemo3, "change3.json"]] as const) ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(definition)}`, "--set", `name=${name}`, "--value", file));
-    ok(await run(founder, "issue", "open", "--title", "A page is missing"));
+    ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    for (const [name, definition, file] of [["issue", issueDemo, "issue-demo.json"], ["change", changeDemo3, "change3.json"]] as const) ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(definition)}`, "--set", `name=${name}`, "--value", file));
+    ok(await run(creator, "issue", "open", "--title", "A page is missing"));
     let manifest: FactRef | null = null;
     let sources = 0, links = 0, merges = 0;
     const faultFetch = (async (url: string, init?: RequestInit) => {
@@ -441,7 +441,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       if (kind === "link-own" && linkFault === "reply") throw new Error("TEST private linking transport detail");
       return response;
     }) as unknown as Fetch;
-    const result = await command({ ...founder, fetch: faultFetch }, ["edit", "one.md", "--file", "one.md", "--closes", "1"]);
+    const result = await command({ ...creator, fetch: faultFetch }, ["edit", "one.md", "--file", "one.md", "--closes", "1"]);
     expect(manifest).not.toBeNull();
     const recorded = manifest as unknown as FactRef;
     expect(result.lines[0]).toBe(`Proposed one.md (${files["one.md"]!.length} bytes) as change ${recorded.at.scope}, version ${recorded.seq}.`);
@@ -462,10 +462,10 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     return;
   }
   if (unknownDeleteOnly) {
-    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
-    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
-    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
-    const proposed = ok(await run(founder, "propose", "delete-unknown"));
+    ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+    const proposed = ok(await run(creator, "propose", "delete-unknown"));
     await pause([repository.destination]);
     expect(proposed.lines[1]).toMatch(/^Published:/);
     const publication = (await G.summary()).value.items.find((item) => item.type === "publication")!;
@@ -483,45 +483,45 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       expect(await runInDurableObject(G.object, () => later.late(later.request.operation, later.request.attempt, { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: "failed" } } }))).toMatchObject({ recorded: "written" });
       expect((await G.item(publication.id)).values["cleanupReason"]).toEqual({ tokenReason: "reservation-token-unknown", tokenAttempts: 3, refRemoved: true });
       expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(3);
-      const verified = await run(founder, "verify", "--all");
+      const verified = await run(creator, "verify", "--all");
       expect(verified.lines.join("\n")).toContain("reservation-token-unknown; attempts 3");
       expect(verified.lines.join("\n")).not.toContain("reservation-ref-unknown;");
     }
-    const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
+    const retry = await run(creator, "act", "resend", "--on", "destination", "--target", String(publication.id));
     expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     return;
   }
   if (nonemptyProfile) {
-    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
-    const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(activeChange)}`, "--set", "title=nonempty admission", "--set", "draft=false", "--value", "change3.json"));
+    ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
+    const opened = ok(await run(creator, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(activeChange)}`, "--set", "title=nonempty admission", "--set", "draft=false", "--value", "change3.json"));
     const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
     const D = new Platform(repository.directory.scope); await pause([D.name]);
     const lane = await D.created(openSeq); await pause([lane.name]);
-    const empty = await run(founder, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", "files=[]");
+    const empty = await run(creator, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", "files=[]");
     expect([empty.code, empty.lines[0]]).toEqual([1, expect.stringContaining("empty-manifest")]);
     expect((await lane.summary()).value.items.some((item) => item.type === "manifest")).toBe(false);
-    const source = ok(await run(founder, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
+    const source = ok(await run(creator, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
     const sourceSeq = Number(/entry \S+:(\d+),/.exec(source.lines[0]!)![1]);
     const row = { path: "one.md", entry: factRefOf((await lane.entries())[sourceSeq]!), digest: digestBytes(files["one.md"]!) };
-    ok(await run(founder, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([row])}`));
+    ok(await run(creator, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([row])}`));
     const manifest = (await lane.summary()).value.items.find((item) => item.type === "manifest")!;
     expect([manifest.state, manifest.values["complete"], manifest.values["files"]]).toEqual(["current", true, [{ ...row, entry: sourceSeq }]]);
-    const closed = await run(founder, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=two.md", "--set", `digest=${digestBytes(files["two.md"]!)}`, "--set", `size=${files["two.md"]!.length}`, "--set", "content=# Two\n");
+    const closed = await run(creator, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=two.md", "--set", `digest=${digestBytes(files["two.md"]!)}`, "--set", `size=${files["two.md"]!.length}`, "--set", "content=# Two\n");
     expect([closed.code, closed.lines[0]]).toEqual([1, expect.stringContaining("collection-closed")]);
     return;
   }
-  const invitation = ok(await run(founder, "invite", "@check", "--role", "checker")).lines[1]!.split(": ")[1]!;
+  const invitation = ok(await run(creator, "invite", "@check", "--role", "checker")).lines[1]!.split(": ")[1]!;
   ok(await run(checker, "join", invitation));
   const checkMember = { membership: repository.membership, member: "@check" };
   const checkConfig = { name: "text", image: `sha256:${"7".repeat(64)}`, environment: [], steps: [["check", "text"]], judged: { passed: { status: 0, line: "ok" }, failed: { status: 1, line: "bad" } }, limits: { seconds: 60, outputBytes: 65536 } };
   files["config.json"] = utf8(canonicalize(checkConfig));
   const configuration = valueDigest(CONFIGURATION_DOMAIN, checkConfig);
-  ok(await run(founder, "act", "keep-configuration", "--on", "rules", "--set", `digest=${configuration}`, "--set", "name=text", "--value", "config.json"));
-  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
-  ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
-  founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+  ok(await run(creator, "act", "keep-configuration", "--on", "rules", "--set", `digest=${configuration}`, "--set", "name=text", "--value", "config.json"));
+  ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
+  ok(await run(creator, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
+  creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
   if ((exhaustCleanup && !unknownStageOnly) || unknownMintOnly) {
-    const proposed = ok(await run(founder, "propose", "cleanup-exhausted"));
+    const proposed = ok(await run(creator, "propose", "cleanup-exhausted"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
     const manifest = await lane.item(version), ref = manifest.values["reservationRef"] as string;
@@ -539,8 +539,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       expect(beforeRead.value.reservationExpiry).toEqual({ clock: "available", time: net.clock.now, expired: [] });
       net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
       const expiredClock = net.clock.now;
-      const creatorConfig = (await founder.store.config())!;
-      const creatorSecret = (await founder.store.secret(creatorConfig.key))!;
+      const creatorConfig = (await creator.store.config())!;
+      const creatorSecret = (await creator.store.secret(creatorConfig.key))!;
       const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, creatorSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
       expect(session.ok).toBe(true);
       if (!session.ok) throw new Error("native session unavailable");
@@ -576,7 +576,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       try { expect((await G.summary()).value.reservationExpiry).toEqual({ clock: "unavailable" }); }
       finally { net.clock.read = clockRead; }
       net.clock.now = expiredClock;
-      const pendingCleanup = await run(founder, "verify", "--all");
+      const pendingCleanup = await run(creator, "verify", "--all");
       expect(pendingCleanup.code, pendingCleanup.lines.join("\n")).toBe(1);
       expect(pendingCleanup.lines.join("\n")).toContain(`reservation ${expiring.id}`);
       expect(pendingCleanup.lines.join("\n")).toContain("waits for the next act or alarm");
@@ -585,13 +585,13 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     } else {
       net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
     }
-    await run(founder, "act", "add-room", "--on", "destination", "--target", String(expiring.id));
+    await run(creator, "act", "add-room", "--on", "destination", "--target", String(expiring.id));
     expect((await G.entries()).filter((entry) => entry.input.type === "timed" && entry.input.item === expiring.id && entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "reservation-delete" && effect.attempts === 3))).toHaveLength(1);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
     const owed = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "cleanup-owed")!;
     if (unknownMintOnly) {
       expect([owed.values["cleanupAttempts"], owed.values["cleanupReason"], host.refs.has(ref)]).toEqual([2, { tokenReason: "reservation-token-unknown", tokenAttempts: 1, refRemoved: true }, false]);
-      const verified = await run(founder, "verify", "--all");
+      const verified = await run(creator, "verify", "--all");
       expect(verified.lines.join("\n")).toContain("reservation-token-unknown; attempts 1");
       const held = pendingMint as unknown as { request: import("../../../../packages/scope/src/operations.ts").EffectRequest; answer: import("../../../../packages/scope/src/operations.ts").EffectAnswer; late: import("../../../../packages/scope/src/operations.ts").LateAnswers };
       releaseMint = true;
@@ -609,18 +609,18 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect((await G.entries()).filter((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete")).toHaveLength(exhaustCleanup === "ref" ? 3 : 1);
     const replayed = await verify(httpSource(SERVICE, { fetch: routed, reader }), { mode: "replay", scope: G.name, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE, head: (await G.summary()).at });
     expect([replayed.report.result, replayed.why ?? null]).toEqual(["consistent", null]);
-    const verified = await run(founder, "verify", "--all");
+    const verified = await run(creator, "verify", "--all");
     expect(verified.code, verified.lines.join("\n")).toBe(1);
     expect(verified.lines.join("\n")).toContain(`reservation ${owed.id}, entry`);
     expect(verified.lines.join("\n")).toContain(`${exhaustCleanup === "ref" ? "reservation-ref" : exhaustCleanup === "token-unknown" ? "reservation-token-unknown" : "reservation-token"}; attempts 3`);
     return;
   }
   if (refusePushOnly) {
-    const proposed = ok(await run(founder, "propose", "refused-push"));
+    const proposed = ok(await run(creator, "propose", "refused-push"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
     const manifest = await lane.item(version), ref = manifest.values["reservationRef"] as string;
-    const requested = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    const requested = ok(await run(creator, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
     await pause([lane.name, repository.destination]);
     const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
     ok(await run(checker, "act", "check", "--on", lane.name, "--set", `job=${job}`, "--set", `tree=${manifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
@@ -632,7 +632,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     return;
   }
   if (unknownStageOnly) {
-    const unknown = await run(founder, "propose", "stage-unknown");
+    const unknown = await run(creator, "propose", "stage-unknown");
     expect(unknown.code).toBe(1);
     expect(unknown.lines.some((line) => line.includes("Observation unknown"))).toBe(true);
     const publication = (await G.summary()).value.items.find((item) => item.type === "publication")!;
@@ -646,18 +646,18 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     const reservation = events[publication.values["reservedAt"] as number]!;
     const ref = `refs/artroom/reservations/${factRefOf(reservation).hash.slice(7)}`;
     expect(host.refs.has(ref)).toBe(true);
-    ok(await run(founder, "act", "cancel-merge", "--on", lane.name, "--target", String(merge.id)));
+    ok(await run(creator, "act", "cancel-merge", "--on", lane.name, "--target", String(merge.id)));
     await pause([lane.name, repository.destination]);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
     expect([(await G.item(publication.id)).state, (await G.item(publication.id)).values["cleanupReason"], host.refs.has(ref), (await G.item(0)).refs["slot"] ?? null]).toEqual(["cleanup-owed", { refReason: "reservation-stage-unknown", ...(exhaustCleanup ? { tokenReason: "reservation-token" } : {}), tokenAttempts: exhaustCleanup ? 3 : 0, refRemoved: false }, false, null]);
     expect((await G.entries()).filter((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete")).toHaveLength(1);
     expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(1);
     if (exhaustCleanup) {
-      const verified = await run(founder, "verify", "--all");
+      const verified = await run(creator, "verify", "--all");
       expect(verified.lines.join("\n")).toContain("reservation-stage-unknown; attempts 1");
       expect(verified.lines.join("\n")).toContain("reservation-token; attempts 3");
     }
-    const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
+    const retry = await run(creator, "act", "resend", "--on", "destination", "--target", String(publication.id));
     expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     // Settle that exact original stage answer; a remaining cleanup operation
     // is recorded with only the unused portion of the three-attempt ceiling.
@@ -680,18 +680,18 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     return;
   }
   if (startedOnly) {
-    const proposed = ok(await run(founder, "propose", "started"));
+    const proposed = ok(await run(creator, "propose", "started"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
     const manifest = await lane.item(version);
-    const requested = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    const requested = ok(await run(creator, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
     await pause([lane.name, repository.destination]);
     const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
     holdPush = true;
     ok(await run(checker, "act", "check", "--on", lane.name, "--set", `job=${job}`, "--set", `tree=${manifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
     await pause([lane.name, repository.destination]);
     const beforeRetry = host.refs.get("refs/heads/main");
-    const retry = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", `earlier=${job}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    const retry = ok(await run(creator, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", `earlier=${job}`, "--set", "name=text", "--set", `configuration=${configuration}`));
     await pause([lane.name, repository.destination]);
     const refusal = (await lane.entries()).find((entry) => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.reason?.name === "publication-started");
     expect(refusal).toBeDefined();
@@ -702,18 +702,18 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   }
   if (!oneFileOnly) {
     // Freeze the wrong-source controls on a separately opened collection.
-    const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(changeDemo3)}`, "--set", "title=source controls", "--set", "draft=false", "--value", "change3.json"));
+    const opened = ok(await run(creator, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(changeDemo3)}`, "--set", "title=source controls", "--set", "draft=false", "--value", "change3.json"));
     const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
     const D = new Platform(repository.directory.scope); await pause([D.name]);
     const controlLane = await D.created(openSeq); await pause([controlLane.name]);
-    const source = ok(await run(founder, "act", "propose-file", "--on", controlLane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
+    const source = ok(await run(creator, "act", "propose-file", "--on", controlLane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
     const sourceSeq = Number(/entry \S+:(\d+),/.exec(source.lines[0]!)![1]);
     const sourceEntry = (await controlLane.entries())[sourceSeq]!;
     const row = { path: "one.md", entry: factRefOf(sourceEntry), digest: digestBytes(files["one.md"]!) };
-    const mismatch = await run(founder, "act", "propose-manifest", "--on", controlLane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([{ ...row, digest: `sha256:${"e".repeat(64)}` }])}`);
+    const mismatch = await run(creator, "act", "propose-manifest", "--on", controlLane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([{ ...row, digest: `sha256:${"e".repeat(64)}` }])}`);
     expect([mismatch.code, mismatch.lines[0]]).toEqual([1, expect.stringContaining("source-mismatch")]);
   }
-  const proposed = oneFileOnly ? await run(founder, "edit", "one.md", "--file", "one.md") : await run(founder, "propose", "topic");
+  const proposed = oneFileOnly ? await run(creator, "edit", "one.md", "--file", "one.md") : await run(creator, "propose", "topic");
   ok(proposed);
   const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
   const [lane, version] = [matched[1]!, Number(matched[2])];
@@ -723,7 +723,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(proposed.lines[1]).toMatch(/^Reserved: merge/);
   const reservationRef = manifest.values["reservationRef"] as string;
   expect([reservationRef, host.refs.get(reservationRef)]).toEqual([expect.stringMatching(/^refs\/artroom\/reservations\/[0-9a-f]{64}$/), manifest.values["integration"]]);
-  const requested = ok(await run(founder, "act", "request-check", "--on", lane, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const requested = ok(await run(creator, "act", "request-check", "--on", lane, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
   await pause([lane, repository.destination]);
   expect((await L.item(job)).values["tree"]).toBe(manifest.values["tree"]);
@@ -816,7 +816,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: corrupt })).toEqual({ not: "no-manifest" });
   }
   const otherChecker = person();
-  const otherInvitation = ok(await run(founder, "invite", "@other-checker", "--role", "checker")).lines[1]!.split(": ")[1]!;
+  const otherInvitation = ok(await run(creator, "invite", "@other-checker", "--role", "checker")).lines[1]!.split(": ")[1]!;
   ok(await run(otherChecker, "join", otherInvitation));
   const savedStage = host.refs.get(reservationRef)!;
   host.refs.delete(reservationRef);
@@ -845,25 +845,25 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(commit.tree).toBe(manifest.values["tree"]);
   expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "docs", "one.md"]);
   // The same command also waits for a publication when no check is owed.
-  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
-  founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
-  const direct = ok(await run(founder, "propose", "next"));
+  ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+  creator.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
+  const direct = ok(await run(creator, "propose", "next"));
   expect(direct.lines[1]).toMatch(/^Published: commit/);
   const lastPublished = host.refs.get("refs/heads/main")!;
   const blocked = person();
-  const blockedInvite = ok(await run(founder, "invite", "@blocked", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
+  const blockedInvite = ok(await run(creator, "invite", "@blocked", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
   ok(await run(blocked, "join", blockedInvite));
   blocked.git = { run: async () => 0, files: async () => ({ ok: true, tip: lastPublished, files: [{ path: "AGENTS.md", bytes: utf8("# Authority\n") }, { path: "five.md", bytes: utf8("# Five\n") }] }) };
   const refused = await run(blocked, "propose", "policy");
   expect([refused.code, refused.lines[1], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("rules-not-met:rules"), lastPublished]);
   // A authentic failed check ends its reservation and leaves the branch unchanged.
-  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
-  const failing = ok(await run(founder, "propose", "failed"));
+  ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
+  const failing = ok(await run(creator, "propose", "failed"));
   const failMatch = /as change (sc_\S+), version (\d+)\./.exec(failing.lines[0]!)!;
   const failLane = new Platform(failMatch[1] as ScopeId), failVersion = Number(failMatch[2]);
   const failManifest = await failLane.item(failVersion);
   const failRef = failManifest.values["reservationRef"] as string;
-  const failRequested = ok(await run(founder, "act", "request-check", "--on", failLane.name, "--set", `manifest=${failVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const failRequested = ok(await run(creator, "act", "request-check", "--on", failLane.name, "--set", `manifest=${failVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([failLane.name, repository.destination]);
   const failJob = Number(/entry \S+:(\d+),/.exec(failRequested.lines[0]!)![1]);
   ok(await run(checker, "act", "check", "--on", failLane.name, "--set", `job=${failJob}`, "--set", `tree=${failManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=failed"));
@@ -874,30 +874,30 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(host.refs.has(failRef)).toBe(false);
   expect((await failLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-failed"))).toBe(true);
   // A pass whose delivery waits while its job is superseded counts for none.
-  const replacing = ok(await run(founder, "propose", "replacement"));
+  const replacing = ok(await run(creator, "propose", "replacement"));
   const replacementMatch = /as change (sc_\S+), version (\d+)\./.exec(replacing.lines[0]!)!;
   const replacementLane = new Platform(replacementMatch[1] as ScopeId), replacementVersion = Number(replacementMatch[2]);
   const replacementManifest = await replacementLane.item(replacementVersion);
-  const j1out = ok(await run(founder, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const j1out = ok(await run(creator, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([replacementLane.name, repository.destination]);
   const j1 = Number(/entry \S+:(\d+),/.exec(j1out.lines[0]!)![1]);
   const wireOnly = net.hold;
   net.hold = (envelope) => { if (wireOnly?.(envelope)) return true; return envelope.from.at.scope === replacementLane.name && envelope.message.class === "request" && envelope.message.type === "tell" && (envelope.message.body as { message?: string }).message === "checked"; };
   ok(await run(checker, "act", "check", "--on", replacementLane.name, "--set", `job=${j1}`, "--set", `tree=${replacementManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
   await pause([replacementLane.name]);
-  ok(await run(founder, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", `earlier=${j1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  ok(await run(creator, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", `earlier=${j1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   net.hold = wireOnly;
   await pause([replacementLane.name, repository.destination]);
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   const replacementMerge = (await replacementLane.summary()).value.items.find((item) => item.type === "merge")!;
-  ok(await run(founder, "act", "cancel-merge", "--on", replacementLane.name, "--target", String(replacementMerge.id)));
+  ok(await run(creator, "act", "cancel-merge", "--on", replacementLane.name, "--target", String(replacementMerge.id)));
   await pause([replacementLane.name, repository.destination]);
   // J2's fence is local before its ACK makes it active in the lane.
   // During that interval J1 is still requested there but cannot read objects.
-  const snapshotRace = ok(await run(founder, "propose", "snapshot-generation"));
+  const snapshotRace = ok(await run(creator, "propose", "snapshot-generation"));
   const snapshotMatch = /as change (sc_\S+), version (\d+)\./.exec(snapshotRace.lines[0]!)!;
   const snapshotLane = new Platform(snapshotMatch[1] as ScopeId), snapshotVersion = Number(snapshotMatch[2]);
-  const snapshotJ1out = ok(await run(founder, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const snapshotJ1out = ok(await run(creator, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([snapshotLane.name, repository.destination]);
   const snapshotJ1 = Number(/entry \S+:(\d+),/.exec(snapshotJ1out.lines[0]!)![1]);
   const snapshotJ1Fact = factRefOf((await snapshotLane.entries())[snapshotJ1]!);
@@ -905,7 +905,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await Gsnapshot.reservationSnapshot(snapshotJ1Ask)).not.toBeNull();
   const originalHold = net.hold;
   net.hold = (envelope) => originalHold?.(envelope) === true || (envelope.from.at.scope === G.name && envelope.message.class === "result" && envelope.message.of.from.at.scope === snapshotLane.name);
-  const snapshotJ2out = ok(await run(founder, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", `earlier=${snapshotJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const snapshotJ2out = ok(await run(creator, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", `earlier=${snapshotJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([snapshotLane.name, repository.destination]);
   expect((await snapshotLane.item(snapshotJ1)).state).toBe("requested");
   expect(await Gsnapshot.reservationSnapshot(snapshotJ1Ask)).toBeNull();
@@ -916,14 +916,14 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const snapshotJ2Ask = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await snapshotLane.at(), fact: factRefOf((await snapshotLane.entries())[snapshotJ2]!) }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   expect(await Gsnapshot.reservationSnapshot(snapshotJ2Ask)).not.toBeNull();
   const snapshotMerge = (await snapshotLane.summary()).value.items.find((item) => item.type === "merge")!;
-  ok(await run(founder, "act", "cancel-merge", "--on", snapshotLane.name, "--target", String(snapshotMerge.id)));
+  ok(await run(creator, "act", "cancel-merge", "--on", snapshotLane.name, "--target", String(snapshotMerge.id)));
   await pause([snapshotLane.name, repository.destination]);
   // Read J1 as current, then fence J2 before offering that same old answer.
-  const racing = ok(await run(founder, "propose", "read-before-fence"));
+  const racing = ok(await run(creator, "propose", "read-before-fence"));
   const raceMatch = /as change (sc_\S+), version (\d+)\./.exec(racing.lines[0]!)!;
   const raceLane = new Platform(raceMatch[1] as ScopeId), raceVersion = Number(raceMatch[2]);
   const raceManifest = await raceLane.item(raceVersion);
-  const raceRequest = ok(await run(founder, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const raceRequest = ok(await run(creator, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([raceLane.name, repository.destination]);
   const raceJ1 = Number(/entry \S+:(\d+),/.exec(raceRequest.lines[0]!)![1]);
   holdCheckAnswer = true;
@@ -933,7 +933,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect((heldAnswer.answer.evidence.body as { current: boolean }).current).toBe(true);
   const beforeFenceHold = net.hold;
   net.hold = (envelope) => beforeFenceHold?.(envelope) === true || (envelope.from.at.scope === raceLane.name && envelope.message.class === "request" && envelope.message.type === "tell" && (envelope.message.body as { message?: string }).message === "check-fence");
-  const raceJ2out = ok(await run(founder, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", `earlier=${raceJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const raceJ2out = ok(await run(creator, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", `earlier=${raceJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   const raceJ2 = Number(/entry \S+:(\d+),/.exec(raceJ2out.lines[0]!)![1]);
   expect((await raceLane.item(raceJ2)).state).toBe("queued");
   const premature = await run(checker, "act", "check", "--on", raceLane.name, "--set", `job=${raceJ2}`, "--set", `tree=${raceManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
@@ -948,27 +948,27 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   await pause([raceLane.name, repository.destination]);
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   const raceMerge = (await raceLane.summary()).value.items.find((item) => item.type === "merge")!;
-  ok(await run(founder, "act", "cancel-merge", "--on", raceLane.name, "--target", String(raceMerge.id)));
+  ok(await run(creator, "act", "cancel-merge", "--on", raceLane.name, "--target", String(raceMerge.id)));
   await pause([raceLane.name, repository.destination]);
   // Cancelling a reserved change with no push releases the publication slot.
-  const cancelled = ok(await run(founder, "propose", "cancel"));
+  const cancelled = ok(await run(creator, "propose", "cancel"));
   const cancelMatch = /as change (sc_\S+), version (\d+)\./.exec(cancelled.lines[0]!)!;
   const cancelLane = new Platform(cancelMatch[1] as ScopeId);
   const cancelRef = (await cancelLane.summary()).value.items.find((item) => item.type === "manifest")!.values["reservationRef"] as string;
   const cancelMerge = (await cancelLane.summary()).value.items.find((item) => item.type === "merge")!;
-  ok(await run(founder, "act", "cancel-merge", "--on", cancelLane.name, "--target", String(cancelMerge.id)));
+  ok(await run(creator, "act", "cancel-merge", "--on", cancelLane.name, "--target", String(cancelMerge.id)));
   await pause([cancelLane.name, repository.destination]);
   expect([(await G.item(0)).refs["slot"] ?? null, host.refs.get("refs/heads/main")]).toEqual([null, lastPublished]);
   expect(host.refs.has(cancelRef)).toBe(false);
   // No response at the recorded deadline ends both sides. The next reserve
   // reclaims the final slot before it opens another judge; no push was sent.
-  const expired = ok(await run(founder, "propose", "expired"));
+  const expired = ok(await run(creator, "propose", "expired"));
   const expireMatch = /as change (sc_\S+), version (\d+)\./.exec(expired.lines[0]!)!;
   const expireLane = new Platform(expireMatch[1] as ScopeId);
   const expireMerge = (await expireLane.summary()).value.items.find((item) => item.type === "merge")!;
   const expiringPublication = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "reserved")!;
   net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
-  await run(founder, "act", "add-room", "--on", "destination", "--target", String(expiringPublication.id)); // The ordinary act drains the expired reservation before judging the act.
+  await run(creator, "act", "add-room", "--on", "destination", "--target", String(expiringPublication.id)); // The ordinary act drains the expired reservation before judging the act.
   await runDurableObjectAlarm(expireLane.object);
   expect((await expireLane.summary()).value.items.some((item) => item.type === "merge")).toBe(false);
   expect((await expireLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-timeout"))).toBe(true);
@@ -981,11 +981,11 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(host.refs.has(expiredRef)).toBe(false);
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   // A second reservation cannot be disclosed to a compromised checker key.
-  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
-  const held = ok(await run(founder, "propose", "held"));
+  ok(await run(creator, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
+  const held = ok(await run(creator, "propose", "held"));
   const heldMatch = /as change (sc_\S+), version (\d+)\./.exec(held.lines[0]!)!;
   const heldLane = new Platform(heldMatch[1] as ScopeId), heldVersion = Number(heldMatch[2]);
-  const heldRequest = ok(await run(founder, "act", "request-check", "--on", heldLane.name, "--set", `manifest=${heldVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const heldRequest = ok(await run(creator, "act", "request-check", "--on", heldLane.name, "--set", `manifest=${heldVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([heldLane.name, repository.destination]);
   const heldJob = Number(/entry \S+:(\d+),/.exec(heldRequest.lines[0]!)![1]);
   const heldFact = factRefOf((await heldLane.entries())[heldJob]!);
@@ -993,7 +993,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await Gsnapshot.reservationSnapshot(heldAsk)).not.toBeNull();
   const M = new Platform(repository.membership.scope);
   const keyItem = (await M.summary()).value.items.find((item) => item.type === "key" && item.values["id"] === checkerKey)!;
-  ok(await run(founder, "act", "revoke-key", "--on", "membership", "--target", String(keyItem.id), "--set", "as=compromised"));
+  ok(await run(creator, "act", "revoke-key", "--on", "membership", "--target", String(keyItem.id), "--set", "as=compromised"));
   expect(await Gsnapshot.reservationSnapshot(heldAsk)).toBeNull();
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   const replayed = await verify(httpSource(SERVICE, { fetch: routed, reader }), { mode: "replay", scope: G.name, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE, head: (await G.summary()).at });

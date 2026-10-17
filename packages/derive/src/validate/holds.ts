@@ -187,7 +187,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendi
   const clausesOf = (send: unknown, path: string): { path: string; starts: ClauseStarts }[] => {
     const result = isObject(send) && isObject(send["result"]) ? send["result"] : {};
     const observes = isObject(send) && isObject(send["observes"]) ? send["observes"] : {};
-    const found: { path: string; starts: ClauseStarts }[] = [];
+    const matched: { path: string; starts: ClauseStarts }[] = [];
     for (const clause of CLAUSES) {
       const effects = own(result, clause);
       const rows = own(observes, clause);
@@ -197,10 +197,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendi
       const p = at(at(path, "result"), clause);
       const marks = (Array.isArray(effects) ? effects : []).flatMap((e, i) => (marked(e) ? [mostOf(e, at(p, i))] : []));
       for (const mark of marks) if (mark.opens !== null && holderTypes.has(mark.opens)) bad("holds", p, `a type that states holds is opened only by new work, and a clause's mark may open ${mark.opens}`);
-      found.push({ path: p, starts: { marks, retains: retainedBytes(rows) } });
+      matched.push({ path: p, starts: { marks, retains: retainedBytes(rows) } });
     }
-    everyClause.push(...found.map((clause) => clause.starts));
-    return found;
+    everyClause.push(...matched.map((clause) => clause.starts));
+    return matched;
   };
 
   // The kinds of `outcomes`.
@@ -290,10 +290,10 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendi
   /** The held kinds that one step from a kind reaches: by its mark, and by a clause of its send. */
   const step = (kind: string): string[] => [...(mosts.get(kind)?.operations ?? []), ...(sends.get(kind)?.clauses ?? []).flatMap((clause) => clause.starts.marks.flatMap((mark) => mark.operations))].filter((k) => held.has(k));
   const reachFrom = (first: readonly string[]): string[] => {
-    const found = new Set<string>();
+    const matched = new Set<string>();
     const todo = [...first];
-    for (let k = todo.pop(); k !== undefined; k = todo.pop()) if (!found.has(k)) { found.add(k); todo.push(...step(k)); }
-    return [...found].sort();
+    for (let k = todo.pop(); k !== undefined; k = todo.pop()) if (!matched.has(k)) { matched.add(k); todo.push(...step(k)); }
+    return [...matched].sort();
   };
 
   const req = requestOf(c, everyClause, { item: true });

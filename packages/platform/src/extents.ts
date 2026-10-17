@@ -330,9 +330,9 @@ export function classify(extents: readonly Extent[], changed: readonly string[] 
     let fresh = [path];
     for (let pass = 0; fresh.length > 0; pass += 1) {
       if (pass > links.length) { refused.add(path); break; }
-      const found: string[] = [];
-      for (const judgedAt of fresh) for (const other of given(judgedAt, path, left)) if (!judged.has(other)) { judged.add(other); found.push(other); }
-      fresh = found;
+      const matched: string[] = [];
+      for (const judgedAt of fresh) for (const other of given(judgedAt, path, left)) if (!judged.has(other)) { judged.add(other); matched.push(other); }
+      fresh = matched;
     }
     for (const at of judged) {
       const holding = patterned.filter((extent) => extent.patterns.some((pattern) => matches(pattern, at)));

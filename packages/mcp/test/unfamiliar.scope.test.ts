@@ -4,7 +4,7 @@ import { canonicalize, definitionDigest, textDigest } from "@generalbusiness/art
 import { firstExtents } from "@generalbusiness/dap-platform";
 import { garden } from "./support/garden.ts";
 import { mcpRoom } from "./support/room.ts";
-import { exercises, founded } from "./support/story.ts";
+import { exercises, created as createRoom } from "./support/story.ts";
 
 // Invariant: an application the server has never seen, written in this test, gets its tools the moment the room holds it, with
 // no change to the server: they are listed with derived text, signed with a detached text and a presented fact, refused by the
@@ -13,7 +13,7 @@ test("an unfamiliar application, created by the room and driven through the same
   const room = mcpRoom();
   try {
     const rita = room.agent("rita");
-    await founded(room, rita);
+    await createRoom(room, rita);
     await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
     expect((await rita.ok("rules.activate", { fields: { digest: definitionDigest(garden), name: "garden" }, values: [canonicalize(garden)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
     expect((await rita.names()).some((n) => n.startsWith("garden."))).toBe(false);

@@ -8,15 +8,15 @@ import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusines
 import { inbox, platform } from "@generalbusiness/dap-platform";
 import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability, type CapabilityScript } from "../src/testing.ts";
-import { Node, founding as creationIn, net, routed, soon } from "./net.ts";
-import { HOLD, START, at, definition, create, founding, reader, rita, stubOf, una } from "./support.ts";
+import { Node, creation as creationIn, net, routed, soon } from "./net.ts";
+import { HOLD, START, at, definition, create, creation, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   test("entry 0 holds the seed, the signed intent and a minted incarnation, and the scope answers under its own name only", async () => {
     const s = await create();
     expect(await s.stub.entry(reader, 0)).toMatchObject({
       ok: true, at: { seq: 0, hash: s.genesis.fact.hash },
-      value: { entry: { seq: 0, prev: null, at: { scope: s.name, inc: s.at.inc, kind: "directory" }, input: { type: "genesis", inc: s.at.inc, founding: s.signed, decision: "applied" } } },
+      value: { entry: { seq: 0, prev: null, at: { scope: s.name, inc: s.at.inc, kind: "directory" }, input: { type: "genesis", inc: s.at.inc, "founding": s.signed, decision: "applied" } } },
     });
     expect([isIncarnation(s.at.inc), s.genesis.intent, s.genesis.definition]).toEqual([true, intentDigest(s.signed.intent), definition.digest]);
     // The same founding again is answered from the genesis: the same receipt, with the incarnation minted the first time.
@@ -24,8 +24,8 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     expect(await s.head()).toEqual({ seq: 0, hash: s.genesis.fact.hash });
 
     // Another founding intent asks for another seed. Its digest is not this object's name, nor the name of an object with no entry.
-    const other = founding();
-    const empty = stubOf(founding().name);
+    const other = creation();
+    const empty = stubOf(creation().name);
     const unverified = { answer: "refused", reason: "source-unverified" };
     expect([await s.stub.create(other.signed, definition.declared), await empty.create(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
@@ -41,7 +41,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     // The same lane, but the end of a hold tells nobody. A founding under it reaches the scope when the hold is due.
     const other = variant(definition.declared, (def) => { def.timed["hold-end"].attention = []; });
     s.c.clock.now = at(HOLD);
-    expect(await s.stub.create(founding(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
+    expect(await s.stub.create(creation(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
     // The turn drained first, as every turn does, and the end it wrote is the pinned definition's.
     expect((await s.entries(4)).map((e) => e.effects)).toEqual([[{ effect: "hold", item: hold, change: "end", epoch: 2 }, { effect: "attention", item: hold, members: [una.member], reason: "hold ended" }]]);
   });
@@ -73,13 +73,13 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
 
   test("the object with no wiring has every production default: it records a founding on the real clock, calls no grant current and lets no reader read", async () => {
     const soon = () => timeOf(Date.now() + 60_000);
-    const { signed, name } = founding(soon());
+    const { signed, name } = creation(soon());
     // The namespace `AS_DEPLOYED` is the class `ScopeObject`, with the ports of `production()` and nothing else. It is not the class that
     // `wrangler.jsonc` names: that is `DeployedScope`, which adds the namespace, the authority of a repository and read sessions.
     const deployed = stubOf(name, env.AS_DEPLOYED);
-    const founded = await deployed.create(signed, definition.declared);
-    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const { at, seq, hash } = founded.receipt.fact;
+    const created = await deployed.create(signed, definition.declared);
+    if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+    const { at, seq, hash } = created.receipt.fact;
     expect([at.scope, seq]).toEqual([name, 0]);
     const offer = signIntent({ v: 1, to: at, actor: rita.key, kind: "offer", on: null, expected: { intent: 1 }, fields: { intent: 0 }, idempotencyKey: "k", notAfter: soon() }, rita.secret);
     expect(await deployed.submit(offer, [grantOf(rita, at, ["offer"])])).toEqual({ answer: "refused", reason: "unauthorized", judgedAt: { seq, hash } });
@@ -106,10 +106,10 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       const name = scopeIdOf(seedOf(intent, NAMED));
       const I = new Node(name, inbox as unknown as DeclaredDefinition);
       // The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
-      const founded = await I.stub.create(signIntent(intent, rita.secret), NAMED);
-      if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-      const ref: ScopeRef = founded.receipt.fact.at;
-      expect([ref.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, NAMED]);
+      const created = await I.stub.create(signIntent(intent, rita.secret), NAMED);
+      if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+      const ref: ScopeRef = created.receipt.fact.at;
+      expect([ref.scope, created.receipt.fact.seq, created.receipt.definition]).toEqual([name, 0, NAMED]);
 
       // The genesis entry: the genesis act of section 12.1.6, `establish`, with the two effects that the definition's data writes.
       // A platform definition is pinned by its name and version, so no declaration is retained for it.
@@ -123,7 +123,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       // After a restart the definition is the code's again, and the scope runs: an act is judged. `mark-read` names no notice, which
       // is check 8 of section 4.2.
       await I.restart();
-      const head = { seq: 0, hash: founded.receipt.fact.hash };
+      const head = { seq: 0, hash: created.receipt.fact.hash };
       const read = (on: number) => I.act(rita, "mark-read", { on, expected: { on: 1, inbox: 1 } });
       expect(await read(7)).toEqual({ answer: "refused", reason: "no-item", judgedAt: head });
 
@@ -202,9 +202,9 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const asked: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000) };
     const seed: Seed = { v: 1, kind: "directory", definition: staged.digest, creator: null, cause: intentDigest(asked), ordinal: 0 };
     const deployed = stubOf(scopeIdOf(seed), env.AS_DEPLOYED);
-    const founded = await deployed.create(signIntent(asked, rita.secret), staged.declared);
-    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const at = founded.receipt.fact.at;
+    const created = await deployed.create(signIntent(asked, rita.secret), staged.declared);
+    if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+    const at = created.receipt.fact.at;
     const intent = (kind: string, more: Partial<Intent>): Intent => ({ v: 1, to: at, actor: rita.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000), ...more });
     const offer = signIntent(intent("offer", { expected: { intent: 1 }, fields: { intent: 0 } }), rita.secret);
     const step = signIntent(intent("hold@1:instance", { fields: { hold: 2, task: { ...at, kind: "task" }, instance: "i1" } }), rita.secret);

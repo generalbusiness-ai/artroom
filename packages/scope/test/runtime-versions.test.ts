@@ -37,16 +37,16 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     const child = beginSessionChild(owner, { inspector: reader });
     try { return await child.required(action); } finally { child.close(); }
   };
-  const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: "platform:register@2", creator: null, cause: intentDigest(install), ordinal: 0 }));
   const host = outsideOf(R.name);
   wired.set(R.name, () => ({ outside: host }));
   expect((await R.stub.create(signIntent(install, keys.paul.secret), "platform:register@2")).answer).toBe("accepted");
-  const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-  const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@2", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+  const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+  const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@2", creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
   const D = new Platform(scopeIdOf(seed));
   host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: repositoryName(seedDigest(seed), 1) } } });
-  expect((await R.stub.submit(found, [])).answer).toBe("accepted");
+  expect((await R.stub.submit(matched, [])).answer).toBe("accepted");
   await (R.stub as unknown as { effect(): Promise<number> }).effect();
   await settle(R, D);
   const children = (await D.entries())[0]!.sends.filter((send) => "creator" in send.to && ["membership", "rules", "destination"].includes(send.to.kind));

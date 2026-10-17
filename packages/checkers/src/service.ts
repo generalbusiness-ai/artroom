@@ -219,17 +219,17 @@ export class CheckerService {
     if (record.state === "started") {
       // The delivery that made the record is at work in this process: its run has not ended, or has not begun.
       if (this.#flying.has(flightOf(job))) return { did: "waiting" };
-      let found: unknown;
+      let matched: unknown;
       try {
-        found = await this.#o.runner.find(record.run);
+        matched = await this.#o.runner.find(record.run);
       } catch {
         // The runner's record could not be read now. That is not "no record": nothing is concluded.
         this.#log("find", "unreadable");
         return { did: "waiting" };
       }
-      if (found === RUNNING) return { did: "waiting" };
+      if (matched === RUNNING) return { did: "waiting" };
       // The run's end as its own record has it, or no record at all: `run-lost`. No second run in either case.
-      await this.#conclude(job, record.run, await this.#configuration(job), found);
+      await this.#conclude(job, record.run, await this.#configuration(job), matched);
     }
     return this.#submit(job, false);
   }

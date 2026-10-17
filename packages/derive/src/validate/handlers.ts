@@ -30,9 +30,9 @@ const many = (top: Rec, type: string): unknown => members(own(members(top["items
  */
 function opens(top: Rec, kind: string, type: string): boolean {
   const act = own(members(top["acts"]), kind);
-  const found: unknown[] = isObject(act) ? [act["step"] === "open" ? act["on"] : null] : [];
-  for (const h of Object.values(members(top["receives"]))) if (isObject(h) && h["message"] === kind && h["class"] !== "advisory") found.push(h["opens"]);
-  return found.length > 0 && found.every((t) => t === type);
+  const matched: unknown[] = isObject(act) ? [act["step"] === "open" ? act["on"] : null] : [];
+  for (const h of Object.values(members(top["receives"]))) if (isObject(h) && h["message"] === kind && h["class"] !== "advisory") matched.push(h["opens"]);
+  return matched.length > 0 && matched.every((t) => t === type);
 }
 
 /**

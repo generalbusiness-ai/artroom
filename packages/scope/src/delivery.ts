@@ -155,9 +155,9 @@ export class Deliveries {
     // The definition is read only after authenticating the source bytes.
     const declared = this.#scope.pinned() || !creates ? null : await this.#declared(delivered.to as Seed);
     if (typeof declared === "string") return retry(declared);
-    const founding = declared;
+    const creation = declared;
     const pinned = this.#scope.pinned();
-    if (pinned ? !pinned.definition : !founding) return retry("unavailable");
+    if (pinned ? !pinned.definition : !creation) return retry("unavailable");
 
     // What the judgment reads beside the source entry. For a genesis: the foreign entries its fields name (section 5.2, step 1).
     // For a result: this scope's own entry that sent the request, and the foreign entries that entry read, from its retained inputs.
@@ -172,8 +172,8 @@ export class Deliveries {
     // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
     // which reads a creation's texts, is not taken.
     if (!known && message.class !== "control") {
-      reader ??= !pinned && founding && message.class === "request" && message.type === "create"
-        ? await ReceiverReads.forCreation(this.#ports, { seed: delivered.to as Seed, source: from, n: delivered.n, message }, isPlatformDefinition((delivered.to as Seed).definition) ? (delivered.to as Seed).definition as PlatformDefinition : founding.valid.declared, probe?.operation)
+      reader ??= !pinned && creation && message.class === "request" && message.type === "create"
+        ? await ReceiverReads.forCreation(this.#ports, { seed: delivered.to as Seed, source: from, n: delivered.n, message }, isPlatformDefinition((delivered.to as Seed).definition) ? (delivered.to as Seed).definition as PlatformDefinition : creation.valid.declared, probe?.operation)
         : await this.#scope.receiverReads();
       if (!reader) return retry("dependency-unavailable");
       const named = probe?.source ? await reader.read(from, bounds.fetchSeconds) : source;
@@ -201,8 +201,8 @@ export class Deliveries {
       if (native === null) return retry("dependency-unavailable");
       if (!native) return UNVERIFIED;
     }
-    if (!pinned && founding) {
-      const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
+    if (!pinned && creation) {
+      const act = own(creation.valid.declared.acts, creation.valid.declared.genesis)!;
       const given = creationFields(message.class === "request" ? message : null, from, act.fields);
       carried = textsNamed(act.fields, given);
       const fields = given ? readFields(act.fields, given, bounds) : null;
@@ -235,9 +235,9 @@ export class Deliveries {
     // derives the list again (`Observes`). No other delivery may hold `observed`, so nothing is read for one.
     const rows = message.class === "result" && !known ? this.#scope.observes() : new Observes(null, bounds);
     const context = (clock: Reading): Omit<DeliveryContext, "prepared"> =>
-      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: (this.#scope.pinned() ?? founding)?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin, ...rows.hand() });
+      ({ clock, bounds, facts, own: ownOf(store), snapshot: snapshotsOf(store), texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: (this.#scope.pinned() ?? creation)?.platform ?? undefined, source: { entry: source.entry, under: source.under }, origin, ...rows.hand() });
     /** The definition a section of the turn runs under: the pinned one, or before the genesis the one the seed names. */
-    const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? founding!.valid;
+    const definition = (): ValidDefinition => this.#scope.pinned()?.definition ?? creation!.valid;
     /** A `create` goes to the genesis judge, which answers a repeat from the genesis when the scope exists. */
     const judge = (view: StateView, inc: Incarnation, reading: DeliveryContext): Judgment =>
       (creates ? judgeGenesis(view, definition(), { name, inc, to: delivered.to as Seed, from, n: delivered.n, message } as Creation, reading) : judgeDelivery(view, definition(), delivered, reading));
@@ -264,11 +264,11 @@ export class Deliveries {
             if ((view.scope()?.head.seq ?? -1) + 1 >= bounds.scopeEntries) return said(retry("scope-full"));
             // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry.
             const retain: Retained[] = [...used(judged.draft, [source, ...facts]), ...texts.retain(definition(), judged.draft, source.under), ...valuesOf(judged.draft)];
-            if (genesis && founding) {
-              store.cover(founding.valid.indexes);
+            if (genesis && creation) {
+              store.cover(creation.valid.indexes);
               // A platform definition is pinned by its name and version, and no bytes are retained for it.
-              if (founding.bytes !== null) retain.push({ kind: "definition", digest: founding.valid.digest, bytes: canonicalize(JSON.parse(founding.bytes)) });
-              retain.push(...founding.children);
+              if (creation.bytes !== null) retain.push({ kind: "definition", digest: creation.valid.digest, bytes: canonicalize(JSON.parse(creation.bytes)) });
+              retain.push(...creation.children);
             }
             return {
               verdict: "write", draft: judged.draft, facts: [source, ...facts], retain,
@@ -290,7 +290,7 @@ export class Deliveries {
           case "refused": return said(retry("unavailable"));
         }
       },
-    }, founding?.valid));
+    }, creation?.valid));
     return end.end === "answer" ? end.answer : retry(end.end === "idle" ? "unavailable" : end.end);
   }
 }

@@ -73,9 +73,9 @@ class Deciding extends Ledger {
   constructor(readonly data: PlatformData = DATA, readonly rules: Rules = {}, memo?: string) {
     super(valid(validateDefinition(data, PROPOSED_BOUNDS, undefined, { platform: true })));
     if (memo !== undefined) this.texts.set(textDigest(memo), memo);
-    const founding = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member, ...(memo === undefined ? {} : { memo: textDigest(memo) }) }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
-    const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, founding }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
+    const creation = signIntent({ v: 1, to: null, actor: keys.rita.key, kind: "found", on: null, expected: {}, fields: { opener: keys.rita.member, ...(memo === undefined ? {} : { memo: textDigest(memo) }) }, idempotencyKey: "decisions", notAfter: t(60) }, keys.rita.secret);
+    const seed: Seed = { v: 1, kind: "directory", definition: NAMED, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    const judged = judgeGenesis(this.state, this.definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(6)), seed, creation: creation }, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: { named: NAMED, rules: this.rules }, texts: this.sizes });
     if (judged.result !== "write") throw new Error(JSON.stringify(judged));
     this.seal(judged.draft);
   }

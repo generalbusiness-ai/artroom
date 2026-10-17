@@ -107,8 +107,8 @@ export function markerReservations(types: Markers, base: (type: string, form: Ma
     if (!t) return NOTHING;
     const set = completed(t, done);
     const key = JSON.stringify([name, state, set]);
-    const found = known.get(key);
-    if (found !== undefined) return found;
+    const matched = known.get(key);
+    if (matched !== undefined) return matched;
     if (open.has(key)) { cyclic(name, state); return NOTHING; }
     open.add(key);
     const total = sum(workOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => workOf(name, t, mark, state, set)));

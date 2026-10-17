@@ -407,7 +407,7 @@ export function install(ctx: Context, service: string, options: InstallOptions =
 /** The signed `install` intent, by the operator key, which is made and kept when it does not exist yet. */
 async function installing(ctx: Context, options: { host?: string; namespace?: string }, at: Signing): Promise<{ signed: SignedIntent; key: KeyId }> {
   const signer = secretSigner(await keyOf(ctx, "operator"));
-  const fields = { host: options.host ?? "github.com", namespace: options.namespace ?? "artroom", policy: "keys", founders: [signer.key] };
+  const fields = { host: options.host ?? "github.com", namespace: options.namespace ?? "artroom", policy: "keys", "founders": [signer.key] };
   return { signed: await signedIntent(signer, { to: null, kind: "install", fields }, at), key: signer.key };
 }
 
@@ -415,8 +415,8 @@ async function installing(ctx: Context, options: { host?: string; namespace?: st
  * The ID of the register that a founding by this intent, under this version, makes: a scope's ID is a function of its seed, and
  * a register's seed of the founding intent and the version alone (the scope's `found`).
  */
-const registerIdOf = (founding: SignedIntent, definition: PlatformDefinition): ScopeId =>
-  scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(founding.intent), ordinal: 0 });
+const registerIdOf = (creation: SignedIntent, definition: PlatformDefinition): ScopeId =>
+  scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(creation.intent), ordinal: 0 });
 
 /** Exact closed catalog selection; no name-only or newest provenance fallback. */
 function knownPlatform(named: unknown, name: string): ReturnType<typeof platform> {
@@ -425,7 +425,7 @@ function knownPlatform(named: unknown, name: string): ReturnType<typeof platform
 }
 /** Local recovery identity only. The signature and server decide authority. */
 const installAttemptOf = (plan: PlannedInstall): Digest => textDigest(canonicalize({
-  service: plan.service, operator: plan.founding.intent.actor, founding: plan.founding, definition: plan.definition, register: plan.register,
+  service: plan.service, operator: plan["founding"].intent.actor, "founding": plan["founding"], definition: plan.definition, register: plan.register,
 }));
 
 /** Verify exact selected custody without creating a second store or lock. */
@@ -451,13 +451,13 @@ function retainedCohortPlan(before: Config, service: string, options: InstallOpt
   try {
     compatible = plan.definition === definition && before.key === "operator"
       && plan.service === service && before.service === service
-      && isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
-      && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
-      && Object.keys(plan.founding.intent.expected).length === 0
-      && typeof plan.founding.intent.fields["host"] === "string" && typeof plan.founding.intent.fields["namespace"] === "string"
-      && (options.host === undefined || options.host === plan.founding.intent.fields["host"])
-      && (options.namespace === undefined || options.namespace === plan.founding.intent.fields["namespace"])
-      && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register;
+      && isSignedIntentShape(plan["founding"]) && verifySignedIntent(plan["founding"])
+      && plan["founding"].intent.kind === "install" && plan["founding"].intent.to === null && plan["founding"].intent.on === null
+      && Object.keys(plan["founding"].intent.expected).length === 0
+      && typeof plan["founding"].intent.fields["host"] === "string" && typeof plan["founding"].intent.fields["namespace"] === "string"
+      && (options.host === undefined || options.host === plan["founding"].intent.fields["host"])
+      && (options.namespace === undefined || options.namespace === plan["founding"].intent.fields["namespace"])
+      && isScopeId(plan.register) && registerIdOf(plan["founding"], plan.definition) === plan.register;
   } catch { /* malformed retained plan cannot select a new request */ }
   if (!compatible) stop(failed("Refused: plan-mismatch. The retained install's cohort, service, host or namespace conflicts with this request. The original plan is kept; nothing was signed or sent."));
   return parseStrict(canonicalize(plan)) as PlannedInstall;
@@ -473,15 +473,15 @@ async function cohortPlan(ctx: Context, service: string, options: InstallOptions
     stop(usage("This config directory already holds another setup or pending request. Use a separate config directory for the selected install."));
   }
   const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
-  const plan: PlannedInstall = { service, definition, founding: signed, register: registerIdOf(signed, definition) };
+  const plan: PlannedInstall = { service, definition, "founding": signed, register: registerIdOf(signed, definition) };
   await saveCohortConfig(ctx, { ...before, v: 1, service, key: "operator", plan });
   return plan;
 }
 function plannedLines(plan: PlannedInstall): Outcome {
-  const { host, namespace } = plan.founding.intent.fields;
+  const { host, namespace } = plan["founding"].intent.fields;
   return done(
-    `Planned: register ${plan.register}, under ${plan.definition}, on host ${String(host)}, namespace ${String(namespace)}. The seed's time is ${plan.founding.intent.notAfter}.`,
-    `Set registerScope to ${plan.register} in the Worker's host setting, then run dap install --planned before ${plan.founding.intent.notAfter}.`,
+    `Planned: register ${plan.register}, under ${plan.definition}, on host ${String(host)}, namespace ${String(namespace)}. The seed's time is ${plan["founding"].intent.notAfter}.`,
+    `Set registerScope to ${plan.register} in the Worker's host setting, then run dap install --planned before ${plan["founding"].intent.notAfter}.`,
   );
 }
 
@@ -501,7 +501,7 @@ export function planInstall(ctx: Context, service: string, options: InstallOptio
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry dap install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
     const register = registerIdOf(signed, NEW_REGISTER);
-    await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: NEW_REGISTER, founding: signed, register } });
+    await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: NEW_REGISTER, "founding": signed, register } });
     const { host, namespace } = signed.intent.fields as { host: string; namespace: string };
     return done(
       `Planned: register ${register}, under ${NEW_REGISTER}, on host ${host}, namespace ${namespace}. The seed's time is ${signed.intent.notAfter}.`,
@@ -532,26 +532,26 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   const operator = await ctx.store.secret("operator");
   const now = ctx.now?.() ?? Date.now();
   if (!knownPlatform(plan.definition, "platform:register")) return failed("Unsupported install provenance: this command cannot serve the plan's exact pinned register version. The pending plan is kept; nothing was sent.");
-  const valid = isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
-    && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
-    && Object.keys(plan.founding.intent.expected).length === 0
-    && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan.founding.intent.actor === keyIdOfSecret(operator)
+  const valid = isSignedIntentShape(plan["founding"]) && verifySignedIntent(plan["founding"])
+    && plan["founding"].intent.kind === "install" && plan["founding"].intent.to === null && plan["founding"].intent.on === null
+    && Object.keys(plan["founding"].intent.expected).length === 0
+    && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan["founding"].intent.actor === keyIdOfSecret(operator)
     && typeof plan.service === "string" && plan.service === before!.service
-    && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register
-    && timeMs(plan.founding.intent.notAfter)! - now <= PROPOSED_BOUNDS.intentLifetimeSeconds * 1000;
+    && isScopeId(plan.register) && registerIdOf(plan["founding"], plan.definition) === plan.register
+    && timeMs(plan["founding"].intent.notAfter)! - now <= PROPOSED_BOUNDS.intentLifetimeSeconds * 1000;
   if (!valid) {
     return failed("Refused: plan-mismatch. The saved plan does not match this service, operator key and supported register version. Nothing was sent. Keep the original plan for recovery; do not silently replace it.");
   }
   const attempt = installAttemptOf(plan);
   if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
-  if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
+  if (plan.attempted === undefined && now >= timeMs(plan["founding"].intent.notAfter)!) {
     const label = plan.definition === APPLICATION_COHORT.register ? "application" : plan.definition === FILE_PUBLICATION_COHORT.register ? "application-publication" : "Counting";
-    return failed(`Refused: plan-expired. The planned install could be created until ${plan.founding.intent.notAfter}. ${strictCustody
+    return failed(`Refused: plan-expired. The planned install could be created until ${plan["founding"].intent.notAfter}. ${strictCustody
       ? `No request was sent by this run. Keep this original config directory unchanged. For a new ${label} plan, use a separate empty ARTROOM_HOME directory; configure the host with that new plan's register ID before installing.`
       : "Nothing was sent. Plan again, and set the new register ID."}`);
   }
   const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)
-    && receipt.definition === plan.definition && receipt.intent === intentDigest(plan.founding.intent)
+    && receipt.definition === plan.definition && receipt.intent === intentDigest(plan["founding"].intent)
     && receipt.fact.at.scope === plan.register && receipt.fact.at.kind === "register" && receipt.fact.seq === 0;
   const prior = plan.acknowledged;
   if (prior !== undefined && (!prior || prior.status !== "service-acknowledged" || prior.service !== plan.service || !matches(prior.receipt))) {
@@ -568,7 +568,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
     if (strictCustody) await saveCohortConfig(ctx, pending);
     else await ctx.store.save(pending);
   } else if (strictCustody) await readBackCohortConfig(ctx, before!);
-  const { answer } = await create(transportOf(ctx, plan.service), plan.founding, plan.definition);
+  const { answer } = await create(transportOf(ctx, plan.service), plan["founding"], plan.definition);
   const receipt = accepted(answer, null, "Installed").receipt;
   if (!matches(receipt)) {
     return failed("Held: the install acknowledgement does not match the planned register's exact identity. The plan is kept.");
@@ -693,7 +693,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       if (!DIRECTORY_OF[definition]) return failed(`The register ${register.scope} is under ${definition}, which this command does not know.`);
       registerDefinition = definition;
       const shape = platform(definition)!.data as unknown as DefinitionShape;
-      const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
+      const fields = { branch: options.branch ?? "main", "founderHandle": handle, recoveryKey: recovery };
       const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, "found": { signed } };
       await ctx.store.save({ ...base, claim: pending });
@@ -713,7 +713,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       const legacySeed: Seed = { v: 1, kind: "directory", definition: legacyDefinition, creator: register, cause: pending.intent, ordinal: 0 };
       const D = await handleOf(ctx, config, scopeIdOf(legacySeed), null);
       const genesis = await D.entry(0);
-      let found: ClaimStep | null = null;
+      let matched: ClaimStep | null = null;
       let unread = genesis.ok ? "no matching retained claim" : `directory genesis read: ${genesis.reason}`;
       if (genesis.ok && genesis.value.entry.input.type === "genesis" && canonicalize(genesis.value.entry.input.seed) === canonicalize(legacySeed)) {
         for (const use of genesis.value.entry.uses) {
@@ -724,12 +724,12 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
             const entry = parseStrict(kept.value.bytes) as unknown as Entry;
             if (entry.input.type !== "act" || canonicalize(factRefOf(entry)) !== canonicalize(use.fact)) continue;
             const candidate: ClaimStep = { signed: entry.input.signed, accepted: use.fact };
-            if (validStep(candidate, register, signer.key, "found") && intentDigest(candidate.signed.intent) === pending.intent && candidate.signed.intent.fields["founderHandle"] === pending.handle) { found = candidate; break; }
+            if (validStep(candidate, register, signer.key, "found") && intentDigest(candidate.signed.intent) === pending.intent && candidate.signed.intent.fields["founderHandle"] === pending.handle) { matched = candidate; break; }
           } catch { /* Not a checked copy of this legacy claim. */ }
         }
       }
-      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact creation signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
-      await keep({ ...pending, found });
+      if (!matched) return failed(`This pending claim has only a digest and no readable admitted directory with its exact creation signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
+      await keep({ ...pending, "found": matched });
     }
     const submitted = async (step: ClaimStep, at: ScopeRef, handle: ScopeHandle, took: string): Promise<FactRef> => {
       const digest = intentDigest(step.signed.intent);
@@ -1181,10 +1181,10 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
   const directory = config.repository!.directory.scope;
   const D = await handleOf(ctx, config, directory, reader);
   const register = ((await summaryOf(D)).items.find((item) => item.type === "repository")?.refs["register"] as ScopeRef | undefined)?.scope;
-  const found = [...(register ? [{ kind: "register", scope: register }] : []), { kind: "directory", scope: directory }];
+  const matched = [...(register ? [{ kind: "register", scope: register }] : []), { kind: "directory", scope: directory }];
   // From the directory on: each scope found is read in turn, and what its history creates is added at the end.
-  for (let i = found.length - 1; i < found.length; i++) {
-    const handle = await handleOf(ctx, config, found[i]!.scope, reader);
+  for (let i = matched.length - 1; i < matched.length; i++) {
+    const handle = await handleOf(ctx, config, matched[i]!.scope, reader);
     for (let cursor: string | undefined, pages = 0; pages < pageLimit; pages++) {
       const page = await handle.history(cursor);
       if (!page.ok) return stop(failed(`Cannot read the history of ${handle.scope}: ${page.reason}.`));
@@ -1193,7 +1193,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
           if (!("creator" in send.to)) continue;
           const seed = send.to as Seed;
           const scope = scopeIdOf(seed);
-          if (!found.some((f) => f.scope === scope)) found.push({ kind: seed.kind, scope });
+          if (!matched.some((f) => f.scope === scope)) matched.push({ kind: seed.kind, scope });
         }
       }
       if (page.next === undefined) break;
@@ -1201,7 +1201,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
       cursor = page.next;
     }
   }
-  return found;
+  return matched;
 }
 
 /**
@@ -1389,8 +1389,8 @@ function textOf(bytes: Uint8Array, path: string): string {
 
 /** One entry's effect on one item, of one kind, from a sealed entry. */
 type Effects = Entry["effects"];
-const stateOf = (effects: Effects, item: number): string | null => { const found = effects.find((e) => e.effect === "state" && e.item === item); return found?.effect === "state" ? found.state : null; };
-const valueOf_ = (effects: Effects, item: number, slot: string): unknown => { const found = effects.find((e) => e.effect === "value" && e.item === item && e.slot === slot); return found?.effect === "value" ? found.value : undefined; };
+const stateOf = (effects: Effects, item: number): string | null => { const matched = effects.find((e) => e.effect === "state" && e.item === item); return matched?.effect === "state" ? matched.state : null; };
+const valueOf_ = (effects: Effects, item: number, slot: string): unknown => { const matched = effects.find((e) => e.effect === "value" && e.item === item && e.slot === slot); return matched?.effect === "value" ? matched.value : undefined; };
 
 /** The lane definition of that name that the rules scope holds active, and its canonical bytes, which the rules scope retains. The latest activation wins. */
 async function activeDefinition(ctx: Context, config: Config, reader: string | null, name: "change" | "issue"): Promise<{ digest: Digest; bytes: string; declared: DeclaredDefinition }> {
@@ -1814,8 +1814,8 @@ async function issuesOf(ctx: Context, config: Config, reader: string | null): Pr
 async function issueNamed(ctx: Context, config: Config, reader: string | null, named: string): Promise<Issue> {
   const issues = await issuesOf(ctx, config, reader);
   const number = /^#?(\d+)$/.exec(named);
-  const found = number ? issues.find((issue) => issue.number === Number(number[1])) : issues.find((issue) => issue.lane === named);
-  return found ?? stop(usage(`No issue ${named} is listed in the directory ${config.repository!.directory.scope}. Run: dap issues`));
+  const matched = number ? issues.find((issue) => issue.number === Number(number[1])) : issues.find((issue) => issue.lane === named);
+  return matched ?? stop(usage(`No issue ${named} is listed in the directory ${config.repository!.directory.scope}. Run: dap issues`));
 }
 
 /**

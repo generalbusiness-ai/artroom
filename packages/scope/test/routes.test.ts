@@ -7,17 +7,17 @@ import { grantOf } from "@generalbusiness/dap-derive/testing";
 import type { Created } from "../src/index.ts";
 import { route, type Api } from "../src/worker.ts";
 import { definition } from "./support.ts";
-import { founding, rita, soon } from "./net.ts";
+import { creation, rita, soon } from "./net.ts";
 
 test("one real route: a founding, an act and a request for a step through the Worker's fetch; the exact retry through the service binding returns the same receipt; a read states its position", async () => {
   const post = (path: string, body: unknown) => SELF.fetch(`https://scopes.test${path}`, { method: "POST", body: JSON.stringify(body) });
-  const { signed, name } = founding(definition, { title: "A lane", opener: rita.member });
-  const founded = await post("/v1/scopes", { founding: signed, definition: definition.declared });
-  const genesis = await founded.json<Created>();
+  const { signed, name } = creation(definition, { title: "A lane", opener: rita.member });
+  const created = await post("/v1/scopes", { creation: signed, definition: definition.declared });
+  const genesis = await created.json<Created>();
   if (genesis.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(genesis)}`);
   // The service computed the scope ID from the signed intent and the definition.
   const at = genesis.receipt.fact.at;
-  expect([founded.status, at.scope]).toEqual([201, name]);
+  expect([created.status, at.scope]).toEqual([201, name]);
 
   const intent: Intent = { v: 1, to: at, actor: rita.key, kind: "offer", on: null, expected: { intent: 1 }, fields: { intent: 0 }, idempotencyKey: "k", notAfter: soon(60) };
   const body = { signed: signIntent(intent, rita.secret), grants: [grantOf(rita, at, ["offer"])] };
@@ -42,8 +42,8 @@ test("one real route: a founding, an act and a request for a step through the Wo
 test("the HTTP boundary: a body is budgeted in raw bytes while it is read, and a path that is not percent-encoded text is refused; neither reaches an operation", async () => {
   const post = (body: BodyInit) => route(new Request("https://scopes.test/v1/scopes", { method: "POST", body }), env.NET);
   // A founding that would be accepted, with a padding member of 400,000 three-byte characters: under 1 MiB of UTF-16 units, over it in bytes.
-  const { signed } = founding(definition, { title: "A lane", opener: rita.member });
-  const asked = { founding: signed, definition: definition.declared };
+  const { signed } = creation(definition, { title: "A lane", opener: rita.member });
+  const asked = { creation: signed, definition: definition.declared };
   const padded = await post(JSON.stringify({ ...asked, pad: "\u4e00".repeat(400_000) }));
   expect([padded.status, await padded.json()]).toEqual([400, { error: "bad-request" }]);
   // A body with no end and no declared length: it is cancelled at the chunk that passes the budget, and is not read further.

@@ -24,8 +24,8 @@ export const demoRegisterRules: Rules = {
   install: {
     place: "grant", refusals: [],
     run: ({ input }) => {
-      if (input.type !== "genesis" || !input.founding) return { pass: false };
-      const intent = input.founding.intent;
+      if (input.type !== "genesis" || !input["founding"]) return { pass: false };
+      const intent = input["founding"].intent;
       return intentDigest(intent) === input.seed.cause && intent.fields["purpose"] === DEMO_PURPOSE && intent.fields["policy"] === "open" && !Object.hasOwn(intent.fields, "founders") ? { pass: true, member: null } : { pass: false };
     },
   },

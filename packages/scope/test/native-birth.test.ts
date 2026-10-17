@@ -12,7 +12,7 @@ type Peer = Remote & { nativeBirth(at: unknown, milliseconds: number, maxBytes?:
 // Actual native register genesis, preparation, code pin and SQLite. Clock/key
 // fixtures are the existing test ports. No new partition factory is claimed.
 test("native raw birth reads the exact accepted pin without an activation turn, writes, authority or a derived under label", async () => {
-  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "birth-test", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
+  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "birth-test", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
   const name = scopeIdOf({ v: 1, kind: "register", definition: "platform:register@3", creator: null, cause: intentDigest(intent), ordinal: 0 });
   controls(name);
   const object = env.SCOPES.get(env.SCOPES.idFromName(name)), peer = object as unknown as Peer;

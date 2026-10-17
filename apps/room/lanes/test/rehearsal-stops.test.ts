@@ -3,7 +3,7 @@ import type { Entry, Read, ScopeRef, Seed, Sealed, Summary } from "@generalbusin
 import { entryHash, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { memoryStore, type Context, type Outcome } from "@generalbusiness/dap-cli";
 import { DEMO_DIGESTS, MANIFEST_DIGESTS } from "../src/index.ts";
-import { prepareConcurrentAndMerge, staleReproposal, type Found } from "../../../../scripts/demo/rehearse.ts";
+import { prepareConcurrentAndMerge, staleReproposal, type CapturedValues } from "../../../../scripts/demo/rehearse.ts";
 
 // Runner boundary STAND-IN: commands, read sessions, entries and summaries
 // below are scripted. Production composite code still judges exact results,
@@ -62,7 +62,7 @@ test("scripted preparation answers stop the composite before the next mutation, 
     if (fault === "wrong-definition") entry.sends = [{ ...entry.sends[0]!, to: { ...opening(DEMO_DIGESTS.change).sends[0]!.to as Seed, definition: MANIFEST_DIGESTS.demo } }];
     const seed = opening(manifest ? MANIFEST_DIGESTS.demo : DEMO_DIGESTS.change).sends[0]!.to as Seed;
     const stale = { ...C, scope: scopeIdOf(seed) };
-    const found: Found = { directory: D.scope, publishedCommit: OLD, controlled: C.scope };
+    const matched: CapturedValues = { directory: D.scope, publishedCommit: OLD, controlled: C.scope };
     const calls: string[] = [];
     const took = (scope: string, seq: number) => `Took effect: entry ${scope}:${seq}, hash ${fault === "wrong-opening-hash" ? textDigest("different scripted opening") : entryHash(entry)}.`;
     const source = { ...opening(MANIFEST_DIGESTS.demo), at: stale, seq: 3, sends: [] };
@@ -91,7 +91,7 @@ test("scripted preparation answers stop the composite before the next mutation, 
       lines.splice(11, 0, "$ dap act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
       lines.splice(lines.length - 2, 1);
     }
-    const result = await prepareConcurrentAndMerge(ctx, OLD, C.scope, { code: 0, lines }, found, manifest);
+    const result = await prepareConcurrentAndMerge(ctx, OLD, C.scope, { code: 0, lines }, matched, manifest);
     if (fault === "none") {
       expect(result.code).toBe(0);
       expect(calls).toEqual(["open-pr", "ask-rules", "propose-file", "merge"]);
@@ -123,7 +123,7 @@ test("scripted refusal and replacement answers stop before further work, and the
     ports.command.mockReset();
     const ctx = await context(), calls: string[] = [], events: string[] = [];
     let clock = 100, measured: number | undefined;
-    const found: Found = { stale: stale.scope, staleVersion: "3" };
+    const matched: CapturedValues = { stale: stale.scope, staleVersion: "3" };
     const refusal = `Not published: the merge ${stale.scope}:4 is refused, out-of-date. The change ${stale.scope} stays open at version 3. When it may be merged, run: dap merge ${stale.scope}`;
     ports.command.mockImplementation(async (_ctx: Context, args: string[]): Promise<Outcome> => {
       calls.push(args[0]!); events.push(args[0]!);
@@ -136,7 +136,7 @@ test("scripted refusal and replacement answers stop before further work, and the
       return { code: fault === "wrong-edit-code" ? 1 : 0, lines: fault === "wrong-edit-output" ? ["Unexpected fresh edit answer."] : [`Proposed guide/concurrent.md (1 bytes) as change ${identity}, version 5.`, `Published: commit ${NEW}, by the merge ${identity}:6.`, "Page: scripted page"] };
     });
     const expected = { code: 0, lines: ["Old base: <...>.", "$ dap merge {stale}", "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: dap merge {stale}", "Exit 1.", "$ dap edit <...>", "Proposed guide/concurrent.md (1 bytes) as change <reproposed>, version <reproposedVersion>.", "Published: commit <reproposedCommit>, by the merge {reproposed}:<seq>.", "Page: scripted page", "Exit 0."] };
-    const result = await staleReproposal(ctx, OLD, NEW, expected, found, () => clock, () => Date.parse(TIME), ms => { measured = ms; events.push("measured"); });
+    const result = await staleReproposal(ctx, OLD, NEW, expected, matched, () => clock, () => Date.parse(TIME), ms => { measured = ms; events.push("measured"); });
     if (["wrong-reason", "wrong-code", "wrong-version", "unknown-refusal"].includes(fault)) {
       expect(calls, `no fresh edit after ${fault}`).toEqual(["merge"]);
       expect(result.code, fault).toBe(1);

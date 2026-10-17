@@ -36,7 +36,7 @@ export const routed = (url: string, init?: RequestInit): Promise<Response> => ro
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);
 
 /** A founding intent signed by rita for a directory under that definition, and the name of the object that holds it. */
-export function founding(definition: ValidDefinition, fields: Intent["fields"]): { signed: SignedIntent; name: ScopeId } {
+export function creation(definition: ValidDefinition, fields: Intent["fields"]): { signed: SignedIntent; name: ScopeId } {
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
   return { signed: signIntent(intent, rita.secret), name: scopeIdOf(seed) };
@@ -133,7 +133,7 @@ export async function later(seconds: number, ...nodes: readonly Node[]): Promise
  */
 export async function desk(): Promise<Node> {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(deskDefinition, { source: "a repository" });
+  const { signed, name } = creation(deskDefinition, { source: "a repository" });
   const node = new Node(name, deskDefinition.declared);
   const answer = await node.stub.create(signed, deskDefinition.declared, [ticketDefinition.declared]);
   if (answer.answer !== "accepted") throw new Error(`the desk was not founded: ${JSON.stringify(answer)}`);

@@ -29,16 +29,16 @@ export async function sessionRoom(registerPin: PlatformDefinition = REGISTER) {
 export async function sessionRepository(life: ReturnType<typeof nativeFixtureLifetime>, registerPin: PlatformDefinition = REGISTER) {
     const directoryPin = DIRECTORY_OF[registerPin]; if (!directoryPin) return expect.fail("no exact cohort");
     const demo = registerPin === "platform:register@7" || registerPin === "platform:register@8";
-    const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "bounded-reference", ...(demo ? { policy: "open", purpose: DEMO_PURPOSE } : { policy: "keys", founders: [rita.key] }) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "bounded-reference", ...(demo ? { policy: "open", purpose: DEMO_PURPOSE } : { policy: "keys", "founders": [rita.key] }) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = life.platform(scopeIdOf({ v: 1, kind: "register", definition: registerPin, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name); life.wire(R.name, () => ({ outside: host }));
     expect(await life.wait(() => R.stub.create(signIntent(install, rita.secret), registerPin))).toMatchObject({ answer: "accepted" });
     const register = await life.wait(() => R.at());
-    const found = await life.wait(() => R.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }));
-    const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+    const matched = await life.wait(() => R.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } }));
+    const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(matched.intent), ordinal: 0 };
     const D = life.platform(scopeIdOf(seed));
     host.answer("1:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "bounded-reference-repo" } } });
-    expect(await life.wait(() => R.stub.submit(found, []))).toMatchObject({ answer: "accepted" });
+    expect(await life.wait(() => R.stub.submit(matched, []))).toMatchObject({ answer: "accepted" });
     await effectFixture([R], life.wait); await dispatchFixture([R, D], life.wait);
     const entries = await life.wait(() => D.entries());
     const children = [1, 2, 3].map(n => life.platform(scopeIdOf(entries[0]!.sends.find(send => send.n === n)!.to as Seed)));

@@ -676,23 +676,23 @@ async function historyOf(handle: ScopeHandle, at: Head): Promise<Entry[]> {
  * the item the same entry opens.
  */
 export function operationsOf(entries: readonly Entry[]): (Operation & { for: number | null })[] {
-  const found = new Map<string, Operation & { for: number | null }>();
+  const matched = new Map<string, Operation & { for: number | null }>();
   for (const entry of entries) {
     const opened = entry.effects.find((effect) => effect.effect === "open");
     for (const effect of entry.effects) {
       if (effect.effect === "operation") {
         const item = effect.for === "self" ? (opened && "item" in opened ? opened.item : null) : (effect.for ?? null);
-        found.set(`${entry.seq}:${effect.k}`, { id: `${entry.seq}:${effect.k}`, kind: effect.kind, attempts: [], for: item });
+        matched.set(`${entry.seq}:${effect.k}`, { id: `${entry.seq}:${effect.k}`, kind: effect.kind, attempts: [], for: item });
       } else if (effect.effect === "attempt") {
         const id = typeof effect.operation === "string" ? effect.operation : `${entry.seq}:${effect.operation.k}`;
-        const operation = found.get(id);
+        const operation = matched.get(id);
         if (!operation) continue;
         if (effect.result === "opened") operation.attempts.push("opened");
         else operation.attempts[effect.attempt - 1] = effect.result;
       }
     }
   }
-  return [...found.values()];
+  return [...matched.values()];
 }
 
 // ---------------------------------------------------------------- the published site

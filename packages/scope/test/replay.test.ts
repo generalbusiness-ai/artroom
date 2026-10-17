@@ -7,7 +7,7 @@ import { variant } from "@generalbusiness/dap-derive/testing";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import type { Checkpointed } from "../src/index.ts";
 import { HOLD, definition } from "./support.ts";
-import { Node, desk, founding, later, net, rita, routed, settle, ticket, una } from "./net.ts";
+import { Node, desk, creation, later, net, rita, routed, settle, ticket, una } from "./net.ts";
 
 /**
  * Replay agrees with the runtime. Each history below was written by real
@@ -22,7 +22,7 @@ const kinds = (entries: readonly Entry[]) => entries.map((e) => (e.input.type ==
 describe("replay of histories the runtime wrote, read through the Worker's read routes (sections 9.3 to 9.5)", () => {
   test("one scope: acts, one under a rule, a timed expiry and a checkpoint are each derived again as recorded, and the report states its coverage and trusts", async () => {
     net.hold = net.deaf = null;
-    const { signed, name } = founding(definition, { title: "A lane", opener: rita.member });
+    const { signed, name } = creation(definition, { title: "A lane", opener: rita.member });
     const L = new Node(name, definition.declared);
     expect(await L.stub.create(signed, definition.declared)).toMatchObject({ answer: "accepted" });
     const commitment = (await L.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
@@ -81,7 +81,7 @@ test("explicit recorded durability has its own native pin and replay; unsupporte
   const explicit = variant(definition.declared, def => { def.level = { name: "recorded", version: 1 }; });
   expect(explicit.digest).not.toBe(implicitPin);
   const fields = { title: "A recorded lane", opener: rita.member };
-  const { signed, name } = founding(explicit, fields);
+  const { signed, name } = creation(explicit, fields);
   const L = new Node(name, explicit.declared);
   expect(await L.stub.create(signed, explicit.declared)).toMatchObject({ answer: "accepted", receipt: { definition: explicit.digest, fact: { seq: 0 } } });
   const retained = await source.retained(name, "definition", explicit.digest, { bytes: 1024 * 1024 });

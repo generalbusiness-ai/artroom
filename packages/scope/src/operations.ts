@@ -304,7 +304,7 @@ export class Operations {
    * leaves an accepted entry first, so its following pass sees that same
    * entry; a pass removes accepted entries and restarts the durable walk. */
   #accepted(remove = true): boolean {
-    let found = false;
+    let matched = false;
     const limit = Math.min(this.#bounds.deliveryBatch, this.#refused.size);
     for (let n = 0; n < limit; n++) {
       const first = this.#refused.entries().next().value;
@@ -313,13 +313,13 @@ export class Operations {
       if (this.#outside.accepts(refused.owner, refused.kind)) {
         if (!remove) return true;
         this.#refused.delete(key);
-        found = true;
+        matched = true;
       } else {
         this.#refused.delete(key);
         this.#refused.set(key, refused);
       }
     }
-    return found;
+    return matched;
   }
 
   /**

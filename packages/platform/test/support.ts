@@ -19,7 +19,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { DeclaredDefinition, KeyId, ObservationUse, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { PROFILES, clockOf, grantFrom, judgeDelivery, judgeGenesis, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Judgment, PlatformRules, Presented, ValidDefinition } from "@generalbusiness/dap-derive";
-import { Ledger, T0, creation, founded, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
+import { Ledger, T0, creation, created, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, membership, platform, standingOf, type Platform } from "../src/index.ts";
 
 /**
@@ -55,12 +55,12 @@ export const office: DeclaredDefinition = {
   acts: {
     open: {
       step: "open", on: "repository", grant: "office.open", also: {},
-      fields: { founder: { type: "text", max: 64, required: true }, founderHandle: { type: "text", max: 256, required: true }, recoveryKey: { type: "text", max: 64, required: true } },
+      fields: { "founder": { type: "text", max: 64, required: true }, "founderHandle": { type: "text", max: 256, required: true }, recoveryKey: { type: "text", max: 64, required: true } },
       guards: [], effects: [],
       sends: [{
         create: {
           kind: "membership", definition: MEMBERSHIP,
-          fields: { founder: { field: "founder" }, founderHandle: { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
+          fields: { "founder": { field: "founder" }, "founderHandle": { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
           result: { applied: [{ ref: { slot: "membership", from: { sender: true } } }] },
         },
       }],
@@ -111,7 +111,7 @@ export class Roster extends Ledger {
     this.named = named;
     this.platformRules = { named, rules: code.rules };
     const parent = officeDefinitionFor(named);
-    this.office = founded(parent, { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key });
+    this.office = created(parent, { "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key });
     const { asked, source } = creation(this.office, 0);
     this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.platformRules }));
     // The office records the `applied` result and sends the confirmation, which makes the membership scope active.

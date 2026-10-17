@@ -117,11 +117,11 @@ export class ScopeHandle {
     const entry = read.value.entry;
     if (entry.at?.scope !== at.scope || entry.at.kind !== at.kind || entry.seq !== seq) return { ok: false, reason: "reference-mismatch" };
     if (entry.at.inc !== at.inc) return { ok: false, reason: "wrong-incarnation" };
-    let found: Digest | null = null;
+    let matched: Digest | null = null;
     try {
-      found = entryHash(entry);
+      matched = entryHash(entry);
     } catch { /* not canonical values */ }
-    if (found !== hash) return { ok: false, reason: "hash-mismatch" };
+    if (matched !== hash) return { ok: false, reason: "hash-mismatch" };
     return { ok: true, at: read.at, entry };
   }
 
@@ -153,8 +153,8 @@ export class ScopeHandle {
  * name. A founding is retried with the same signed intent, like an act.
  */
 export async function create(
-  transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
+  transport: Transport, creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
 ): Promise<{ answer: Created; scope: ScopeHandle | null }> {
-  const answer = await transport.create(founding, definition, definitions, beside);
+  const answer = await transport.create(creation, definition, definitions, beside);
   return { answer, scope: answer.answer === "accepted" ? new ScopeHandle(transport, answer.receipt.fact.at.scope, reader) : null };
 }

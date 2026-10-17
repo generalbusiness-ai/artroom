@@ -22,7 +22,7 @@ export function scriptedOrigin(name: "change" | "issue" = "change", route = name
   const creator: Entry = { v: 1, at: directory, seq: 1, prev: d("0"), time: T0, clamped: false, epoch: 0,
     input: { type: "act", signed, authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: seed, message }] };
   const genesis: Entry = { v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0,
-    input: { type: "genesis", seed, inc: at.inc, kind: name === "change" ? "open" : "file", founding: null,
+    input: { type: "genesis", seed, inc: at.inc, kind: name === "change" ? "open" : "file", "founding": null,
       source: factRefOf(creator), n: 0, message, decision: "applied" }, uses: [], prepared: [], effects: [], sends: [] };
   const merge: Entry = { ...genesis, seq: 2, prev: factRefOf(genesis).hash,
     input: { type: "act", signed: signIntent({ v: 1, to: at, actor: keys.rita.key, kind: "merge", on: null,
@@ -44,10 +44,10 @@ export function scriptedApplicationOrigin(pin: "platform:directory@8" | "platfor
   const message = { class: "request", type: "create", body: { directory, membership: { ...directory, kind: "membership" }, creationContext: { v: 1 },
     fields: destinationField ? { destination: native.destination } : {} } } as const;
   const creator: Entry = { ...native.creator, at: directory, input: { type: "act", signed, authority: [], presented: {} }, sends: [{ n: 0, to: seed, message }] };
-  const genesis: Entry = { ...native.genesis, at, input: { type: "genesis", seed, inc: at.inc, kind: "open", founding: null,
+  const genesis: Entry = { ...native.genesis, at, input: { type: "genesis", seed, inc: at.inc, kind: "open", "founding": null,
     source: factRefOf(creator), n: 0, message, decision: "applied" } };
   const office: Entry = { ...native.genesis, at: directory, input: { type: "genesis", seed: directorySeed, inc: directory.inc, kind: "found",
-    founding: null, source: null, n: null, message: null, decision: "applied" } };
+    "founding": null, source: null, n: null, message: null, decision: "applied" } };
   const merge: Entry = { ...native.merge, at, input: { type: "act", signed: signIntent({ v: 1, to: at, actor: keys.rita.key,
     kind: "merge", on: null, expected: {}, fields: {}, idempotencyKey: "scripted-application-merge", notAfter: t(60) }, keys.rita.secret), authority: [], presented: {} } };
   const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "declared:change" },

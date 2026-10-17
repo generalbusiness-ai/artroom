@@ -126,8 +126,8 @@ function symbol(bits: Bits, codes: Huffman): number {
   let code = 0;
   for (let n = 1; n <= 15; n++) {
     code = code * 2 + bits.take(1);
-    const found = codes[n]!.get(code);
-    if (found !== undefined) return found;
+    const matched = codes[n]!.get(code);
+    if (matched !== undefined) return matched;
   }
   throw fail("deflate symbol");
 }

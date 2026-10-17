@@ -78,7 +78,7 @@ test("concurrent health calls share one physical probe, keep it after timeout an
 // no head, data or credential. Provisional/refused metadata mutations below
 // are explicit state fixtures, not proof of those native transitions.
 test("native readiness reports absent, active register, non-register, provisional, refused and malformed metadata without writing history", async () => {
-  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "fixture", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
+  const intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "fixture", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) } as const;
   const name = scopeIdOf({ v: 1, kind: "register", definition: "platform:register@3", creator: null, cause: intentDigest(intent), ordinal: 0 });
   controls(name);
   const object = env.SCOPES.get(env.SCOPES.idFromName(name));

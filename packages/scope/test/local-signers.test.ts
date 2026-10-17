@@ -20,7 +20,7 @@ test("native append signer evidence preserves every classifier variant, inclusiv
   if (genesis.input.type !== "genesis" || act.input.type !== "act") return expect.fail("fixture lacks native signed entries");
   expect(signerOf(genesis)).toBe(rita.key);
   const unsigned: Input[] = [
-    { ...genesis.input, decision: "refused" }, { ...genesis.input, founding: null },
+    { ...genesis.input, decision: "refused" }, { ...genesis.input, "founding": null },
     { type: "checkpoint", through: 0, state: entryHash(genesis) },
     { type: "timed", item: 0, rule: "rule", due: at(0) },
     { type: "diagnosis", of: { seq: 0, n: 0 }, finding: "undelivered", attempts: [] },

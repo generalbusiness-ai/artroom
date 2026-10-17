@@ -37,7 +37,7 @@ registerHooks({
 });
 
 const { DeployedScope, route } = await import("@generalbusiness/artroom-scope/worker");
-const { found, httpTransport, secretSigner, signedIntent } = await import("@generalbusiness/artroom-client");
+const { create, httpTransport, secretSigner, signedIntent } = await import("@generalbusiness/artroom-client");
 const { main: replay } = await import("@generalbusiness/artroom-replay");
 const { deskDefinition, ticketDefinition, grantOf, keys } = await import("@generalbusiness/artroom-derive/testing");
 const { scopeIdOf } = await import("@generalbusiness/artroom-bytes");
@@ -202,8 +202,8 @@ async function history(seat, from = 0) { for (const sealed of (await seat.entrie
 out(`I1 story. Clock starts at ${time()}. Node ${process.version}.`);
 out();
 out("Step 0. Rita founds a desk D (a directory) over the HTTP routes.");
-const founding = await intent(rita, { to: null, kind: "found", fields: { source: "a repository" } });
-const made = await create(transport, founding, deskDefinition.declared, [ticketDefinition.declared], READER);
+const creation = await intent(rita, { to: null, kind: "found", fields: { source: "a repository" } });
+const made = await create(transport, creation, deskDefinition.declared, [ticketDefinition.declared], READER);
 if (!made.scope) throw new Error(`the desk was not founded: ${JSON.stringify(made.answer)}`);
 const D = new Seat("D", made.scope, deskDefinition.declared);
 await settle();

@@ -126,7 +126,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
         ]);
         expect(rehearsal.shots[18]!.lines[0]).toMatch(/^Proposed 2 files as change sc_/);
         expect(rehearsal.shots[20]!.lines[1]).toContain("rules-not-met:rules");
-        await concurrencyWitness(people.founder!, rehearsal, at.stand.pushes.filter(push => push.ref === "refs/heads/main").map(push => push.commit));
+        await concurrencyWitness(people["founder"]!, rehearsal, at.stand.pushes.filter(push => push.ref === "refs/heads/main").map(push => push.commit));
         const directory = rehearsal.room.directory!;
         for (const file of branchFiles("two-pages")) {
           const page = await stage.get(`${SERVICE}/site/${directory}/HEAD/${file.path}`);
@@ -190,9 +190,9 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
     const actor = path.endsWith("/sessions") ? ` ${(JSON.parse(String(init?.body)) as { request: { actor: string } }).request.actor}` : "";
     return keep(`${init?.method === "POST" ? "POST" : "GET"} ${path}${actor}`, answer);
   }) as unknown as Fetch;
-  const founder = people.founder!;
-  const config = (await founder.store.config())!;
-  const secret = (await founder.store.secret(config.key))!;
+  const creator = people["founder"]!;
+  const config = (await creator.store.config())!;
+  const secret = (await creator.store.secret(config.key))!;
   const place = placeOf(JSON.stringify(config))!;
   const { issue, published, refused } = rehearsal.room as Required<typeof rehearsal.room>;
   // The screens, each as `main.ts` draws it: the room, the issue, the refused change, the published change and the rules; then
@@ -232,7 +232,7 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const kept = {
     service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: creatorAnswers,
     claimWitness: { register: configured.register, definition: configured.definition,
-      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: creatorAnswers },
+      "founder": { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: creatorAnswers },
       member: { place: memberPlace, secret: b64url(memberSecret), actor: keyIdOfSecret(memberSecret), answers: { ...assets, ...Object.fromEntries(recording) }, refusal: memberRefusal },
     },
   };
@@ -390,9 +390,9 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 
   // Real native genesis and actual creator send entries anchor the capture's
   // lane hints to the full refs kept by claim/join, without a new grant.
-  const births = await observeCaptures(people.founder!, rehearsal.room);
-  const config = (await people.founder!.store.config())!;
-  const observed = { v: 1 as const, source: "test source", service: SERVICE, config: textDigest(canonicalize(config)), actor: keyIdOfSecret((await people.founder!.store.secret(config.key))!), births };
+  const births = await observeCaptures(people["founder"]!, rehearsal.room);
+  const config = (await people["founder"]!.store.config())!;
+  const observed = { v: 1 as const, source: "test source", service: SERVICE, config: textDigest(canonicalize(config)), actor: keyIdOfSecret((await people["founder"]!.store.secret(config.key))!), births };
   const bound = captureBinding(config, observed, SERVICE, { ...rehearsal.room, diagnostic: "not capture metadata" } as typeof rehearsal.room, "test source");
   expect(bound.place).toEqual({ directory: config.repository!.directory.scope, membership: config.repository!.membership });
   expect(bound.room).toEqual(rehearsal.room);
@@ -402,7 +402,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   detached.births.published.creator = null;
   expect(() => captureBinding(config, detached, SERVICE, rehearsal.room, "test source")).toThrow("Capture binding");
   let loaded = 0;
-  const noKey: Context = { ...people.founder!, store: { ...people.founder!.store, secret: async () => { loaded++; throw new Error("unexpected key load"); } } };
+  const noKey: Context = { ...people["founder"]!, store: { ...people["founder"]!.store, secret: async () => { loaded++; throw new Error("unexpected key load"); } } };
   await expect(observeCaptures(noKey, { ...rehearsal.room, service: "https://other.test" })).rejects.toThrow("Capture binding");
   await expect(observeCaptures(noKey, { ...rehearsal.room, directory: rehearsal.room.issue! })).rejects.toThrow("Capture binding");
   expect(loaded).toBe(0);
@@ -415,7 +415,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect([pushed.length, lines(16)[2]!.includes(pushed[1]!), lines(19).some(line => line.startsWith("Published:") && line.includes(pushed[2]!))]).toEqual([4, true, true]);
   expect(lines(23).at(-1)).toBe("All consistent: 14 scopes.");
 
-  await concurrencyWitness(people.founder!, rehearsal, pushed);
+  await concurrencyWitness(people["founder"]!, rehearsal, pushed);
 
   // No secret is in the transcript: neither the invitation links, nor any person's key, nor any credential of the host.
   const links = [rehearsal.shots[6]!, rehearsal.shots[8]!].map((shot) => shot.lines[1]!);
@@ -452,16 +452,16 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 }
 
 /** Real native proposals and retained merges, tied to the command transcript. */
-async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed: string[]): Promise<void> {
+async function concurrencyWitness(creator: Context, rehearsal: Rehearsal, pushed: string[]): Promise<void> {
   // Invariant: reservation check 1 sees the winner and loser on the same old
   // base, keeps the refused lane, and only a distinct new change publishes.
   // The scopes are real; Git host and scheduler remain the stand-ins above.
-  const config = (await founder.store.config())!;
-  const secret = (await founder.store.secret(config.key))!;
-  const session = await requestSession(SERVICE, config.repository!.membership.scope, sessionRequest(config.repository!.membership, secret, timeOf(timeMs(net.clock.now)! + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch: founder.fetch! });
+  const config = (await creator.store.config())!;
+  const secret = (await creator.store.secret(config.key))!;
+  const session = await requestSession(SERVICE, config.repository!.membership.scope, sessionRequest(config.repository!.membership, secret, timeOf(timeMs(net.clock.now)! + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch: creator.fetch! });
   expect(session.ok).toBe(true);
   if (!session.ok) return;
-  const transport = signedReads(httpTransport(SERVICE, { fetch: founder.fetch! }), secretSigner(secret), { now: founder.now! });
+  const transport = signedReads(httpTransport(SERVICE, { fetch: creator.fetch! }), secretSigner(secret), { now: creator.now! });
   const controlled = new ScopeHandle(transport, rehearsal.room.controlled as ScopeId, session.session.reader());
   const stale = new ScopeHandle(transport, rehearsal.room.stale as ScopeId, session.session.reader());
   const replacement = new ScopeHandle(transport, rehearsal.room.reproposed as ScopeId, session.session.reader());

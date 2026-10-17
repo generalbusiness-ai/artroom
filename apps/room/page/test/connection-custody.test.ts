@@ -8,8 +8,8 @@ import type { Context, InvitationIssueInput, InvitationIssueResult } from "@gene
 import type { ClaimStorage } from "../src/claim.ts";
 const shared = vi.hoisted(() => ({ issueInvitation: vi.fn() }));
 vi.mock("@generalbusiness/dap-cli", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/dap-cli")>("@generalbusiness/dap-cli"), ...shared }));
-const founder = vi.hoisted(() => ({ originalStart: vi.fn(), startRoom: vi.fn(), recoveryKeyOnce: vi.fn() }));
-vi.mock("../src/start-custody.ts", () => founder);
+const creator = vi.hoisted(() => ({ originalStart: vi.fn(), startRoom: vi.fn(), recoveryKeyOnce: vi.fn() }));
+vi.mock("../src/start-custody.ts", () => creator);
 vi.mock("../src/data.ts", async () => ({ ...await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts"), openRoom: async (session: { service: string; secret: Uint8Array }) => ({ session, directory: directory.scope, membership, key, me: { handle: "@founder", ref: controller, actions: ["membership.invite", "membership.manage"] } }) }));
 import { connectInvitation, originalConnection, creatorConnectionFiles, saveCreatorRecoveryOnce } from "../src/connection-custody.ts";
 const origin = "https://connection-custody.test";
@@ -20,11 +20,11 @@ const expected = { key, operation: "50000000-0000-4000-8000-000000000001", membe
 const repository = { directory, membership, rules: directory.scope, destination: membership.scope };
 const locks = { request: async <T>(_name: string, work: () => Promise<T>) => work() };
 function fixture() {
-  shared.issueInvitation.mockReset(); founder.originalStart.mockReset(); founder.startRoom.mockReset(); founder.recoveryKeyOnce.mockReset();
+  shared.issueInvitation.mockReset(); creator.originalStart.mockReset(); creator.startRoom.mockReset(); creator.recoveryKeyOnce.mockReset();
   const values = new Map<string, string>();
   const handed: Uint8Array[] = [];
-  founder.originalStart.mockReturnValue({ ...expected, state: "complete" });
-  founder.startRoom.mockImplementation(async () => { const secret = seed.slice(); handed.push(secret); return { ...expected, repository, configured: { register, definition: "platform:register@7" }, handle: "@founder", secret }; });
+  creator.originalStart.mockReturnValue({ ...expected, state: "complete" });
+  creator.startRoom.mockImplementation(async () => { const secret = seed.slice(); handed.push(secret); return { ...expected, repository, configured: { register, definition: "platform:register@7" }, handle: "@founder", secret }; });
   const storage: ClaimStorage = { getItem: name => values.get(name) ?? null, setItem: (name, value) => { values.set(name, value); } };
   return { values, storage, handed };
 }
@@ -99,10 +99,10 @@ test("dropped connection reservation dispatches nothing; true agent input uses t
     const privateKey = (await cliStore.secret(loaded.key))!;
     try { expect(keyIdOfSecret(privateKey)).toBe(expected.key); } finally { privateKey.fill(0); }
   } finally { rmSync(directory, { recursive: true, force: true }); }
-  founder.recoveryKeyOnce.mockResolvedValue(b64url(seed) + "\n");
+  creator.recoveryKeyOnce.mockResolvedValue(b64url(seed) + "\n");
   const recovery = await saveCreatorRecoveryOnce(origin, f.storage, expected, { locks });
   expect(recovery.trim() === b64url(seed)).toBe(true);
-  expect(founder.recoveryKeyOnce).toHaveBeenCalledWith(origin, f.storage, expected, { locks });
+  expect(creator.recoveryKeyOnce).toHaveBeenCalledWith(origin, f.storage, expected, { locks });
   expect(f.handed.every(bytes => bytes.every(byte => byte === 0))).toBe(true);
 });
 

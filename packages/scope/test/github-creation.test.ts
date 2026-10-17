@@ -147,7 +147,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
   const keypair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keypair.privateKey) as ArrayBuffer);
   const privateKey = `-----BEGIN PRIVATE KEY-----\n${btoa(Array.from(privateBytes, (byte) => String.fromCharCode(byte)).join(""))}\n-----END PRIVATE KEY-----\n`;
-  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "github.com", namespace: ACCOUNT.login, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "github.com", namespace: ACCOUNT.login, policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const registerSeed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 };
   const R = new Platform(scopeIdOf(registerSeed));
   const host = new ScriptedGitHub();
@@ -174,10 +174,10 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     wire(R.name);
     expect(await R.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
     const register = await R.at();
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const directorySeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+    const directorySeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(matched.intent), ordinal: 0 };
     const D = new Platform(scopeIdOf(directorySeed));
-    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.submit(matched, [])).toMatchObject({ answer: "accepted" });
     await (R.stub as unknown as { effect(): Promise<number> }).effect();
     await settle(R, D);
     const births = (await D.entries())[0]!.sends;

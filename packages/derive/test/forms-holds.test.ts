@@ -292,9 +292,9 @@ describe("18.47: a reservation that an item holds is taken once, drawn down and 
       const entry = structuredClone(s.entries[written]!.entry);
       change(entry.effects.find((effect) => effect.effect === "operation") as unknown as Record<string, unknown>);
       const state = s.replay(written);
-      const found = drawsOf(state, s.definition, entry);
+      const matched = drawsOf(state, s.definition, entry);
       expect(() => applyEntry(state, s.definition, entry, entryHash(entry))).toThrow(FoldError);
-      return "fault" in found ? found.fault : "drawn";
+      return "fault" in matched ? matched.fault : "drawn";
     };
     expect([drawn((effect) => { effect["kind"] = "step"; }), drawn((effect) => { delete effect["for"]; }), drawn((effect) => { effect["for"] = 0; }), drawn((effect) => { effect["for"] = "self"; })]).toEqual(["past-count", "no-holder", "no-holder", "no-holder"]);
   });

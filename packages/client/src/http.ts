@@ -102,7 +102,7 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
 
   return {
     // What travels beside the intent goes in the same body: each detached text, and each presented fact by name.
-    create: (founding, definition, definitions = [], beside = {}) => call("create", "", null, { founding, definition, definitions, ...beside }),
+    create: (creation, definition, definitions = [], beside = {}) => call("create", "", null, { creation, definition, definitions, ...beside }),
     submit: (scope, signed, grants, beside = {}) => call("submit", `/${part(scope)}/acts`, null, { signed, grants, ...beside }),
     prepare: (scope, signed, grants, capability, step) => call("prepare", `/${part(scope)}/preparations`, null, { signed, grants, capability, step }),
     settle: (scope, signed) => call("settle", `/${part(scope)}/settle`, null, { signed }),

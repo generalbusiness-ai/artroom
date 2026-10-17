@@ -29,14 +29,14 @@ test("native integer indexes retain exact duplicate and boundary keys across fin
     fixedChangeAttempts++;
     return input.type === "act" && input.signed.intent.on !== null ? [{ effect: "value", item: input.signed.intent.on, slot: "number", value: 8 }] : [];
   } } }).rules;
-  const founding: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
-  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(founding), ordinal: 0 };
+  const creation: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };
+  const seed: Seed = { v: 1, kind: "directory", definition: MADE, creator: null, cause: intentDigest(creation), ordinal: 0 };
   const name = scopeIdOf(seed); controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: named => named === MADE ? { data: data as never, rules } : null } }));
   try {
-    const stub = stubOf(name), founded = await stub.create(signIntent(founding, rita.secret), MADE);
-    if (founded.answer !== "accepted") return expect.fail(`indexed fixture was not founded: ${JSON.stringify(founded)}`);
-    const scope = founded.receipt.fact.at;
+    const stub = stubOf(name), created = await stub.create(signIntent(creation, rita.secret), MADE);
+    if (created.answer !== "accepted") return expect.fail(`indexed fixture was not founded: ${JSON.stringify(created)}`);
+    const scope = created.receipt.fact.at;
     const act = (kind: string, over: Partial<Intent>): Promise<Answer> => stub.submit(signIntent({ v: 1, to: scope, actor: rita.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: at(60), ...over }, rita.secret), [grantOf(rita, scope, ["gate.issue"])]);
     const issue = (number: unknown) => act("issue", { fields: { number: number as FieldValue, hash: textDigest("integer-key") } });
     const ids: number[] = [];

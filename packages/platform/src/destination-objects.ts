@@ -191,18 +191,18 @@ export function editTree(
     }
     const replaced = new Set<TreeRow>(), written: TreeRow[] = [];
     for (const [key, edit] of edits) {
-      const found = byName.get(key) ?? null;
+      const matched = byName.get(key) ?? null;
       let row: TreeRow;
       if (edit.bytes !== undefined) {
-        if (found !== null && !FILE_MODES.includes(found.mode)) return null;
-        row = { mode: found?.mode ?? "100644", name: edit.name, id: keep(object(format, "blob", edit.bytes)) };
+        if (matched !== null && !FILE_MODES.includes(matched.mode)) return null;
+        row = { mode: matched?.mode ?? "100644", name: edit.name, id: keep(object(format, "blob", edit.bytes)) };
       } else {
-        if (found !== null && found.mode !== TREE_MODE) return null;
-        const below = write(found?.id ?? null, edit.children);
+        if (matched !== null && matched.mode !== TREE_MODE) return null;
+        const below = write(matched?.id ?? null, edit.children);
         if (below === null) return null;
         row = { mode: TREE_MODE, name: edit.name, id: below };
       }
-      if (found) replaced.add(found);
+      if (matched) replaced.add(matched);
       written.push(row);
     }
     const next = [...rows.filter((kept) => !replaced.has(kept)), ...written].sort(rowOrder);

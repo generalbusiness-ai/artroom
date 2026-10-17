@@ -178,8 +178,8 @@ export const directory: PlatformData = {
       values: {
         repository: { fixed: true, required: true, of: REPOSITORY },
         branch: { fixed: true, required: true, of: NAME },
-        founder: { fixed: true, required: true, of: KEY },
-        founderHandle: { fixed: true, required: true, of: NAME },
+        "founder": { fixed: true, required: true, of: KEY },
+        "founderHandle": { fixed: true, required: true, of: NAME },
         recoveryKey: { fixed: true, required: true, of: KEY },
         import: { fixed: true, required: false, of: { type: "text", max: 2048 } },
         imported: { fixed: false, required: false, of: { type: "commit" } },
@@ -235,7 +235,7 @@ export const directory: PlatformData = {
         claim: { ...CLAIM, required: true },
         repository: { ...REPOSITORY, required: true },
         branch: { ...NAME, required: true },
-        founderHandle: { ...NAME, required: true },
+        "founderHandle": { ...NAME, required: true },
         recoveryKey: { ...KEY, required: true },
         import: { type: "text", max: 2048, required: false },
       },
@@ -258,7 +258,7 @@ export const directory: PlatformData = {
         {
           create: {
             kind: "membership", definition: "platform:membership@1",
-            fields: { founder: { slot: "founder" }, founderHandle: { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
+            fields: { "founder": { slot: "founder" }, "founderHandle": { field: "founderHandle" }, recoveryKey: { field: "recoveryKey" }, directory: { scope: true } },
             result: { applied: [{ ref: { slot: "membership", from: { sender: true } } }] },
           },
         },
@@ -795,7 +795,7 @@ export const directoryRules: Rules = {
             fields: {
               repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules"),
               // Version 2: the founder's handle, which the destination's founding commit names in its README.
-              ...(pinnedBy(given) === "platform:directory@1" ? {} : { founderHandle: fields["founderHandle"] }),
+              ...(pinnedBy(given) === "platform:directory@1" ? {} : { "founderHandle": fields["founderHandle"] }),
             },
           },
         },

@@ -33,7 +33,7 @@ import { reader } from "./support.ts";
 export const { rita, una, vic, sam } = keys;
 
 interface Surface {
-  create(founding: SignedIntent, definition: unknown): Promise<{ answer: string }>;
+  create(creation: SignedIntent, definition: unknown): Promise<{ answer: string }>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside): Promise<Answer>;
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
@@ -116,7 +116,7 @@ export async function office(hold: ((envelope: Delivered) => boolean) | null = n
   const officeDefinition = officeDefinitionFor(named);
   net.hold = hold;
   net.deaf = null;
-  const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const seed: Seed = { v: 1, kind: "directory", definition: officeDefinition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
   const O = new Platform(scopeIdOf(seed));
   const answer = await O.stub.create(signIntent(intent, rita.secret), officeDefinition.declared);

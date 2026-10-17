@@ -10,7 +10,7 @@ export function scriptedPartitionOrigin(name: "application" | "change" | "issue"
   const address = (seed: Seed): ScopeRef => ({ kind: seed.kind, scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(inc++)) });
   const empty = (at: ScopeRef): Omit<Entry, "input"> => ({ v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0, uses: [], prepared: [], effects: [], sends: [] });
   const seedOf = (kind: ScopeRef["kind"], named: Digest | PlatformDefinition, creator: ScopeRef | null, cause: Digest, ordinal = 0): Seed => ({ v: 1, kind, definition: named, creator, cause, ordinal });
-  const birth = (seed: Seed, at: ScopeRef, kind: string, source: FactRef | null, n: number | null, message: Request | null): Entry => ({ ...empty(at), input: { type: "genesis", seed, inc: at.inc, kind, founding: null, source, n, message, decision: "applied" } });
+  const birth = (seed: Seed, at: ScopeRef, kind: string, source: FactRef | null, n: number | null, message: Request | null): Entry => ({ ...empty(at), input: { type: "genesis", seed, inc: at.inc, kind, "founding": null, source, n, message, decision: "applied" } });
   const signed = (at: ScopeRef, kind: string, fields: Record<string, never> | { definition: Digest }, key: string) => signIntent({ v: 1, to: at, actor: keys.rita.key, kind, on: null, expected: {}, fields, idempotencyKey: key, notAfter: t(60) }, keys.rita.secret);
   const registerSeed = seedOf("register", C.register, null, d("1")), register = address(registerSeed);
   const rootSeed = seedOf("directory", C.directory, register, d("2")), root = address(rootSeed);

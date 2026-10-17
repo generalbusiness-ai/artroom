@@ -474,14 +474,14 @@ export async function graph(creationTransport: Transport = transport): Promise<G
   net.hold = net.deaf = null;
   net.capability = {};
   net.outside = null;
-  const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
+  const creation = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
   // Native service by default. The dedicated wire witness supplies HTTP.
   // Both receive the exact declaration closure and detached text beside it.
-  const { answer, scope } = await create(creationTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
+  const { answer, scope } = await create(creationTransport, creation, officeDefinition, definitions, reader, { texts: [README] });
   expect(answer.answer).toBe("accepted");
   expect(scope).not.toBeNull();
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
-  const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
   expect(answer.receipt.definition).toBe(seed.definition);
   expect(isScopeRef(answer.receipt.fact.at)).toBe(true);
   expect([scope.scope, answer.receipt.fact.at.scope, answer.receipt.fact.at.kind]).toEqual([scopeIdOf(seed), scopeIdOf(seed), "directory"]);

@@ -29,7 +29,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     focus() {} showModal() {} close() {} remove() {}
     set textContent(value: string) { this.text = value; }
     get textContent(): string { return this.text || this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
-    find(predicate: (element: Element) => boolean): Element | undefined { if (predicate(this)) return this; for (const child of this.children) if (child instanceof Element) { const found = child.find(predicate); if (found) return found; } return undefined; }
+    find(predicate: (element: Element) => boolean): Element | undefined { if (predicate(this)) return this; for (const child of this.children) if (child instanceof Element) { const matched = child.find(predicate); if (matched) return matched; } return undefined; }
   }
   const root = new Element("div");
   const body = new Element("body");

@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { ActType, DeclaredDefinition, Input, Request, Result, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { validateDefinition, type ProblemCode } from "../src/index.ts";
-import { Scope, arrive, born, decided, deliver, desk, directory, fields, founded, keys, on, ticketDefinition, valid, variant } from "./fixtures.ts";
+import { Scope, arrive, born, decided, deliver, desk, directory, fields, created, keys, on, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita, una } = keys;
 
@@ -220,7 +220,7 @@ describe("sends (section 6.6)", () => {
   });
 
   test("a scope created under `self` pins its creator's definition, and its index row goes to the directory that its creator recorded; a scope with no directory sends none", () => {
-    const D = founded();
+    const D = created();
     D.did(rita, "open-issue", fields({ title: "whole" }));
     const C = born(D, 1).child;
     deliver(D, C, 0);
@@ -234,7 +234,7 @@ describe("sends (section 6.6)", () => {
     const K = born(C, split.seq).child;
     expect(K.last.sends.map((s) => [s.n, s.message.class, s.to])).toEqual([[0, "result", C.at], [1, "advisory", D.at]]);
     // A directory records no directory of its own. The index row of its genesis act is not made.
-    expect(founded(variant(desk, (d) => { d.acts["found"].sends = [{ index: { fields: {} } }]; })).last.sends).toEqual([]);
+    expect(created(variant(desk, (d) => { d.acts["found"].sends = [{ index: { fields: {} } }]; })).last.sends).toEqual([]);
   });
 
   test("the validator bounds what one entry can send and tell, and refuses a send that it cannot bound or address", () => {
@@ -270,7 +270,7 @@ describe("sends (section 6.6)", () => {
       ["attention that could tell more members than one entry may", refusal(() => {}, { ...tight, attentionMembers: 1 }), "attention-unbounded"],
       ["an entry that could have more sends than one entry may: a fan-out of three, two more forms, two members told and the result", refusal(() => {}, { ...tight, sendsPerEntry: 7 }), "bound"],
     ];
-    expect(rows.filter(([, found, code]) => found?.length !== 1 || found[0] !== code).map(([name, found]) => [name, found])).toEqual([]);
+    expect(rows.filter(([, matched, code]) => matched?.length !== 1 || matched[0] !== code).map(([name, matched]) => [name, matched])).toEqual([]);
     // At the limit itself each passes: three sends of a fan-out, two members told, and eight sends in all.
     expect(refusal(() => {}, { ...tight, attentionMembers: 2, sendsPerEntry: 8 })).toBeNull();
   });

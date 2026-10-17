@@ -168,7 +168,7 @@ export class Reads {
       else if (input.type === "genesis") {
         const act = own(definition.declared.acts, definition.declared.genesis);
         types = act?.fields;
-        fields = input.founding?.intent.fields ?? (input.source && act ? creationFields(input.message, input.source, act.fields) : null) ?? {};
+        fields = input["founding"]?.intent.fields ?? (input.source && act ? creationFields(input.message, input.source, act.fields) : null) ?? {};
       } else if (input.type === "delivery" && (input.message.class === "request" || input.message.class === "advisory")) {
         const received = bound(definition, input.message, input.from, under);
         types = received?.handler?.fields;
@@ -354,8 +354,8 @@ export class Reads {
   operation(reader: unknown, operation: OperationId): Read<OperationStatus> {
     const read = this.#open(reader, "operations");
     if (!("scope" in read)) return read;
-    const found = operationOf(operation) ? this.#store.operationStatus(operation) : null;
-    return found ? { ok: true, at: read.scope.head, value: found, complete: true } : no("not-found");
+    const matched = operationOf(operation) ? this.#store.operationStatus(operation) : null;
+    return matched ? { ok: true, at: read.scope.head, value: matched, complete: true } : no("not-found");
   }
 
   /**

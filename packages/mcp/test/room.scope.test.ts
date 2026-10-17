@@ -5,7 +5,7 @@ import { firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { GENERIC, mcpRoom, type Agent } from "./support/room.ts";
-import { exercises, founded, offers, step } from "./support/story.ts";
+import { exercises, created, offers, step } from "./support/story.ts";
 
 /**
  * The room story. Returns the number of list changes each agent was told, step by step, for the delivery note.
@@ -14,7 +14,7 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
   const room = mcpRoom();
   try {
     const rita = room.agent("rita", { subscribe: true, mode });
-    await founded(room, rita, mode);
+    await created(room, rita, mode);
     // List changes are counted step by step: since the end of the agent's previous step, with the watch fired twice at the end
     // (`tick`). An ordinary head advance with no change of the catalogue is told nothing; a genuine change is told once.
     const seen = new Map<Agent, number>();
@@ -187,7 +187,7 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     expect(credential).toMatchObject({ credential: expect.any(String), remote: expect.stringMatching(/^https:/) });
     await settled(paul, 0, "the end of the story");
     lines.push(`room story, ${mode}: requests to the scope service: rita ${rita.requests.length}, paul ${paul.requests.length}`);
-    return { told: { founding: atCreation, rita: rita.told, paul: paul.told }, requests: rita.requests.length + paul.requests.length };
+    return { told: { creation: atCreation, rita: rita.told, paul: paul.told }, requests: rita.requests.length + paul.requests.length };
   } finally { room.done(); }
 }
 

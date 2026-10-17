@@ -67,14 +67,14 @@ interface Chromium { launch(options: { executablePath: string }): Promise<Browse
 
 /** What the browser needs: the service's base URL, the room, the key, and the recorded answers when there is no service. */
 interface ClaimActorRecord { recordedName?: string | null; place: { directory: string; membership: unknown }; secret: string; actor: string; answers: NonNullable<Sitting["answers"]> }
-interface Sitting { claimWitness?: { register: ScopeRef; definition: string; founder: ClaimActorRecord; member: ClaimActorRecord & { refusal: string } }; service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
+interface Sitting { claimWitness?: { register: ScopeRef; definition: string; "founder": ClaimActorRecord; member: ClaimActorRecord & { refusal: string } }; service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
 
 function browserPath(): string | null {
   if (process.env["CHROMIUM"]) return existsSync(process.env["CHROMIUM"]) ? process.env["CHROMIUM"] : null;
   const base = process.env["PLAYWRIGHT_BROWSERS_PATH"] || "/opt/pw-browsers";
   if (!existsSync(base)) return null;
-  const found = readdirSync(base).filter((name) => /^chromium-\d+$/.test(name)).sort().map((name) => join(base, name, "chrome-linux", "chrome")).filter((path) => existsSync(path));
-  return found.at(-1) ?? null;
+  const matched = readdirSync(base).filter((name) => /^chromium-\d+$/.test(name)).sort().map((name) => join(base, name, "chrome-linux", "chrome")).filter((path) => existsSync(path));
+  return matched.at(-1) ?? null;
 }
 
 function chromiumOf(): Chromium | null {
@@ -291,8 +291,8 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
     await memberTab.goto(`${sitting.service}/page/#/`);
     await memberTab.getByRole("heading", { name: "Issues" }).waitFor({ state: "attached" });
     if (await memberTab.getByRole("button", { name: "Create room", exact: true }).count() !== 0) throw new Error("An ordinary member received a founding affordance despite its native eligibility refusal.");
-    const founder = await as("founder", 390);
-    const tab = await founder.newPage(); watch(tab);
+    const creator = await as("founder", 390);
+    const tab = await creator.newPage(); watch(tab);
     await tab.goto(`${sitting.service}/page/#/`);
     const opener = tab.getByRole("button", { name: "Create room", exact: true }).filter({ visible: true });
     await opener.click();
@@ -313,9 +313,9 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
         targets: [...modal.querySelectorAll("button")].map((button) => button.getBoundingClientRect().height),
         overflow: document.documentElement.scrollWidth > innerWidth + 1 };
     });
-    if (dialogCheck.title !== (native.founder.recordedName ? `dap - workroom ${native.founder.recordedName}` : "dap - workroom") || dialogCheck.origin !== sitting.service || dialogCheck.fontSize < 16 || dialogCheck.inputHeight < 44 || dialogCheck.targets.some((height) => height < 44) || dialogCheck.overflow) throw new Error("Create room dialog failed its phone identity or target-size checks.");
+    if (dialogCheck.title !== (native["founder"].recordedName ? `dap - workroom ${native["founder"].recordedName}` : "dap - workroom") || dialogCheck.origin !== sitting.service || dialogCheck.fontSize < 16 || dialogCheck.inputHeight < 44 || dialogCheck.targets.some((height) => height < 44) || dialogCheck.overflow) throw new Error("Create room dialog failed its phone identity or target-size checks.");
     await tab.screenshot({ path: join(out, "create-room-mobile.png") });
-    const other = await founder.newPage(); watch(other);
+    const other = await creator.newPage(); watch(other);
     await other.goto(`${sitting.service}/page/#/`);
     await other.getByRole("button", { name: "Create room", exact: true }).filter({ visible: true }).click();
     const otherDialog = other.getByRole("dialog", { name: "Create room" });
@@ -415,8 +415,8 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
  * synthesize claim completion or change any native room name. */
 async function labelWitness(chromium: Chromium, executablePath: string, sitting: Sitting, out: string): Promise<void> {
   const native = sitting.claimWitness;
-  if (!native?.founder.recordedName) throw new Error("The native recorder supplied no recorded repository name.");
-  const actor = native.founder;
+  if (!native?.["founder"].recordedName) throw new Error("The native recorder supplied no recorded repository name.");
+  const actor = native["founder"];
   const browser = await chromium.launch({ executablePath });
   const checks: unknown[] = [], errors: string[] = [], unanswered: string[] = [];
   const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();

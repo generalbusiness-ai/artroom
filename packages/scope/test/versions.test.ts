@@ -31,7 +31,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
     const fetch = (url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init));
     try {
     const REGISTER_1: PlatformDefinition = "platform:register@1";
-    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER_1, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
     lifetime.wire(R.name, () => ({ outside: {
@@ -40,13 +40,13 @@ describe("a room founded on version 1 of every definition, on the code that ship
       late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
     expect((await R.stub.create(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
     // Version 1 of the register seeds the directory under version 1.
-    const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
     const D = lifetime.platform(scopeIdOf(seed));
     lifetime.active();
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
-    expect((await R.stub.submit(found, [])).answer).toBe("accepted");
+    expect((await R.stub.submit(matched, [])).answer).toBe("accepted");
     await effectFixture([R], lifetime.wait);
     await dispatchFixture([R, D], lifetime.wait);
     const sent = (await D.entries())[0]!.sends;

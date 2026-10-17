@@ -162,7 +162,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   cleanups.push(() => { if (wired.get(R.name) === installedWiring) wired.delete(R.name); });
   cleanups.push(installSignedDiagnostic(owner, R.name));
   await owner.required(() => R.restart());
-  const founds = async () => (await owner.required(() => R.entries())).filter((entry): entry is Entry & { input: { type: "act" } } => entry.input.type === "act" && entry.input.signed.intent.kind === "found");
+  const creates = async () => (await owner.required(() => R.entries())).filter((entry): entry is Entry & { input: { type: "act" } } => entry.input.type === "act" && entry.input.signed.intent.kind === "found");
 
   // Save before delivery: the first POST never reaches the Worker. A resume
   // must resend the exact bytes rather than wait forever on an absent digest.
@@ -178,11 +178,11 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect(await configOf()).toEqual(beforeCheck);
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeCheckPosts);
   expect(checkPauses).toBe(0);
-  expect([(await founds()).length, sent["found"]]).toEqual([0, [savedCreation]]);
+  expect([(await creates()).length, sent["found"]]).toEqual([0, [savedCreation]]);
   const beforeLegacy = (await configOf())!;
   await owner.required(async () => rita.store.save({ ...beforeLegacy, claim: { register: beforeLegacy.claim!.register, intent: beforeLegacy.claim!.intent, handle: beforeLegacy.claim!.handle } }));
   expect(await run("claim", "demo")).toMatchObject({ code: 1, lines: [expect.stringMatching(/^This pending claim has only a digest and no readable admitted directory/)] });
-  expect([(await founds()).length, sent["found"]!.length]).toEqual([0, 1]);
+  expect([(await creates()).length, sent["found"]!.length]).toEqual([0, 1]);
   await owner.required(async () => rita.store.save(beforeLegacy));
   unavailableCreation = true;
   const beforeRemovedAlias = await configOf();
@@ -190,7 +190,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect(await configOf()).toEqual(beforeRemovedAlias);
   expect(await run("create", "demo")).toEqual({ code: 1, lines: [`Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect dap log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
   expect((await configOf())!.claim!["found"]!.signed).toEqual(savedCreation);
-  expect((await founds()).length).toBe(0);
+  expect((await creates()).length).toBe(0);
   advanceClock();
   await owner.required(() => R.restart());
   // The same found is admitted once; it then gives up waiting on Git settings.
@@ -201,7 +201,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", "found": { signed: savedCreation, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);
   expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation]);
   await noSecret();
-  expect([(await founds()).length, host.sent.length]).toEqual([1, 0]);
+  expect([(await creates()).length, host.sent.length]).toEqual([1, 0]);
 
   // --again signs a second found. A mismatched known definition in its
   // accepted reply stops before directory routing, keeping the exact request.
@@ -218,14 +218,14 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect(safeDiagnostic.records.filter(record => record.phase === "final-summary" && (record.stage === "local-summary-eligible" || record.stage === "genesis-root-summary-eligible" || record.stage === "genesis-root-summary-ineligible" || record.stage === "request-refused")).map(record => record.stage)).toEqual([expect.stringMatching(/^(local-summary-eligible|genesis-root-summary-eligible)$/)]);
   expect(requestedPaths.slice(beforeMismatch).every((path) => path.startsWith(`/v1/scopes/${R.name}`))).toBe(true);
   const second = (await configOf())!.claim!;
-  expect([(await founds()).length, second.intent === pending.claim!.intent, second["found"]!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
+  expect([(await creates()).length, second.intent === pending.claim!.intent, second["found"]!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
   await noSecret();
 
   // The Git host's settings are set, and the register's object restarts. The host will create each repository.
   owner.active();
   host.accepting = true;
   await owner.required(() => R.restart());
-  for (const claim of await founds()) {
+  for (const claim of await creates()) {
     const seed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: await owner.required(() => R.at()), cause: intentDigest(claim.input.signed.intent), ordinal: 0 };
     owner.active();
     host.answer(`${claim.seq}:0` as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: `repo-${claim.seq}` } } });
@@ -295,9 +295,9 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   const config = (await configOf())!;
   expect([config.claim, config.handle, resumedClaim.lines[1], resumedClaim.lines[2]]).toEqual([undefined, "@rita", "Definitions: platform:directory@3, platform:membership@2, platform:rules@2, platform:destination@3.", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
   const D = platform(config.repository!.directory.scope);
-  expect((await owner.required(() => D.entries()))[0]!.uses.map((use) => use.fact.seq)).toContain((await founds())[1]!.seq);
+  expect((await owner.required(() => D.entries()))[0]!.uses.map((use) => use.fact.seq)).toContain((await creates())[1]!.seq);
   // No third found; each creation attempt was sent once, by the pass that the register's first call after its restart started.
-  expect([(await founds()).length, host.attempts.sort()]).toEqual([2, [`${(await founds())[0]!.seq}:0#1`, `${(await founds())[1]!.seq}:0#1`].sort()]);
+  expect([(await creates()).length, host.attempts.sort()]).toEqual([2, [`${(await creates())[0]!.seq}:0#1`, `${(await creates())[1]!.seq}:0#1`].sort()]);
   expect([(await enrollment("seat")).length, (await enrollment("first-key")).length]).toEqual([1, 1]);
   expect(sent["first-key"]).toEqual([keyedPending.firstKey!.signed, keyedPending.firstKey!.signed]);
   expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation, second["found"]!.signed, second["found"]!.signed]); // The mismatched reply retries only its exact admitted envelope.

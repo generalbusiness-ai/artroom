@@ -94,7 +94,7 @@ test.each(["effective", "absent", "unavailable", "active", "root-full", "file-su
   await drive("adopt-read", `${adoptSeq}:0`, { seen: HEAD });
 
   if (fileCase) {
-    const office: Entry = { ...handMade(directory, "unused"), seq: 0, prev: null, input: { type: "genesis", seed: directorySeed, inc: directory.inc, founding: null, source: null, n: null, message: null, kind: "found", decision: "applied" }, effects: [], sends: [] };
+    const office: Entry = { ...handMade(directory, "unused"), seq: 0, prev: null, input: { type: "genesis", seed: directorySeed, inc: directory.inc, "founding": null, source: null, n: null, message: null, kind: "found", decision: "applied" }, effects: [], sends: [] };
     const definition = textDigest("PUBLIC TEST D1 scripted application");
     const maker = handMade(directory, "establish-application", [], keys.rita, { definition });
     if (maker.input.type !== "act") throw Error("Scripted application maker is an act");
@@ -102,7 +102,7 @@ test.each(["effective", "absent", "unavailable", "active", "root-full", "file-su
     const app: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(86)), kind: "lane" };
     const creation: Request = { class: "request", type: "create", body: { kind: "establish", directory: directory as unknown as FieldValue, membership: membership as unknown as FieldValue, creationContext: { v: 1 }, fields: { destination: destination as unknown as FieldValue } } };
     const sourceMaker = { ...maker, sends: [{ n: 0, to: seed, message: creation }] };
-    const genesis: Entry = { ...handMade(app, "unused"), seq: 0, prev: null, input: { type: "genesis", seed, inc: app.inc, founding: null, source: factRefOf(sourceMaker), n: 0, message: creation, kind: "establish", decision: "applied" }, effects: [], sends: [] };
+    const genesis: Entry = { ...handMade(app, "unused"), seq: 0, prev: null, input: { type: "genesis", seed, inc: app.inc, "founding": null, source: factRefOf(sourceMaker), n: 0, message: creation, kind: "establish", decision: "applied" }, effects: [], sends: [] };
     const origin: Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "declared:application" }, { fact: factRefOf(sourceMaker), entry: sourceMaker, under: "platform:directory" }, { fact: factRefOf(office), entry: office, under: "platform:directory" }];
     const deliverFile = async (content: string) => {
       const message: Request = { class: "request", type: "tell", body: { message: "publish-file", fields: { path: "shelf/standing.md", content } } };
@@ -175,7 +175,7 @@ test.each(["effective", "absent", "unavailable", "active", "root-full", "file-su
   const lane: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(83)), kind: "lane" };
   const creation: Request = { class: "request", type: "create", body: { kind: "open", directory: birth.directory as unknown as FieldValue, fields: { destination: destination as unknown as FieldValue } } };
   const maker = { ...creator, sends: [{ n: 0, to: seed, message: creation }] };
-  const sourceGenesis: Entry = { ...handMade(lane, "unused"), seq: 0, prev: null, input: { type: "genesis", seed, inc: lane.inc, founding: null, source: factRefOf(maker), n: 0, message: creation, kind: "open", decision: "applied" }, effects: [], sends: [] };
+  const sourceGenesis: Entry = { ...handMade(lane, "unused"), seq: 0, prev: null, input: { type: "genesis", seed, inc: lane.inc, "founding": null, source: factRefOf(maker), n: 0, message: creation, kind: "open", decision: "applied" }, effects: [], sends: [] };
   const origin: Fetched[] = [{ fact: factRefOf(sourceGenesis), entry: sourceGenesis, under: "change" }, { fact: factRefOf(maker), entry: maker, under: "platform:directory" }];
   const content = "D1 native standing witness\n", manifest = handMade(lane, "propose-file", [], una, { path: "standing.md", content, size: utf8(content).length, digest: digestBytes(utf8(content)), base: HEAD });
   const reserve: Request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest) as unknown as FieldValue, verdicts: [], jobs: [], links: [], reports: [] } } };

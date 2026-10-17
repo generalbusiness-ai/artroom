@@ -103,8 +103,8 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
       if (signed) {
         const descriptorKey = `artroom-page-start:${origin}`, descriptorBytes = values.get(descriptorKey)!;
         const descriptor = JSON.parse(descriptorBytes) as { secret: string; operation: string };
-        const founder = unb64url(descriptor.secret)!;
-        try { expect([founder.length, keyIdOfSecret(founder) === installer.key, signed.intent.actor === keyIdOfSecret(founder)]).toEqual([32, false, true]); } finally { founder.fill(0); }
+        const creator = unb64url(descriptor.secret)!;
+        try { expect([creator.length, keyIdOfSecret(creator) === installer.key, signed.intent.actor === keyIdOfSecret(creator)]).toEqual([32, false, true]); } finally { creator.fill(0); }
         const journalKey = [...values.keys()].find(key => key.startsWith("artroom-page-claim:"))!;
         const journalBytes = values.get(journalKey)!, journal = JSON.parse(journalBytes);
         const kept = JSON.parse(journal.claims[descriptor.operation]);

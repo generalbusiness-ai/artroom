@@ -71,7 +71,7 @@ function prose(text) {
 // then lower case, punctuation removed, spaces to hyphens, and a repeated
 // anchor numbered from -1.
 function anchorsOfText(text) {
-	const found = new Set();
+	const matched = new Set();
 	const seen = new Map();
 	for (const line of outsideFences(text)) {
 		const heading = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
@@ -85,12 +85,12 @@ function anchorsOfText(text) {
 				.replace(/\s/g, "-");
 			const n = seen.get(base) ?? 0;
 			seen.set(base, n + 1);
-			found.add(n === 0 ? base : `${base}-${n}`);
+			matched.add(n === 0 ? base : `${base}-${n}`);
 		}
 		const html = line.replace(/(`+)[\s\S]*?\1/g, "");
-		for (const anchor of html.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) found.add(anchor[1]);
+		for (const anchor of html.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) matched.add(anchor[1]);
 	}
-	return found;
+	return matched;
 }
 
 const anchors = (path) => anchorsOfText(readFileSync(path, "utf8"));

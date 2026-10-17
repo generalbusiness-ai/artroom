@@ -36,7 +36,7 @@ import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, M
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/dap-derive";
-import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
+import { Ledger, Scope, T0, creation as creationRequest, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION, DESTINATION_KINDS, destination2, destinationReceipt, destinationRules2, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { rulesScope } from "../src/rules-scope.ts";
@@ -70,7 +70,7 @@ export const rulesObserved = (at: Timestamp, content: Partial<Extract<RulesObser
 export const retained = (observation: Observation | MemberObservation | RulesObservation | HoldersObservation, n: number): ObservationUse => ({ observation, read: { run: "run-1" as ObservationUse["read"]["run"], n }, use: "fresh", prior: null });
 
 /** The evidence of a `judge` whose reads found the branch at the first head and the integration commit whole, with one changed path. */
-export const FOUND: JudgeEvidence = { head: HEAD, present: true, tree: TREE, firstParent: HEAD, ancestors: [], changes: { paths: ["src/a.ts"], links: [], unreadable: 0 } };
+export const CREATED: JudgeEvidence = { head: HEAD, present: true, tree: TREE, firstParent: HEAD, ancestors: [], changes: { paths: ["src/a.ts"], links: [], unreadable: 0 } };
 
 /**
  * STAND-IN: what `observed` and `uses` say for a reservation that nothing
@@ -136,7 +136,7 @@ export const bureau: DeclaredDefinition = {
         claim: { type: "fact", kind: ["found"], under: "platform:register", required: true },
         membership: { type: "text", max: 64, required: true },
         rules: { type: "text", max: 64, required: true },
-        founderHandle: { ...NAME, required: true },
+        "founderHandle": { ...NAME, required: true },
       },
       guards: [], effects: [],
       sends: [{
@@ -144,7 +144,7 @@ export const bureau: DeclaredDefinition = {
           kind: "destination", definition: DESTINATION,
           fields: {
             repository: { field: "repository" }, branch: { field: "branch" }, import: { field: "import" }, claim: { field: "claim" },
-            directory: { scope: true }, membership: { field: "membership" }, rules: { field: "rules" }, founderHandle: { field: "founderHandle" },
+            directory: { scope: true }, membership: { field: "membership" }, rules: { field: "rules" }, "founderHandle": { field: "founderHandle" },
           },
           result: { applied: [{ ref: { slot: "destination", from: { sender: true } } }] },
         },
@@ -247,13 +247,13 @@ export class Branch extends Ledger {
     const facts = [fetched(claim, "platform:register")];
     // The bureau is founded as a directory is: by rita's signed intent. It is read as a directory under `platform:directory`.
     this.bureau = new Ledger(bureauDefinition, "platform:directory");
-    const founding = signIntent({
+    const creation = signIntent({
       v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, idempotencyKey: `found-${importing}`, notAfter: t(60),
-      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: MEMBERSHIP.scope, rules: RULES.scope, founderHandle: "@rita" },
+      fields: { repository: REPOSITORY, branch: "main", import: importing, claim: factRefOf(claim) as unknown as FieldValue, membership: MEMBERSHIP.scope, rules: RULES.scope, "founderHandle": "@rita" },
     }, rita.secret);
-    const seed: Seed = { v: 1, kind: "directory", definition: bureauDefinition.digest, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
-    this.bureau.seal(written(judgeGenesis(this.bureau.state, bureauDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, founding }, { clock: clockOf(this.bureau.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source: null })));
-    const { asked, source } = creation(this.bureau, 0);
+    const seed: Seed = { v: 1, kind: "directory", definition: bureauDefinition.digest, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
+    this.bureau.seal(written(judgeGenesis(this.bureau.state, bureauDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(1)), seed, creation: creation }, { clock: clockOf(this.bureau.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source: null })));
+    const { asked, source } = creationRequest(this.bureau, 0);
     this.seal(written(judgeGenesis(this.state, destinationDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts, prepared: [], source, platform: this.rules })));
   }
 
@@ -390,7 +390,7 @@ export class Branch extends Ledger {
     const { merge } = this.reserve();
     const publication = this.head.seq;
     this.read = reading(this.now, over);
-    const judgment = this.answered(`${publication}:0`, 1, "confirmed", FOUND);
+    const judgment = this.answered(`${publication}:0`, 1, "confirmed", CREATED);
     if (judgment.result !== "write" || this.item(publication).state !== "reserved") throw new Error(`the reservation was not written: ${JSON.stringify(judgment)}`);
     const at = this.head.seq;
     return { publication, merge, at, push: `${at}:0`, mint: `${at}:1` };

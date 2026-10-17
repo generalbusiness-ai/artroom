@@ -155,7 +155,7 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
 function fieldOf(j: Judging, entry: Entry, local: boolean, name: string): unknown {
   const input = entry.input;
   if (input.type === "act") return own(input.signed.intent.fields, name) ?? null;
-  if (input.type === "genesis" && input.founding) return own(input.founding.intent.fields, name) ?? null;
+  if (input.type === "genesis" && input["founding"]) return own(input["founding"].intent.fields, name) ?? null;
   const message = input.type === "genesis" ? input.message : input.type === "delivery" && input.message.class === "request" ? input.message : null;
   const body = message?.body;
   if (!message || !isObject(body)) return null;
@@ -175,12 +175,12 @@ function entryPart(j: Judging, ref: Held, at: ScopeRef, part: EntryPart, item: I
   if (part === "scope") return at;
   if (part === "seq") return typeof ref === "number" ? ref : ref.seq;
   // Read from the entry's bytes.
-  const found = entryOf(j, ref);
-  if (!found) return null;
-  const { entry, local } = found;
+  const matched = entryOf(j, ref);
+  if (!matched) return null;
+  const { entry, local } = matched;
   const input = entry.input;
   if (part === "kind") return kindOf(entry);
-  if (part === "intent") return input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
+  if (part === "intent") return input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input["founding"] ? intentDigest(input["founding"].intent) : null;
   // The primary item: the item the entry opens, by the entry's own `seq`, or the item an act or a timed entry is on.
   if (part === "on") return entry.effects.some((e) => e.effect === "open") ? entry.seq : input.type === "act" ? input.signed.intent.on : input.type === "timed" ? input.item : null;
   if ("field" in part) return fieldOf(j, entry, local, part.field);

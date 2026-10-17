@@ -98,10 +98,10 @@ test("W2, a mixed change touching the source and the rules extents: the source r
     expect(holders).toMatchObject({ observation: { subject: "holders", action: "rules.publish", of: await r.M.at(), head: (await r.M.summary()).at, count: 0, holders: [] }, use: "fresh" });
     expect(zeroJudge.effects).toContainEqual(expect.objectContaining({ effect: "state", state: "not-reserved" }));
     const kept = await copied(r.G); kept.entries = kept.entries.slice(0, zeroJudge.seq + 1);
-    const found = await verify(through(kept), { ...options, scope: r.G.name });
+    const matched = await verify(through(kept), { ...options, scope: r.G.name });
     // Old most=0 makes this row a mismatch. No anchor or later limitation is
     // removed: successful row derivation still ends at the original unwalked ancestry.
-    expect([found.report.result, found.why?.split(":")[0], found.report.coverage.find(scope => scope.scope.scope === r.G.name)?.through]).toEqual(["incomplete", unwalked, zeroJudge.seq]);
+    expect([matched.report.result, matched.why?.split(":")[0], matched.report.coverage.find(scope => scope.scope.scope === r.G.name)?.through]).toEqual(["incomplete", unwalked, zeroJudge.seq]);
   } finally {
     // Restore by an authorized native act so the original controller approval
     // and publication assertions below retain their ordinary authority.

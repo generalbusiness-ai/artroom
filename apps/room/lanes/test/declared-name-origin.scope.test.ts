@@ -35,7 +35,7 @@ test("native reserve refuses declared-name applications across rooms and inside 
   const room = async (label: string, who: Actor, recovery: Actor): Promise<Room> => {
     const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null,
       expected: {}, fields: { host: "git.example", namespace: `security-${label}`,
-        policy: "keys", founders: [who.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+        policy: "keys", "founders": [who.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register,
       creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
@@ -45,14 +45,14 @@ test("native reserve refuses declared-name applications across rooms and inside 
       late: deliver => { lifetime.active(); host.late(deliver); },
     } }));
     expect(await R.stub.create(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
-    const found = await R.intent(who, "found", { expected: await R.expected({ register: 0 }),
-      fields: { branch: "main", founderHandle: label === "A" ? "@rita" : "@sam", recoveryKey: recovery.key } });
+    const matched = await R.intent(who, "found", { expected: await R.expected({ register: 0 }),
+      fields: { branch: "main", "founderHandle": label === "A" ? "@rita" : "@sam", recoveryKey: recovery.key } });
     const seed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory,
-      creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+      creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
     const D = lifetime.platform(scopeIdOf(seed));
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer",
       body: { name: repositoryName(seedDigest(seed), 1), id: `security-${label}` } } });
-    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.submit(matched, [])).toMatchObject({ answer: "accepted" });
     await effectFixture([R], lifetime.wait); await settle(R, D);
     const sends = (await D.entries())[0]!.sends;
     const child = (kind: Seed["kind"]) => {

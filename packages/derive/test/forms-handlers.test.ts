@@ -279,6 +279,6 @@ describe("subjects and handlers (sections 6.4 and 7.3)", () => {
       ["a handler that sets the state of the one item of its type, which may be final already", inBoard((d) => { d.items.tally.states.shut = { final: true }; d.receives.count.effects.push({ state: "kept" }); }), "final"],
       ["`self` from a handler into a fact slot whose kinds do not include its message", inBoard((d) => { d.items.card.refs.postedAt.to.kind = ["count"]; }), "name"],
     ];
-    expect(rows.filter(([, found, code]) => (code === null ? found !== null : found?.length !== 1 || found[0] !== code)).map(([name, found]) => [name, found])).toEqual([]);
+    expect(rows.filter(([, matched, code]) => (code === null ? matched !== null : matched?.length !== 1 || matched[0] !== code)).map(([name, matched]) => [name, matched])).toEqual([]);
   });
 });

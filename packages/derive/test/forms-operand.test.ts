@@ -303,6 +303,6 @@ describe("operands, parts and a local fact (sections 6.2 and 6.5; witness 18.1)"
       ["`self` in a fact slot whose kinds do not include the act's kind", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.kind = ["ask"]; }), "name"],
       ["`self` in a fact slot under another definition's name", refusal(asks, (d) => { d.items.ask.refs.termsAt.to.under = "others"; d.acts.accept.fields.terms.under = "others"; }), "name"],
     ];
-    expect(rows.filter(([, found, code]) => found?.length !== 1 || found[0] !== code).map(([name, found]) => [name, found])).toEqual([]);
+    expect(rows.filter(([, matched, code]) => matched?.length !== 1 || matched[0] !== code).map(([name, matched]) => [name, matched])).toEqual([]);
   });
 });

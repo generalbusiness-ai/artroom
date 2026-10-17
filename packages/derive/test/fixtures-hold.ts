@@ -146,8 +146,8 @@ export class Staging extends Scope {
 
   /** One record of `hold@1`, in short: its state and its values. */
   record(kind: string, ...key: FieldValue[]) {
-    const found = this.state.record("hold@1", kind, key);
-    return found && { state: found.state, ...found.values };
+    const matched = this.state.record("hold@1", kind, key);
+    return matched && { state: matched.state, ...matched.values };
   }
   /** What a capability rule is given for an input of this scope, with that intent digest. */
   given(over: Partial<CapabilityGiven> = {}): CapabilityGiven {

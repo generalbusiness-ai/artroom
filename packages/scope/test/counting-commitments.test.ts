@@ -42,12 +42,12 @@ test("native Counting admits one competing pledge, fulfills its exact holder, ap
   }
   const settle=(...nodes:Native[])=>dispatchFixture(nodes,lifetime.wait);
   try {
-    const install:Intent={v:1,to:null,actor:keys.paul.key,kind:"install",on:null,expected:{},fields:{host:"git.example",namespace:"counter-native",policy:"keys",founders:[rita.key]},idempotencyKey:crypto.randomUUID(),notAfter:soon(60)};
+    const install:Intent={v:1,to:null,actor:keys.paul.key,kind:"install",on:null,expected:{},fields:{host:"git.example",namespace:"counter-native",policy:"keys","founders":[rita.key]},idempotencyKey:crypto.randomUUID(),notAfter:soon(60)};
     const R=new Native(scopeIdOf({v:1,kind:"register",definition:COUNTING_COHORT.register,creator:null,cause:intentDigest(install),ordinal:0}),keys.paul);
     const host=outsideOf(R.name);
     lifetime.wire(R.name,()=>({outside:{accepts:()=>{lifetime.active();return host.accepts();},send:request=>lifetime.wait(()=>host.send(request)),late:deliver=>{lifetime.active();host.late(deliver);}}}));
     expect(await R.stub.create(signIntent(install,keys.paul.secret),COUNTING_COHORT.register)).toMatchObject({answer:"accepted"});
-    const claim=await R.intent(rita,"found",{expected:await R.expected({register:0}),fields:{branch:"main",founderHandle:"@rita",recoveryKey:keys.sam.key}});
+    const claim=await R.intent(rita,"found",{expected:await R.expected({register:0}),fields:{branch:"main","founderHandle":"@rita",recoveryKey:keys.sam.key}});
     const seed:Seed={v:1,kind:"directory",definition:COUNTING_COHORT.directory,creator:await R.at(),cause:intentDigest(claim.intent),ordinal:0};
     const D=new Native(scopeIdOf(seed));
     lifetime.active();host.answer("1:0",1,{result:"confirmed",evidence:{basis:"own-answer",body:{name:repositoryName(seedDigest(seed),1),id:"counter-native-fixture"}}});

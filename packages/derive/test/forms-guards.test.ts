@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { ActType, Bounds, DeclaredDefinition, FieldValue, Guard, Operand, Range, Send } from "@generalbusiness/dap-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, validateDefinition, type ActJudgment, type Fetched, type ProblemCode } from "../src/index.ts";
-import { Scope, arriving, desk, fields, forged, founded, keys, on, t, ticketDefinition, valid, variant } from "./fixtures.ts";
+import { Scope, arriving, desk, fields, forged, created, keys, on, t, ticketDefinition, valid, variant } from "./fixtures.ts";
 
 const { rita } = keys;
 
@@ -204,7 +204,7 @@ describe("the list forms (section 6.5)", () => {
       d.items.repo.values.due = { fixed: false, required: false, of: { type: "time" } };
       d.receives.audit = { message: "audit", class: "tell", from: { kind: "lane" }, fields: {}, opens: null, also: { repo: { item: "repo", one: true } }, guards: [{ of: "also.repo", anyOf: [[{ set: "source" }], [second]] }], effects: [], sends: [], attention: [] };
     });
-    const D = founded();
+    const D = created();
     const tell: Send = { n: 0, to: D.at, message: { class: "request", type: "tell", body: { message: "audit", fields: {} } } };
     const source = forged(new Scope(ticketDefinition).at, 1, D.entries[0]!.entry.input, [tell]);
     const arrival = { ...tell, from: factRefOf(source.entry) };
@@ -225,7 +225,7 @@ describe("the list forms (section 6.5)", () => {
         also: {}, guards: [checked({ field: "barred" }), pathed], effects: [], sends: [], attention: [],
       };
     });
-    const D = founded();
+    const D = created();
     const X = new Scope(ticketDefinition);
     const decision = (barred: string, checks: unknown = [{ name: "lint", required: true }, { name: "docs", required: false }]) => {
       const tell: Send = { n: 0, to: D.at, message: { class: "request", type: "tell", body: { message: "audit", fields: { barred, checks } } } };
@@ -281,6 +281,6 @@ describe("the list forms (section 6.5)", () => {
       ["as many guards as the bound, counting those nested", inMerge(deep(2), { ...PROPOSED_BOUNDS, nestedGuards: 5 }), null],
       ["more guards than the bound, counting those nested", inMerge(deep(3), { ...PROPOSED_BOUNDS, nestedGuards: 5 }), "bound"],
     ];
-    expect(rows.filter(([, found, code]) => (code === null ? found !== null : found?.length !== 1 || found[0] !== code)).map(([name, found]) => [name, found])).toEqual([]);
+    expect(rows.filter(([, matched, code]) => (code === null ? matched !== null : matched?.length !== 1 || matched[0] !== code)).map(([name, matched]) => [name, matched])).toEqual([]);
   });
 });

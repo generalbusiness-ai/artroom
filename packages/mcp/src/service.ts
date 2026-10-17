@@ -310,8 +310,8 @@ export class McpService {
     const at = (scope: ScopeId) => ({ scope, held: held(scope), membership: this.#membershipOf(s, held(scope)) });
     if (typeof named === "string" && isScopeId(named)) return at(named);
     if (typeof named === "string" && (SINGLETON_PLACES as readonly string[]).includes(named)) {
-      const found = s.read.inventory.scopes.find((h) => h.place === named);
-      return found ? at(found.scope) : stop({ error: "target", what: `no ${named} is in the inventory` });
+      const matched = s.read.inventory.scopes.find((h) => h.place === named);
+      return matched ? at(matched.scope) : stop({ error: "target", what: `no ${named} is in the inventory` });
     }
     const number = typeof named === "number" ? named : typeof named === "string" && /^#?\d+$/.test(named) ? Number(named.replace("#", "")) : null;
     if (number !== null && room) {
@@ -356,8 +356,8 @@ export class McpService {
 
   async #definition(s: Snapshot, pinned: Digest | PlatformDefinition, scope: ScopeId, membership: ScopeRef | null): Promise<DefinitionLike> {
     const rules = s.read.room?.rules;
-    const found = await definitionOf(this.reads, this.kept, pinned, [{ scope, membership }, ...(rules ? [{ scope: rules.scope, membership: s.read.room!.membership }] : [])]);
-    return found ?? stop({ error: "read", scope, reason: "unsupported-definition" });
+    const matched = await definitionOf(this.reads, this.kept, pinned, [{ scope, membership }, ...(rules ? [{ scope: rules.scope, membership: s.read.room!.membership }] : [])]);
+    return matched ?? stop({ error: "read", scope, reason: "unsupported-definition" });
   }
 
   // ---------------------------------------------------------------- an act, under custody
@@ -742,9 +742,9 @@ export class McpService {
         // A creation settles by the scope it founded: its genesis carries the founding intent.
         const kind = isPlatformDefinition(envelope.creation.definition) && envelope.creation.definition.startsWith("platform:register@") ? "register" : "directory";
         const definition = typeof envelope.creation.definition === "string" ? envelope.creation.definition : definitionDigest(envelope.creation.definition);
-        const founded = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
+        const created = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
         try {
-          const read = await this.#reads.transport.settle(founded, envelope.signed);
+          const read = await this.#reads.transport.settle(created, envelope.signed);
           return read.ok ? read.value : null;
         } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
       }
@@ -811,16 +811,16 @@ export class McpService {
       catch (error) { if (error instanceof Unshaped) return stop({ error: "shape", field: error.field, what: error.what, declared: error.declared }); throw error; }
       // A founding intent's kind is the founding's, not the genesis act's: `install` for a register, `found` for any other scope
       // with no creator (the scope contract, section 7.1). The genesis act then applies with the intent's fields.
-      const founding = data!.name === "platform:register" ? "install" : "found";
-      const signed = await signedIntent(this.#port.signer, { to: null, kind: founding, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
+      const creation = data!.name === "platform:register" ? "install" : "found";
+      const signed = await signedIntent(this.#port.signer, { to: null, kind: creation, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
       return { binding: { definition: data!.name, kind, declaration: null, pinned: named }, envelope: { signed, beside: shaped.texts.length > 0 ? { texts: shaped.texts } : {}, creation: { definition, definitions } } as Envelope };
     };
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try {
-        const founded = await this.#reads.transport.create(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
+        const created = await this.#reads.transport.create(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
         // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
-        return founded.answer === "refused" ? { answer: "refused", reason: founded.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : founded as Answer;
+        return created.answer === "refused" ? { answer: "refused", reason: created.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : created as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: bytesOf({ definition: args["definition"], fields: fieldsGiven, texts: textsGiven, definitions }) });
     if ("lost" in kept) return failed({ error: "transport", scope: "the creation", submitted: true });
@@ -919,8 +919,8 @@ export class McpService {
           for (let n = 0; n < SEARCH_PAGES; n++) {
             const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string, cursor));
             if (!final.ok) break;
-            const found = final.value.find(match);
-            if (found) { this.#pages.delete(key); return { item: found, head: read.at, final: true }; }
+            const matched = final.value.find(match);
+            if (matched) { this.#pages.delete(key); return { item: matched, head: read.at, final: true }; }
             cursor = final.next;
             if (cursor === undefined) break;
           }

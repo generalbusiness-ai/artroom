@@ -49,11 +49,11 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       issue: { items: 12, acts: 50, timedRules: 1, receives: 7, values: 10, also: 4 },
       change: { items: 14, acts: 54, timedRules: 2, receives: 4, also: 4, presents: 1, guards: 24, nestedGuards: 73, guardDepth: 8, effects: 16 },
     };
-    const found = names.flatMap((name) => (Object.entries(meets[name]) as [keyof Bounds, number][]).map(([bound, n]) => {
+    const matched = names.flatMap((name) => (Object.entries(meets[name]) as [keyof Bounds, number][]).map(([bound, n]) => {
       const less = validated(lanes[name], { [bound]: n - 1 });
       return [name, bound, n <= PROPOSED_BOUNDS[bound], validated(lanes[name], { [bound]: n }).ok, less.ok ? null : [...new Set(less.problems.map((p) => p.code))]];
     }));
-    expect(found.filter(([, , within, at, below]) => !(within === true && at === true && JSON.stringify(below) === '["bound"]'))).toEqual([]);
+    expect(matched.filter(([, , within, at, below]) => !(within === true && at === true && JSON.stringify(below) === '["bound"]'))).toEqual([]);
   });
 
   test("validation: both definitions pass the validator whole at the adopted bounds; the forms that no runtime derives yet are the capability rows; neither genesis opens a timed item", () => {

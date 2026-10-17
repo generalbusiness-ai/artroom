@@ -202,13 +202,13 @@ export class BlockParser {
     block.open = false;
     switch (block.type) {
       case "paragraph": {
-        let found = false;
+        let matched = false;
         let taken: number;
         while (block.content[0] === "[" && (taken = this.inline.parseReference(block.content, this.refmap)) > 0) {
           block.content = block.content.slice(taken);
-          found = true;
+          matched = true;
         }
-        if (found && !NONSPACE.test(block.content)) block.unlink();
+        if (matched && !NONSPACE.test(block.content)) block.unlink();
         break;
       }
       case "code_block":

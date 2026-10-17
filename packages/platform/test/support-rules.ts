@@ -26,7 +26,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/dap-derive";
 import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/dap-derive";
-import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
+import { Ledger, Scope, T0, arriving, creation, d, created, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
 import { RULES_SCOPE, platform } from "../src/index.ts";
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
@@ -126,7 +126,7 @@ export class Rulebook extends Ledger {
     const creator = named === RULES_SCOPE ? registrarDefinition : checked(validateDefinition({
       ...registrar, acts: { ...registrar.acts, open: { ...registrar.acts["open"]!, sends: registrar.acts["open"]!.sends.map(send => "create" in send ? { create: { ...send.create, definition: named } } : send) } },
     }, PROPOSED_BOUNDS));
-    this.registrar = founded(creator, { branch: BRANCH, membership: of });
+    this.registrar = created(creator, { branch: BRANCH, membership: of });
     const { asked, source } = creation(this.registrar, 0);
     this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.#platform }));
     if (!confirmed) return;

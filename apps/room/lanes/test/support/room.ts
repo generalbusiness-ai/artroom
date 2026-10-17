@@ -253,7 +253,7 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   net.hold = net.deaf = null;
   const registerPin = setup.partitioned ? PARTITION_COHORT.register : REGISTER;
   const directoryPin = setup.partitioned ? PARTITION_COHORT.directory : DIRECTORY;
-  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+  const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: registerPin, creator: null, cause: intentDigest(install), ordinal: 0 }));
   // STAND-IN: the Git host of this register.
   const host = outsideOf(R.name);
@@ -261,14 +261,14 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   const installed = await R.stub.create(signIntent(install, paul.secret), registerPin);
   if (installed.answer !== "accepted") throw new Error(`no register: ${JSON.stringify(installed)}`);
   const register = await R.at();
-  const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-  const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+  const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+  const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(matched.intent), ordinal: 0 };
   const D = new Platform(scopeIdOf(seed));
   // Explicit native capacity-fixture bound, before root birth. Other scopes
   // retain their own defaults; no deployed configuration is changed.
   if (setup.rootBounds) { net.sized.set(D.name, setup.rootBounds); onTestFinished(() => { net.sized.delete(D.name); }); }
   host.answer("1:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
-  const claimed = await R.stub.submit(found, []);
+  const claimed = await R.stub.submit(matched, []);
   if (claimed.answer !== "accepted") throw new Error(`no claim: ${JSON.stringify(claimed)}`);
   while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
   await settle(R, D);

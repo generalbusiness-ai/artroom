@@ -5,14 +5,14 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
 import { prepareRules, validateDefinition } from "@generalbusiness/dap-derive";
 import { evaluateRules, RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
-import { founded, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/dap-derive/testing";
+import { created, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/dap-derive/testing";
 import { counting, countingClosure } from "./definition.ts";
 import { COUNTING_DEFINITION } from "./pin.ts";
 
 // Real validator, expression evaluator, judge and fold. Ledger supplies scripted
 // current grants: this is not enrollment, DO commits, transport recovery or audio.
 const make = (target = 100): Ledger => {
-  const s = founded(valid(validateDefinition(counting, PROPOSED_BOUNDS, RULE_PROFILES)), { opener: keys.rita.member, target });
+  const s = created(valid(validateDefinition(counting, PROPOSED_BOUNDS, RULE_PROFILES)), { opener: keys.rita.member, target });
   s.did(keys.rita, "initialize", { expected: { configuration: s.item(0).revision } });
   return s;
 };

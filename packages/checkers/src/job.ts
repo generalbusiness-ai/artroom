@@ -89,8 +89,8 @@ export type Origin = { job: Job } | { not: NotAJob };
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
 const valueOf = (effects: readonly Effect[], item: number, slot: string): unknown => {
-  const found = effects.filter((e) => e.effect === "value" && e.item === item && e.slot === slot);
-  return found.length === 1 && found[0]!.effect === "value" ? found[0]!.value : undefined;
+  const matched = effects.filter((e) => e.effect === "value" && e.item === item && e.slot === slot);
+  return matched.length === 1 && matched[0]!.effect === "value" ? matched[0]!.value : undefined;
 };
 const opens = (effects: readonly Effect[], item: number, type: string): boolean => effects.filter((e) => e.effect === "open").length === 1 && effects.some((e) => e.effect === "open" && e.item === item && e.type === type);
 /** The entry as the lane served it, when it is the lane's entry at that position and its bytes hash to the served hash. */

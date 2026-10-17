@@ -13,7 +13,7 @@ import { operational, type Operational } from "../src/operational.ts";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { open } from "./operation-opening.ts";
-import { HOLD, Lane, START, at, definition, create, founding, reader, rita, stubOf } from "./support.ts";
+import { HOLD, Lane, START, at, definition, create, creation, reader, rita, stubOf } from "./support.ts";
 
 /** The delay before the second attempt of an operation. */
 const RETRY = PROPOSED_BOUNDS.dispatchRetrySeconds;
@@ -444,12 +444,12 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
   test("a scope whose pinned definition the runtime cannot run sends nothing outside the service: the attempt stays recorded, with no wake-up, and is sent once the runtime can run the definition. The capability is the scripted stand-in", async () => {
     // The lane of the other tests, with one capability guard. The scripted test capability, a stand-in, is the code for it.
     const staged = variant(definition.declared, (def) => { def.acts.report.guards.push({ capability: { name: "hold", guard: "staged", with: { commit: { field: "commit" }, under: { item: "also.commitment" } } } }); def.acts.report.fields.commit = { type: "commit", required: true }; });
-    const { signed, name } = founding(at(60), staged);
+    const { signed, name } = creation(at(60), staged);
     const c = controls(name, START);
     c.capability = {};
-    const founded = await stubOf(name).create(signed, staged.declared);
-    if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-    const s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed);
+    const created = await stubOf(name).create(signed, staged.declared);
+    if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+    const s = new Lane(name, c, created.receipt.fact.at, created.receipt, signed);
     const out = outsideOf(name);
     const [op] = await open(s, pushOf(1)) as [OperationId];
 

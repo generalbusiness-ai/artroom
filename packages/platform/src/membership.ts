@@ -228,8 +228,8 @@ export const membership: PlatformData = {
       parties: {},
       refs: { directory: { fixed: true, required: true, to: { type: "scope", kind: "directory" } } },
       values: {
-        foundingKey: { fixed: true, required: true, of: KEY },
-        foundingHandle: { fixed: true, required: true, of: HANDLE },
+        "foundingKey": { fixed: true, required: true, of: KEY },
+        "foundingHandle": { fixed: true, required: true, of: HANDLE },
         recoveryKey: { fixed: false, required: true, of: KEY },
         formerRecovery: { fixed: false, required: false, of: { type: "list", of: KEY, max: 32 } },
         adminActions: { fixed: false, required: true, of: ACTIONS },
@@ -279,8 +279,8 @@ export const membership: PlatformData = {
       step: "open", on: "roster", grant: "membership.establish",
       also: {},
       fields: {
-        founder: { ...KEY, required: true },
-        founderHandle: { ...HANDLE, required: true },
+        "founder": { ...KEY, required: true },
+        "founderHandle": { ...HANDLE, required: true },
         recoveryKey: { ...KEY, required: true },
         directory: { type: "scope", kind: "directory", required: true },
       },

@@ -19,8 +19,8 @@ test.each(transports)("a scope handle over %s: an act returns its receipt; the e
   net.hold = () => true;
   const signer = secretSigner(rita.secret);
   const now = timeMs(net.clock.now)!;
-  const founding = await signedIntent(signer, { to: null, kind: "found", fields: { source: "a repository" } }, { now });
-  const { answer, scope } = await create(transport(), founding, deskDefinition.declared, [ticketDefinition.declared], reader);
+  const creation = await signedIntent(signer, { to: null, kind: "found", fields: { source: "a repository" } }, { now });
+  const { answer, scope } = await create(transport(), creation, deskDefinition.declared, [ticketDefinition.declared], reader);
   if (answer.answer !== "accepted" || !scope) throw new Error(`not founded: ${JSON.stringify(answer)}`);
   const at = answer.receipt.fact.at;
   expect(scope).toBeInstanceOf(ScopeHandle);

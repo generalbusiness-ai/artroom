@@ -61,10 +61,10 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
   const sk = (of as string | undefined) ?? "on";
   const sets = (name: unknown, successive = false): Sets => ({ what: `slot ${String(name)} of ${sk}`, successive });
   const slot = (name: unknown, kind: Slot["kind"]): Slot | null => {
-    const found = typeof name === "string" ? s.slots.get(name) : undefined;
-    if (found?.kind !== kind) return bad("name", p, `names no ${kind} slot of ${s.name}`);
+    const matched = typeof name === "string" ? s.slots.get(name) : undefined;
+    if (matched?.kind !== kind) return bad("name", p, `names no ${kind} slot of ${s.name}`);
     // Section 6.3: a fixed slot is set by the act that opens the item and never again.
-    return found.fixed && !nascent ? bad("fixed", p, "a fixed slot is set only by the act that opens its item") : found;
+    return matched.fixed && !nascent ? bad("fixed", p, "a fixed slot is set only by the act that opens its item") : matched;
   };
   /**
    * A source that is an operand (section 6.6). A slot with no `of` is a slot
@@ -197,8 +197,8 @@ export function effect(d: Defining, v: unknown, path: string, ctx: Ctx, later: b
       // an act's effect, and no handler, timed rule or result clause has one.
       const r = rec(x, p, ["slot"]);
       if (!r) return null;
-      const found = typeof r["slot"] === "string" ? s.slots.get(r["slot"]) : undefined;
-      if (found?.kind !== "value" || !isDetached(found.type)) return bad("name", p, `names no value slot of ${s.name} that holds a detached text`);
+      const matched = typeof r["slot"] === "string" ? s.slots.get(r["slot"]) : undefined;
+      if (matched?.kind !== "value" || !isDetached(matched.type)) return bad("name", p, `names no value slot of ${s.name} that holds a detached text`);
       if (!ctx.signer || later) bad("shape", p, "a redaction is an effect of an act: its entry records who removed the text, and under which grant");
       return { what: `the texts of slot ${String(r["slot"])} of ${sk}`, successive: false };
     }

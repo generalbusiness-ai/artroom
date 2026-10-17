@@ -37,7 +37,7 @@ export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery
   // Each {id,bytes} of safe integers costs under64 UTF8 bytes incl comma.
   if (maximum > candidates || 2 + 64 * maximum > metadataBytes) return no("too-large");
   admit?.(maximum, 2 + 64 * maximum);
-  const found: ItemCandidate[] = [];
+  const matched: ItemCandidate[] = [];
   let used = 2;
   const take = (selected: Record<string, SqlValue>[], limit: number): boolean => {
     if (selected.length > limit) return false;
@@ -46,9 +46,9 @@ export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery
       const id = row["id"], bytes = row["bytes"];
       if (!whole(id) || id <= previous || !whole(bytes)) return false;
       const next = { id, bytes };
-      used += utf8(canonicalize(next)).length + (found.length > 0 ? 1 : 0);
-      if (used > metadataBytes || found.length >= candidates) return false;
-      found.push(next); previous = id;
+      used += utf8(canonicalize(next)).length + (matched.length > 0 ? 1 : 0);
+      if (used > metadataBytes || matched.length >= candidates) return false;
+      matched.push(next); previous = id;
     }
     return true;
   };
@@ -67,7 +67,7 @@ export function itemCandidates(sql: Pick<Sql, "exec">, query: ItemCandidateQuery
       }
     }
   } catch { return no("query-not-ready"); }
-  found.sort((a, b) => a.id - b.id);
-  if (found.some((row, i) => i > 0 && row.id === found[i - 1]!.id)) return no("invalid-metadata");
-  return { ok: true, rows: found.slice(0, rows + 1), exhausted: found.length <= rows, candidatesRead: found.length, metadataBytes: used };
+  matched.sort((a, b) => a.id - b.id);
+  if (matched.some((row, i) => i > 0 && row.id === matched[i - 1]!.id)) return no("invalid-metadata");
+  return { ok: true, rows: matched.slice(0, rows + 1), exhausted: matched.length <= rows, candidatesRead: matched.length, metadataBytes: used };
 }

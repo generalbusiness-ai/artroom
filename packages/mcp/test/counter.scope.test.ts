@@ -24,10 +24,10 @@ function counterRecipe(mode: "default" | "generic"): { tools: string[]; count: n
 async function counterRoom(room: Room, options: { subscribe?: boolean } = {}): Promise<Agent> {
   const rita = room.agent("rita", options);
   // The explicit application cohort: register@5, whose claim creates directory@5, membership@4, rules@3 and destination@2.
-  const installed = await rita.ok("create", { definition: APPLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+  const installed = await rita.ok("create", { definition: APPLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: "install" });
   const register = installed["scope"] as ScopeId;
   await room.wireRegister(register);
-  const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
+  const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
   expect(claimed["answer"], JSON.stringify(claimed)).toBe("accepted");
   const w = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as FactRef).seq });
   expect(w["timedOut"], JSON.stringify(w)).toBe(false);
@@ -66,9 +66,9 @@ const applicationsOf = async (agent: Agent) => (await agent.ok("room", {}))["app
  */
 async function takePart(taker: Agent, mode: "default" | "generic"): Promise<string[]> {
   const from = taker.calls.length;
-  const found = (await applicationsOf(taker)).find((a) => a.definition === NAME && a.state === "created");
-  expect(found, "room lists the Counter among the applications").toBeDefined();
-  const counter = found!.scope!;
+  const matched = (await applicationsOf(taker)).find((a) => a.definition === NAME && a.state === "created");
+  expect(matched, "room lists the Counter among the applications").toBeDefined();
+  const counter = matched!.scope!;
   let digest = "";
   const act = async (kind: string, args: Record<string, unknown>) => {
     if (mode === "default") return taker.ok(`${NAME}.${kind}`, { target: counter, ...args });

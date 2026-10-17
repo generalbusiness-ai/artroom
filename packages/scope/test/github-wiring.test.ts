@@ -32,7 +32,7 @@ function registerFixture(installKey = "install", demo: typeof DEMO_REGISTER | ty
   const intent = installing(paul, "keys", [rita.key]).intent;
   const install = signIntent({ ...intent, idempotencyKey: installKey, fields: demo ? { host: "github.com", namespace: ACCOUNT.login, policy: "open", purpose: "demo-start" } : { ...intent.fields, host: "github.com", namespace: ACCOUNT.login } }, paul.secret);
   const seed: Seed = { v: 1, kind: "register", definition: demo ? demo : REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
-  const genesis = judgeGenesis(register.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules });
+  const genesis = judgeGenesis(register.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, creation: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules });
   expect(genesis.result).toBe("write");
   if (genesis.result === "write") register.seal(genesis.draft);
   const given: OutsideGiven = {
@@ -41,8 +41,8 @@ function registerFixture(installKey = "install", demo: typeof DEMO_REGISTER | ty
     clock: { read: () => register.now }, random: { bytes: (length) => new Uint8Array(length) },
   };
   const claim = () => {
-    const found = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }, { platform: rules, grants: [] });
-    expect(found.result).toBe("write");
+    const matched = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } }, { platform: rules, grants: [] });
+    expect(matched.result).toBe("write");
     const operation = register.state.operation("1:0")!;
     return { scope: register.at, operation: operation.id, attempt: 1, owner: operation.owner, kind: operation.kind, origin: register.own(1)! } satisfies EffectRequest;
   };
@@ -62,7 +62,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
   const at: ScopeRef = { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(3)), kind: "destination" };
   const entry: Entry = {
     ...register.own(0)!.entry, at,
-    input: { type: "genesis", seed, inc: at.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" },
+    input: { type: "genesis", seed, inc: at.inc, kind: "establish", "founding": null, source: null, n: null, message: null, decision: "applied" },
     uses: [{ fact: claim, content }], effects: [], sends: [],
   };
   const hash = entryHash(entry);

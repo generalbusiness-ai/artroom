@@ -67,7 +67,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
 
     // The neighbour (rita) claims the room. She is its founder and admin.
     const neighbour = rita, nasruddin = keys.una, passerby = keys.vic;
-    const claim = await R.intent(neighbour, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@neighbour", recoveryKey: sam.key } });
+    const claim = await R.intent(neighbour, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@neighbour", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: FILE_PUBLICATION_COHORT.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
     const D = new OwnedPlatform(scopeIdOf(directorySeed));
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(directorySeed), 1), id: "lending-fixture" } } });
@@ -105,7 +105,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     lifetime.wire(L.name, () => NO_OUTSIDE);
     await settle(D, L);
     expect((await L.summary()).value).toMatchObject({ definition: LENDING_DEFINITION, status: "active",
-      items: [{ type: "library", state: "open", refs: { destination: await G.at() }, parties: { founder: { membership, member: "@neighbour" } } }] });
+      items: [{ type: "library", state: "open", refs: { destination: await G.at() }, parties: { "founder": { membership, member: "@neighbour" } } }] });
 
     // Enrollment and the factory grant no lending action by implication.
     let pageOrdinal = 0;
@@ -358,11 +358,11 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect(await joining(second, { lock: serial, store: joinStore, now: clock, fetch }).join(read.link, read.seat)).toMatchObject({ status: "refused" });
     expect([joinSlot, await joinsOf(second.publicKey)]).toEqual([null, 0]);
     // The visitor's device finds the lending scope and acts as @visitor.
-    const found = await findLending(read.seat, device, { now: clock, fetch });
-    if (!found.ok) throw new Error(found.reason);
-    expect(found.identity).toMatchObject({ scope: scopeOfLending, member: { member: "@visitor" }, publicKey: device.publicKey });
+    const matched = await findLending(read.seat, device, { now: clock, fetch });
+    if (!matched.ok) throw new Error(matched.reason);
+    expect(matched.identity).toMatchObject({ scope: scopeOfLending, member: { member: "@visitor" }, publicKey: device.publicKey });
     let visitorSlot: string | null = null;
-    const visitor = lendingGateway(found.identity, (await import("../../../examples/lending/browser/join.ts")).deviceSigner(device), { current: () => true, lock: serial, now: clock, fetch,
+    const visitor = lendingGateway(matched.identity, (await import("../../../examples/lending/browser/join.ts")).deviceSigner(device), { current: () => true, lock: serial, now: clock, fetch,
       store: { load: async () => visitorSlot === null ? null : JSON.parse(visitorSlot) as Kept, save: async (value) => { visitorSlot = JSON.stringify(value); }, clear: async () => { visitorSlot = null; } } });
     expect((await visitor.look()).status).toBe("current");
     expect(await visitor.act("donate", { name: "Whisk", description: "Balloon." })).toEqual({ status: "recorded" });

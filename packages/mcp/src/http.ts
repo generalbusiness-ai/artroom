@@ -271,9 +271,9 @@ export class McpHttp {
       session.lastActive = session.created;
     } else {
       if (sessionId === null) return json(400, rpcError(id, -32600, "Mcp-Session-Id is required."));
-      const found = this.sessions.get(sessionId);
-      if (!found) return bare(404);
-      session = found;
+      const matched = this.sessions.get(sessionId);
+      if (!matched) return bare(404);
+      session = matched;
       if (!(await this.#touch(session))) return bare(404);
     }
     const response = await this.port.wire.handle(m, session, (out) => session.stream?.send(out));

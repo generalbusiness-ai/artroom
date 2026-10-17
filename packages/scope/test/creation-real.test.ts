@@ -60,7 +60,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     try {
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
-    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     // STAND-IN: the Git host of this register. It is wired before the object is first reached.
     const host = outsideOf(R.name);
@@ -74,8 +74,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
 
     // Step 1: the founder's claim. The policy is `keys`, and rita's key is a founder's. No grant judges the act. The entry fixes the
     // directory's seed, and so its scope ID, and opens the creation of a repository, with attempt 1.
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(matched.intent), ordinal: 0 };
     const D = lifetime.platform(scopeIdOf(seed));
     const creation: OperationId = "1:0";
     // What the host answers, which the test writes (section 12.1.1, case c). The reply to attempt 1 is lost: no answer comes. The
@@ -84,7 +84,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     lifetime.active();
     host.answer(creation, 1, null);
     host.answer(creation, 2, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: "repo-7" } } });
-    const claimed: Answer = await R.stub.submit(found, []);
+    const claimed: Answer = await R.stub.submit(matched, []);
     expect(claimed).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 1 } } });
 
     // Steps 2 to 7: the operations driver sends the one request of each attempt and records what came as an outcome entry, and the
@@ -141,7 +141,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // the three children that answered.
     expect((await D.item(0))).toMatchObject({
       refs: { register, claim: { at: register, seq: 1 }, membership, rules, destination: branchScope },
-      values: { repository: { host: "git.example", namespace: "artroom", name, id: "repo-7" }, branch: "main", founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key },
+      values: { repository: { host: "git.example", namespace: "artroom", name, id: "repo-7" }, branch: "main", "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key },
     });
 
     // Before any session (the planner's decisions 61cc5e50 and c6499e91): the founder's claim key reads, by signed reads, the
@@ -248,9 +248,9 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // (authority note, revision 28, section 12.1.4; I3 deltas, entries EQ8 and FB10). It is what another scope's object is answered:
     // one call on the object, by the reference or by the scope ID alone. A membership scope answers no such request.
     const observes = async (of: object, asked: string) => { const got = await rulesScope!.stub.observe({ of, asked }); return got && typeof got === "object" && "answer" in got ? got.answer : got; };
-    const founding = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) };
+    const initialRules = { asked: "rules", approvals: 1, ownerMayReview: false, checks: [], labels: [], singleControllerException: false, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 1, checks: [] })) };
     expect([await observes(rules, "rules"), await observes({ scope: rules.scope, kind: "rules" }, "definitions"), await membershipScope!.stub.observe({ of: membership, asked: "rules" })]).toEqual([
-      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: founding, definition: "platform:rules@2" },
+      { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: initialRules, definition: "platform:rules@2" },
       { subject: "rules", of: rules, head: (await rulesScope!.summary()).at, revision: 0, content: { asked: "definitions", active: [] }, definition: "platform:rules@2" }, null,
     ]);
     expect(await publish(2)).toMatchObject({ answer: "accepted" });
@@ -375,7 +375,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // scope's head. A request that states another incarnation of the rules scope's name is answered by nobody.
     const published = (await rulesScope!.summary()).at;
     expect([await observes(rules, "rules"), (await rulesScope!.item(0)).refs["published"], await observes({ ...rules, inc: register.inc }, "rules")]).toEqual([
-      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...founding, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@2" }, published.seq, null,
+      { subject: "rules", of: rules, head: published, revision: published.seq, content: { ...initialRules, approvals: 3, extents: valueDigest(RULES_EXTENTS_VALUE.domain, firstExtents({ approvals: 3, checks: [] })) }, definition: "platform:rules@2" }, published.seq, null,
     ]);
     // A request that states another incarnation of membership's name is answered by nobody, and one by the ID alone is answered.
     const asked = { ...membership, inc: register.inc };
@@ -432,7 +432,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       input: { type: "act", signed: signIntent(factoryIntent, rita.secret), authority: [], presented: {} },
       uses: [], prepared: [], effects: [], sends: [{ n: 0, to: laneSeed, message: creationMessage }] };
     const genesis: Entry = { v: 1, at: otherLane, seq: 0, prev: null, time: timeOf(lifetime.now()), clamped: false, epoch: 0,
-      input: { type: "genesis", seed: laneSeed, inc: otherLane.inc, kind: "open", founding: null,
+      input: { type: "genesis", seed: laneSeed, inc: otherLane.inc, kind: "open", "founding": null,
         source: factRefOf(creator), n: 0, message: creationMessage, decision: "applied" },
       uses: [useOf(factRefOf(creator), creator)], prepared: [], effects: [], sends: [] };
     const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "change" },

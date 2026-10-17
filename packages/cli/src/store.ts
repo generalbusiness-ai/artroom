@@ -62,7 +62,7 @@ export interface PendingInvitationIssue { operation: string; request: string; di
  * secret: the register's genesis records both.
  */
 export interface PlannedInstall {
-  service: string; definition: PlatformDefinition; founding: SignedIntent; register: ScopeId;
+  service: string; definition: PlatformDefinition; "founding": SignedIntent; register: ScopeId;
   /** Saved before possible submission, bound to the exact original plan. */
   attempted?: Digest;
   /** Configured-service acknowledgement, retained for later history verification. */

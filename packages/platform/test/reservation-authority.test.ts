@@ -5,7 +5,7 @@ import { observationOf } from "@generalbusiness/dap-derive";
 import { d, otherLane, t } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, standingOf } from "../src/membership.ts";
 import { judgeReservation, judgeReservationWithStanding, type Statement } from "../src/reservation.ts";
-import { FOUND, HEAD, NEXT, reading, rulesObserved, keyObserved } from "./support-destination.ts";
+import { CREATED, HEAD, NEXT, reading, rulesObserved, keyObserved } from "./support-destination.ts";
 import { Roster, paul, rita, una } from "./support.ts";
 
 // Membership is judged in memory with its real rules below the made-up office of Roster. Its standing is the actual
@@ -22,7 +22,7 @@ for (const loses of ["last active key", "membership"] as const) test(`a customiz
   m.did(una, "enrol", { on: 0, expected: { on: m.item(0).revision, member: m.item(agent).revision }, fields: { invitation, secret: "agent invitation" } });
   m.did(rita, "set-actions", { on: 0, expected: { on: m.item(0).revision }, fields: { role: "agent", actions: ["change.merge", "change.review", "change.check"] } });
   const observed = (key: typeof una.key) => observationOf(standingOf(m.state, { of: m.at, key }, MEMBERSHIP), m.now)!;
-  const judge = (read = reading(m.now, { merger: observed(una.key) }), named = statement) => judgeReservation({ recorded: HEAD, evidence: FOUND, statement: named, read, time: m.now });
+  const judge = (read = reading(m.now, { merger: observed(una.key) }), named = statement) => judgeReservation({ recorded: HEAD, evidence: CREATED, statement: named, read, time: m.now });
   const before = observed(una.key);
   expect(before).toMatchObject({ keyState: "active", memberState: "active", role: "agent", controller: "@paul", controllerActive: true, actions: ["change.merge", "change.review", "change.check"] });
   expect(judge()).toEqual({ reserved: true, integration: NEXT, reason: null });
@@ -54,14 +54,14 @@ test("D1 metadata follows the actual independent approvals and required check de
     { job: fact(7), name: "optional", state: "passed", decidedBy: fact(8) },
   ] };
   const read = reading(t(0), {
-    manifest: { base: HEAD, integration: NEXT, tree: FOUND.tree, reports: [], authors: [rita.member.member], complete: true },
+    manifest: { base: HEAD, integration: NEXT, tree: CREATED.tree, reports: [], authors: [rita.member.member], complete: true },
     rules: rulesObserved(t(0), { approvals: 1, ownerMayReview: false, checks: [
       { name: "verify", configuration: d("b"), checker: una.member.member, required: true },
       { name: "optional", configuration: d("c"), checker: paul.member.member, required: false },
     ] }), verdicts: [{ sound: true, key: keyObserved(una, t(0)) }, { sound: true, key: keyObserved(rita, t(0)) }],
     checks: { verify: { opening: "sound", deciding: true, key: keyObserved(una, t(0)) }, optional: { opening: "sound", deciding: true, key: keyObserved(paul, t(0)) } },
   });
-  const asked = { recorded: HEAD, evidence: FOUND, statement: name, read, time: t(0) };
+  const asked = { recorded: HEAD, evidence: CREATED, statement: name, read, time: t(0) };
   expect(judgeReservation(asked)).toEqual({ reserved: true, integration: NEXT, reason: null });
   expect(judgeReservationWithStanding(asked)).toEqual({ reserved: true, integration: NEXT, reason: null, standing: {
     base: [{ key: read.merger!.key, from: statement.operation }, { key: una.key, from: fact(3) }],

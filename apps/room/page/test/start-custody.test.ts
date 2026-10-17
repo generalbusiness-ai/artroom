@@ -29,7 +29,7 @@ test("scripted retained register7 Start keeps its founder key before the CLI bou
   const legacyOffer: CreationOffer = { ...offer, register, definition: "platform:register@7" };
   const f = fixture(), offerRead = vi.fn(async () => legacyOffer);
   f.values.set(`artroom-page-start:${origin}`, canonicalize({ v: 1, origin, secret: b64url(new Uint8Array(32).fill(61)), configured: { register, definition: "platform:register@7" }, label: "Personal intent", handle: "@founder" }));
-  let original: SignedIntent | undefined, posts = 0, founder: string | undefined;
+  let original: SignedIntent | undefined, posts = 0, creator: string | undefined;
   cli.claim.mockImplementation(async (ctx: Context) => {
     const descriptorBytes = f.values.get(`artroom-page-start:${origin}`)!;
     expect(!!descriptorBytes, "founder-key readback precedes the workflow boundary").toBe(true);
@@ -38,15 +38,15 @@ test("scripted retained register7 Start keeps its founder key before the CLI bou
     expect(secret !== null && b64url(secret) === descriptor.secret).toBe(true);
     const config = (await ctx.store.config())!;
     if (!config.claim) {
-      founder = descriptor.secret;
+      creator = descriptor.secret;
       await ctx.store.keep("recovery", new Uint8Array(32).fill(92));
-      const intent = { v: 1 as const, idempotencyKey: "20000000-0000-4000-8000-000000000001", actor: keyIdOfSecret(secret!), to: register, kind: "found", on: null, fields: { branch: "main", founderHandle: "@founder", recoveryKey: keyIdOfSecret(new Uint8Array(32).fill(92)) }, expected: { "0": 1 }, notAfter: "2099-01-01T00:00:00Z" };
+      const intent = { v: 1 as const, idempotencyKey: "20000000-0000-4000-8000-000000000001", actor: keyIdOfSecret(secret!), to: register, kind: "found", on: null, fields: { branch: "main", "founderHandle": "@founder", recoveryKey: keyIdOfSecret(new Uint8Array(32).fill(92)) }, expected: { "0": 1 }, notAfter: "2099-01-01T00:00:00Z" };
       original = signIntent(intent, secret!);
       const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", "found": { signed: original } };
       await ctx.store.save({ ...config, claim: pending });
     } else {
       expect(canonicalize(config.claim["found"]?.signed) === canonicalize(original)).toBe(true);
-      expect(descriptor.secret === founder).toBe(true);
+      expect(descriptor.secret === creator).toBe(true);
     }
     secret?.fill(0); posts++;
     return { code: 1, lines: ["SCRIPTED lost original reply"] };

@@ -12,7 +12,7 @@ const [Z, D, D2, U, I, I2, X, A, B, E, R] = ["0", "d", "9", "1", "2", "4", "a", 
 /** A commit object with those parents: one `tree` line, the `parent` lines, an author and a committer. */
 const commit = (parents: readonly string[], header = ""): GitObject => ({ type: "commit", body: utf8(`tree ${C("7")}\n${parents.map((p) => `parent ${p}\n`).join("")}${header}author A <a@example.org> 0 +0000\ncommitter A <a@example.org> 0 +0000\n\nparent ${X}\n`) });
 type Graph = Record<string, readonly string[] | GitObject>;
-const reader = (graph: Graph) => (id: string): GitObject | null => { const found = { [Z]: [], [D]: [Z], ...graph }[id]; return found === undefined ? null : "type" in found ? found : commit(found); };
+const reader = (graph: Graph) => (id: string): GitObject | null => { const matched = { [Z]: [], [D]: [Z], ...graph }[id]; return matched === undefined ? null : "type" in matched ? matched : commit(matched); };
 
 // S is the staging lane. L2 and L3 are other lanes: only their names in a staged ref are used.
 const [S, L2, L3] = [otherLane, directory, membership];

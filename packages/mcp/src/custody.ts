@@ -286,9 +286,9 @@ export class Custody {
     if (inline) return inline;
     for (let end = inSegment; end > 0; end -= DECIDED_SLICE) {
       const from = Math.max(0, end - DECIDED_SLICE);
-      const found = search(await this.store.segmented(id, from, end - from));
-      if (found === "older") return null;
-      if (found) return found;
+      const matched = search(await this.store.segmented(id, from, end - from));
+      if (matched === "older") return null;
+      if (matched) return matched;
     }
     return null;
   }
@@ -309,10 +309,10 @@ export class Custody {
   }
 
   async #kept(id: string, identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, bytes: number, standalone = false): Promise<CustodyRecord> {
-    const found = await this.#read(id);
-    if (found) {
-      if (found.meaning !== meaning) throw new CustodyError({ held: "conflicting", recorded: `${found.envelope.signed.intent.kind} on ${found.identity.target && "scope" in found.identity.target ? found.identity.target.scope : "a creation"}` });
-      return found;
+    const matched = await this.#read(id);
+    if (matched) {
+      if (matched.meaning !== meaning) throw new CustodyError({ held: "conflicting", recorded: `${matched.envelope.signed.intent.kind} on ${matched.identity.target && "scope" in matched.identity.target ? matched.identity.target.scope : "a creation"}` });
+      return matched;
     }
     // Before signing: the envelope must fit a record with room for its first outcome.
     if (bytes + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes });

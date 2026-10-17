@@ -18,14 +18,14 @@ test("demo install admits open founding without an allow-list and refuses a clos
     if (!result.ok) expect.fail(`The selected platform definition failed validation: ${named}`);
     return result.definition;
   };
-  const judged=(policy:"open"|"keys",founders:string[]|undefined,named:typeof DEMO_REGISTER|typeof WEB_DEMO_REGISTER=DEMO_REGISTER)=>{
+  const judged=(policy:"open"|"keys",creators:string[]|undefined,named:typeof DEMO_REGISTER|typeof WEB_DEMO_REGISTER=DEMO_REGISTER)=>{
     const selected = platform(named)!;
     const definition = named === DEMO_REGISTER ? checked.definition : definitionOf(named);
-    const source=installing(paul,policy,founders).intent;
+    const source=installing(paul,policy,creators).intent;
     const signed=signIntent({...source,fields:{...source.fields,purpose:DEMO_PURPOSE}},paul.secret);
     const seed={v:1 as const,kind:"register" as const,definition:named,creator:null,cause:intentDigest(signed.intent),ordinal:0};
     const ledger=new Ledger(definition,"platform:register");
-    return judgeGenesis(ledger.state,definition,{name:scopeIdOf(seed),inc:newIncarnation(new Uint8Array(16).fill(7)),seed,founding:signed},{clock:clockOf(ledger.state,T0),bounds:PROPOSED_BOUNDS,facts:[],prepared:[],source:null,platform:{named,rules:selected.rules}});
+    return judgeGenesis(ledger.state,definition,{name:scopeIdOf(seed),inc:newIncarnation(new Uint8Array(16).fill(7)),seed,creation:signed},{clock:clockOf(ledger.state,T0),bounds:PROPOSED_BOUNDS,facts:[],prepared:[],source:null,platform:{named,rules:selected.rules}});
   };
   const original = judged("open",undefined);
   expect(original.result).toBe("write");
@@ -43,10 +43,10 @@ test("demo install admits open founding without an allow-list and refuses a clos
     if (genesis.result !== "write") expect.fail("The selected demo genesis was refused.");
     register.seal(genesis.draft);
     const authority = { named, rules: selected.rules };
-    expect(register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key } }, { platform: authority, grants: [] }).result).toBe("write");
-    const found = register.head.seq, claimSeed = register.item(found).values["seed"];
+    expect(register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: paul.key } }, { platform: authority, grants: [] }).result).toBe("write");
+    const matched = register.head.seq, claimSeed = register.item(matched).values["seed"];
     if (!isDigest(claimSeed)) expect.fail("The recorded founding seed is missing.");
-    const outcome = judgeOutcome(register.state, definition, { type: "outcome", operation: `${found}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(claimSeed, 1), id: "demo-repository" } } }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, platform: authority, own: register.own });
+    const outcome = judgeOutcome(register.state, definition, { type: "outcome", operation: `${matched}:0`, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(claimSeed, 1), id: "demo-repository" } } }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, platform: authority, own: register.own });
     if (outcome.result !== "write") expect.fail("The scripted creation answer was refused.");
     register.seal(outcome.draft);
     const directoryCreation = creation(register, register.head.seq);
@@ -54,7 +54,7 @@ test("demo install admits open founding without an allow-list and refuses a clos
     expect(directoryCreation.asked.to.definition).toBe(directoryName);
     const directoryDefinition = definitionOf(directoryName);
     const directory = new Ledger(directoryDefinition, "platform:directory");
-    const directoryGenesis = judgeGenesis(directory.state, directoryDefinition, directoryCreation.asked, { clock: clockOf(directory.state, T0), bounds: PROPOSED_BOUNDS, prepared: [], facts: [{ fact: register.fact(found), entry: register.entries[found]!.entry, under: register.under }], source: directoryCreation.source, platform: { named: directoryName, rules: platform(directoryName)!.rules } });
+    const directoryGenesis = judgeGenesis(directory.state, directoryDefinition, directoryCreation.asked, { clock: clockOf(directory.state, T0), bounds: PROPOSED_BOUNDS, prepared: [], facts: [{ fact: register.fact(matched), entry: register.entries[matched]!.entry, under: register.under }], source: directoryCreation.source, platform: { named: directoryName, rules: platform(directoryName)!.rules } });
     if (directoryGenesis.result !== "write") expect.fail("The selected directory genesis was refused.");
     directory.seal(directoryGenesis.draft);
     expect(directory.last.sends.slice(1).map(send => "definition" in send.to ? send.to.definition : null)).toEqual(["platform:membership@2", named === DEMO_REGISTER ? "platform:rules@2" : WEB_DEMO_COHORT.rules, "platform:destination@3"]);

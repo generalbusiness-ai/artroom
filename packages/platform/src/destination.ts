@@ -501,7 +501,7 @@ export const destination2: PlatformData = {
   ...destination,
   items: {
     ...destination.items,
-    branch: { ...branch1, values: { ...branch1.values, founderHandle: { fixed: true, required: true, of: NAME } } },
+    branch: { ...branch1, values: { ...branch1.values, "founderHandle": { fixed: true, required: true, of: NAME } } },
     // i5 edit: the publication may refer to a one-file manifest.
     publication: { ...publication1, refs: { ...publication1.refs, manifest: { fixed: true, required: false, to: MANIFEST_2 } } },
   },
@@ -509,7 +509,7 @@ export const destination2: PlatformData = {
     ...destination.acts,
     establish: {
       ...establish1,
-      fields: { ...establish1.fields, founderHandle: { ...NAME, required: true } },
+      fields: { ...establish1.fields, "founderHandle": { ...NAME, required: true } },
       // The founder's handle, before the mark `declare-first-head`, which stays the last effect.
       effects: [...establish1.effects.slice(0, -1), { value: { slot: "founderHandle", from: { field: "founderHandle" } } }, ...establish1.effects.slice(-1)],
     },
@@ -674,11 +674,11 @@ const seqOf = (id: OperationId): number => Number(id.slice(0, id.indexOf(":")));
 
 /** The operations that the entry at that position opened, in the order of their records there. Their IDs are that position and an ordinal from 0. */
 function openedIn(state: Pick<StateView, "operation">, seq: number): Operation[] {
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let k = 0; ; k += 1) {
     const operation = state.operation(`${seq}:${k}` as OperationId);
-    if (!operation) return found;
-    found.push(operation);
+    if (!operation) return matched;
+    matched.push(operation);
   }
 }
 
@@ -714,14 +714,14 @@ const ownEntry = (own: Own, seq: number) => {
 function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: Item, before: number): Operation[] {
   const from = publication.values["reservedAt"];
   if (typeof from !== "number") return [];
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const checked = ["platform:destination@3", "platform:destination@4", "platform:destination@5", "platform:destination@6"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
+    if (about) matched.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
-  return found;
+  return matched;
 }
 
 /**
@@ -733,13 +733,13 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
  * ID to the entry that is written (I3 deltas, entry FA5).
  */
 function receiptWrites(state: Pick<StateView, "operation">, own: Own, receipt: Item, before: number): Operation[] {
-  const found: Operation[] = [];
+  const matched: Operation[] = [];
   for (let seq = receipt.id; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
     const about = seq === receipt.id || (input.type === "act" && input.signed.intent.kind === "resend-receipt" && input.signed.intent.fields["receipt"] === receipt.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.receipt));
+    if (about) matched.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.receipt));
   }
-  return found;
+  return matched;
 }
 
 /** An operation that this entry opens, at its ordinal among the operations of the entry, with its attempt 1 (the contract's section 4.3, items 1 and 2). */
@@ -2809,9 +2809,9 @@ function standingTarget(given: RuleGiven, mint: Operation): Item | null {
 function standingKeys(given: RuleGiven, publication: Item): readonly KeyId[] {
   const scope = given.state.scope(), membership = destinationMembership(given.state);
   if (!scope || !membership?.inc) throw new Error("D1 membership incarnation is unavailable");
-  const found = publicationStandingKeys({ at: scope.at, membership: { scope: membership.scope, inc: membership.inc, kind: "membership" }, owner: pinnedBy(given), before: given.resolved.self, own: given.own, operation: id => given.state.operation(id) }, publication);
-  if (!found.ok) throw new Error(`D1 standing provenance ${found.reason}`);
-  return found.keys;
+  const matched = publicationStandingKeys({ at: scope.at, membership: { scope: membership.scope, inc: membership.inc, kind: "membership" }, owner: pinnedBy(given), before: given.resolved.self, own: given.own, operation: id => given.state.operation(id) }, publication);
+  if (!matched.ok) throw new Error(`D1 standing provenance ${matched.reason}`);
+  return matched.keys;
 }
 /** Preserve base provenance on each current-generation update. A fence
  * constructs a new false row with no proof; a successful check captures

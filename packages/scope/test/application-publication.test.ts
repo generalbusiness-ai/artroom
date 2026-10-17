@@ -72,7 +72,7 @@ test("a native application publishes once after missing proof, keeps later sourc
       original: { request: EffectRequest; answer: EffectAnswer } | null; late: LateAnswers | null } = {
       allowPush: true, allowRead: true, losePushReply: false, pushes: [], original: null, late: null,
     };
-    const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: host.host, namespace: host.namespace, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: host.host, namespace: host.namespace, policy: "keys", "founders": [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = life.platform(scopeIdOf({ v: 1, kind: "register", definition: cohort.register, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const bindings = host.bindings(R.name);
     const wire = (node: Platform) => life.outside(node.name, (given, sql) => {
@@ -92,10 +92,10 @@ test("a native application publishes once after missing proof, keeps later sourc
     });
     wire(R);
     expect(await R.stub.create(signIntent(install, rita.secret), cohort.register)).toMatchObject({ answer: "accepted" });
-    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const seed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    const matched = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(matched.intent), ordinal: 0 };
     const D = life.platform(scopeIdOf(seed));
-    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.submit(matched, [])).toMatchObject({ answer: "accepted" });
     await pause([R, D]);
     const initial = (await D.entries())[0]!;
     const sibling = (kind: ScopeRef["kind"]) => {
@@ -159,8 +159,8 @@ test("a native application publishes once after missing proof, keeps later sourc
     let proofAvailable = false;
     const actual = namespace(env.PLATFORM).resolver;
     life.wire(a.G.name, () => ({ resolver: { read: async (fact, seconds, origin) => {
-      const found = await life.wait(() => actual.read(fact, seconds, origin));
-      return found && "entry" in found && origin && !proofAvailable ? { ...found, origin: found.origin?.slice(0, 2) ?? [] } : found;
+      const matched = await life.wait(() => actual.read(fact, seconds, origin));
+      return matched && "entry" in matched && origin && !proofAvailable ? { ...matched, origin: matched.origin?.slice(0, 2) ?? [] } : matched;
     } } }));
     await a.G.restart();
     const beforeRead = await a.G.summary();

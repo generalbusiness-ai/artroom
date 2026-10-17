@@ -357,7 +357,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return { value, turn: context.turn.entered };
   }
 
-  async create(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return this.#publicInvoke("create", async () => this.#sent(await this.#scope.create(founding, definition, definitions, beside))); }
+  async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return this.#publicInvoke("create", async () => this.#sent(await this.#scope.create(creation, definition, definitions, beside))); }
   /**
    * `address`: the caller's address as the Worker's route had it, or null. Only the serving limits of a join read it (`limits.ts`):
    * at a membership scope a join is served through them, and no other act and no other scope is.

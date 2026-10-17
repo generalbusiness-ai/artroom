@@ -367,9 +367,9 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     const body = "y".repeat(2_000_000);
     const big = (signed: SignedIntent): Answer => ({ answer: "accepted", receipt: { ...receiptOf(signed, 12), effects: Array.from({ length: 400 }, (_, i) => ({ effect: "value", item: i, slot: "s", value: "v".repeat(400) })) as never } });
     await custody.send(identity("found"), meaningOf("f"), build("found", body), async (e) => big(e.signed), { notAfter, bytes: body.length });
-    const found = (await custody.find(identity("found")))!;
+    const matched = (await custody.find(identity("found")))!;
     reads.length = 0;
-    expect([found.outcomes.length, (await custody.decided(identityId(identity("found")), found))?.answer.answer]).toEqual([0, "accepted"]);
+    expect([matched.outcomes.length, (await custody.decided(identityId(identity("found")), matched))?.answer.answer]).toEqual([0, "accepted"]);
     expect(reads).toEqual([{ from: 0, limit: 1 }]);
   });
 

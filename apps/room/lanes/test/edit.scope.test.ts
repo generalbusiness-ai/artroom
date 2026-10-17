@@ -165,8 +165,8 @@ async function story(at: Stand, wired: Set<ScopeId>, checkpointMeta?: object): P
   const siteEnv: SiteEnv = { SCOPES: env.PLATFORM, ...bindings() };
   const page = async (path: string) => { const response = await site(new Request(`${SERVICE}/site/${D.name}/HEAD/${path}`), siteEnv, host.fetch); return { status: response.status, body: await response.text() }; };
   // The site already serves the founding README, which the first edit replaces.
-  const founded = await page("README.md");
-  expect([founded.status, founded.body.includes("Founded by")]).toEqual([200, true]);
+  const created = await page("README.md");
+  expect([created.status, created.body.includes("Founded by")]).toEqual([200, true]);
 
   // paul, a maintainer: he holds change.merge and not rules.publish.
   const link = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;

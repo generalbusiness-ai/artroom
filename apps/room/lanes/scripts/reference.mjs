@@ -138,9 +138,9 @@ export function reference() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const text = reference();
   if (process.argv.includes("--check")) {
-    let found = null;
-    try { found = readFileSync(target, "utf8"); } catch { /* no file yet */ }
-    if (found !== text) {
+    let matched = null;
+    try { matched = readFileSync(target, "utf8"); } catch { /* no file yet */ }
+    if (matched !== text) {
       console.error("docs/lanes-reference.md is not what apps/room/lanes/scripts/reference.mjs writes; run it without --check");
       process.exit(1);
     }

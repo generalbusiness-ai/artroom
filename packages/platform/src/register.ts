@@ -91,7 +91,7 @@ export const register: PlatformData = {
         host: { fixed: true, required: true, of: NAME },
         namespace: { fixed: true, required: true, of: NAME },
         policy: { fixed: true, required: true, of: POLICY },
-        founders: { fixed: true, required: false, of: CREATORS },
+        "founders": { fixed: true, required: false, of: CREATORS },
       },
     },
     // The second row. A claim is `pending` until the directory's applied result is recorded.
@@ -106,7 +106,7 @@ export const register: PlatformData = {
       values: {
         intent: { fixed: true, required: true, of: { type: "digest" } },
         seed: { fixed: true, required: true, of: { type: "digest" } },
-        founder: { fixed: true, required: true, of: KEY },
+        "founder": { fixed: true, required: true, of: KEY },
         policy: { fixed: true, required: true, of: POLICY },
         branch: { fixed: true, required: true, of: NAME },
         repository: { fixed: false, required: false, of: REPOSITORY },
@@ -123,7 +123,7 @@ export const register: PlatformData = {
         host: { ...NAME, required: true },
         namespace: { ...NAME, required: true },
         policy: { ...POLICY, required: true },
-        founders: { ...CREATORS, required: false },
+        "founders": { ...CREATORS, required: false },
       },
       guards: [],
       effects: [
@@ -138,12 +138,12 @@ export const register: PlatformData = {
     // `found`: an act, signed by the founder's key (Code P13 and P14). It is judged by the founding policy in place of a grant: the
     // rule at `grant` is the row's guard, and it refuses `unauthorized`. It opens `claim`, `pending`. A founding intent's fields are
     // `branch`, `founderHandle`, `recoveryKey` and, for a founding by import, `import`.
-    found: {
+    "found": {
       step: "open", on: "claim", grant: { code: "founding-policy", row: "P13" },
       also: { register: { item: "register", one: true } },
       fields: {
         branch: { ...NAME, required: true },
-        founderHandle: { ...NAME, required: true },
+        "founderHandle": { ...NAME, required: true },
         recoveryKey: { ...KEY, required: true },
         import: { type: "text", max: 2048, required: false },
       },
@@ -280,7 +280,7 @@ export const registerRules: Rules = {
    */
   install: {
     place: "grant", refusals: [],
-    run: ({ input }) => (input.type === "genesis" && input.founding !== null && intentDigest(input.founding.intent) === input.seed.cause ? { pass: true, member: null } : { pass: false }),
+    run: ({ input }) => (input.type === "genesis" && input["founding"] !== null && intentDigest(input["founding"].intent) === input.seed.cause ? { pass: true, member: null } : { pass: false }),
   },
   /**
    * Row 3, at `grant` of `found` (P13, P14). It reads `register.policy` and
@@ -292,8 +292,8 @@ export const registerRules: Rules = {
     place: "grant", refusals: [],
     run: (given) => {
       const held = registerOf(given.state);
-      const founders: unknown = held?.values["founders"];
-      const passes = held?.values["policy"] === "open" || (held?.values["policy"] === "keys" && Array.isArray(founders) && founders.includes(signed(given).intent.actor));
+      const creators: unknown = held?.values["founders"];
+      const passes = held?.values["policy"] === "open" || (held?.values["policy"] === "keys" && Array.isArray(creators) && creators.includes(signed(given).intent.actor));
       return passes ? { pass: true, member: null } : { pass: false };
     },
   },
@@ -418,11 +418,11 @@ export const registerRules: Rules = {
       if (!opening || opening.entry.input.type !== "act" || !held) throw new Error("the operation create-repository was opened by a found entry of a register");
       const { intent } = opening.entry.input.signed;
       const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY_OF[pinnedBy(given)]!, creator: given.resolved.at, cause: intentDigest(intent), ordinal: 0 };
-      const { branch, founderHandle, recoveryKey } = intent.fields;
+      const { branch, "founderHandle": creatorHandle, recoveryKey } = intent.fields;
       const fields = {
         claim: { at: given.resolved.at, seq: opening.entry.seq, hash: opening.hash },
         repository: { host: held.values["host"]!, namespace: held.values["namespace"]!, name: body["name"] as string, id: body["id"] as string },
-        branch, founderHandle, recoveryKey, ...(intent.fields["import"] === undefined ? {} : { import: intent.fields["import"] }),
+        branch, "founderHandle": creatorHandle, recoveryKey, ...(intent.fields["import"] === undefined ? {} : { import: intent.fields["import"] }),
       };
       return { to: seed, message: { class: "request", type: "create", body: { fields } } };
     },

@@ -7,7 +7,7 @@ import { timeMs } from "@generalbusiness/dap-derive";
 import { grantOf, variant } from "@generalbusiness/dap-derive/testing";
 import { create, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
-import { Node, founding, later, net, rita, routed, settle } from "./net.ts";
+import { Node, creation, later, net, rita, routed, settle } from "./net.ts";
 import { reader } from "./support.ts";
 
 /**
@@ -98,7 +98,7 @@ test("a detached text over the real route: the entry holds its digest and the sc
 
 test("a detached text in a creation message: the child reads the bytes from its creator and keeps them; when the creator has redacted the text first, the creation is not decided", async () => {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(notes, {});
+  const { signed, name } = creation(notes, {});
   const P = new Node(name, notes.declared);
   expect(await P.stub.create(signed, notes.declared)).toMatchObject({ answer: "accepted" });
   const write = async (text: string) => {
@@ -147,7 +147,7 @@ test("a detached text in a creation message: the child reads the bytes from its 
 
 test("a repeat of a decided send is answered from the entry that recorded it, and writes nothing, after both scopes have redacted the text that the message carries", async () => {
   net.hold = net.deaf = null;
-  const { signed, name } = founding(notes, {});
+  const { signed, name } = creation(notes, {});
   const P = new Node(name, notes.declared);
   expect(await P.stub.create(signed, notes.declared)).toMatchObject({ answer: "accepted" });
   const text = "A body that is told.";

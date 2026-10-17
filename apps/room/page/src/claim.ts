@@ -156,8 +156,8 @@ export async function allowedClaim(session: Session, register: ScopeRef): Promis
   if (!read.complete || read.next !== undefined || canonicalize(read.value.scope) !== canonicalize(register) || !DIRECTORY_OF[read.value.definition]) throw new Error("The register read does not match the complete configured reference and a supported pinned version. Nothing was submitted.");
   const registers = read.value.items.filter((item) => item.type === "register" && item.state === "open");
   const policy = registers[0]?.values["policy"];
-  const founders = registers[0]?.values["founders"];
-  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(founders) && founders.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's creation policy. Nothing was submitted.");
+  const creators = registers[0]?.values["founders"];
+  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(creators) && creators.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's creation policy. Nothing was submitted.");
   return { register, definition: read.value.definition as PlatformDefinition };
 }
 

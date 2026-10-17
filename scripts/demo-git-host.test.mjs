@@ -33,7 +33,7 @@ test("owner-only exclusive preparation keeps keys off stdout and locks one genui
     assert.equal((await stat(path)).mode & 0o777, 0o600);
     for (const role of Object.values(state.roles)) assert.ok(!child.stdout.includes(role.secret));
     assert.equal(child.stderr, "");
-    await assert.rejects(prepare({ directory, branch: "main", founderHandle: "@demo-owner" }), { code: "directory-exists" });
+    await assert.rejects(prepare({ directory, branch: "main", "founderHandle": "@demo-owner" }), { code: "directory-exists" });
     assert.equal(await readFile(path, "utf8"), privateBytes);
     const now = Date.parse("2030-01-01T00:00:00Z");
     await assert.rejects(plan({ directory, deadline: "2030-01-01T00:16:00Z" }, now), { code: "invalid-deadline" });
@@ -44,10 +44,10 @@ test("owner-only exclusive preparation keeps keys off stdout and locks one genui
     const pub = createPublicKey({ key: { kty: "OKP", crv: "Ed25519", x: b64url(publicKeyOf(state.roles.installer.key)) }, format: "jwk" });
     assert.equal(verify(null, domainBytes(DOMAINS.intent, signed.intent), pub, unb64url(signed.sig)), true);
     assert.equal(signed.intent.actor, prepared.roleKeys.installer.key);
-    assert.deepEqual(signed.intent.fields.founders, [prepared.roleKeys.founder.key]);
-    assert.equal(publicPlan.founding.recoveryKey, prepared.roleKeys.recovery.key);
-    assert.equal(publicPlan.founding.branch, "main");
-    assert.equal(publicPlan.founding.founderHandle, "@demo-owner");
+    assert.deepEqual(signed.intent.fields["founders"], [prepared.roleKeys["founder"].key]);
+    assert.equal(publicPlan["founding"].recoveryKey, prepared.roleKeys.recovery.key);
+    assert.equal(publicPlan["founding"].branch, "main");
+    assert.equal(publicPlan["founding"]["founderHandle"], "@demo-owner");
     assert.equal(isScopeId(publicPlan.registerScope), true);
     assert.equal(publicPlan.registerSeed.cause, publicPlan.installDigest);
     assert.equal(signed.intent.notAfter, "2030-01-01T00:10:00Z");
@@ -68,13 +68,13 @@ test("insecure private file and checkout custody are refused with static errors"
   const scratch = await mkdtemp(join(tmpdir(), "artroom-demo-host-"));
   const directory = join(scratch, "private");
   try {
-    await prepare({ directory, branch: "main", founderHandle: "@demo-owner" });
+    await prepare({ directory, branch: "main", "founderHandle": "@demo-owner" });
     await chmod(join(directory, "private-state.json"), 0o644);
     await assert.rejects(plan({ directory, deadline: "2030-01-01T00:10:00Z" }, Date.parse("2030-01-01T00:00:00Z")), (failure) => failure instanceof DemoPreparationError && failure.code === "private-permissions");
     const child = spawnSync(process.execPath, [...childRuntime, script, "plan", "--directory", directory, "--deadline", "2030-01-01T00:10:00Z"], { encoding: "utf8" });
     assert.equal(child.status, 1);
     assert.equal(child.stdout, "");
     assert.equal(JSON.parse(child.stderr).code, "private-permissions");
-    await assert.rejects(prepare({ directory: join(checkout, "would-be-private-demo-state"), branch: "main", founderHandle: "@demo-owner" }), { code: "checkout-directory" });
+    await assert.rejects(prepare({ directory: join(checkout, "would-be-private-demo-state"), branch: "main", "founderHandle": "@demo-owner" }), { code: "checkout-directory" });
   } finally { await rm(scratch, { recursive: true, force: true }); }
 });

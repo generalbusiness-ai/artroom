@@ -85,13 +85,13 @@ describe("what the validator takes beside an intent (sections 6.2, 6.4 and 6.6)"
   ];
 
   test("a detached text is held where its bytes can be kept and redacted, and is read by nothing that judges; a presented fact is one the act declares", () => {
-    const found = rows.map(([name, change, code]) => {
+    const matched = rows.map(([name, change, code]) => {
       const changed = structuredClone(notes);
       change(changed);
       const checked = validateDefinition(changed, PROPOSED_BOUNDS);
       return [name, checked.ok ? null : [...new Set(checked.problems.map((p) => p.code))], code] as const;
     });
-    expect(found.filter(([, codes, code]) => (code === null ? codes !== null : codes?.length !== 1 || codes[0] !== code)).map(([name, codes]) => [name, codes])).toEqual([]);
+    expect(matched.filter(([, codes, code]) => (code === null ? codes !== null : codes?.length !== 1 || codes[0] !== code)).map(([name, codes]) => [name, codes])).toEqual([]);
     // The value of a detached text is its digest, whatever the text: the text itself is no value of the field.
     expect([isValue(body, d("a"), PROPOSED_BOUNDS), isValue(body, "a text", PROPOSED_BOUNDS), isValue({ type: "text", max: 40 }, "a text", PROPOSED_BOUNDS)]).toEqual([true, false, true]);
   });

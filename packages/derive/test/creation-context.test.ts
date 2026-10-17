@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition, type ScopeKind } from "@generalbusiness/dap-contract";
 import { canonicalize, isSeed } from "@generalbusiness/artroom-bytes";
 import { clockOf, judgeGenesis, validateDefinition, type ValidDefinition } from "../src/index.ts";
-import { Ledger, T0, creation, deliver, founded, keys, valid } from "./fixtures.ts";
+import { Ledger, T0, creation, deliver, created, keys, valid } from "./fixtures.ts";
 
 // Pure judge/send boundary. Parent metadata and authority are SCRIPTED in a
 // draft before it seals; no native emitter/membership/session proof is claimed.
@@ -30,7 +30,7 @@ function incoming(metadata: Record<string, unknown>, under = definition, kind: S
   const parentDefinition = valid(validateDefinition({ ...declared, name: "context-parent", acts: {
     open: row, spawn: { ...row, step: "transition", sends: [{ create: { ...create.create, kind, definition: under.digest } }] },
   } }, PROPOSED_BOUNDS));
-  const parent = founded(parentDefinition, {});
+  const parent = created(parentDefinition, {});
   const result = parent.judge(parent.intent(keys.rita, "spawn", { on: 0, expected: { on: parent.item(0).revision } }));
   if (result.result !== "write") throw new Error(`scripted parent create was ${result.result}${"reason" in result ? `: ${result.reason}` : ""}`);
   const send = result.draft.sends[0];

@@ -140,7 +140,7 @@ function pin(state: DurableObjectState, named: PlatformDefinition) {
   const kind = named.startsWith("platform:directory-partition@") ? "directory" : named.slice("platform:".length).split("@")[0];
   if (!isScopeKind(kind)) return expect.fail("fixture pin has unsupported scope kind");
   const seed = { ...sample.input.seed, kind, definition: named }, at = { ...sample.at, kind, scope: scopeIdOf(seed) };
-  const entry: Entry = { ...sample, at, input: { ...sample.input, seed, founding: null, kind: platform(named)?.data.genesis ?? "unsupported" }, effects: [], sends: [] };
+  const entry: Entry = { ...sample, at, input: { ...sample.input, seed, "founding": null, kind: platform(named)?.data.genesis ?? "unsupported" }, effects: [], sends: [] };
   const bytes = canonicalize(entry), hash = entryHash(entry);
   state.storage.sql.exec("UPDATE entry SET hash=?,bytes=?,size=? WHERE seq=0", hash, bytes, utf8(bytes).length);
   store.setScope({ ...current, at, head: { seq: 0, hash }, genesis: { ...current.genesis, hash } });

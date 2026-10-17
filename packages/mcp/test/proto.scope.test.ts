@@ -4,7 +4,7 @@ import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
 import { firstExtents } from "@generalbusiness/dap-platform";
 import { pantry } from "./support/pantry.ts";
 import { mcpRoom, type Agent, type Room } from "./support/room.ts";
-import { founded } from "./support/story.ts";
+import { created } from "./support/story.ts";
 
 /** Whether `name` is an own property of `v`, with that value: not lost to the prototype setter, and not the prototype. */
 const own = (v: unknown, name: string): unknown => (v !== null && typeof v === "object" && Object.hasOwn(v, name) ? Object.getOwnPropertyDescriptor(v, name)!.value : "(not own)");
@@ -21,7 +21,7 @@ async function accepted(room: Room, agent: Agent, tool: string, args: Record<str
 /** A room whose directory has created the pantry as lane 1, with rita, its founder, in the given mode. */
 async function pantryRoom(room: Room, mode: "default" | "add"): Promise<Agent> {
   const rita = room.agent("rita", { mode });
-  await founded(room, rita);
+  await created(room, rita);
   await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
   expect((await rita.ok("rules.activate", { fields: { digest: definitionDigest(pantry), name: "pantry" }, values: [canonicalize(pantry)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
   const opened = await rita.ok("issue.create", { fields: { definition: definitionDigest(pantry), title: "The pantry", conditions: ["it keeps"] }, idempotencyKey: "pantry" });

@@ -28,7 +28,7 @@ function chain(sample: Entry, act: Entry, count: number): Entry[] {
   const entries: Entry[] = [act]; let previous = act;
   for (let n = 1; n <= count; n++) {
     const seed: Seed = { ...sample.input.seed, creator: previous.at, cause: previous.input.type === "genesis" ? seedDigest(previous.input.seed) : intentDigest(act.input.signed.intent), ordinal: n };
-    const genesis: Entry = { ...sample, at: { ...sample.at, scope: scopeIdOf(seed) }, time: at(n), input: { ...sample.input, seed, founding: null, source: factRefOf(previous), decision: "applied" }, uses: [useOf(factRefOf(previous), previous)] };
+    const genesis: Entry = { ...sample, at: { ...sample.at, scope: scopeIdOf(seed) }, time: at(n), input: { ...sample.input, seed, "founding": null, source: factRefOf(previous), decision: "applied" }, uses: [useOf(factRefOf(previous), previous)] };
     entries.push(genesis); previous = genesis;
   }
   return entries;

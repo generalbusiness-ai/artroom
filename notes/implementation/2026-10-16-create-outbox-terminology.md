@@ -245,3 +245,75 @@ Separate client and CLI creation-offer route tests each pass in
 /tmp/artroom-create-outbox-client-creation-route-focus.log and
 /tmp/artroom-create-outbox-cli-creation-route-focus.log. No full gate,
 independent terminology review or provider operation has run.
+
+## Remaining identifier and unsigned-wrapper checkpoint
+
+The existing pinned TypeScript 7.0.2 AST API, run from scratch without
+installing anything, classifies the remaining names by syntax. The pass
+renames bindings and references, expands shorthand properties with their
+original quoted keys, and spells native or retained data accesses with
+explicit string keys. This avoids confusing a spread with a property
+access. Scope-making names use creation/created/creator; lookup results
+use matched. Lending discovery and autolink types use DiscoveryResult and
+MatchedLink. No old API export or method alias is added.
+
+SignedCreation now uses creation internally, and the paired unsigned
+POST /v1/scopes wrapper carries creation. Old Entry-v1 genesis input
+founding remains an explicit literal, including the runtime rule view and
+replay reader; the CLI's digested retained install plan also keeps its
+literal. The existing HTTP witness verifies that the removed wrapper key
+is refused before a native turn. This changes no signed request bytes.
+
+The original AST pass found three optional-access punctuation repairs and
+local creation/created collisions with existing names or helpers. The
+first full compiler log records those failures; a partial repair helper
+then stopped on an unmatched source phrase, leaving the duplicate local
+for the second failed compiler invocation. The explicit initialRules
+binding and scoped helper import names resolve them. The third complete
+root compiler passes. Logs are
+/tmp/artroom-create-outbox-remaining-identifiers-first-types.log,
+/tmp/artroom-create-outbox-remaining-identifiers-second-types.log and
+/tmp/artroom-create-outbox-remaining-identifiers-third-types.log.
+
+Canonical comparison after these edits confirms all 36 platform data
+values, catalog names and defaults remain identical to the retained
+b38c578a baseline. The projection is
+/tmp/artroom-create-outbox-platform-catalog-after-identifiers.json.
+This is data correspondence, not Source approval. The AST audit is
+/tmp/artroom-terminology-ast-rename-audit.json; its original proposal
+included six ordinary lookup references in Jam's record.ts. Those edits
+were restored before validation because the module belongs to the exact
+historical deployed-source.json closure. The retained deployment record,
+source and bundle are unchanged. The two existing Jam managed-asset checks
+pass in /tmp/artroom-create-outbox-jam-retained-closure-focus.log.
+Whether the parent's no-found condition includes these unrelated lookup
+locals remains an explicit planner clarification, not a claimed exception
+approval. The other active source has no remaining found identifier in
+the AST inventory. Generated assets still need their final owned builds.
+
+Focused checks pass: 65 derive compose/mark cases, fifteen platform
+version/register cases, five replay decision cases and two CLI install
+plan cases. Their logs use /tmp/artroom-create-outbox-remaining-identifiers-
+with derive-focus.log, platform-focus.log, replay-focus.log and
+install-plan-focus.log. The first native focus passed 24 and failed one
+across six files; its five passing files cover real creation/replay,
+routes and the two renamed MCP fixtures. It retains expected scripted
+reset diagnostics and a native RPC-disposal diagnostic, with no cause or
+leak claim. The HTTP telemetry witness first still expected the old
+operation label, then still expected the public key for a raw SQL row.
+Both original repair failures are retained in the matching
+http-metric-repair.log and http-metric-second-repair.log files.
+
+That witness then exposed a production omission: Turns.run's answer
+classifier still listed found/rpc:found, after the operation labels had
+become create/rpc:create. The classifier is corrected, and the existing
+native HTTP witness now verifies both HTTP creation and an exact RPC
+retry report accepted with their distinct labels. It also verifies the
+removed wrapper is a pre-turn refusal and correlation uses the unchanged
+private SQL key. The repaired case passes in
+/tmp/artroom-create-outbox-http-rpc-create-classifier-focus.log; its earlier
+single-case repair is
+/tmp/artroom-create-outbox-remaining-identifiers-http-classifier-repair.log.
+No whole suite or full terminology gate has run. Whitespace and the
+484-link documentation check pass. Prose, the protected-literal/version
+inventory, owned generated outputs and final line counts remain pending.

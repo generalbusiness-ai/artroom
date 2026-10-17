@@ -35,17 +35,17 @@ test("demo offer exposes only its configured register and admits a previously un
     expect([first.status,offer]).toEqual([200,{v:1,origin,register:at,definition:WEB_DEMO_REGISTER,at:{seq:0,hash:(await lifetime.wait(()=>register.summary())).at.hash},registerItem:{id:0,revision:1,state:"open",host:"github.com",namespace:"generalbusiness-ai",policy:"open",purpose:DEMO_PURPOSE}}]);
     expect(JSON.stringify(offer)).not.toContain(newcomer.key);
     // Native found is the judgment; the anonymous offer grants no authority.
-    const found=await signedIntent(newcomer,{to:at,kind:"found",expected:{register:offer.registerItem.revision},fields:{branch:"main",founderHandle:"@newcomer",recoveryKey:installer.key}},{now:lifetime.now()});
-    const answer=await lifetime.wait(()=>register.stub.submit(found,[]));
+    const matched=await signedIntent(newcomer,{to:at,kind:"found",expected:{register:offer.registerItem.revision},fields:{branch:"main","founderHandle":"@newcomer",recoveryKey:installer.key}},{now:lifetime.now()});
+    const answer=await lifetime.wait(()=>register.stub.submit(matched,[]));
     expect(answer.answer).toBe("accepted");
     if(answer.answer!=="accepted")throw Error("Native demo admission failed");
     // The new pin does not relax an existing keys-only register.
-    const oldInstall=await signedIntent(installer,{to:null,kind:"install",fields:{host:"github.com",namespace:"generalbusiness-ai",policy:"keys",founders:[installer.key]}},{now:lifetime.now()});
+    const oldInstall=await signedIntent(installer,{to:null,kind:"install",fields:{host:"github.com",namespace:"generalbusiness-ai",policy:"keys","founders":[installer.key]}},{now:lifetime.now()});
     const oldSeed:Seed={v:1,kind:"register",definition:"platform:register@3",creator:null,cause:intentDigest(oldInstall.intent),ordinal:0};
     const old=lifetime.platform(scopeIdOf(oldSeed));lifetime.outside(old.name,()=>({accepts:()=>false,send:async()=>null}));
     expect((await lifetime.wait(()=>old.stub.create(oldInstall,"platform:register@3"))).answer).toBe("accepted");
     const oldAt=await lifetime.wait(()=>old.at());
-    const forbidden=await signedIntent(newcomer,{to:oldAt,kind:"found",expected:{register:1},fields:{branch:"main",founderHandle:"@newcomer",recoveryKey:installer.key}},{now:lifetime.now()});
+    const forbidden=await signedIntent(newcomer,{to:oldAt,kind:"found",expected:{register:1},fields:{branch:"main","founderHandle":"@newcomer",recoveryKey:installer.key}},{now:lifetime.now()});
     expect(await lifetime.wait(()=>old.stub.submit(forbidden,[]))).toMatchObject({answer:"refused",reason:"unauthorized"});
     // A separately retained register7 remains available only at its exact full reference.
     const legacyInstall=await signedIntent(installer,{to:null,kind:"install",fields:{host:"github.com",namespace:"generalbusiness-ai",policy:"open",purpose:DEMO_PURPOSE}},{now:lifetime.now()});

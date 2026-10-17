@@ -40,7 +40,7 @@ test('managed recipe preserves all nineteen recorded public bodies and the secur
     assert.equal(headers, "/*\n  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Cache-Control: no-cache\n");
     assert.deepEqual(JSON.parse(await readFile(join(app, 'wrangler.jsonc'), 'utf8')), {
       name: 'artroom-jam', compatibility_date: '2026-10-11',
-      assets: { directory: './deploy/assets', not_found_handling: 'none', run_worker_first: false },
+      assets: { directory: './deploy/assets', "not_found_handling": 'none', run_worker_first: false },
     });
     // Source closure is static and local: no package, model or Worker import is introduced by this move.
     const modules = record.source.filter(row => row.path.endsWith('.ts'));

@@ -3,7 +3,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Digest, Entry, Input, SignedIntent } from "@generalbusiness/dap-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { clockOf, derivable, judgeDelivery, judgeGenesis, runnable, type OutcomeRule, type PlatformRule, type RuleGiven } from "@generalbusiness/dap-derive";
-import { Ledger, T0, deskDefinition, founded } from "@generalbusiness/dap-derive/testing";
+import { Ledger, T0, deskDefinition, created } from "@generalbusiness/dap-derive/testing";
 import { CREATION_ATTEMPTS, DIRECTORY, REGISTER, directoryIdOf, platform, register, registerRules, repositoryName } from "../src/index.ts";
 import { Directory, Register, installing, paul, registerDefinition, registerPlatform, registerSeed, rita, una } from "./support-creation.ts";
 
@@ -45,7 +45,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
   });
   /** What the rule `install` is given: the genesis, with its seed and its founding intent. */
   const installed = (install: SignedIntent, cause = intentDigest(install.intent)): RuleGiven =>
-    ({ ...given(keyed, paul), input: { type: "genesis", seed: registerSeed(install, { cause }), founding: install, source: null, n: null, message: null } });
+    ({ ...given(keyed, paul), input: { type: "genesis", seed: registerSeed(install, { cause }), "founding": install, source: null, n: null, message: null } });
   const run = (name: string, ...args: unknown[]): unknown => (registerRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);
   const PASS = { pass: true, member: null };
   const byRita = given(keyed, rita);
@@ -90,12 +90,12 @@ test("a register is founded by an install intent, under its own definition and n
   const r = new Register();
   const genesis = r.last.input as Extract<Input, { type: "genesis" }>;
   expect([r.at.kind, r.state.scope()!.status, genesis.seed.creator, genesis.kind, genesis.seed.definition, r.at.scope === scopeIdOf(genesis.seed), r.item(0).values])
-    .toEqual(["register", "active", null, "install", REGISTER, true, { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }]);
+    .toEqual(["register", "active", null, "install", REGISTER, true, { host: "git.example", namespace: "artroom", policy: "keys", "founders": [rita.key] }]);
 
   const install = installing(paul, "keys", []);
-  const create = (seed = registerSeed(install), founding = install, definition = registerDefinition, rules = registerPlatform) => {
+  const create = (seed = registerSeed(install), creation = install, definition = registerDefinition, rules = registerPlatform) => {
     const s = new Ledger(definition);
-    return judgeGenesis(s.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding }, { clock: clockOf(s.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules }).result;
+    return judgeGenesis(s.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, creation: creation }, { clock: clockOf(s.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules }).result;
   };
   const byCreation = installing(paul, "keys", [], "found");
   expect([
@@ -110,7 +110,7 @@ test("a register is founded by an install intent, under its own definition and n
     create(registerSeed(install, { kind: "membership" })),
   ]).toEqual(["write", "refused", "source-unverified", "source-unverified", "source-unverified"]);
   // The first delivery's founding of a directory, by a `found` intent, stands as it was.
-  expect(founded().at.kind).toBe("directory");
+  expect(created().at.kind).toBe("directory");
 });
 
 // Authority note, section 12.1.1: the row `found`, the cases a to d, and "The rule `create-repository`, whole" of the note's
@@ -121,17 +121,17 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   expect([r.create(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
   // Section 12.1.1, the row `found`, and row r of the table of marks: a founding whose `founderHandle` is no handle is refused
   // `bad-field`, named `bad-handle`, by the register's own rule `handle-form`, and opens no claim.
-  expect([r.create(rita, { founderHandle: "@Rita" }, "no handle"), r.create(rita, { founderHandle: "rita" }, "no at-sign"), r.state.count("claim", "pending")])
+  expect([r.create(rita, { "founderHandle": "@Rita" }, "no handle"), r.create(rita, { "founderHandle": "rita" }, "no at-sign"), r.state.count("claim", "pending")])
     .toMatchObject([{ result: "refused", reason: "bad-field", name: "bad-handle" }, { result: "refused", reason: "bad-field", name: "bad-handle" }, 0]);
 
-  const signed = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key } });
+  const signed = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: paul.key } });
   expect(r.submit(signed, { platform: registerPlatform, grants: [] }).result).toBe("write");
   const claim = r.head.seq;
   // The claim is `pending`, with the intent's digest, the directory's seed digest, the signing key and the policy value used. No
   // grant judged the act, and the entry records none.
   const seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: r.at, cause: intentDigest(signed.intent), ordinal: 0 } as const;
   expect([r.item(claim).state, r.item(claim).values, (r.last.input as Extract<Input, { type: "act" }>).authority, r.last.sends])
-    .toEqual(["pending", { intent: intentDigest(signed.intent), seed: seedDigest(seed), founder: rita.key, policy: "keys", branch: "main", repository: null }, [], []]);
+    .toEqual(["pending", { intent: intentDigest(signed.intent), seed: seedDigest(seed), "founder": rita.key, policy: "keys", branch: "main", repository: null }, [], []]);
   const creation = `${claim}:0` as const;
   expect(r.state.operation(creation)).toMatchObject({ owner: REGISTER, kind: "create-repository", most: 3, attempts: [{ attempt: 1, outcomes: [] }], selected: null });
   // Case b: the same founding intent again, after its claim exists. Nothing is opened.
@@ -166,7 +166,7 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   // digest the claim holds, with the founder's intent as its cause. It names the `found` entry by its fact, as `claim`, and carries
   // the record that this outcome set, with the fields of the founding intent. It carries no signed intent.
   expect(r.last.sends).toEqual([{ n: 0, to: seed, message: { class: "request", type: "create", body: { fields: {
-    claim: r.fact(claim), repository: { host: "git.example", namespace: "artroom", name: name(2), id: "r2" }, branch: "main", founderHandle: "@rita", recoveryKey: paul.key,
+    claim: r.fact(claim), repository: { host: "git.example", namespace: "artroom", name: name(2), id: "r2" }, branch: "main", "founderHandle": "@rita", recoveryKey: paul.key,
   } } } }]);
   // Case d: attempt 1's own answer arrives later, created. It is not selected, and opens its own deletion. The claim does not change.
   r.outcome(creation, 1, "confirmed", { name: name(1), id: "r1" });
@@ -179,7 +179,7 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   expect(r.last.sends).toEqual([]);
 
   // A second founding, refused at the host for its name: the outcome records the answer, opens the next attempt and derives nothing.
-  const other = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key }, idempotencyKey: "another founding" });
+  const other = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: paul.key }, idempotencyKey: "another founding" });
   expect(r.submit(other, { platform: registerPlatform, grants: [] }).result).toBe("write");
   const second = `${r.head.seq}:0` as const;
   const taken = repositoryName(r.item(r.head.seq).values["seed"] as Digest, 1);

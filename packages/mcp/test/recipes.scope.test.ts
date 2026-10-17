@@ -6,7 +6,7 @@ import { firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/dap-lanes";
 import DOC from "../../../docs/mcp.md?raw";
 import { mcpRoom, type Agent } from "./support/room.ts";
-import { founded } from "./support/story.ts";
+import { created } from "./support/story.ts";
 
 type Mode = "default" | "generic";
 interface Ran { calls: string[]; n: number; answers: string[] }
@@ -68,13 +68,13 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
     // install, create (and Create room, the same calls).
     let register!: ScopeId;
     await recipe("`dap install", [rita], async () => {
-      const installed = accepted(await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" }));
+      const installed = accepted(await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: "install" }));
       register = installed["scope"] as ScopeId;
     });
     await room.wireRegister(register);
     await recipe("`dap create", [rita], async () => {
       fresh(rita);
-      const claimed = accepted(await act(rita, "room.create", register, "found", { fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" }));
+      const claimed = accepted(await act(rita, "room.create", register, "found", { fields: { branch: "main", "founderHandle": "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" }));
       expect((await rita.ok("wait", { scope: register, entry: seqOf(claimed) }))["timedOut"]).toBe(false);
       room.know(rita.config.repository!.destination);
       const seat = accepted(await act(rita, "room.seat", "membership", "seat", { idempotencyKey: "seat" }));
@@ -251,7 +251,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
     const proposeRoom = mcpRoom();
     try {
       const una = proposeRoom.agent("una", { mode });
-      await founded(proposeRoom, una, mode);
+      await created(proposeRoom, una, mode);
       fresh(una);
       accepted(await act(una, "rules.publish", "rules", "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }));
       fresh(una);

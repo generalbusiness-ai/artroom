@@ -43,7 +43,7 @@ export interface Supplied { definition: ValidDefinition; platform: PlatformRules
 /** The receipt of a sealed entry: a view, built after sealing (section 4.1). */
 export function receiptOf({ entry, hash }: Sealed, definition: Digest | PlatformDefinition): Receipt {
   const input = entry.input;
-  const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input.founding ? intentDigest(input.founding.intent) : null;
+  const intent = input.type === "act" ? intentDigest(input.signed.intent) : input.type === "genesis" && input["founding"] ? intentDigest(input["founding"].intent) : null;
   return { fact: { at: entry.at, seq: entry.seq, hash }, definition, intent, effects: entry.effects, sends: entry.sends.map((s): OutboxId => `${entry.seq}.${s.n}`), epoch: 0 };
 }
 
@@ -431,10 +431,10 @@ export class Scope {
    * No grant is asked for: who may found a repository is the authority
    * note's (section 7.1).
    */
-  async create(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
+  async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
     const refused = (reason: Extract<Created, { answer: "refused" }>["reason"]): Created => ({ answer: "refused", reason });
     const name = this.#name;
-    if (!name || !isSigned(founding)) return refused("source-unverified");
+    if (!name || !isSigned(creation)) return refused("source-unverified");
     const { random, resolver } = this.#ports;
     const bounds = this.#bounds;
 
@@ -479,19 +479,19 @@ export class Scope {
     }, (text) => this.validate(text), bounds.namedDefinitions);
     if (!children.ok) return refused("unsupported-definition");
 
-    const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+    const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
     // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
     // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
     const act = own(valid.declared.acts, valid.declared.genesis)!;
-    const fields = readFields(act.fields, founding.intent.fields, bounds);
+    const fields = readFields(act.fields, creation.intent.fields, bounds);
     // No scope exists yet, so no fact can name it: every fact a founding names is foreign.
     const named = fields.ok && !this.#store.scope() ? factsNamed(act.fields, fields.fields, null) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
 
     const texts = Received.beside(besideOf(beside).texts, act.fields, bounds);
-    const asked = (inc: SignedCreation["inc"]): SignedCreation => ({ name, inc, seed, founding });
+    const asked = (inc: SignedCreation["inc"]): SignedCreation => ({ name, inc, seed, creation: creation });
     const context = (clock: Reading) => ({ clock, bounds, facts, source: null, texts: texts.sizes, capabilities: this.#ports.capabilities ?? undefined, platform: platform ?? undefined });
     const pinned = (): Pinned => this.pinned() ?? { named: names, definition: valid, platform };
     const answer = (sealed: Sealed): Created =>
@@ -699,8 +699,8 @@ export class Scope {
       if (standing === null || needs === null || wanted.action !== needs.action || wanted.window.seconds !== needs.window.seconds || wanted.window.once !== needs.window.once) return { result: "unavailable" };
       const held = heldBy(standing, view, clock);
       if (held === null) return { result: "unavailable" };
-      const found = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
-      return found ? { result: "granted", grant: found.grant } : { result: "refused" };
+      const matched = held.find(({ grant, current }) => current && grant.key === wanted.key && grant.actions.includes(wanted.action));
+      return matched ? { result: "granted", grant: matched.grant } : { result: "refused" };
     };
 
     const end = await this.#turns.run<Answer>({

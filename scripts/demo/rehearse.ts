@@ -19,7 +19,7 @@ import { firstExtents, platform } from "@generalbusiness/dap-platform";
 
 /** The three people of the script, each with a fresh config directory. Hardware identity is not verified. */
 export type Person = "founder" | "member" | "maintainer";
-export const HANDLES: Readonly<Record<Person, string>> = { founder: "@hugh", member: "@una", maintainer: "@paul" };
+export const HANDLES: Readonly<Record<Person, string>> = { "founder": "@hugh", member: "@una", maintainer: "@paul" };
 
 /** The local files the people's commands read, by the names they type. */
 export const FILES: Readonly<Record<string, Uint8Array>> = {
@@ -120,7 +120,7 @@ export interface Room {
 export interface Rehearsal { shots: Taken[]; room: Room; ok: boolean }
 
 /** The values a shot's lines named, by the name of their place in the expected lines; a later shot types them. */
-export type Found = Record<string, string>;
+export type CapturedValues = Record<string, string>;
 
 class Missing extends Error {}
 
@@ -130,10 +130,10 @@ interface Shot {
   scene: string;
   who: Person;
   /** The command as typed: a `dap` command line, `git ...`, or `GET <url>`. */
-  typed(v: Found): string[];
-  expect: { code: number; lines: (v: Found) => string[] };
+  typed(v: CapturedValues): string[];
+  expect: { code: number; lines: (v: CapturedValues) => string[] };
   /** After the shot ends: what the stage does that no command prints. */
-  after?(v: Found, stage: Stage): Promise<string>;
+  after?(v: CapturedValues, stage: Stage): Promise<string>;
 }
 
 const slash = (service: string) => service.replace(/\/+$/, "");
@@ -170,11 +170,11 @@ function shots(stage: Stage): Shot[] {
     },
     {
       title: "Create the room", scene: "3", who: "founder",
-      typed: () => ["dap", "create", stage.name, "--handle", HANDLES.founder],
+      typed: () => ["dap", "create", stage.name, "--handle", HANDLES["founder"]],
       expect: { code: 0, lines: () => [
         `Created ${stage.name}: directory <directory>, membership <membership>, rules <rules>, destination <destination>; each created and confirmed.`,
         "Definitions: <...>.",
-        `You are ${HANDLES.founder}, an admin, on key {operatorKey}; your inbox is <founderInbox>.`,
+        `You are ${HANDLES["founder"]}, an admin, on key {operatorKey}; your inbox is <founderInbox>.`,
       ] },
     },
     {
@@ -386,19 +386,19 @@ export const branchFiles = (branch: string): readonly { path: string; bytes: Uin
   { path: "guide/controlled.md", bytes: utf8("# Controlled branch\n\nThis second text file must not publish alone.\n") },
 ];
 
-function need(v: Found, name: string): string {
+function need(v: CapturedValues, name: string): string {
   const value = v[name];
   if (value === undefined) throw new Missing(`no earlier shot printed ${name}`);
   return value;
 }
 
 /** The typed words with each `{name}` filled from the values kept so far. */
-const filled = (words: readonly string[], v: Found): string[] => words.map((word) => word.replace(/\{([A-Za-z]+)\}/g, (_, name: string) => need(v, name)));
+const filled = (words: readonly string[], v: CapturedValues): string[] => words.map((word) => word.replace(/\{([A-Za-z]+)\}/g, (_, name: string) => need(v, name)));
 
 const escaped = (text: string) => text.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
 
 /** One expected line as a pattern: each `<name>` a kept group, `<...>` any text, `{name}` the kept value. */
-function pattern(template: string, v: Found, named: Set<string>): RegExp {
+function pattern(template: string, v: CapturedValues, named: Set<string>): RegExp {
   let source = "";
   for (const part of template.split(/(<[A-Za-z]+>|<\.\.\.>|\{[A-Za-z]+\})/)) {
     if (part === "<...>") source += "[\\s\\S]*?";
@@ -413,20 +413,20 @@ function pattern(template: string, v: Found, named: Set<string>): RegExp {
 }
 
 /** Whether the outcome is the one expected: the exit code, then each line in order. The values it names are kept in `v`. */
-export function judged(expected: { code: number; lines: readonly string[] }, outcome: Outcome, v: Found): string | null {
+export function judged(expected: { code: number; lines: readonly string[] }, outcome: Outcome, v: CapturedValues): string | null {
   if (outcome.code !== expected.code) return `exit ${outcome.code}, where ${expected.code} is expected`;
   if (outcome.lines.length !== expected.lines.length) return `${outcome.lines.length} lines, where ${expected.lines.length} are expected`;
-  const kept: Found = {};
+  const kept: CapturedValues = {};
   for (let i = 0; i < expected.lines.length; i++) {
-    let found: RegExpExecArray | null;
+    let matched: RegExpExecArray | null;
     try {
-      found = pattern(expected.lines[i]!, { ...v, ...kept }, new Set()).exec(outcome.lines[i]!);
+      matched = pattern(expected.lines[i]!, { ...v, ...kept }, new Set()).exec(outcome.lines[i]!);
     } catch (error) {
       if (error instanceof Missing) return `line ${i + 1}: ${error.message}`;
       throw error;
     }
-    if (!found) return `line ${i + 1} is not "${expected.lines[i]}"`;
-    Object.assign(kept, found.groups ?? {});
+    if (!matched) return `line ${i + 1} is not "${expected.lines[i]}"`;
+    Object.assign(kept, matched.groups ?? {});
   }
   Object.assign(v, kept);
   return null;
@@ -455,32 +455,32 @@ export async function plannedOperator(ctx: Context, stage: Pick<Stage, "service"
   const raw = config?.plan as unknown;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const plan = raw as Record<string, unknown>;
-  const founding = plan["founding"];
+  const creation = plan["founding"];
   if (!config || config.key !== "operator" || config.service !== stage.service || plan["service"] !== stage.service
     || plan["register"] !== register || !isScopeId(register) || plan["definition"] !== definition
     || !isPlatformDefinition(definition) || platformName(definition) !== "platform:register" || platform(definition) === null
-    || !isSignedIntentShape(founding) || !verifySignedIntent(founding) || founding.intent.kind !== "install" || founding.intent.to !== null
-    || founding.intent.on !== null || Object.keys(founding.intent.expected).length !== 0
-    || founding.intent.fields["host"] !== stage.host || founding.intent.fields["namespace"] !== stage.namespace
-    || scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(founding.intent), ordinal: 0 }) !== register) return null;
+    || !isSignedIntentShape(creation) || !verifySignedIntent(creation) || creation.intent.kind !== "install" || creation.intent.to !== null
+    || creation.intent.on !== null || Object.keys(creation.intent.expected).length !== 0
+    || creation.intent.fields["host"] !== stage.host || creation.intent.fields["namespace"] !== stage.namespace
+    || scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(creation.intent), ordinal: 0 }) !== register) return null;
   const secret = await ctx.store.secret(config.key);
-  if (!(secret instanceof Uint8Array) || secret.length !== 32 || keyIdOfSecret(secret) !== founding.intent.actor) return null;
+  if (!(secret instanceof Uint8Array) || secret.length !== 32 || keyIdOfSecret(secret) !== creation.intent.actor) return null;
   if (installed) {
     const rawAcknowledgement = plan["acknowledged"];
     if (!rawAcknowledgement || typeof rawAcknowledgement !== "object" || Array.isArray(rawAcknowledgement)) return null;
     const acknowledgement = rawAcknowledgement as Record<string, unknown>;
     const receipt = acknowledgement["receipt"];
     if (acknowledgement["status"] !== "service-acknowledged" || acknowledgement["service"] !== stage.service || !isReceipt(receipt)
-      || receipt.definition !== definition || receipt.intent !== intentDigest(founding.intent) || receipt.fact.at.scope !== register
+      || receipt.definition !== definition || receipt.intent !== intentDigest(creation.intent) || receipt.fact.at.scope !== register
       || receipt.fact.at.kind !== "register" || receipt.fact.seq !== 0 || !isScopeRef(config.register) || canonicalize(config.register) !== canonicalize(receipt.fact.at)) return null;
   }
-  return founding.intent.actor;
+  return creation.intent.actor;
 }
 
 /** The freeze route uses existing generic acts and a normal fresh-head edit.
  * Each command is recorded with its actual exit. A mismatch stops this
  * composite before another mutation; no unknown request is retried. */
-export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controlled: string, expected: { code: number; lines: string[] }, v: Found, manifest: boolean): Promise<Outcome> {
+export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controlled: string, expected: { code: number; lines: string[] }, v: CapturedValues, manifest: boolean): Promise<Outcome> {
   const lines = [`Proposal base: ${oldBase}.`];
   const failure = (reason = "required result did not match"): Outcome => ({ code: 1, lines: [...lines, `Composite stopped: ${reason}. No mutation was retried.`] });
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !isScopeId(controlled)) return failure();
@@ -530,7 +530,7 @@ export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, c
 }
 
 /** Merge the already-admitted loser, then open a distinct fresh-head change. */
-export async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found, monotonic: () => number, now: () => number, measured: (milliseconds: number, at: string) => void): Promise<Outcome> {
+export async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: CapturedValues, monotonic: () => number, now: () => number, measured: (milliseconds: number, at: string) => void): Promise<Outcome> {
   const lines = [`Old base: ${oldBase}; new base: ${newBase}.`];
   const failure = (): Outcome => ({ code: 1, lines: [...lines, "Composite stopped: required result did not match. No mutation was retried."] });
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
@@ -558,7 +558,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const now = () => (stage.now ? stage.now() : Date.now());
   const people: Partial<Record<Person, Context>> = {};
   const personOf = async (who: Person) => (people[who] ??= await stage.person(who));
-  const v: Found = {};
+  const v: CapturedValues = {};
   const taken: Taken[] = [];
   const list = shots(stage);
   let identityStop: string | null = null;

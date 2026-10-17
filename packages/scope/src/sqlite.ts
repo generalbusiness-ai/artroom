@@ -193,12 +193,12 @@ export class SqliteStore implements Store {
    * scope retains.
    */
   page(type: string, states: readonly string[], after: number | null, limit: number): Page {
-    const found: Item[] = [];
+    const matched: Item[] = [];
     for (const state of new Set(states)) {
-      for (const row of this.#all("SELECT record FROM item WHERE type = ? AND state = ? AND id > ? ORDER BY id LIMIT ?", type, state, after ?? -1, limit + 1)) found.push(json<Item>(row["record"]));
+      for (const row of this.#all("SELECT record FROM item WHERE type = ? AND state = ? AND id > ? ORDER BY id LIMIT ?", type, state, after ?? -1, limit + 1)) matched.push(json<Item>(row["record"]));
     }
-    found.sort((a, b) => a.id - b.id);
-    return { items: found.slice(0, limit), more: found.length > limit };
+    matched.sort((a, b) => a.id - b.id);
+    return { items: matched.slice(0, limit), more: matched.length > limit };
   }
 
   relation(owner: ScopeRef, name: string, item: number): Relation | null { return this.#folded("relation", canonicalize([owner.scope, owner.inc, name, item])); }
@@ -226,8 +226,8 @@ export class SqliteStore implements Store {
   }
   observed(of: Pick<ScopeRef, "scope" | "inc">, subject: string): number | null { return this.#folded<ObservedHead>("observed", canonicalize([of.scope, of.inc, subject]))?.seq ?? null; }
   incarnations(scope: ScopeId): readonly Incarnation[] {
-    const found = this.#all("SELECT DISTINCT json_extract(value, '$.of.inc') AS inc FROM folded WHERE kind = 'observed' AND json_extract(value, '$.of.scope') = ?", scope).map((row) => row["inc"] as Incarnation);
-    return found.sort(byteOrder);
+    const matched = this.#all("SELECT DISTINCT json_extract(value, '$.of.inc') AS inc FROM folded WHERE kind = 'observed' AND json_extract(value, '$.of.scope') = ?", scope).map((row) => row["inc"] as Incarnation);
+    return matched.sort(byteOrder);
   }
   texts(item: number, slot: string): readonly Digest[] { return this.#folded<[number, string, Digest[]]>("texts", canonicalize([item, slot]))?.[2] ?? []; }
   prepared(intent: Digest, capability: CapabilityName, step: string): PreparedStep | null {

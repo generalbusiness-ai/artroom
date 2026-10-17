@@ -36,13 +36,13 @@ export async function offers(agent: Agent, mode: "default" | "generic", at: { to
 }
 
 /** Create the register and claim a room through the tools: create, room.create, wait, room.seat, room.first-key, wait. */
-export async function founded(room: Room, rita: Agent, mode: "default" | "generic" = "default", definition: PlatformDefinition = "platform:register@3"): Promise<{ register: ScopeId }> {
-  const installed = await rita.ok("create", { definition, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+export async function created(room: Room, rita: Agent, mode: "default" | "generic" = "default", definition: PlatformDefinition = "platform:register@3"): Promise<{ register: ScopeId }> {
+  const installed = await rita.ok("create", { definition, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: "install" });
   expect(installed["answer"]).toBe("accepted");
   const register = installed["scope"] as ScopeId;
   await room.wireRegister(register);
   const recovery = keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32)));
-  const claimed = await step(rita, mode, { tool: "room.create", scope: register, kind: "found" }, { fields: { branch: "main", founderHandle: "@rita", recoveryKey: recovery }, idempotencyKey: "claim" });
+  const claimed = await step(rita, mode, { tool: "room.create", scope: register, kind: "found" }, { fields: { branch: "main", "founderHandle": "@rita", recoveryKey: recovery }, idempotencyKey: "claim" });
   expect(claimed["answer"], JSON.stringify(claimed)).toBe("accepted");
   const created = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as { seq: number }).seq });
   expect([created["timedOut"], (created["created"] as { kind: string }[]).map((c) => c.kind).sort()]).toEqual([false, ["destination", "directory", "membership", "rules"]]);

@@ -52,7 +52,7 @@ export interface ScopeApi {
    * in `create` sends, which the directory retains for its children.
    * `beside`: the detached texts that the founding intent's fields name.
    */
-  create(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;
+  create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Created>;
   /**
    * Submit an act (section 4.2). A caller with no answer, or an unavailable
    * one, sends the same signed intent again, with the same `beside`.

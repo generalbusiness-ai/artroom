@@ -4,7 +4,7 @@ import type { Attempt, Input, Result, ScopeRef, Seed, Send } from "@generalbusin
 import { deliveryCauseDigest, entryHash, factRefOf, intentDigest, messageDigest, newIncarnation, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { MemoryState, applyEntry, checkpointOf, clockOf, entryOf, fits, judgeCheckpoint, judgeDelivery, judgeDiagnosis, judgeGenesis, owed, prepareRules, stateDigest, useOf } from "../src/index.ts";
 import type { Creation, DeliveryContext, Draft, Fetched, Judged, Source, ValidDefinition } from "../src/index.ts";
-import { Ledger, Scope, T0, arriving, born, creation, d, deliver, deskDefinition, fields, forged, founded, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
+import { Ledger, Scope, T0, arriving, born, creation, d, deliver, deskDefinition, fields, forged, created, judged, keys, laneDefinition, on, sent, t, ticket, ticketDefinition, variant, type Over } from "./fixtures.ts";
 
 const { rita, una } = keys;
 const unverified = { result: "source-unverified" };
@@ -20,10 +20,10 @@ const resealed = (from: Ledger, seq: number, sends: readonly Send[]): Source => 
 
 describe("founding a directory and creating a child (sections 7.1 and 7.2)", () => {
   test("four entries, each derived by its judge: the act, a provisional genesis, the result with its applied clause, and the confirmation", () => {
-    const D = founded();
+    const D = created();
     // A directory has no creator to confirm it. Its genesis holds the founding intent, whose digest is the seed's cause.
-    const found = D.last.input as Extract<Input, { type: "genesis" }>;
-    expect([D.state.scope()!.status, found.seed.creator, found.seed.cause, D.at.scope]).toEqual(["active", null, intentDigest(found.founding!.intent), scopeIdOf(found.seed)]);
+    const matched = D.last.input as Extract<Input, { type: "genesis" }>;
+    expect([D.state.scope()!.status, matched.seed.creator, matched.seed.cause, D.at.scope]).toEqual(["active", null, intentDigest(matched["founding"]!.intent), scopeIdOf(matched.seed)]);
 
     // D.1: the act. Its send is addressed by a seed whose cause is the act's intent digest.
     const act = D.did(rita, "open-issue", fields({ title: "A flaky test" }));
@@ -34,7 +34,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
     const { child: I } = born(D, 1);
     expect(I.last).toMatchObject({
       seq: 0, prev: null, at: { scope: scopeIdOf(seed), kind: "lane" },
-      input: { type: "genesis", seed, kind: ticketDefinition.declared.genesis, founding: null, source: D.fact(1), n: 0, decision: "applied" },
+      input: { type: "genesis", seed, kind: ticketDefinition.declared.genesis, "founding": null, source: D.fact(1), n: 0, decision: "applied" },
       effects: [{ effect: "open", item: 0, type: "intent", state: "open" }, { effect: "party", item: 0, slot: "requester", member: rita.member }, { effect: "value", item: 0, slot: "title", value: "A flaky test" }],
       sends: [
         { n: 0, to: D.at, message: { class: "result", of: { from: D.fact(1), n: 0 }, outcome: "applied" } },
@@ -70,7 +70,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
   });
 
   test("a refused genesis is terminal; a second incarnation's result runs `conflict` and gets no confirmation", () => {
-    const D = founded();
+    const D = created();
     D.did(rita, "open-issue", fields({ title: "refuse" }));
     const { child: R } = born(D, 1);
     // The genesis act's guard refused: the entry is written with no effect, and sends its `refused` result and nothing else.
@@ -93,7 +93,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
   });
 
   test("two deliveries with identical message bytes create two different children, and an exact repeat adds nothing", () => {
-    const D = founded();
+    const D = created();
     const S = asker(D);
     S.did(una, "ask", fields({ desk: D.at }));
     const m = messageDigest(S.entries[2]!.entry.sends[0]!.message);
@@ -123,7 +123,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
   // write. The sending side, where the judge of an outcome derives such a creation, is in `forms-marks.test.ts`. The child's judge
   // is the real one.
   test("a child that an outcome entry creates: its cause is the intent of the act that opened the outcome's operation, which the creation names by a fact", () => {
-    const D = founded();
+    const D = created();
     // D.1 is an act. The copy of it at hand also holds the `operation` record of ordinal 0, as a `found` of a register does.
     const act = D.did(rita, "open-issue", fields({ title: "A repository" }));
     const opener = { ...act, effects: [...act.effects, { effect: "operation", k: 0, owner: "platform:register@1", kind: "create-repository", attempts: 3 }] } as typeof act;
@@ -203,7 +203,7 @@ describe("a relationship update (section 7.3)", () => {
   });
 
   test("a handler whose sends hold two relate sends for one key gets a deciding entry `refused`, with no send but the result", () => {
-    const D = founded();
+    const D = created();
     const X = new Scope(ticketDefinition);
     const tell: Send = { n: 0, to: D.at, message: { class: "request", type: "tell", body: { message: "echo", fields: { peer: X.at, a: 0, b: 0 } } } };
     const source = resealed(X, 1, [tell]);
@@ -216,7 +216,7 @@ describe("a relationship update (section 7.3)", () => {
 
 describe("what a receiver checks in the source entry (section 7.4)", () => {
   test("a result that names an owned send is admitted only from the entry that decided it, in the scope and incarnation addressed", () => {
-    const D = founded();
+    const D = created();
     const S = asker(D);
     deliver(D, S, 2);                                   // D.1 decides S.2 and sends its result at ordinal 1
     const { entry } = D.entries[1]!;
@@ -238,7 +238,7 @@ describe("what a receiver checks in the source entry (section 7.4)", () => {
   });
 
   test("a source entry with the send removed, a message that is not the one sent, or a seed with another cause fails the genesis and the delivery checks", () => {
-    const D = founded();
+    const D = created();
     D.did(rita, "open-issue", fields({ title: "A" }));
     const S = asker(D);
     const genesis = (asked: Creation, source: Source) => judgeGenesis(new MemoryState(), ticketDefinition, asked, { ...reading(D), source });
@@ -280,7 +280,7 @@ describe("what a written refusal or a later clause records of what it read (sect
       def.acts.file.guards.push({ rule: "never" });
       def.receives.closes.guards.push({ rule: "never" });
     });
-    const D = founded();
+    const D = created();
     D.did(rita, "open-issue", fields({ title: "A" }));
     const { asked, context } = creationUnder(D, strict);
     const forGenesis = falsely(new MemoryState(), strict, { genesis: asked, context });
@@ -313,7 +313,7 @@ describe("what a written refusal or a later clause records of what it read (sect
       def.acts.file.fields.proof = proof;
       def.acts.file.guards.push({ fact: { field: "proof", where: [{ equals: { a: { field: "performer" }, b: { field: "opener" } } }] } });
     });
-    const D = founded();
+    const D = created();
     D.did(rita, "open-issue", fields({ title: "A" }));
     const { asked, context } = creationUnder(D, cited, { proof: fetched.fact });
     // The opener is rita, so the guard is false. The entry holds the source entry and P: the child can derive the refusal again from its own retained bytes.
@@ -350,7 +350,7 @@ describe("a clause run in a later entry (sections 6.6 and 6.7)", () => {
       def.items.request.parties = { owner: { fixed: false, required: false, list: false, author: true }, authors: { fixed: false, required: false, list: true, max: 4, author: false } };
       def.acts.ask.sends[0].tell.result.applied = [{ state: "answered" }, { party: { slot: "owner", from: { signer: true } } }, { attribute: { slot: "authors", of: "on" } }];
     });
-    const D = founded();
+    const D = created();
     const S = new Scope(owned);
     S.did(una, "ask", fields({ desk: D.at }));
     deliver(D, S, 2);
@@ -366,7 +366,7 @@ describe("a diagnosis (section 7.4)", () => {
   const answers = (...list: Attempt["answer"][]): Attempt[] => list.map((answer, i) => ({ at: t(i), answer }));
 
   test("the finding follows from the log: `undelivered` only when every attempt was a routing refusal; `delivery-unavailable` leaves the request pending", () => {
-    const D = founded();
+    const D = created();
     const S = asker(D);
     const diagnose = (attempts: Attempt[]) => judgeDiagnosis(S.state, ticketDefinition, { of: { seq: 2, n: 0 }, attempts }, { ...reading(S), origin: S.entries[2]!.entry });
     const diagnosisResult = (attempts: Attempt[]) => {
@@ -392,7 +392,7 @@ describe("a diagnosis (section 7.4)", () => {
 
 describe("checkpoints (section 9.2)", () => {
   test("a checkpoint's digest is the digest of the state folded through its sequence; a wrong digest is refused", () => {
-    const s = asker(founded());
+    const s = asker(created());
     const at = checkpointOf(s.state);
     expect(judgeCheckpoint(s.state, ticketDefinition, { ...at, state: d("0") }, reading(s))).toMatchObject({ result: "refused", reason: "bad-input" });
     const j = judgeCheckpoint(s.state, ticketDefinition, at, reading(s));
@@ -423,7 +423,7 @@ describe("room to settle (section 17.2)", () => {
       d.acts.ask.sends[0].tell.result = { applied: [{ state: "asked" }] };
       d.acts.ask.sends.push(structuredClone(d.acts.ask.sends[0]));
     });
-    const D = founded();
+    const D = created();
     const S = new Scope(x12);                                  // entries 0 and 1: one more than the contract's table, which has a founding only
     const ask = S.did(una, "ask", fields({ desk: D.at, until: t(-60) }));
     // The act: a deadline that reserves 1, two requests that reserve 3 each, and the closing checkpoint. It fits in 11 entries and not in 10.
@@ -484,7 +484,7 @@ describe("room to settle (section 17.2)", () => {
     expect(jobs(["timed-out"]).pending).toEqual({ job: { requested: 3, "timed-out": 3 } });
 
     const budget = { scopeEntries: 10 };
-    const [S, P, D] = [new Scope(x15), new Scope(x15, rita.member, true, 1), founded()];
+    const [S, P, D] = [new Scope(x15), new Scope(x15, rita.member, true, 1), created()];
     /** What the commit does with a judged input at this budget: the entry is folded into a copy of the state, and is kept only if it fits. */
     const commit = (j: { result: string; draft?: Draft }) => {
       if (j.result !== "write" || !j.draft) return j.result;
@@ -554,7 +554,7 @@ describe("room to settle (section 17.2)", () => {
     // Rule A, `asked` to `paused`; rule B, `paused` to `failed`, which is final. Both read one deadline.
     const x11 = variant(ticket, (d) => { pausing(d); d.timed.lapse = { ...d.timed.pause, states: ["paused"], effects: [{ state: "failed" }] }; });
     const S = new Scope(x11);
-    S.did(una, "ask", fields({ desk: founded().at, until: t(-60) }));
+    S.did(una, "ask", fields({ desk: created().at, until: t(-60) }));
     // The chain of 2, the request's 2, and the closing checkpoint. Both timed entries are then written from that reservation.
     expect([x11.deadlines, row(S), S.drain().length, row(S)]).toEqual([{ request: { asked: 2, paused: 1 } }, [3, 5], 2, [5, 3]]);
   });

@@ -27,7 +27,7 @@ import { TokenHost, Vault } from "../../git/test/support/tokens.ts";
 import { CAPABILITY_CODE, type Diagnosis, type EffectAnswer, type EffectRequest, type OperationStatus, type Outside } from "../src/index.ts";
 import { controls } from "../src/testing.ts";
 import { wired } from "./outside.ts";
-import { Lane, START, at, definition, founding, reader, stubOf, una } from "./support.ts";
+import { Lane, START, at, definition, creation, reader, stubOf, una } from "./support.ts";
 
 /** The fixture lane with one form of `hold@1`, so that its holds have a workspace, and a report that names its commit, as `report` of `issue` does. */
 export const staged = variant(definition.declared, (def) => {
@@ -117,13 +117,13 @@ export const C = (digit: string): string => digit.repeat(40);
  * driver sends what an entry opened as soon as that entry is committed.
  */
 export async function hosted(before: (h: Hosted) => void = () => undefined): Promise<{ h: Hosted; prepared: Entry; stage: OperationId; mints: [OperationId, OperationId] }> {
-  const { signed, name } = founding(at(60), staged);
+  const { signed, name } = creation(at(60), staged);
   const c = controls(name, START);
   const h = new Hosted();
   wired.set(name, () => h.ports());
-  const founded = await stubOf(name).create(signed, staged.declared);
-  if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
-  const lane = (h.s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed));
+  const created = await stubOf(name).create(signed, staged.declared);
+  if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
+  const lane = (h.s = new Lane(name, c, created.receipt.fact.at, created.receipt, signed));
   before(h);
   const commitment = await lane.commitment();
   const hold = (await lane.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } })).fact.seq;
