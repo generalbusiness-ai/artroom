@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:875c89799a0de122e22144051c865a28874d1bfe","text":"Merge retired a covered predecessor; the successor is at docs/manual/ten-terms.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:878066eda8378970dbb945eba38d90104a80e21d","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/tokens.test.ts."}
