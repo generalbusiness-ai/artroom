@@ -20,7 +20,7 @@ export interface JournalHead { readonly v: 1; readonly scope: ScopeRef; readonly
 const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 export function journalJSON(body: Uint8Array, maximum: number, work: JournalWork): unknown {
   work.size(body.length);
-  if (body.length > maximum) return refuseJournal("limit");
+  if (body.length > maximum) return work.stop();
   work.metadata(body.length * 3); work.input(body.length, 8);
   let value: unknown;
   try {
@@ -37,11 +37,11 @@ export function journalHead(body: Uint8Array, work: JournalWork): JournalHead {
 }
 export function journalManifest(body: Uint8Array, expected: JournalFormat, work: JournalWork): JournalManifest {
   const r = journalRecord(journalJSON(body, JOURNAL_SELECTION_BYTES, work), ["v", "through", "parent", "format", "entries", "retained", "omitted"]);
-  const head = journalRecord(r["through"], ["seq", "hash"]), range = journalList(r["entries"], 2);
+  const head = journalRecord(r["through"], ["seq", "hash"]), range = journalList(r["entries"], 2, work);
   if (r["v"] !== 1 || journalFormat(r["format"]) !== expected || !journalNatural(head["seq"]) || head["seq"] >= 4096 || !isDigest(head["hash"]) || range.length !== 2 || range[0] !== 0 || range[1] !== head["seq"]) return refuseJournal("manifest");
   const parent = r["parent"] === null ? null : journalId(expected, r["parent"]);
-  const retained = journalList(r["retained"], 512).map(journalRetainedKey);
-  const omitted = journalList(r["omitted"], 8192).map(raw => {
+  const retained = journalList(r["retained"], 512, work).map(journalRetainedKey);
+  const omitted = journalList(r["omitted"], 8192, work).map(raw => {
     const row = journalRecord(raw, ["kind", "digest", "reason"]);
     if (row["kind"] !== "text" || !isDigest(row["digest"]) || row["reason"] !== "detached-text") return refuseJournal("manifest");
     return { kind: "text" as const, digest: row["digest"], reason: "detached-text" as const };

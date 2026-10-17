@@ -44,8 +44,10 @@ export function journalRecord(value: unknown, fields: readonly string[]): Record
   if (keys.length !== fields.length || keys.some(k => !fields.includes(k))) refuseJournal("input");
   return row;
 }
-export function journalList(value: unknown, max: number): unknown[] {
-  return Array.isArray(value) && value.length <= max ? value : refuseJournal("limit");
+export function journalList(value: unknown, max: number, work: JournalWork): unknown[] {
+  work.check();
+  if (!Array.isArray(value)) return refuseJournal("input");
+  return value.length <= max ? value : work.stop();
 }
 export function journalOrdered<T>(rows: readonly T[], key: (row: T) => string, work: JournalWork): T[] {
   const pairs = rows.map(row => ({ row, bytes: utf8(key(row)) }));
@@ -80,10 +82,11 @@ function currentRetained(value: unknown): ArchiveRetainedName {
  * the selected native prefix. Neither matching shape nor these counters
  * prove that the caller ran native admission. */
 export function journalSelection(bytes: string, work: JournalWork): JournalSelection {
-  if (typeof bytes !== "string" || bytes.length > JOURNAL_SELECTION_BYTES) return refuseJournal("limit");
+  if (typeof bytes !== "string") return refuseJournal("input");
+  if (bytes.length > JOURNAL_SELECTION_BYTES) return work.stop();
   work.metadata(bytes.length * 3); // Reserve UTF-8 and metadata work before encoding/parsing.
   work.input(bytes.length * 3, 8);
-  if (utf8(bytes).length > JOURNAL_SELECTION_BYTES) return refuseJournal("limit");
+  if (utf8(bytes).length > JOURNAL_SELECTION_BYTES) return work.stop();
   let value: unknown;
   try { value = parseStrict(bytes); if (canonicalize(value) !== bytes) return refuseJournal("input"); }
   catch { return refuseJournal("input"); }
@@ -94,7 +97,7 @@ export function journalSelection(bytes: string, work: JournalWork): JournalSelec
   if (!journalNatural(head["seq"]) || head["seq"] >= inventoryCeilings.entries || !isDigest(head["hash"])) return refuseJournal("input");
   const through = { seq: head["seq"], hash: head["hash"] };
   const table = new Map<number, JournalEntrySelection>();
-  const rawEntries = journalList(top["entries"], inventoryCeilings.entries);
+  const rawEntries = journalList(top["entries"], inventoryCeilings.entries, work);
   if (rawEntries.length !== through.seq + 1) return refuseJournal("input");
   for (const raw of rawEntries) {
     work.check();
@@ -120,7 +123,7 @@ export function journalSelection(bytes: string, work: JournalWork): JournalSelec
     } else if (mode === "probe") {
       if (r["consumer"] !== "observation-value" || r["purpose"] !== "replay-required" || !["act", "delivery", "outcome"].includes(from.input)) return refuseJournal("input");
       let named = false;
-      for (const rawChoice of journalList(r["choices"], 64)) {
+      for (const rawChoice of journalList(r["choices"], 64, work)) {
         const choice = journalRecord(rawChoice, ["domain", "key"]), candidate = currentRetained(choice["key"]);
         if (choice["domain"] !== (candidate.kind === "definition" ? DOMAINS.definition : candidate.kind === "value" ? candidate.domain : null)) return refuseJournal("input");
         named ||= journalKeyName(candidate) === journalKeyName(key);
@@ -130,21 +133,21 @@ export function journalSelection(bytes: string, work: JournalWork): JournalSelec
     return { origin: from, description: canonicalize(raw) };
   }
   const objects = new Map<string, { key: ArchiveRetainedName; bytes: number; consumers: Map<string, JournalConsumer> }>();
-  for (const raw of journalList(top["objects"], 1024)) {
+  for (const raw of journalList(top["objects"], 1024, work)) {
     work.check();
     const r = journalRecord(raw, ["key", "bytes", "consumers"]), key = currentRetained(r["key"]), name = journalKeyName(key);
     if (!journalNatural(r["bytes"]) || r["bytes"] === 0 || r["bytes"] > RETAINED_INPUT_BYTES) return refuseJournal("input");
     const previous = objects.get(name);
     if (previous && previous.bytes !== r["bytes"]) return refuseJournal("input");
     const chosen = previous ?? { key, bytes: r["bytes"], consumers: new Map<string, JournalConsumer>() };
-    const reasons = journalList(r["consumers"], 4096);
+    const reasons = journalList(r["consumers"], 4096, work);
     if (reasons.length === 0) return refuseJournal("input");
     for (const rawReason of reasons) { const reason = consumer(rawReason, key); chosen.consumers.set(reason.description, reason); }
     objects.set(name, chosen);
-    if (objects.size > inventoryCeilings.attempts) return refuseJournal("limit");
+    if (objects.size > inventoryCeilings.attempts) return work.stop();
   }
   const omissions = new Map<string, { kind: "text"; digest: Digest; reason: "detached-text"; consumers: Map<string, JournalConsumer> }>();
-  for (const raw of journalList(top["omittedTexts"], 8192)) {
+  for (const raw of journalList(top["omittedTexts"], 8192, work)) {
     work.check();
     const r = journalRecord(raw, ["mode", "origin", "consumer", "key", "archive"]), key = journalRecord(r["key"], ["kind", "digest"]);
     if (r["mode"] !== "text" || r["consumer"] !== "detached-text" || r["archive"] !== "omit" || key["kind"] !== "text" || !isDigest(key["digest"])) return refuseJournal("input");
@@ -153,7 +156,7 @@ export function journalSelection(bytes: string, work: JournalWork): JournalSelec
     const chosen = omissions.get(name) ?? { kind: "text" as const, digest: key["digest"], reason: "detached-text" as const, consumers: new Map<string, JournalConsumer>() };
     const description = canonicalize(raw); chosen.consumers.set(description, { origin: from, description }); omissions.set(name, chosen);
   }
-  const ancestryUnwalked = journalList(top["ancestryUnwalked"], inventoryCeilings.entries).map(origin);
+  const ancestryUnwalked = journalList(top["ancestryUnwalked"], inventoryCeilings.entries, work).map(origin);
   if (ancestryUnwalked.some(from => from.input !== "outcome")) return refuseJournal("input");
   const cost = journalRecord(top["cost"], Object.keys(inventoryCeilings)), live = work.budget.admitted(), inventoryCost = {} as JournalCost;
   for (const k of Object.keys(inventoryCeilings) as (keyof JournalCost)[]) {

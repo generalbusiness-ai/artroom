@@ -174,7 +174,7 @@ export async function buildJournalArchive(options: JournalLayoutOptions): Promis
     const metadataBound = selectionBytes.length * 3 + 2048;
     work.spend({ outputWork: metadataBound }); work.input(metadataBound, 2);
     const manifestBytes = canonicalize(manifest), headBytes = canonicalize({ v: 1, scope: selection.at, through: selection.through.seq, hash: selection.through.hash });
-    if (utf8(manifestBytes).length > JOURNAL_SELECTION_BYTES || headBytes.length > 1024) return refuseJournal("limit");
+    if (utf8(manifestBytes).length > JOURNAL_SELECTION_BYTES || headBytes.length > 1024) return work.stop();
     const files = journalPhysicalFiles(segments(entries, work), [...retained.values()], utf8(headBytes), utf8(manifestBytes), work);
     const maker = new JournalObjects(format, work), tree = journalFileTree(files, maker, work);
     const commit = maker.commit(tree, parent, cutoffSeconds(entries.at(-1)!));

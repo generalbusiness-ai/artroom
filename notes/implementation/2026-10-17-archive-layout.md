@@ -218,6 +218,17 @@ parent refusal after only the older commit was removed. The source was
 restored. This is the parent-closure refusal control, rather than a claim
 based only on the reported count.
 
+Checkpoint `d6c86ac0`, tree `1083aa012648b96e12b7f268ec9994be4efe9293`,
+was submitted for read-only advisory `86a5e5d5` before the gate. A later
+self-audit found additional direct size refusals outside the object
+writer/parser. A file-tree witness reproduced accessible earlier objects
+after a zero-file allowance refused the call. The list, description,
+JSON, path, file and generated-manifest size guards now stop the shared
+work state consistently. Invalid non-list/non-string shapes remain input
+refusals. Original run `15585` ended CLOSED 0 after the repair: Git source
+and test typechecks, then eleven focused file/layout cases passed. The
+reproducer's original failed log is retained; it is not passing evidence.
+
 Logs retain the `/tmp/artroom-archive-layout-` prefix. Relevant suffixes
 include `parent-content-control.log`, `buffer-ownership-original-failure.log`,
 `buffer-copy-and-cumulative-files-focus.log`,
@@ -225,7 +236,9 @@ include `parent-content-control.log`, `buffer-ownership-original-failure.log`,
 `advisory-snapshot-terminal-repair-focus.log`,
 `first-complete-closure-focus.log`, `closure-and-operand-focus.log`,
 `cache-depth-opaque-focus.log`, `cache-depth-opaque-repaired-focus.log`,
-`parent-closure-control.log` and `parent-closure-refusal-control.log`.
+`parent-closure-control.log`, `parent-closure-refusal-control.log`,
+`file-limit-terminal-original.log`, `terminal-limits-types.log` and
+`terminal-limits-focus.log`.
 These original focused runs are not a combined gate. One gate at the
 frozen implementation head and complete independent Source review remain
 required before landing.

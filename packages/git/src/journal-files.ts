@@ -12,7 +12,8 @@ function component(name: string): void {
   if (name.length === 0 || name.length > 255 || /[^a-z0-9_.-]/.test(name) || name === "." || name === "..") refuseJournal("tree");
 }
 function pathParts(path: string, work: JournalWork): string[] {
-  if (typeof path !== "string" || path.length > JOURNAL_PATH_BYTES || !path.startsWith("journal/v1/")) return refuseJournal("tree");
+  if (typeof path !== "string" || !path.startsWith("journal/v1/")) return refuseJournal("tree");
+  if (path.length > JOURNAL_PATH_BYTES) return work.stop();
   work.metadata(path.length + 64);
   const parts = path.split("/");
   work.depth(parts.length);
@@ -42,7 +43,7 @@ export function journalPhysicalFiles(segments: readonly ArchiveSegment[], retain
     const names = [...group.files.keys()], shards = archiveShards(names, group.kind);
     for (const { name, path } of shards) {
       work.check();
-      if (prefix.length + path.length > JOURNAL_PATH_BYTES) return refuseJournal("limit");
+      if (prefix.length + path.length > JOURNAL_PATH_BYTES) return work.stop();
       work.metadata(prefix.length + path.length + 64);
       out.push({ path: prefix + path, data: group.files.get(name)! });
     }
@@ -55,7 +56,7 @@ interface Directory { files: Map<string, string>; dirs: Map<string, Directory> }
 /** Mechanical tree writer, usable with synthetic names independently of
  * the initial native selection caps. It grants no archive admission. */
 export function journalFileTree(files: readonly JournalFile[], objects: JournalObjects, work: JournalWork): string {
-  if (files.length > work.limits.files) return refuseJournal("limit");
+  if (files.length > work.limits.files) return work.stop();
   const directory = (): Directory => { work.metadata(128); return { files: new Map(), dirs: new Map() }; };
   const root = directory();
   for (const file of files) {
@@ -92,7 +93,7 @@ export async function journalTreeFiles(reader: JournalObjectReader, tree: string
     const rows = reader.tree(await reader.read(id, "tree"));
     for (const row of rows) {
       work.check();
-      if (prefix.length + row.name.length + (row.mode === "40000" ? 1 : 0) > JOURNAL_PATH_BYTES) return refuseJournal("limit");
+      if (prefix.length + row.name.length + (row.mode === "40000" ? 1 : 0) > JOURNAL_PATH_BYTES) return work.stop();
       work.metadata(prefix.length + row.name.length + 64);
       const path = prefix + row.name;
       if (row.mode === "40000") await visit(row.id, path + "/", depth + 1);

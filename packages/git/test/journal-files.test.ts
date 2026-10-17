@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import type { Digest } from "@generalbusiness/dap-contract";
 import { ArchiveBudget } from "../../scope/src/archive-budget.ts";
-import { journalPhysicalFiles } from "../src/journal-files.ts";
+import { journalFileTree, journalPhysicalFiles } from "../src/journal-files.ts";
+import { JournalObjects } from "../src/journal-objects.ts";
 import { JournalWork } from "../src/journal-work.ts";
 
 // Mechanical logical-name fixture only. The initial full native selector
@@ -22,4 +23,8 @@ test("crossing the fan-out threshold relocates physical leaves while preserving 
   }
   expect(after.length).toBe(4099);
   expect(new Set(after.map(file => file.path)).size).toBe(after.length);
+  const stopped = new JournalWork(new ArchiveBudget({}, () => 0), { files: 0 });
+  const partial = new JournalObjects("sha1", stopped); partial.make("blob", data);
+  expect(() => journalFileTree([{ path: "journal/v1/head.json", data: metadata }], partial, stopped)).toThrow("journal-layout-limit");
+  expect(() => partial.objects()).toThrow("journal-layout-limit");
 });
