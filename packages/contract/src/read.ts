@@ -86,7 +86,7 @@ export interface Dispatched { at: Timestamp; answer: Attempt["answer"] | "acknow
 
 /** One send of one entry, as the outbox holds it (section 7.4). The message itself is in the entry. */
 export interface OutboxItem {
-  duty: OutboxId;
+  outboxId: OutboxId;
   to: ScopeRef | Seed;
   class: Message["class"];
   /** Sealed and not to be dispatched: a send of a provisional scope's genesis, until the confirmation (section 7.2). */

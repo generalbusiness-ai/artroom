@@ -236,9 +236,9 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
     });
 
     await recipe("A send's outcome", [paul], async () => {
-      const duty = (issueOpened.r["duties"] as string[])[0]!;
+      const outboxId = (issueOpened.r["outboxIds"] as string[])[0]!;
       expect(((await paul.ok("sends", { scope: "directory" }))["sends"] as unknown[]).length).toBeGreaterThan(0);
-      expect((await paul.ok("wait", { scope: "directory", duty }))["timedOut"]).toBe(false);
+      expect((await paul.ok("wait", { scope: "directory", outboxId }))["timedOut"]).toBe(false);
     });
     await recipe("`dap verify --all", [paul], async () => {
       const view = await paul.ok("room", {});

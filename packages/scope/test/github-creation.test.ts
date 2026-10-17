@@ -210,8 +210,8 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     expect(await D.item(0)).toMatchObject({ refs: { register, membership: await membership.at(), rules: await rules.at(), destination: await G.at() }, values: { repository: { host: "github.com", namespace: ACCOUNT.login, name: host.name, id: "71" } } });
     const summaries = await Promise.all([R, D, membership, rules, G].map((node) => node.summary()));
     expect(summaries.map((summary) => [summary.value.scope.kind, summary.value.status])).toEqual([["register", "active"], ["directory", "active"], ["membership", "active"], ["rules", "active"], ["destination", "active"]]);
-    const duties = await D.stub.outbox(reader);
-    expect(duties.ok && duties.value.every((duty) => duty.acknowledged !== null)).toBe(true);
+    const outboxItems = await D.stub.outbox(reader);
+    expect(outboxItems.ok && outboxItems.value.every((outboxId) => outboxId.acknowledged !== null)).toBe(true);
     const privateState = () => runInDurableObject(G.object, (_instance, state) => {
       const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
       const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };

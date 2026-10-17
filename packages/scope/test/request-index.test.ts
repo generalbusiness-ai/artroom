@@ -12,6 +12,10 @@ test("the sidecar completely expires a backlog, evicts only at capacity, pages n
     const sql = { exec: (query: string, ...args: (number | string | null)[]) => state.storage.sql.exec(query, ...args) };
     const before = sql.exec("SELECT seq, hash, bytes FROM entry ORDER BY seq").toArray();
     const index = new RequestIndex(sql), now = 2_000_000_000_000, id = "abcdef0123456789", trace = "abcdef0123456789abcdef0123456789";
+    // A row written before the public rename keeps its private SQL column.
+    sql.exec("INSERT INTO request_index(request,trace,time,seq,duty) VALUES (?,?,?,NULL,?)", id, trace, now, "0.0").toArray();
+    const retained = index.page(requestQuery(id, undefined)!, now)!.rows;
+    sql.exec("DELETE FROM request_index").toArray();
     // More than 256 expired rows must all disappear on the one next write.
     sql.exec("WITH RECURSIVE i(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM i WHERE n<500) INSERT INTO request_index(request,trace,time,seq,duty) SELECT ?,?,?,n,NULL FROM i", id, trace, now - REQUEST_AGE_MS - 1).toArray();
     const wrote = index.record(id, trace, now, 0, null);
@@ -22,7 +26,7 @@ test("the sidecar completely expires a backlog, evicts only at capacity, pages n
     if (typeof oldest !== "number") throw Error("Seeded operational row has no position");
     // An insertion with an older time still evicts the oldest retained row;
     // paging orders by time rather than pretending insertion order is time.
-    const dutyWrote = index.record(id, trace, now + 100, null, "0.0");
+    const outboxWrote = index.record(id, trace, now + 100, null, "0.0");
     const count = sql.exec("SELECT COUNT(*) AS n FROM request_index").toArray()[0]!["n"];
     const evicted = sql.exec("SELECT n FROM request_index WHERE n=?", oldest).toArray().length;
     let query = requestQuery(undefined, trace)!, rows: { n: number; time: string }[] = [], pages = 0;
@@ -38,10 +42,11 @@ test("the sidecar completely expires a backlog, evicts only at capacity, pages n
     sql.exec("UPDATE request_index SET time=?", now - REQUEST_AGE_MS - 1).toArray();
     const empty = index.page(requestQuery(id, undefined)!, now);
     const retainedBytes = sql.exec("SELECT COUNT(*) AS n FROM request_index").toArray()[0]!["n"];
-    return { before, after: sql.exec("SELECT seq,hash,bytes FROM entry ORDER BY seq").toArray(), wrote, expired, dutyWrote, count, evicted, rows, pages, empty, retainedBytes };
+    return { before, after: sql.exec("SELECT seq,hash,bytes FROM entry ORDER BY seq").toArray(), retained, wrote, expired, outboxWrote, count, evicted, rows, pages, empty, retainedBytes };
   });
   expect(result.after).toEqual(result.before);
-  expect([result.wrote, result.expired, result.dutyWrote, result.count, result.evicted]).toEqual([true, 0, true, REQUEST_ROWS, 0]);
+  expect(result.retained).toEqual([{ n: expect.any(Number), request: "abcdef0123456789", trace: "abcdef0123456789abcdef0123456789", time: timeOf(2_000_000_000_000), seq: null, outboxId: "0.0" }]);
+  expect([result.wrote, result.expired, result.outboxWrote, result.count, result.evicted]).toEqual([true, 0, true, REQUEST_ROWS, 0]);
   expect(result.pages).toBe(41); expect(result.rows).toHaveLength(REQUEST_ROWS);
   expect(new Set(result.rows.map(row => row.n)).size).toBe(REQUEST_ROWS);
   expect(result.rows.every((row, i) => i === 0 || Date.parse(row.time) <= Date.parse(result.rows[i - 1]!.time))).toBe(true);

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
+import { runInDurableObject } from "cloudflare:test";
 import type { OutboxItem, Entry, Read } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Delivered } from "@generalbusiness/dap-derive";
 import { incidentsOf, type Incident, type Resent } from "../src/index.ts";
+import { OperatorRecord } from "../src/operator.ts";
 import { desk, later, net, settle, ticket, una, type Node } from "./net.ts";
 import type { MetricPoint } from "../src/metrics.ts";
 import { metricBindings } from "./worker.ts";
@@ -15,13 +17,13 @@ import { reader } from "./support.ts";
 interface Surface {
   incidents(reader: unknown, cursor?: string): Promise<Read<readonly Incident[]>>;
   waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: string): Promise<Read<readonly OutboxItem[]>>;
-  resend(duty: unknown): Promise<Resent>;
+  resend(outboxId: unknown): Promise<Resent>;
 }
 const surface = (node: Node) => node.object as unknown as Surface;
 const listed = async (node: Node, list: "diagnosed" | "unanswered") => {
   const read = await surface(node).waiting(reader, list);
   if (!read.ok) throw new Error(read.reason);
-  return read.value.map((duty) => duty.duty);
+  return read.value.map((item) => item.outboxId);
 };
 const recorded = async (node: Node) => {
   const read = await surface(node).incidents(reader);
@@ -50,41 +52,56 @@ describe("the operator's record and the requests that wait (authority note, sect
     const unanswered = await S.did(una, "ask", { fields: { desk: await D.at() } });
     await settle(S, D);
 
-    const duty = (receipt: { fact: { seq: number } }) => `${receipt.fact.seq}.0`;
-    expect([await listed(S, "diagnosed"), await listed(S, "unanswered"), await recorded(S)]).toEqual([[duty(diagnosed)], [duty(unanswered)], []]);
+    const outboxId = (receipt: { fact: { seq: number } }) => `${receipt.fact.seq}.0`;
+    expect([await listed(S, "diagnosed"), await listed(S, "unanswered"), await recorded(S)]).toEqual([[outboxId(diagnosed)], [outboxId(unanswered)], []]);
     // A page is bounded, and says so: a cursor that names no send is `not-found`, and a list of another name is none.
     expect([(await surface(S).waiting(reader, "diagnosed", "x")).ok, (await surface(S).waiting(reader, "others" as never)).ok]).toEqual([false, false]);
 
     // The operator's instruction names the diagnosed request by its entry and ordinal. Transport is watched, and still holds results.
-    const before = { summary: await S.summary(), entries: (await S.entries()).length, row: (await S.duties()).find((d) => d.duty === duty(diagnosed))! };
+    const before = { summary: await S.summary(), entries: (await S.entries()).length, row: (await S.outboxItems()).find((d) => d.outboxId === outboxId(diagnosed))! };
     const sent: Delivered[] = [];
     net.hold = (envelope: Delivered) => { if (envelope.message.class !== "result") sent.push(envelope); return envelope.message.class === "result"; };
-    const answer = await surface(S).resend(duty(diagnosed));
+    const answer = await surface(S).resend(outboxId(diagnosed));
     // One dispatch, of the same envelope: the same source entry, ordinal and message. The request keeps its identity.
     expect([answer, sent]).toEqual([{ sent: true, answer: "wrong-incarnation" }, [await S.envelope(diagnosed.fact.seq)]]);
     // It is bookkeeping: no entry, the same state at the same head, no second diagnosis, and one more attempt in the log of that send. No
     // retry follows by itself. The request still waits, in the same list.
-    const after = (await S.duties()).find((d) => d.duty === duty(diagnosed))!;
+    const after = (await S.outboxItems()).find((d) => d.outboxId === outboxId(diagnosed))!;
     await settle(S);
     for (const seconds of [60, 600]) await later(seconds, S);
     expect([await S.summary().then((s) => [s.at, s.value.items]), (await S.entries()).length, after.diagnosis, after.result, after.attempts.length, sent.length, await listed(S, "diagnosed")])
-      .toEqual([[before.summary.at, before.summary.value.items], before.entries, before.row.diagnosis, null, before.row.attempts.length + 1, 1, [duty(diagnosed)]]);
+      .toEqual([[before.summary.at, before.summary.value.items], before.entries, before.row.diagnosis, null, before.row.attempts.length + 1, 1, [outboxId(diagnosed)]]);
     // It is written to the operator's record, with the scope and the duty, and nothing else.
-    expect(await recorded(S)).toEqual([{ kind: "sent-again", refs: [{ duty: duty(diagnosed) }], scope: await S.at() }]);
+    expect(await recorded(S)).toEqual([{ kind: "sent-again", refs: [{ outboxId: outboxId(diagnosed) }], scope: await S.at() }]);
 
     expect(metrics.filter(p => p.blobs[0] === "incident" && p.blobs[5] === "sent-again").map(p => p.doubles)).toEqual([[1, 0, 1, 0, 0, 0]]);
 
     // A request that is in neither list is not sent again: one that was settled `undelivered`, one that no entry sent, and a value that is no duty ID.
-    expect([await surface(S).resend(duty(refused)), await surface(S).resend("999.0"), await surface(S).resend({ duty: 1 }), sent.length, (await recorded(S)).length])
+    expect([await surface(S).resend(outboxId(refused)), await surface(S).resend("999.0"), await surface(S).resend({ outboxId: 1 }), sent.length, (await recorded(S)).length])
       .toEqual([{ sent: false, reason: "not-waiting" }, { sent: false, reason: "not-found" }, { sent: false, reason: "not-found" }, 1, 1]);
 
     // The acknowledged request is sent again, once: the desk answers with the fact of the entry that recorded it before. Then its late result
     // arrives and settles it, and it waits in no list.
-    expect([await surface(S).resend(duty(unanswered)), sent.length]).toEqual([{ sent: true, answer: "acknowledged" }, 2]);
+    expect([await surface(S).resend(outboxId(unanswered)), sent.length]).toEqual([{ sent: true, answer: "acknowledged" }, 2]);
     // The desk's second attempt of the result was made, and held, when the request reached it again. Its third is due after the retry delay.
     net.hold = null;
     await later(5, D, S);
-    expect([await listed(S, "unanswered"), (await S.duties()).find((d) => d.duty === duty(unanswered))!.result?.clause, (await recorded(S)).map((row) => row.kind)]).toEqual([[], "applied", ["sent-again", "sent-again"]]);
+    expect([await listed(S, "unanswered"), (await S.outboxItems()).find((d) => d.outboxId === outboxId(unanswered))!.result?.clause, (await recorded(S)).map((row) => row.kind)]).toEqual([[], "applied", ["sent-again", "sent-again"]]);
+
+    // Reopen the actual retained sidecar with an old JSON key. Reads expose
+    // the current projection; new writes do not accept the old alias.
+    const history = await S.entries();
+    const retained = await runInDurableObject(S.object, (_instance, state) => {
+      const sql = { exec: (query: string, ...args: (number | string | null)[]) => state.storage.sql.exec(query, ...args) };
+      const oldRefs = JSON.stringify([{ "duty": "1.0" }]);
+      sql.exec("INSERT INTO operator_record(time,scope,kind,refs) SELECT time,scope,kind,? FROM operator_record ORDER BY n LIMIT 1", oldRefs).toArray();
+      const record = new OperatorRecord(sql, { read: () => { throw Error("A read must not ask for the clock"); } }, () => null);
+      const rejected = record.record("sent-again", [{ "duty": "1.0" }] as never);
+      return { refs: record.page(null, 100).incidents.at(-1)!.refs, rejected, bytes: sql.exec("SELECT refs FROM operator_record ORDER BY n DESC LIMIT 1").toArray()[0]!["refs"] };
+    });
+    expect(retained).toEqual({ refs: [{ outboxId: "1.0" }], rejected: false, bytes: '[{"duty":"1.0"}]' });
+    expect((await recorded(S)).at(-1)!.refs).toEqual([{ outboxId: "1.0" }]);
+    expect(await S.entries()).toEqual(history);
   });
 
   test("T41: an incident that writes an entry is in that entry, and the record reads it from there: a creation's result that ran `conflict` names its entry and the entry of its request. The entry is MADE BY HAND: no second incarnation can be made in one namespace", () => {

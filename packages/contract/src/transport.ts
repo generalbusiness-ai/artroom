@@ -78,7 +78,7 @@ export interface ScopeApi {
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>>;
   outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>>;
   /** The outbox status of one send. */
-  duty(scope: string, reader: unknown, duty: OutboxId): Promise<Read<OutboxItem>>;
+  outboxItem(scope: string, reader: unknown, outboxId: OutboxId): Promise<Read<OutboxItem>>;
   /** A page of the history as stored: each entry's canonical bytes. */
   log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
   /** One retained input, by kind and digest; a value also names its byte domain. */

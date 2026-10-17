@@ -31,7 +31,7 @@ test("HTTP and direct RPC retain distinct native turn places and HTTP correlatio
   expect((await api(env.SCOPES).submit(name, offer, [grantOf(rita, atScope, ["offer"])])).answer).toBe("accepted");
   expect(points.some(p => p.blobs[0] === "turn" && p.blobs[3] === "rpc:acts" && p.blobs[8] === "accepted")).toBe(true);
   const kept = await runInDurableObject(object, (_instance, state) => ({ rows: state.storage.sql.exec("SELECT request,trace,seq,duty FROM request_index ORDER BY n").toArray(), entries: state.storage.sql.exec("SELECT bytes FROM entry ORDER BY seq").toArray() }));
-  expect(kept.rows).toEqual([{ request, trace, seq: 0, duty: null }]);
+  expect(kept.rows).toEqual([{ request, trace, seq: 0, outboxId: null }]);
   expect(JSON.stringify(kept.entries)).not.toContain(request);
   // Three actual Worker early-answer sites: invalid name, noncanonical
   // founding, and malformed body. None may be reported as a native turn.

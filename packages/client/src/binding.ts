@@ -53,7 +53,7 @@ export function bindingTransport(service: ServiceBinding): Transport {
     history: (scope, reader, cursor) => call("history", () => service.history(scope, reader, cursor)),
     entry: (scope, reader, seq) => call("entry", () => service.entry(scope, reader, seq)),
     outbox: (scope, reader, cursor) => call("outbox", () => service.outbox(scope, reader, cursor)),
-    duty: (scope, reader, duty) => call("duty", () => service.duty(scope, reader, duty)),
+    outboxItem: (scope, reader, outboxId) => call("outboxItem", () => service.outboxItem(scope, reader, outboxId)),
     log: (scope, reader, cursor) => call("log", () => service.log(scope, reader, cursor)),
     retained: (scope, reader, kind, digest, domain) => call("retained", () => service.retained(scope, reader, kind, digest, domain)),
   };

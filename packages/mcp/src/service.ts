@@ -133,12 +133,12 @@ export const failed = (f: Finding): CallResult => {
 };
 
 /**
- * A native answer, projected for a result: its kind, the fact and the duties of an acceptance, the reason, name and judged head
+ * A native answer, projected for a result: its kind, the fact and the outbox IDs of an acceptance, the reason, name and judged head
  * of a refusal. The receipt's effects are counted, not repeated: `step` reads the entry whole.
  */
 export function projectAnswer(answer: Answer): Record<string, unknown> {
   switch (answer.answer) {
-    case "accepted": return { answer: "accepted", fact: answer.receipt.fact, duties: answer.receipt.sends, effects: answer.receipt.effects.length };
+    case "accepted": return { answer: "accepted", fact: answer.receipt.fact, outboxIds: answer.receipt.sends, effects: answer.receipt.effects.length };
     case "refused": return { answer: "refused", reason: answer.reason, ...(answer.name ? { name: answer.name } : {}), judgedAt: answer.judgedAt };
     default: return { answer: answer.answer, reason: answer.reason };
   }
@@ -456,7 +456,7 @@ export class McpService {
   #answerOf(answer: Answer, at: { scope: string; kind: string; tool: string; retained: boolean; said: { sentence: string; next: string }; phase: string }): Record<string, unknown> {
     const base = { answer: answer.answer, sentence: at.retained ? `${at.said.sentence} This outcome was kept under custody; nothing was sent.` : at.said.sentence, next: at.retained && answer.answer === "refused" ? `${at.said.next} To send the same envelope again, deliberately: resubmit: true.` : at.said.next, scope: at.scope, kind: at.kind, tool: at.tool, retained: at.retained, phase: at.phase };
     switch (answer.answer) {
-      case "accepted": return { ...base, fact: answer.receipt.fact, duties: answer.receipt.sends };
+      case "accepted": return { ...base, fact: answer.receipt.fact, outboxIds: answer.receipt.sends };
       case "refused": return { ...base, reason: answer.reason, ...(answer.name ? { name: answer.name } : {}), judgedAt: answer.judgedAt };
       default: return { ...base, reason: answer.reason };
     }
@@ -497,12 +497,12 @@ export class McpService {
         { scope: scopeArg, seq: { type: "integer", minimum: 0 }, offset: { type: "integer", minimum: 0 } }, ["scope", "seq"], READ, (a) => this.#step(a)),
       tool("record", "A page of the history as stored: each entry's canonical bytes and hash, for a verifier or an exact comparison.",
         { scope: scopeArg, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#record(a)),
-      tool("sends", "A page of a scope's sends with their attempts and results; or, with duty (seq.n, as a receipt lists it), the status of that one send.",
-        { scope: scopeArg, duty: { type: "string" }, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#sends(a)),
+      tool("sends", "A page of a scope's sends with their attempts and results; or, with outboxId (seq.n, as a receipt lists it), the status of that one send.",
+        { scope: scopeArg, outboxId: { type: "string" }, cursor: { type: "string" } }, ["scope"], READ, (a) => this.#sends(a)),
       tool("text", "A retained input by scope, kind and digest: a definition, a foreign entry, a rule's input, a detached text, a snapshot, or a value in its byte domain; paged by bytes with offset.",
         { scope: scopeArg, kind: { enum: ["definition", "entry", "rule", "text", "snapshot", "value"] }, digest: { type: "string" }, domain: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope", "kind", "digest"], READ, (a) => this.#text(a)),
-      tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
-        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, duty: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
+      tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (outboxId) has a result. Returns what it saw and whether it timed out. Never writes.",
+        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, outboxId: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
       tool("settle", "What is known about the envelope under idempotencyKey on target (or the creation of definition): the act's phase and kept outcome, the scope's settlement for an act that is not final, and each preparation step apart. Signs nothing and sends no act.",
         { target: scopeArg, definition: { type: ["string", "object"] }, idempotencyKey: keyArg, cursor: { type: "string" } }, ["idempotencyKey"], READ, (a) => this.#settle(a)),
       tool("credential", "The one-time read credential for a read-token act your key signed (entry: its seq at the destination), read once from the destination's credential route with your session. Its result is a secret: the credential is in the structured field credential only, with the remote URL beside it. Use it with Git; it is not kept here.",
@@ -653,9 +653,9 @@ export class McpService {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
     const reader = await this.#reads.reader(membership);
-    if (typeof args["duty"] === "string") {
-      const read = await this.#reads.transport.duty(scope, reader, args["duty"] as `${number}.${number}`);
-      return read.ok ? ok({ scope, duty: read.value, head: read.at }, BOUNDS.large) : failed({ error: "read", scope, reason: read.reason });
+    if (typeof args["outboxId"] === "string") {
+      const read = await this.#reads.transport.outboxItem(scope, reader, args["outboxId"] as `${number}.${number}`);
+      return read.ok ? ok({ scope, outboxItem: read.value, head: read.at }, BOUNDS.large) : failed({ error: "read", scope, reason: read.reason });
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
     const read = await this.#reads.transport.outbox(scope, reader, cursor?.c);
@@ -770,7 +770,7 @@ export class McpService {
       : answer === "refused" ? `The act under key ${String(key)} was refused; the refusal is kept.`
       : answer === "mismatch" ? `The key ${String(key)} is on another intent of your key at that scope.`
       : `The outcome under key ${String(key)} is unknown: the scope gave no receipt for the exact envelope. The record stays unknown.`;
-    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ? { at: last.at, ...projectAnswer(last.answer) } : null, steps, ...(nextStep !== null ? { cursor: cursorOf({ i: nextStep }), more: `Steps ${fromStep + 1} to ${nextStep} of ${allSteps.length}; call settle with cursor for the rest.` } : {}) });
+    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, outboxIds: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ? { at: last.at, ...projectAnswer(last.answer) } : null, steps, ...(nextStep !== null ? { cursor: cursorOf({ i: nextStep }), more: `Steps ${fromStep + 1} to ${nextStep} of ${allSteps.length}; call settle with cursor for the rest.` } : {}) });
   }
 
   async #membershipRef(given: unknown): Promise<ScopeRef | null> {
@@ -898,9 +898,9 @@ export class McpService {
     const pause = this.#port.pause ?? (() => new Promise<void>((resolve) => { setTimeout(resolve, 1000); }));
     let waiting: ScopeId[] = [scope];
     const poll = async (): Promise<Record<string, unknown> | null> => {
-      if (typeof args["duty"] === "string") {
-        const read = await this.#reads.transport.duty(scope, await this.#reads.reader(membership), args["duty"] as `${number}.${number}`);
-        return read.ok && (read.value.result !== null || read.value.diagnosis !== null) ? { duty: read.value } : null;
+      if (typeof args["outboxId"] === "string") {
+        const read = await this.#reads.transport.outboxItem(scope, await this.#reads.reader(membership), args["outboxId"] as `${number}.${number}`);
+        return read.ok && (read.value.result !== null || read.value.diagnosis !== null) ? { outboxItem: read.value } : null;
       }
       if (typeof args["entry"] === "number") return this.#created(scope, membership, args["entry"], (w) => { waiting = [scope, ...w]; });
       const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));

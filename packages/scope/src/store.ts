@@ -84,9 +84,9 @@ export interface Store extends StateWriter {
   /** The UTF-8 bytes of one retained input, or null, without reading it. */
   retainedSize(kind: Retained["kind"], digest: Digest, domain?: string): number | null;
   /** The row of one send, or null. */
-  duty(seq: number, n: number): OutboxItem | null;
+  outboxItem(seq: number, n: number): OutboxItem | null;
   /** At most `limit` sends after the one at `after`, in the order of `seq` and ordinal. */
-  duties(after: { seq: number; n: number } | null, limit: number): { duties: OutboxItem[]; more: boolean };
+  outboxItems(after: { seq: number; n: number } | null, limit: number): { outboxItems: OutboxItem[]; more: boolean };
 
   // The dispatcher's bookkeeping (section 7.4). None of it is history, and no judgment reads it. Each call is one durable write.
 

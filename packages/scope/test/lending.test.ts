@@ -185,12 +185,12 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
       expect(tells.some(entry => entry.seq === cause.from.seq && entryHash(entry) === cause.from.hash)).toBe(true);
     }
     expect(new Set(answers.map(entry => entry.input.type === "delivery" && entry.input.message.class === "result" ? canonicalize(entry.input.message.of) : "")).size).toBe(7);
-    const duties = await L.stub.outbox(inspector);
-    expect(duties.ok).toBe(true);
-    if (!duties.ok) throw new Error("The lending outbox could not be read.");
+    const outboxItems = await L.stub.outbox(inspector);
+    expect(outboxItems.ok).toBe(true);
+    if (!outboxItems.ok) throw new Error("The lending outbox could not be read.");
     for (const tell of tells) {
       const result = answers.find(entry => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.of.from.seq === tell.seq)!;
-      expect(duties.value.find(duty => duty.duty === `${tell.seq}.0`)).toMatchObject({ held: false, to: await G.at(), acknowledged: { at: await G.at() }, result: { seq: result.seq, clause: "applied" } });
+      expect(outboxItems.value.find(outboxId => outboxId.outboxId === `${tell.seq}.0`)).toMatchObject({ held: false, to: await G.at(), acknowledged: { at: await G.at() }, result: { seq: result.seq, clause: "applied" } });
     }
 
     // Publish repairs a retained gone thing using the live library as primary.

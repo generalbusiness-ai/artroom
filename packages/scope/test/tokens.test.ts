@@ -26,7 +26,7 @@ describe("the token ledger at a real scope, through the host port (authority not
     ]);
     // The staging's request is sent only when both of its tokens are `live`: it is recorded and not sent. The ledger keeps no
     // wake-up of its own: the one alarm is the end of the hold.
-    expect([stager.sent, await h.seen(stage), await s.alarmAt(), await h.duties()]).toMatchObject([[], { state: "pending", sends: [{ attempt: 1, next: null, sent: null }] }, timeMs(at(HOLD)), ["3:0 head pending", `${stage} stage pending`, `${mints[1]} mint unknown`]]);
+    expect([stager.sent, await h.seen(stage), await s.alarmAt(), await h.outboxItems()]).toMatchObject([[], { state: "pending", sends: [{ attempt: 1, next: null, sent: null }] }, timeMs(at(HOLD)), ["3:0 head pending", `${stage} stage pending`, `${mints[1]} mint unknown`]]);
 
     // A restart, a day, and a listing in which the host shows the token. The alarm writes the end of the hold, a timed entry,
     // which is not a staging's: its tokens are not the hold's. Nothing is minted again for that operation, nothing is revoked on
@@ -64,13 +64,13 @@ describe("the token ledger at a real scope, through the host port (authority not
     expect(await s.alarm()).toBe(true);
     await s.restart();
     s.c.clock.now = at(2 * DAY);
-    expect([await s.alarm(), await h.surface.effect(), host.asked.filter((a) => a.call === "revoke" && a.token === 1).map((a) => a.attempt), await h.tokens(), (await h.duties()).includes(`${owed} revoke unknown`), await s.alarmAt()]).toEqual([
+    expect([await s.alarm(), await h.surface.effect(), host.asked.filter((a) => a.call === "revoke" && a.token === 1).map((a) => a.attempt), await h.tokens(), (await h.outboxItems()).includes(`${owed} revoke unknown`), await s.alarmAt()]).toEqual([
       false, 0, [1, 2, 3], { 1: "revoking", 2: "ended" }, true, null,
     ]);
     expect((await h.seen(owed)).operation.attempts.map((a) => a.outcomes.map((o) => o.result))).toEqual([["unknown"], ["refused"], ["refused"]]);
 
     // Only the first request's own answer settles it: the token is `ended`, and the duty is gone. The first `unknown` entry stays.
-    expect([await h.redeliver("revoke", 1), await h.tokens(), (await h.seen(owed)).state, (await h.seen(owed)).operation.attempts[0]!.outcomes.map((o) => o.result), (await h.duties()).filter((d) => d.includes("revoke") || d.includes("mint"))]).toMatchObject([
+    expect([await h.redeliver("revoke", 1), await h.tokens(), (await h.seen(owed)).state, (await h.seen(owed)).operation.attempts[0]!.outcomes.map((o) => o.result), (await h.outboxItems()).filter((d) => d.includes("revoke") || d.includes("mint"))]).toMatchObject([
       { recorded: "written" }, { 1: "ended", 2: "ended" }, "settled", ["unknown", "confirmed"], [],
     ]);
   });

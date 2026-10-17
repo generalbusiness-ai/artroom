@@ -80,7 +80,7 @@ test("each operation of the handle returns a reply only when it has every member
   const refusal = (reason: unknown) => read({ entry: { ...entry, input: { type: "delivery", from: fact, n: 0, message: { class: "request", type: "tell", body: {} }, decision: "refused", reason } }, hash: d });
   // A genesis states its act kind (section 4.1): one text, always present, and never empty.
   const genesis = (kind: object) => read({ entry: { ...entry, input: { type: "genesis", seed: { v: 1, kind: "lane", definition: d, creator: scope, cause: d, ordinal: 0 }, inc: scope.inc, founding: null, source: fact, n: 0, message: { class: "request", type: "create", body: {} }, decision: "refused", ...kind } }, hash: d });
-  const duty = { duty: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
+  const outboxId = { outboxId: "1.0", to: scope, class: "request", held: false, attempts: [{ at: entry.time, answer: "none" }], acknowledged: null, result: null, diagnosis: null };
   const summary = { scope, status: "active", definition: "platform:directory@1", time: entry.time, items: [item], counts: [["note", "draft", 1]] };
   const read = (value: unknown, more: object = {}) => ({ ok: true, at: head, value, complete: true, ...more });
   const less = (whole: Record<string, unknown>, member: string) => Object.fromEntries(Object.entries(whole).filter(([name]) => name !== member));
@@ -113,10 +113,10 @@ test("each operation of the handle returns a reply only when it has every member
       // A reason is that record, with a code the contract names: not a text, and not a name alone.
       refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" }),
       genesis({}), genesis({ kind: "" }), genesis({ kind: null })]],
-    ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
+    ["outbox", (t) => handle(t).outbox("c"), [read([outboxId], { next: "c2" })], [...each(outboxId).map((v) => read([v])), read(outboxId)]],
     ["followOutbox", (t) => handle(t).followOutbox("1.0"),
-      [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
-      [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
+      [read(outboxId), read({ ...outboxId, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
+      [...each(outboxId).map((v) => read(v)), read({ ...outboxId, class: "letter" }), read({ ...outboxId, result: { seq: 2 } }), read({ ...outboxId, diagnosis: { seq: 3, finding: "lost" } }), read({ ...outboxId, attempts: [{ at: entry.time }] })]],
   ];
   // The guard is one function, `ANSWERS`, and both transports call it. So the table is run once, through the service binding, which hands a reply over as it is.
   // What belongs to the HTTP transport (its bytes, its deadline) is in the tests below.

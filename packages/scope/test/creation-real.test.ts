@@ -171,7 +171,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
 
     // Every declared mark has its production rule, so the third child is created and confirmed too. No duty is held or waiting.
     expect([lacking(REGISTER), lacking(DIRECTORY), lacking("platform:membership@2"), lacking("platform:rules@2"), lacking(DESTINATION)]).toEqual([[], [], [], [], []]);
-    expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((duty) => duty.acknowledged !== null)).toBe(true);
+    expect(((await D.stub.outbox(reader)) as { value: readonly { acknowledged: unknown }[] }).value.every((outboxId) => outboxId.acknowledged !== null)).toBe(true);
     // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
     const destinationHost = outsideOf(G.name);
     const firstHead = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
@@ -507,7 +507,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(finished.held?.decisions ?? {}).toEqual({});
     expect(finished.operations.every((operation) => operation.attempts.every((attempt) => attempt.outcomes.length > 0))).toBe(true);
     const outbox = await G.stub.outbox(reader);
-    expect(outbox.ok && outbox.value.filter((duty) => "scope" in duty.to && duty.to.scope === otherLane.scope).map((duty) => [duty.acknowledged, duty.result, duty.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
+    expect(outbox.ok && outbox.value.filter((outboxId) => "scope" in outboxId.to && outboxId.to.scope === otherLane.scope).map((outboxId) => [outboxId.acknowledged, outboxId.result, outboxId.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
     lifetime.unWire(G.name);
 
     // A verifier reads the five histories as bytes and derives every entry again, with the platform package's data and rules: the

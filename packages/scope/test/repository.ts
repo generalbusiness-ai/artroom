@@ -131,7 +131,7 @@ export interface Repository { O: Platform; M: Platform; ritasInbox: Platform; un
 /** Metadata of this fixture's retained creation protocol, never message bodies. */
 export async function inboxConfirmation(repository: Repository) {
   const membership = await repository.M.at(), parent = await repository.M.sealed();
-  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; duty: string; class: OutboxItem["class"]; next: number; alarm: number | null; attempts: OutboxItem["attempts"] }[] = [];
+  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; outboxId: string; class: OutboxItem["class"]; next: number; alarm: number | null; attempts: OutboxItem["attempts"] }[] = [];
   const inboxes = await Promise.all([repository.ritasInbox, repository.unasInbox].map(async inbox => {
     const sealed = await inbox.sealed(), first = sealed[0];
     if (!first || first.entry.input.type !== "genesis") throw new Error("Inbox creation has no retained genesis");
@@ -153,11 +153,11 @@ export async function inboxConfirmation(repository: Repository) {
     for (const [sender, id] of pairs) {
       const read = await sender.stub.outbox(reader);
       if (!read.ok) throw new Error("Creation protocol outbox unavailable");
-      const duty = read.value.find(d => d.duty === id);
-      if (!duty || duty.acknowledged || duty.result || duty.diagnosis || duty.held) continue;
+      const outboxId = read.value.find(d => d.outboxId === id);
+      if (!outboxId || outboxId.acknowledged || outboxId.result || outboxId.diagnosis || outboxId.held) continue;
       const [seq, n] = id.split(".").map(Number);
       const timing = await runInDurableObject(sender.object, async (_instance, state) => ({ next: state.storage.sql.exec<{ next: number }>("SELECT next FROM outbox WHERE seq = ? AND n = ?", seq!, n!).toArray()[0]?.next ?? null, alarm: await state.storage.getAlarm() }));
-      if (timing.next !== null) retries.push({ scope: await sender.at(), inbox: genesis.at, genesis, duty: id, class: duty.class, next: timing.next, alarm: timing.alarm, attempts: duty.attempts.slice(-4) });
+      if (timing.next !== null) retries.push({ scope: await sender.at(), inbox: genesis.at, genesis, outboxId: id, class: outboxId.class, next: timing.next, alarm: timing.alarm, attempts: outboxId.attempts.slice(-4) });
     }
     const summary = await inbox.summary();
     if (canonicalize(summary.value.scope) !== canonicalize(genesis.at)) throw new Error("Inbox view has another full incarnation");

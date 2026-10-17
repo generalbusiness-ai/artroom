@@ -461,7 +461,7 @@ Creates a scope with no existing target, and records it in your configuration so
       "fact": {
         "type": "object"
       },
-      "duties": {
+      "outboxIds": {
         "type": "array",
         "items": {
           "type": "string"
@@ -547,7 +547,7 @@ Joins a room with an invitation link from dap invite (artroom-invite:...), as da
       "fact": {
         "type": "object"
       },
-      "duties": {
+      "outboxIds": {
         "type": "array",
         "items": {
           "type": "string"
@@ -812,7 +812,7 @@ A page of the history as stored: each entry's canonical bytes and hash, for a ve
 
 ### `sends`
 
-A page of a scope's sends with their attempts and results; or, with duty (seq.n, as a receipt lists it), the status of that one send.
+A page of a scope's sends with their attempts and results; or, with outboxId (seq.n, as a receipt lists it), the status of that one send.
 
 ```json
 {
@@ -826,7 +826,7 @@ A page of a scope's sends with their attempts and results; or, with duty (seq.n,
         ],
         "description": "A scope ID; one of register, directory, membership, rules, destination, inbox; or an issue or change number."
       },
-      "duty": {
+      "outboxId": {
         "type": "string"
       },
       "cursor": {
@@ -902,7 +902,7 @@ A retained input by scope, kind and digest: a definition, a foreign entry, a rul
 
 ### `wait`
 
-Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.
+Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (outboxId) has a result. Returns what it saw and whether it timed out. Never writes.
 
 ```json
 {
@@ -938,7 +938,7 @@ Waits at most 60 seconds until one of: a scope's head reaches seq; an item reach
         "type": "integer",
         "minimum": 0
       },
-      "duty": {
+      "outboxId": {
         "type": "string"
       },
       "seconds": {
@@ -1163,7 +1163,7 @@ Signs one act of a scope by its native kind, under the same custody and binding 
       "fact": {
         "type": "object"
       },
-      "duties": {
+      "outboxIds": {
         "type": "array",
         "items": {
           "type": "string"
@@ -1362,7 +1362,7 @@ works; the count given is the default recipe's.
 | Page: Check status | `settle` with the target and the key: 1 | `settle`: 1 | 1 |
 | Page: Record inspection | `room` for the role and key, `record` on membership: 2 | `room`, `record`: 2 | 2 |
 | A capability step | `prepare` at the resource, with the act's own target, kind and fields, then the act tool under the same key, such as `issue.hand-in`: 2 | `prepare`, `actions`, `act`: 3 | 2 |
-| A send's outcome | `sends` on the scope, then `wait` with the duty a receipt named: 2 | `sends`, `wait`: 2 | 2 |
+| A send's outcome | `sends` on the scope, then `wait` with the outbox ID a receipt named: 2 | `sends`, `wait`: 2 | 2 |
 
 Git steps: `clone` and `propose` use Git outside the server. The server
 returns the remote URL and a one-time credential; the agent's own Git, or

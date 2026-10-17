@@ -141,8 +141,8 @@ test("a detached text in a creation message: the child reads the bytes from its 
   await later(1, P);
   const L = await child(late.fact.seq);
   expect(await L.stub.summary(reader)).toMatchObject({ ok: false });
-  const duty = (await P.duties()).find((d) => d.duty === `${late.fact.seq}.0`)!;
-  expect([duty.result, duty.diagnosis, duty.acknowledged, duty.attempts.at(-1)?.answer]).toEqual([null, null, null, "retry"]);
+  const outboxId = (await P.outboxItems()).find((d) => d.outboxId === `${late.fact.seq}.0`)!;
+  expect([outboxId.result, outboxId.diagnosis, outboxId.acknowledged, outboxId.attempts.at(-1)?.answer]).toEqual([null, null, null, "retry"]);
 });
 
 test("a repeat of a decided send is answered from the entry that recorded it, and writes nothing, after both scopes have redacted the text that the message carries", async () => {

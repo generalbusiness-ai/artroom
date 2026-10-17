@@ -64,7 +64,7 @@ export class Node {
     return read.value;
   }
   async entries(): Promise<Entry[]> { return (await this.sealed()).map((s) => s.entry); }
-  async duties(): Promise<readonly OutboxItem[]> {
+  async outboxItems(): Promise<readonly OutboxItem[]> {
     const read = await this.stub.outbox(reader);
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;

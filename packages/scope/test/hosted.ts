@@ -83,7 +83,7 @@ export class Hosted {
     return read.value;
   }
   /** The operations that are not settled: the duties this scope holds. */
-  async duties(): Promise<string[]> {
+  async outboxItems(): Promise<string[]> {
     const read = await this.surface.operations(reader, undefined, true);
     if (!read.ok) throw new Error(`no operations: ${read.reason}`);
     return read.value.map((o) => `${o.operation.id} ${o.operation.kind} ${o.state}`);

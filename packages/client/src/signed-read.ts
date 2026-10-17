@@ -86,7 +86,7 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
     settle: (...args) => transport.settle(...args),
     items: (...args) => transport.items(...args),
     outbox: (...args) => transport.outbox(...args),
-    duty: (...args) => transport.duty(...args),
+    outboxItem: (...args) => transport.outboxItem(...args),
     summary: async (scope, reader) => transport.summary(scope, await as(reader, scope, "summary")),
     queryItems: async (scope, reader, encoded) => {
       const query = readItemQueryParameter(encoded), argument = query && itemQueryArgument(query);

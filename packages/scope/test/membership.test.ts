@@ -41,9 +41,9 @@ describe("authority on real scopes, under the production wiring (authority note,
         const sealed = await node.sealed();
         const alarm = await runInDurableObject(node.object, (_instance, state) => state.storage.getAlarm());
         return { scope: summary.value.scope, head: summary.at, status: summary.value.status, alarm,
-          duties: outbox.ok ? outbox.value.slice(0, 8).map(duty => ({ duty: duty.duty, class: duty.class, held: duty.held, acknowledged: duty.acknowledged, result: duty.result,
-            attemptCount: duty.attempts.length, attempts: duty.attempts.slice(-4).map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
-          dutyCount: outbox.ok ? outbox.value.length : null,
+          outboxItems: outbox.ok ? outbox.value.slice(0, 8).map(outboxId => ({ outboxId: outboxId.outboxId, class: outboxId.class, held: outboxId.held, acknowledged: outboxId.acknowledged, result: outboxId.result,
+            attemptCount: outboxId.attempts.length, attempts: outboxId.attempts.slice(-4).map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
+          outboxCount: outbox.ok ? outbox.value.length : null,
           entries: sealed.slice(-4).map(({ entry, hash }) => ({ seq: entry.seq, hash, type: entry.input.type,
             ...(entry.input.type === "delivery" ? { class: entry.input.message.class } : {}) })) };
       }));
@@ -108,8 +108,8 @@ describe("authority on real scopes, under the production wiring (authority note,
   test("a version of membership that lacks a rule founds nothing: with one rule missing, of the genesis or of a later act that the genesis does not meet, the creation is not decided, and the office keeps the duty until a runtime has every rule, as the platform package's rules alone do", async () => {
     /** What became of the office's one request, and whether the scope that it asks for exists. */
     const created = async (O: Platform, M: Platform) => {
-      const duties = await O.stub.outbox(reader);
-      return [(await M.stub.summary(reader)).ok, duties.ok && duties.value.map((duty) => [duty.class, duty.result, duty.attempts.map((attempt) => attempt.answer)])];
+      const outboxItems = await O.stub.outbox(reader);
+      return [(await M.stub.summary(reader)).ok, outboxItems.ok && outboxItems.value.map((outboxId) => [outboxId.class, outboxId.result, outboxId.attempts.map((attempt) => attempt.answer)])];
     };
     try {
       // A runtime that lacks the rule `role-table`, whose mark stands in the genesis act. The office is a declared definition, and
@@ -252,7 +252,7 @@ describe("authority on real scopes, under the production wiring (authority note,
     const outbox = await made.M.stub.outbox(reader);
     expect(outbox.ok).toBe(true);
     if (!outbox.ok) throw new Error("Completed confirmation outbox unavailable");
-    const confirmation = outbox.value.find(duty => duty.class === "control" && isScopeRef(duty.to) && canonicalize(duty.to) === canonicalize(child.scope))!;
+    const confirmation = outbox.value.find(outboxId => outboxId.class === "control" && isScopeRef(outboxId.to) && canonicalize(outboxId.to) === canonicalize(child.scope))!;
     expect(confirmation.attempts.map(attempt => attempt.answer)).toEqual(["none", "acknowledged"]);
     expect(confirmation.acknowledged).toEqual(child.controls[0]);
   });

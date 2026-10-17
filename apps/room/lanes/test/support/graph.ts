@@ -254,7 +254,7 @@ export class Node<D extends DeclaredDefinition> {
   }
   /** One item as it is now: a copy, so that a scenario can compare it with the item later. */
   async item(id: number): Promise<Item> { return structuredClone((await this.state()).item(id)!); }
-  async duties(): Promise<readonly OutboxItem[]> {
+  async outboxItems(): Promise<readonly OutboxItem[]> {
     const read = await this.handle.scope.outbox();
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;

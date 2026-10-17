@@ -438,13 +438,13 @@ export class SqliteStore implements Store {
       : this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && (row["size"] as number);
   }
-  duty(seq: number, n: number): OutboxItem | null {
-    const row = this.#one(`SELECT ${DUTY} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
+  outboxItem(seq: number, n: number): OutboxItem | null {
+    const row = this.#one(`SELECT ${OUTBOX} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
     return row && outboxItemOf(row);
   }
-  duties(after: { seq: number; n: number } | null, limit: number): { duties: OutboxItem[]; more: boolean } {
-    const rows = this.#all(`SELECT ${DUTY} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
-    return { duties: rows.slice(0, limit).map(outboxItemOf), more: rows.length > limit };
+  outboxItems(after: { seq: number; n: number } | null, limit: number): { outboxItems: OutboxItem[]; more: boolean } {
+    const rows = this.#all(`SELECT ${OUTBOX} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
+    return { outboxItems: rows.slice(0, limit).map(outboxItemOf), more: rows.length > limit };
   }
 
   // ---------------------------------------------------------------- the dispatcher's bookkeeping
@@ -517,11 +517,11 @@ function sendingOf(row: Row): Sending {
 }
 
 /** The columns of an outbox row that a read of its duty returns. */
-const DUTY = "seq, n, target, class, held, attempts, ack, result, diagnosis";
+const OUTBOX = "seq, n, target, class, held, attempts, ack, result, diagnosis";
 
 function outboxItemOf(row: Row): OutboxItem {
   return {
-    duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as OutboxItem["class"], held: row["held"] === 1,
+    outboxId: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as OutboxItem["class"], held: row["held"] === 1,
     attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
   };
 }

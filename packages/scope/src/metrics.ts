@@ -13,7 +13,7 @@ const ENDS = ["answer", "idle", "busy", "clock-behind", "unavailable"] as const;
 const ANSWERS = ["accepted", "refused", "unavailable", "mismatch", "none", "mixed"];
 export const STEPS = ["retained-replies", "owner", "judged"] as const;
 export const EVENTS = ["outside-call-failed", "outside-replies-failed", "outside-recovery-failed"] as const;
-export const METRIC_PLACES = ["create", "acts", "preparations", "rpc:create", "rpc:acts", "rpc:preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "operations", "history", "entries", "outbox", "duty", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
+export const METRIC_PLACES = ["create", "acts", "preparations", "rpc:create", "rpc:acts", "rpc:preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "operations", "history", "entries", "outbox", "outboxItem", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
 // An exhaustive union makes a new contract reason an explicit schema decision.
 const REASONS: Record<RefusalReason | UnavailableReason | MismatchReason | ReadRefusal | SessionRefusal, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true,

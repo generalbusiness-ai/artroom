@@ -288,11 +288,11 @@ const summary = record({
   counts: listOf((c) => Array.isArray(c) && c.length === 3 && text(c[0]) && text(c[1]) && isLocalId(c[2])),
 }, { reservationExpiry: (v) => record({ clock: is("available"), time: isTime, expired: listOf(isLocalId) })(v) || record({ clock: is("unavailable") })(v) });
 export const isSummary = (v: unknown): v is Summary => summary(v);
-const duty = record({
-  duty: isOutboxId, to: (v) => scopeRef(v) || seed(v), class: among(CLASS), held: flag, attempts: listOf(record({ at: isTime, answer: among(DISPATCHED) })), acknowledged: orNull(factRef),
+const outboxItem = record({
+  outboxId: isOutboxId, to: (v) => scopeRef(v) || seed(v), class: among(CLASS), held: flag, attempts: listOf(record({ at: isTime, answer: among(DISPATCHED) })), acknowledged: orNull(factRef),
   result: orNull(record({ seq: isLocalId, clause: among(CLAUSE) })), diagnosis: orNull(record({ seq: isLocalId, finding: among(FINDING) })),
 });
-export const isOutboxItem = (v: unknown): v is OutboxItem => duty(v);
+export const isOutboxItem = (v: unknown): v is OutboxItem => outboxItem(v);
 /** A page of stored entries. Each entry's `bytes` is text a reader hashes and parses itself; it is not read here. */
 const logPage = record({ scope: scopeRef, definition: isDefinitionName, entries: listOf(record({ seq: isLocalId, hash: isDigest, bytes: text })) });
 export const isLogPage = (v: unknown): v is LogPage => logPage(v);

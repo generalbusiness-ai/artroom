@@ -64,7 +64,7 @@ export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => reply is Awai
   history: isRead(isListOf(isSealed)),
   entry: isRead(isSealed),
   outbox: isRead(isListOf(isOutboxItem)),
-  duty: isRead(isOutboxItem),
+  outboxItem: isRead(isOutboxItem),
   log: isRead(isLogPage),
   retained: isRead(isRetainedInput),
 };

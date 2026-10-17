@@ -57,7 +57,7 @@ const position = (cursor: Cursor | undefined, first: number | null): number | nu
 
 /** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
 /** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
-const outboxItemOf = (duty: unknown): [seq: number, n: number] | null => (isOutboxId(duty) ? (duty.split(".").map(Number) as [number, number]) : null);
+const outboxItemOf = (outboxId: unknown): [seq: number, n: number] | null => (isOutboxId(outboxId) ? (outboxId.split(".").map(Number) as [number, number]) : null);
 
 /** The entry that opened an operation and its ordinal there, from its ID, or null. The form is the bytes package's to judge. */
 const operationOf = (id: unknown): [seq: number, k: number] | null => (isOperationId(id) ? (id.split(":").map(Number) as [number, number]) : null);
@@ -320,16 +320,16 @@ export class Reads {
     if (!("scope" in open)) return open;
     const at = cursor === undefined ? null : outboxItemOf(cursor);
     if (cursor !== undefined && !at) return no("not-found");
-    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
-    return { ok: true, at: open.scope.head, value: page.duties, complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
+    const page = this.#store.outboxItems(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
+    return { ok: true, at: open.scope.head, value: page.outboxItems, complete: !page.more, ...(page.more ? { next: page.outboxItems.at(-1)!.outboxId } : {}) };
   }
 
   /** The outbox row of one send, by its duty ID. */
-  duty(reader: unknown, duty: OutboxId): Read<OutboxItem> {
+  outboxItem(reader: unknown, outboxId: OutboxId): Read<OutboxItem> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = outboxItemOf(duty);
-    const row = at ? this.#store.duty(at[0], at[1]) : null;
+    const at = outboxItemOf(outboxId);
+    const row = at ? this.#store.outboxItem(at[0], at[1]) : null;
     return row ? { ok: true, at: open.scope.head, value: row, complete: true } : no("not-found");
   }
 
@@ -399,7 +399,7 @@ export class Reads {
     if (!("scope" in open)) return open;
     const at = cursor === undefined ? null : outboxItemOf(cursor);
     if ((list !== "diagnosed" && list !== "unanswered") || (cursor !== undefined && !at)) return no("not-found");
-    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
-    return { ok: true, at: open.scope.head, value: page.duties.filter((duty) => waitingIn(duty) === list), complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
+    const page = this.#store.outboxItems(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
+    return { ok: true, at: open.scope.head, value: page.outboxItems.filter((item) => waitingIn(item) === list), complete: !page.more, ...(page.more ? { next: page.outboxItems.at(-1)!.outboxId } : {}) };
   }
 }

@@ -65,7 +65,7 @@ test("partition issue facts and bounded concern births use receiver lineage whil
     expect((await refused.entries())[0]!.input).toMatchObject({ type: "genesis", decision: "refused" });
     expect((await P.entries()).some(entry => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.of.from.hash === refusedOpening.receipt.fact.hash && entry.input.message.outcome === "refused")).toBe(true);
     expect((await P.item(refusedOpening.receipt.fact.seq)).refs["scope"] ?? null).toBeNull();
-    expect(await refused.stub.outbox(reader)).toMatchObject({ ok: true, value: [{ duty: "0.0", acknowledged: { at: await P.at() } }] });
+    expect(await refused.stub.outbox(reader)).toMatchObject({ ok: true, value: [{ outboxId: "0.0", acknowledged: { at: await P.at() } }] });
     const refusedAt = await refused.at(), birth = await namespace(env.PLATFORM).births.read(refusedAt, 10000);
     const raw = birth && proofEntry(birth.proof, birth.proof.fact, PROOF_BYTE_BOUNDS.body);
     expect(raw?.input).toMatchObject({ type: "genesis", decision: "refused" });

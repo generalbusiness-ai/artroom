@@ -330,7 +330,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   #context(place: string, identity: OperationalIdentity = { request: null, trace: null }) {
     const context = operationContext(this.metricEnvironment(), this.#name, place, identity, {
       recordEntry: seq => context.identity.request === null || this.#requestIndex.record(context.identity.request, context.identity.trace, Date.now(), seq, null),
-      recordDuty: duty => context.identity.request === null || this.#requestIndex.record(context.identity.request, context.identity.trace, Date.now(), null, duty),
+      recordOutbox: outboxId => context.identity.request === null || this.#requestIndex.record(context.identity.request, context.identity.trace, Date.now(), null, outboxId),
     });
     return context;
   }
@@ -505,7 +505,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * It has no route: who an operator is, and how one is authenticated, is the installation design's. It is reached over the
    * namespace binding, as `dispatch` is.
    */
-  resend(duty: unknown): Promise<Resent> { return this.#invoke("dispatch", () => { this.#first(); return sendAgain(this.#store, this.#transport, this.#clock, this.#record, duty, this.#seconds); }); }
+  resend(outboxId: unknown): Promise<Resent> { return this.#invoke("dispatch", () => { this.#first(); return sendAgain(this.#store, this.#transport, this.#clock, this.#record, outboxId, this.#seconds); }); }
 
   /** A dispatch pass now, or the one in flight. Resolves when it ends, with the number of dispatches and diagnoses it made. */
   dispatch(): Promise<number> { return this.#invoke("dispatch", () => { this.#first(); return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }); }
@@ -571,7 +571,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async history(reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return this.#invoke("history", async () => { this.#first(); await this.#prepared(reader, "history"); await this.#rooted(reader, "history", cursor ?? "0"); return this.#reads.history(reader, cursor); }); }
   async entry(reader: unknown, seq: number): Promise<Read<Sealed>> { return this.#invoke("entries", async () => { this.#first(); await this.#prepared(reader, "entry"); await this.#rooted(reader, "entry", String(seq)); return this.#reads.entry(reader, seq); }); }
   async outbox(reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return this.#invoke("outbox", async () => { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.outbox(reader, cursor); }); }
-  async duty(reader: unknown, duty: OutboxId): Promise<Read<OutboxItem>> { return this.#invoke("duty", async () => { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.duty(reader, duty); }); }
+  async outboxItem(reader: unknown, outboxId: OutboxId): Promise<Read<OutboxItem>> { return this.#invoke("outboxItem", async () => { this.#first(); await this.#prepared(reader, "outbox"); return this.#reads.outboxItem(reader, outboxId); }); }
   async operations(reader: unknown, cursor?: Cursor, open = false): Promise<Read<readonly OperationStatus[]>> { return this.#invoke("operations", async () => { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operations(reader, cursor, open); }); }
   async operation(reader: unknown, operation: OperationId): Promise<Read<OperationStatus>> { return this.#invoke("operations", async () => { this.#first(); await this.#prepared(reader, "operations"); return this.#reads.operation(reader, operation); }); }
   async log(reader: unknown, cursor?: Cursor): Promise<Read<LogPage>> { return this.#invoke("log", async () => { this.#first(); await this.#prepared(reader, "log"); await this.#rooted(reader, "log", cursor ?? "0"); return this.#reads.log(reader, cursor); }); }

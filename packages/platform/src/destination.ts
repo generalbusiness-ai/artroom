@@ -2262,9 +2262,9 @@ function cleanupStatus(publication: Item, changed: { ref?: string | null; token?
   const token = changed.token === undefined ? previous.tokenReason : changed.token;
   const removed = changed.removed ?? previous.refRemoved;
   const state = ref || token ? "cleanup-owed" : removed ? tokensClosed ? "cleaned" : "cleanup-deleted" : publication.state;
-  const duties = { ...(ref ? { refReason: ref } : {}), ...(token ? { tokenReason: token } : {}), tokenAttempts: Math.max(previous.tokenAttempts, changed.tokenAttempts ?? 0), refRemoved: removed };
+  const pendingWork = { ...(ref ? { refReason: ref } : {}), ...(token ? { tokenReason: token } : {}), tokenAttempts: Math.max(previous.tokenAttempts, changed.tokenAttempts ?? 0), refRemoved: removed };
   const deletes = Math.max(publication.values["cleanupAttempts"] as number, changed.deletes ?? 0);
-  return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(duties) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: duties as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
+  return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(pendingWork) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: pendingWork as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
 }
 const generations = (publication: Item, given: RuleGiven): CheckGeneration[] => {
   const value = publication.values["passes"];

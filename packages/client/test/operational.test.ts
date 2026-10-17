@@ -4,7 +4,7 @@ import { httpTransport, TransportError, type Fetch } from "../src/index.ts";
 const scope = `sc_${"a".repeat(52)}` as const;
 const head = { seq: 7, hash: `sha256:${"a".repeat(64)}` };
 const request = "abcdef0123456789", time = "2099-01-01T00:00:00Z";
-const correlations = { ok: true, at: head, complete: false, next: "4070908800000.1", value: { rows: [{ n: 1, request, trace: null, time, seq: 7, duty: null }], window: { oldest: time, newest: time } } };
+const correlations = { ok: true, at: head, complete: false, next: "4070908800000.1", value: { rows: [{ n: 1, request, trace: null, time, seq: 7, outboxId: null }], window: { oldest: time, newest: time } } };
 
 // Invariant: operational reads use the existing finite HTTP transport,
 // validate their complete typed envelope and never put a session in the URL.
@@ -24,7 +24,7 @@ test("operational reads preserve heads, partial pages and refusals; malformed or
     { ...correlations, complete: "yes" },
     { ...correlations, value: { ...correlations.value, window: null } },
     { ...correlations, value: { ...correlations.value, rows: [{ ...correlations.value.rows[0], request: "1111111111111111" }] } },
-    { ...correlations, value: { ...correlations.value, rows: [{ ...correlations.value.rows[0], duty: "not-a-duty" }] } },
+    { ...correlations, value: { ...correlations.value, rows: [{ ...correlations.value.rows[0], outboxId: "not-a-duty" }] } },
     { ok: false, reason: "provider-private-error" },
   ]) {
     answer = wrong;

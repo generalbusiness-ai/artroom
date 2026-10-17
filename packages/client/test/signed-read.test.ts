@@ -68,7 +68,7 @@ test("a transport with signed reads signs summary, history, entry, log and retai
     history = this.#http.history;
     entry = this.#http.entry;
     outbox = this.#http.outbox;
-    duty = this.#http.duty;
+    outboxItem = this.#http.outboxItem;
     log = this.#http.log;
     retained = this.#http.retained;
     submit(...args: Parameters<Transport["submit"]>) { return this.#http.submit(...args); }

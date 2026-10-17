@@ -137,7 +137,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -218,7 +218,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -456,7 +456,7 @@
     },
     {
       "name": "sends",
-      "description": "A page of a scope's sends with their attempts and results; or, with duty (seq.n, as a receipt lists it), the status of that one send.",
+      "description": "A page of a scope's sends with their attempts and results; or, with outboxId (seq.n, as a receipt lists it), the status of that one send.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -467,7 +467,7 @@
             ],
             "description": "A scope ID; one of register, directory, membership, rules, destination, inbox; or an issue or change number."
           },
-          "duty": {
+          "outboxId": {
             "type": "string"
           },
           "cursor": {
@@ -536,7 +536,7 @@
     },
     {
       "name": "wait",
-      "description": "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
+      "description": "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (outboxId) has a result. Returns what it saw and whether it timed out. Never writes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -569,7 +569,7 @@
             "type": "integer",
             "minimum": 0
           },
-          "duty": {
+          "outboxId": {
             "type": "string"
           },
           "seconds": {
@@ -729,7 +729,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -840,7 +840,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -951,7 +951,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1101,7 +1101,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1242,7 +1242,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1379,7 +1379,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1510,7 +1510,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1638,7 +1638,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1768,7 +1768,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1904,7 +1904,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2179,7 +2179,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2290,7 +2290,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2401,7 +2401,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2531,7 +2531,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2656,7 +2656,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2804,7 +2804,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -2928,7 +2928,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3047,7 +3047,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3157,7 +3157,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3267,7 +3267,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3397,7 +3397,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3532,7 +3532,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3651,7 +3651,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3770,7 +3770,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -3915,7 +3915,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4062,7 +4062,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4190,7 +4190,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4352,7 +4352,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4474,7 +4474,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4585,7 +4585,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4709,7 +4709,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4828,7 +4828,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4960,7 +4960,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5081,7 +5081,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5209,7 +5209,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5346,7 +5346,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5480,7 +5480,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5590,7 +5590,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5712,7 +5712,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5822,7 +5822,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -5932,7 +5932,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6056,7 +6056,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6175,7 +6175,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6285,7 +6285,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6404,7 +6404,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6514,7 +6514,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6644,7 +6644,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6769,7 +6769,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -6882,7 +6882,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7001,7 +7001,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7120,7 +7120,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7224,7 +7224,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7350,7 +7350,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7476,7 +7476,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7661,7 +7661,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7771,7 +7771,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"
@@ -7927,7 +7927,7 @@
           "fact": {
             "type": "object"
           },
-          "duties": {
+          "outboxIds": {
             "type": "array",
             "items": {
               "type": "string"

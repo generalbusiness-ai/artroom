@@ -67,9 +67,9 @@ const i1: Entry = {
 };
 
 // The views, built after sealing.
-const duty: OutboxId = "17.0";
+const outboxId: OutboxId = "17.0";
 const envelope: Envelope = { to: "sc_issue", from: d17Fact, n: 0, message: d17.sends[0]!.message };
-const receipt: Receipt = { fact: d17Fact, definition: "platform:directory@1", intent: d("a"), effects: d17.effects, sends: [duty], epoch: 0 };
+const receipt: Receipt = { fact: d17Fact, definition: "platform:directory@1", intent: d("a"), effects: d17.effects, sends: [outboxId], epoch: 0 };
 const accepted: Answer = { answer: "accepted", receipt };
 const refused: Answer = { answer: "refused", reason: "revision-moved", judgedAt: { seq: 18, hash: d18Fact.hash } };
 const settled: Read<Receipt> = { ok: true, at: { seq: 18, hash: d18Fact.hash }, value: receipt, complete: true };

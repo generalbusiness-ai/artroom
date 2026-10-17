@@ -191,3 +191,57 @@ demo-route and client invocation passes three cases across two Scope
 files in /tmp/artroom-create-outbox-demo-route-outbox-focus.log. Its
 additional client/CLI paths were outside that selected project and are
 not claimed as executed. No full terminology gate has run.
+
+## Outbox fields and retained operational records
+
+ScopeApi and its HTTP/RPC implementations now expose outboxItem for one
+send; the existing outbox route and its protected-read policy remain the
+same. The SDK follows it with followOutbox. Public item and operational
+reference IDs are outboxId. The MCP sends/wait argument is outboxId;
+returned items use outboxItem, and acceptance projections list outboxIds.
+No old method or public argument alias is retained. The MCP reference
+schemas and owned mcp-tools.json are updated from the existing derivation.
+
+The private request_index SQL column remains duty: its current public
+projection is outboxId, so existing rows need no destructive migration.
+OperatorRecord reads normalize only an exact retained one-key duty
+reference with a valid unchanged seq.n ID. New writes accept the current
+outboxId form only. The journal, receipt ID strings, dispatch state,
+read authorization and native definitions are unchanged by this mapping.
+The existing request-index and operator journeys now witness an old SQL
+row and an old retained JSON reference respectively, including unchanged
+native entries, unchanged retained JSON bytes, and refusal of the old key
+on a new operator write. The JSON witness reopens the record against
+actual local SQLite; it does not claim a deployed restart.
+
+The first field-pass compiler invocation failed on the quoted recordDuty
+Pick member, a prototype transport member and one dispatcher spread
+binding. These are repaired; the second complete root compiler passes.
+The operator journey's local ID helper calls were also corrected before
+its focused runtime invocation. Logs are
+/tmp/artroom-create-outbox-outbox-fields-first-types.log and
+/tmp/artroom-create-outbox-outbox-fields-second-types.log.
+
+The first native focus records nine passing and one failing case across
+five files. Its failure was the telemetry witness reading the private SQL
+column with the new public name. The SQL assertion is restored to duty;
+only the affected telemetry file was rerun, and its three cases pass.
+The original failure is retained in
+/tmp/artroom-create-outbox-outbox-fields-first-native-focus.log; the repair
+is /tmp/artroom-create-outbox-outbox-fields-telemetry-repair-focus.log.
+The other four files include the retained-record, protected read and SDK
+outbox witnesses. Thirteen client envelope/signed-read/operational cases
+pass in /tmp/artroom-create-outbox-outbox-fields-client-focus.log.
+
+Both native MCP recipe cases pass in
+/tmp/artroom-create-outbox-outbox-mcp-recipes-focus.log. The first Node
+schema focus passed five cases and failed the stale documentation
+reference. After updating the Markdown schemas and deriving the JSON
+catalog with the repository's MCP_WRITE_DOCS path, its one affected
+reference case passes in
+/tmp/artroom-create-outbox-outbox-mcp-reference-repair.log; the original
+failure is /tmp/artroom-create-outbox-outbox-mcp-schema-focus.log.
+Separate client and CLI creation-offer route tests each pass in
+/tmp/artroom-create-outbox-client-creation-route-focus.log and
+/tmp/artroom-create-outbox-cli-creation-route-focus.log. No full gate,
+independent terminology review or provider operation has run.

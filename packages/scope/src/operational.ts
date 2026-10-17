@@ -9,14 +9,14 @@ import { Metrics, type Metric, type MetricBinding } from "./metrics.ts";
 export interface MetricEnvironment { METRICS?: MetricBinding; DEPLOYMENT?: string; VERSION_METADATA?: { id: string } }
 export interface OperationalIdentity { request: string | null; trace: string | null }
 /** Internal RPC surface only. It cannot name a driver, operator or authority method. */
-export const OBSERVED_METHODS = ["create", "submit", "prepare", "settle", "summary", "items", "queryItems", "history", "entry", "outbox", "duty", "log", "retained", "session", "stream", "incidents", "waiting", "requests", "credential", "reservationSnapshot"] as const;
+export const OBSERVED_METHODS = ["create", "submit", "prepare", "settle", "summary", "items", "queryItems", "history", "entry", "outbox", "outboxItem", "log", "retained", "session", "stream", "incidents", "waiting", "requests", "credential", "reservationSnapshot"] as const;
 export type ObservedMethod = typeof OBSERVED_METHODS[number];
 export const operationPlace = (method: ObservedMethod): string => ({ submit: "acts", prepare: "preparations", entry: "entries", session: "sessions", queryItems: "query-items", reservationSnapshot: "reservation-snapshot" } as Partial<Record<ObservedMethod, string>>)[method] ?? method;
 interface Invocation {
   metrics: Metrics;
   users: number;
   recordEntry?: (seq: number) => boolean;
-  recordDuty?: (duty: OutboxId) => boolean;
+  recordOutbox?: (outboxId: OutboxId) => boolean;
 }
 export interface Operational {
   identity: OperationalIdentity;
@@ -34,7 +34,7 @@ export function operational(): Operational | undefined {
   return context && context.invocation.users > 0 ? context : undefined;
 }
 /** Operational inputs are untrusted correlation, not reader or signer identities. */
-export function operationContext(env: MetricEnvironment, scope: string | null, place: string, identity: OperationalIdentity, sidecar?: Pick<Invocation, "recordEntry" | "recordDuty">): Operational {
+export function operationContext(env: MetricEnvironment, scope: string | null, place: string, identity: OperationalIdentity, sidecar?: Pick<Invocation, "recordEntry" | "recordOutbox">): Operational {
   const request = isRequestId(identity.request) ? identity.request : null;
   const trace = isTraceId(identity.trace) ? identity.trace : null;
   return { identity: { request, trace }, place, turn: { entered: false, known: true }, httpPublic: false, invocation: {
@@ -69,10 +69,10 @@ export function entryCorrelation(seq: number): void {
   if (context.entryFailures) context.entryFailures.count++;
   else context.invocation.metrics.sidecar(true, true);
 }
-export function dutyCorrelation(duty: OutboxId): void {
+export function outboxCorrelation(outboxId: OutboxId): void {
   const context = operational();
-  if (!context?.invocation.recordDuty) return;
-  try { if (context.invocation.recordDuty(duty)) return; } catch { /* below */ }
+  if (!context?.invocation.recordOutbox) return;
+  try { if (context.invocation.recordOutbox(outboxId)) return; } catch { /* below */ }
   context.invocation.metrics.sidecar();
 }
 /** A missing execution mark is a critical coverage loss, never pre-turn proof. */
@@ -92,7 +92,7 @@ function location(request: Request): { place: string; scope: string | null } {
     let scope: string | null = null;
     try { const decoded = decodeURIComponent(parts[3]); if (isScopeId(decoded)) scope = decoded; } catch { /* invalid name, no free text */ }
     const route = parts[4] || "summary";
-    const place = route === "outbox" && parts[5] ? "duty" : ["acts", "preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "history", "entries", "outbox", "log", "retained", "sessions", "stream", "incidents", "waiting", "requests", "credential"].includes(route) ? route : "other";
+    const place = route === "outbox" && parts[5] ? "outboxItem" : ["acts", "preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "history", "entries", "outbox", "log", "retained", "sessions", "stream", "incidents", "waiting", "requests", "credential"].includes(route) ? route : "other";
     return { place, scope };
   }
   if (parts[1] === "health" && parts.length === 2) return { place: "health", scope: null };

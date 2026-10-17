@@ -958,20 +958,20 @@ export async function issueCreation(room: Room, result: Acted, current: () => bo
     const child = row?.refs["scope"];
     if (!row || row.state !== "listed") return unavailable;
     const pending = async (provisional: boolean): Promise<IssueCreation> => {
-      const dutyId: OutboxId = `${receipt.fact.seq}.${creates[0]!.n}`;
-      if (!receipt.sends.includes(dutyId)) return unavailable;
+      const outboxId: OutboxId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      if (!receipt.sends.includes(outboxId)) return unavailable;
       if (!current()) return unavailable;
-      const read = await handle.followOutbox(dutyId);
+      const read = await handle.followOutbox(outboxId);
       if (!current()) return unavailable;
       if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
-      const duty = read.value;
-      if (duty.duty !== dutyId || duty.class !== "request" || duty.held || canonicalize(duty.to) !== canonicalize(seed) || duty.diagnosis !== null) return unavailable;
+      const outboxItem = read.value;
+      if (outboxItem.outboxId !== outboxId || outboxItem.class !== "request" || outboxItem.held || canonicalize(outboxItem.to) !== canonicalize(seed) || outboxItem.diagnosis !== null) return unavailable;
       const final = await summaryOf(handle);
       if (!current()) return unavailable;
       if (canonicalize(final.summary.scope) !== canonicalize(receipt.fact.at)) return unavailable;
       // A normal listed row has no child reference until create.applied.
       // An applied result can precede the earlier projection or child confirmation.
-      if ((!provisional && duty.result === null) || (duty.result?.clause === "applied" && (provisional || duty.result.seq > at.seq))) return { state: "pending" };
+      if ((!provisional && outboxItem.result === null) || (outboxItem.result?.clause === "applied" && (provisional || outboxItem.result.seq > at.seq))) return { state: "pending" };
       return unavailable;
     };
     if (child === undefined || child === null) return await pending(false);

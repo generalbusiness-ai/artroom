@@ -128,7 +128,7 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
       if (reply.ok && reply.value.rows.some(row => row.request !== request)) throw new TransportError("the reply does not match the request ID");
       return reply;
     },
-    duty: (scope, reader, duty) => call("duty", `/${part(scope)}/outbox/${part(duty)}`, reader),
+    outboxItem: (scope, reader, outboxId) => call("outboxItem", `/${part(scope)}/outbox/${part(outboxId)}`, reader),
     log: (scope, reader, cursor) => call("log", `/${part(scope)}/log${page(cursor)}`, reader),
     retained: (scope, reader, kind, digest, domain) => call("retained", `/${part(scope)}/retained/${part(kind)}/${part(digest)}${domain === undefined ? "" : `?domain=${part(domain)}`}`, reader),
   };

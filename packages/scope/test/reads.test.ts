@@ -32,10 +32,10 @@ describe("reads (section 9.1)", () => {
     ]);
 
     // The outbox has one row for each send of the entry, by its duty ID. Nothing has dispatched them.
-    const duty = { held: false, attempts: [], result: null, diagnosis: null };
+    const outboxId = { held: false, attempts: [], result: null, diagnosis: null };
     expect(await s.stub.outbox(reader)).toMatchObject({
       ok: true, at: summary.at, complete: true,
-      value: [{ ...duty, duty: link.sends[0], to: otherLane, class: "request" }, { ...duty, duty: link.sends[1], to: { kind: "lane", creator: s.at, ordinal: 0 }, class: "request" }],
+      value: [{ ...outboxId, outboxId: link.sends[0], to: otherLane, class: "request" }, { ...outboxId, outboxId: link.sends[1], to: { kind: "lane", creator: s.at, ordinal: 0 }, class: "request" }],
     });
     expect(link.sends).toEqual(["13.0", "13.1"]);
 

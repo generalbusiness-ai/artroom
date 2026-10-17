@@ -142,7 +142,7 @@ export class ScopeHandle {
   }
 
   /** Follow a duty: the outbox status of one send, by the duty ID a receipt lists. */
-  followOutbox(duty: OutboxId): Promise<Read<OutboxItem>> { return this.#transport.duty(this.scope, this.#reader, duty); }
+  followOutbox(outboxId: OutboxId): Promise<Read<OutboxItem>> { return this.#transport.outboxItem(this.scope, this.#reader, outboxId); }
 }
 
 /**

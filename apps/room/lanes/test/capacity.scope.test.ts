@@ -43,7 +43,7 @@ test("T7, pending settlement at full capacity, for a copy: an issue lane that is
   await r.settle();
   net.clock.now = soon(1);
   await r.settle();
-  expect([(await C.duties()).find((d) => d.duty === `${again}.0`), (await G.entries()).length]).toMatchObject([{ attempts: [{ answer: "retry" }, { answer: "retry" }], acknowledged: null, result: null }, 11]);
+  expect([(await C.outboxItems()).find((d) => d.outboxId === `${again}.0`), (await G.entries()).length]).toMatchObject([{ attempts: [{ answer: "retry" }, { answer: "retry" }], acknowledged: null, result: null }, 11]);
   // Nothing else is pending in the issue lane, so its last entry is the closing checkpoint, and it fits.
   expect([await G.stub.checkpoint(), (await G.entries()).length]).toMatchObject([{ answer: "written", fact: { seq: 11 } }, 12]);
 });
