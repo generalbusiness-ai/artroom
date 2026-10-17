@@ -489,6 +489,22 @@ review of the head. Status: DRAFT 7, filed for checker review.
 A build head exists on branch `request/mcp-generic`; its delivery note is
 `notes/implementation/2026-10-13-mcp-generic-delivery.md`.
 
+## The journey as acceptance target
+
+[032: The journey as acceptance target](032-2026-10-17-journey-as-acceptance-target.md)
+is a sequencing plan dated 2026-10-17. It commissions nothing. First,
+finish and stop the archive at "clone, disconnect, verify to a cutoff",
+using synthetic or reviewed fixture histories only (real history waits
+for admission, consent and disclosures), and the observability Judge
+stage and the four capacity budgets. Then the
+main line is one journey in the desktop AI app through MCP Apps views:
+the MVP plan's slices S0 to S9 plus five pieces, J1 to J5 (signed requests
+that survive a reload or a device switch; file, diff and interdiff views;
+a real checker runner adapter; a workspace fork and credential adapter for
+holds; the smallest attention loop). Hosted Counter agents and M1 run in
+parallel. A bounded real working sprint is the exit test. Carrying review
+approvals waits until that sprint has measured re-review cost.
+
 ## Other original planning reports
 
 Two original reports still owe independent review and source integration.
