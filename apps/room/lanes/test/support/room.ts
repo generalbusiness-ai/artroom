@@ -17,7 +17,7 @@
 
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { expect } from "vitest";
+import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Answer, Bounds, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, signInvitationProof, textDigest } from "@generalbusiness/artroom-bytes";
@@ -248,7 +248,7 @@ export async function publicationOf(r: Room, C: { name: string }, merge: number)
  */
 /** Fresh native enrollments; defaults retain all three members in their original order. */
 type RoomMember = "@una" | "@vic" | "@paul";
-export interface RoomSetup { roster?: readonly RoomMember[]; partitioned?: boolean }
+export interface RoomSetup { roster?: readonly RoomMember[]; partitioned?: boolean; openPartition?: boolean; rootBounds?: Bounds }
 export async function room(setup: RoomSetup = {}): Promise<Room> {
   net.hold = net.deaf = null;
   const registerPin = setup.partitioned ? PARTITION_COHORT.register : REGISTER;
@@ -264,6 +264,9 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
   const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
   const D = new Platform(scopeIdOf(seed));
+  // Explicit native capacity-fixture bound, before root birth. Other scopes
+  // retain their own defaults; no deployed configuration is changed.
+  if (setup.rootBounds) { net.sized.set(D.name, setup.rootBounds); onTestFinished(() => { net.sized.delete(D.name); }); }
   host.answer("1:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
   const claimed = await R.stub.submit(found, []);
   if (claimed.answer !== "accepted") throw new Error(`no claim: ${JSON.stringify(claimed)}`);
@@ -296,7 +299,7 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
     made.members[handle] = invitation;
   }
   await made.settle();
-  if (setup.partitioned) {
+  if (setup.partitioned && setup.openPartition !== false) {
     const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
     const send = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === PARTITION_COHORT.partition);
     if (!send) return expect.fail("actual root has no partition creation");

@@ -827,3 +827,36 @@ The getter is a labelled cost stand-in, not native execution or a claim
 that synchronous parsing can be preempted. The operation gains no new
 deadline or allowance. The outcome-origin comment also now distinguishes
 retained judgment bytes from the separate bounded identity evidence reads.
+
+## Native Root standing-entry capacity
+
+The actual Root uses an explicit fixture bound of 3,012 scope entries;
+native siblings retain their defaults. Real M6 key invitations, enrolment
+and compromised-key relays fill the Root's ordinary budget while its
+controller's original key remains active. The actual standing counter is
+3,000 before the first generation. No synthetic rows or counters are used.
+
+Test transport refuses each actual partition-create envelope with routing
+not-found before namespace routing. Each generation records its own native
+terminal undelivered result after three attempts. All 1,000 generations
+pass, with exactly 3,000 routing attempts, the correct disjoint number bases,
+two Root entries per generation and standing decreasing by three each time.
+The Root restarts before the sequence and every 100 generations. A further
+open is refused root-exhausted with the inspected state unchanged. This is
+a routing-failure capacity specimen, not successful birth/seal capacity,
+latency proof or a claim about defaults or provider execution.
+
+The initial fixture omitted the required member revision from enrolment;
+its failure remains in root-thousand-native-first-focus.log. The corrected
+case passes in root-thousand-native-second-focus.log. Both logs have the
+/tmp/artroom-directory- prefix. A single focused control removes aggregate
+standing-entry admission accounting while preserving the direct counter.
+Its baseline passes and its mutant fails the first generation's acceptance
+assertion after ordinary filling. The actual refusal code was not printed.
+The source is restored; root-thousand-standing-account-control.log records
+the distinguishing result. No repeat of this 1,000-case run is needed.
+
+The Room fixture now accepts an explicit Root-only bound and can retain
+the Root without automatically opening a partition. Default callers keep
+their previous behavior. No Source gate, approval or provider operation is
+claimed by this checkpoint.
