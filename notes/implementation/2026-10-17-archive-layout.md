@@ -317,6 +317,35 @@ The separate P3 integration gate `24299` also remains an actual pass
 of its original composition; it cannot validate this changed dependency.
 These log references grant no external-file or execution access.
 
+### Replacement frozen gate
+
+Original replacement gate `93203` ran once at clean implementation head
+`83eb65d9c02762b8d454f8ae133706ac3dbbcd9b`, tree
+`5b46835726d468c457297a64a58206bd28708719`, and exited zero. Owner
+terminal `84a44d` records that completion. Installation took 2.3 seconds
+elapsed and 3.4 CPU; whitespace 0.0 and 0.0; types 7.5 and 27.0; tests
+447.9 and 559.9. All 1,560 Vitest cases passed with three skips; the
+sixteen Node cases and fifty-five Counting cases passed as well.
+
+The machine was macOS 27.0.1 on arm64 with eighteen logical CPUs. Before
+the gate, load averages were 0.99, 1.21 and 1.35. Existing dependencies
+were present but the verified-lock stamp was absent; the normal gate
+performed its existing-lock install. The package-lock SHA256 stayed
+`a3dd5689f33c5181b5ff48553fbb3c45b44abf96720ba9935eed40853a3b09bc`.
+These observations do not establish load as a cause.
+
+The original wrapper log is
+`/tmp/artroom-archive-empty-directories-83eb-gate.log`; original step logs
+are under `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.vcz89toFdm`.
+The old `c811785ea` primary and all twelve support reports were normally
+retired, from `339e7a30` through `ffad19e8`; the thirteen-path live artifact
+inventory was then empty and `3957ab1c` / `1311f791` remained promised.
+This result update changes only this note. Replacement Source preparation
+must verify all 1,451 other mode/type/blob leaves, including all twelve
+new implementation/test leaves, against the new passing freeze. All
+1,439 original Main leaves remain exact. Independent exact-head Source
+review is still required; the old metadata grant remains unchanged.
+
 ## Remaining archive outcomes
 
 This internal builder enables no archive producer, exporter, alarm,
