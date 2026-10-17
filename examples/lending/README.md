@@ -27,6 +27,11 @@ staff-control follow-up still awaits its own validation, gate, and deployment.
 These are machine-operated browser profiles, not a human or separate
 physical-device acceptance test.
 
+Later [local interface checks](../../notes/implementation/2026-10-17-lending-refused-drafts.md)
+use the real renderer with scripted gateway, membership, storage and
+publication ports. They show draft retention and handle presentation;
+they add no hosted, native authority or physical-device evidence.
+
 The earlier publication rehearsal remains at its original service. It
 completed mechanically, but its Small pot description differed from the
 approved script. Its browser, publication, and Git extraction evidence remains
@@ -104,6 +109,11 @@ settled with no session, but reading its recorded entry needs one, which
 the room gives the new member's key. Membership's journal gained one
 more entry when the device asked for that session; the test did not
 look at what the entry was.
+
+**Check** submits no new lending or join act. Reading a recorded result
+may first authenticate a read session, which signs and sends a session
+request. A post-join membership read confirms the device's active handle
+before the interface displays it as confirmed.
 
 The Counter's request journal could not be reused as it stands: it accepts
 only the counting definition's acts. `browser/custody.ts` is a smaller

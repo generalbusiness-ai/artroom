@@ -13,6 +13,7 @@ import { b64url, canonicalize, intentDigest, keyIdOf, timeMs, timeOf } from "@ge
 import { ScopeHandle, httpTransport, invitationOf, requestSession, signedIntent, signerSessionRequest, wellFormedInvitation,
   type Fetch, type InvitationLink, type Signer } from "@generalbusiness/artroom-client";
 import { LENDING_DEFINITION } from "../pin.ts";
+import { memberForKey } from "./model.ts";
 import { advance, envelopeKey, validKept, type Binding, type CustodyLock, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports } from "./custody.ts";
 
 /** The membership version of the application cohort, which the lending room uses. */
@@ -80,7 +81,8 @@ export interface Joining {
   join(link: InvitationLink, seat: Seat): Promise<JoinOutcome>;
   /** The seat of the kept join, or null. */
   pending(): Promise<Seat | null>;
-  /** Check: a read that settles whether the kept join took effect. It sends nothing. */
+  /** Check submits no new join act. Reading its recorded entry may first
+   * sign and send read-session authentication. */
   check(): Promise<JoinOutcome | null>;
   /** Explicit Continue sends the kept join, without signing another one. */
   continueOriginal(): Promise<JoinOutcome | null>;
@@ -171,12 +173,18 @@ export async function findLending(seat: Seat, device: DeviceKey, options: { now?
   const signed = await signerSessionRequest(seat.membership, signer, timeOf(now() + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
   const answer = await requestSession(seat.origin, seat.membership.scope, signed, options.fetch ? { fetch: options.fetch } : {});
   if (!answer.ok) return { ok: false, reason: `The room refused a read session: ${answer.reason}.` };
-  const read = await new ScopeHandle(httpTransport(seat.origin, options.fetch ? { fetch: options.fetch } : {}), seat.directory.scope, answer.session.reader()).summary();
+  const api = httpTransport(seat.origin, options.fetch ? { fetch: options.fetch } : {}), reader = answer.session.reader();
+  const membership = await new ScopeHandle(api, seat.membership.scope, reader).summary();
+  if (!membership.ok) return { ok: false, reason: `The room's membership could not be read: ${membership.reason}.` };
+  if (!membership.complete || membership.next !== undefined || membership.value.definition !== ROOM_MEMBERSHIP || canonicalize(membership.value.scope) !== canonicalize(seat.membership)) return { ok: false, reason: "The room's membership could not be confirmed for this history." };
+  const member = memberForKey(membership.value, device.publicKey);
+  if (!member) return { ok: false, reason: "The room did not confirm this device's active membership." };
+  const read = await new ScopeHandle(api, seat.directory.scope, reader).summary();
   if (!read.ok) return { ok: false, reason: `The room's directory could not be read: ${read.reason}.` };
   const scopes = lendingScopes(read.value);
   if (scopes.length !== 1) return { ok: false, reason: scopes.length === 0 ? "This room has no lending library." : "This room has more than one lending library." };
   return { ok: true, identity: { origin: seat.origin, deployment: options.deployment ?? seat.origin, scope: scopes[0]!, definition: LENDING_DEFINITION,
-    membership: seat.membership, member: { membership: seat.membership, member: seat.handle }, publicKey: device.publicKey } };
+    membership: seat.membership, member, publicKey: device.publicKey } };
 }
 /** The scopes of the directory's created applications that pin the lending definition. */
 export function lendingScopes(directory: Summary): ScopeRef[] {

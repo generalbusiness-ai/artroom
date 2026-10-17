@@ -40,7 +40,8 @@ export interface LendingGateway {
   act(kind: LendingAct, input?: { thing?: number; name?: string; description?: string; reason?: string }): Promise<ActOutcome>;
   /** The kept original, or null. */
   pending(): Promise<Pending | null>;
-  /** Check: a read that settles whether the kept original took effect. It sends nothing. */
+  /** Check submits no new act. Its reads may first sign and send
+   * read-session authentication. */
   check(): Promise<ActOutcome | null>;
   /** Resume an unsent original. Unknown delivery needs explicit continueOriginal. */
   resume(): Promise<ActOutcome | null>;

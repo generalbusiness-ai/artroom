@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { type Entry, type Summary } from "@generalbusiness/dap-contract";
 import { grantOf, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { donation, make as makeLedger, submit } from "../test-support.ts";
-import { actsFor, journalRows, lendingView, membershipActions, offeredActs, propose, refusalWords } from "./model.ts";
+import { actsFor, journalRows, lendingView, memberForKey, membershipActions, offeredActs, propose, refusalWords } from "./model.ts";
 
 // A STAND-IN for a complete authenticated membership summary, not a native authority observation.
 const roster = (role: "member" | "admin"): Summary => ({
@@ -41,6 +41,13 @@ test("the view lists every thing in order, live from the summary and gone from t
   const staff = membershipActions(roster("admin"), keys.rita.member, keys.rita.key);
   expect(ordinary).toEqual(["lending.member"]);
   expect(staff).toEqual(["lending.member", "lending.staff"]);
+  expect(memberForKey(roster("member"), keys.rita.key)).toEqual(keys.rita.member);
+  expect(memberForKey(roster("admin"), keys.una.key)).toBeNull();
+  const original = roster("member");
+  const contradictory = { ...original, items: original.items.map((item, i) => i === 1 ? { ...item, values: { ...item.values, handle: "@not-rita" } } : item) };
+  expect(memberForKey(contradictory, keys.rita.key)).toBeNull();
+  const ambiguous = { ...original, items: [...original.items, structuredClone(original.items[2]!)] };
+  expect(memberForKey(ambiguous, keys.rita.key)).toBeNull();
   const unknown = [null, membershipActions(roster("admin"), keys.una.member, keys.una.key)];
   expect(unknown).toEqual([null, null]);
   for (const state of ["available", "lent"] as const) {

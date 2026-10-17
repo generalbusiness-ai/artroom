@@ -357,8 +357,9 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     const second = await newDeviceKey();
     expect(await joining(second, { lock: serial, store: joinStore, now: clock, fetch }).join(read.link, read.seat)).toMatchObject({ status: "refused" });
     expect([joinSlot, await joinsOf(second.publicKey)]).toEqual([null, 0]);
-    // The visitor's device finds the lending scope and acts as @visitor.
-    const matched = await findLending(read.seat, device, { now: clock, fetch });
+    // The advertised handle is not identity evidence. The visitor's own
+    // authenticated membership read must still identify this key as @visitor.
+    const matched = await findLending({ ...read.seat, handle: "@not-visitor" }, device, { now: clock, fetch });
     if (!matched.ok) throw new Error(matched.reason);
     expect(matched.identity).toMatchObject({ scope: scopeOfLending, member: { member: "@visitor" }, publicKey: device.publicKey });
     let visitorSlot: string | null = null;
