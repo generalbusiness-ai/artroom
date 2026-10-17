@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1848e535e358f5c27743034ec4d75c30c0bf3809","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-archive-layout.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:24a26e1b1df4feedb0479bc8e2c40ba42cf71702","text":"Merge retired a covered predecessor; the successor is at packages/git/src/journal-selection.ts."}
