@@ -186,8 +186,8 @@ test("late selected bytes stop under the original deadline, and entry/object/cal
   expect(noCalls).toEqual({ ok: false, reason: "limit" }); expect(reads).toBe(0);
 });
 
-test("a parent with inconsistent head metadata or forbidden tree modes/paths is rejected before an unexpected blob is read", async () => {
-  const format = "sha256", fixture = syntheticJournal(), first = complete(await buildJournalArchive({ format, ...described(fixture), input: selectedInput(fixture), parent: null }));
+test.each(formats)("a parent with inconsistent head metadata or forbidden tree modes/paths is rejected before an unexpected blob is read (%s)", async (format) => {
+  const fixture = syntheticJournal(), first = complete(await buildJournalArchive({ format, ...described(fixture), input: selectedInput(fixture), parent: null }));
   const dir = archiveRepository(format); writeArchiveObjects(dir, first.objects);
   const current = syntheticJournal(2);
   const wrong = canonicalize({ v: 1, scope: { ...fixture.at, kind: "directory" }, through: 0, hash: fixture.description.through.hash });
@@ -201,6 +201,12 @@ test("a parent with inconsistent head metadata or forbidden tree modes/paths is 
     expect(result.ok ? "accepted" : result.reason).toBe("parent");
     expect(calls.some(call => call.id === secret && call.limit > 0)).toBe(false);
   }
+  // An empty directory has no flat file-map entry. It is still an
+  // unexpected physical path, not a canonical archive prefix.
+  const empty = git(dir, ["hash-object", "-w", "-t", "tree", "--stdin"], "");
+  const bad = invalidArchiveLeaf(dir, first.commit, "40000", empty);
+  const result = await buildJournalArchive({ format, ...described(current), input: selectedInput(current), parent: { id: bad, source: archiveObjectSource(dir) } });
+  expect(result.ok ? "accepted" : result.reason).toBe("parent");
 });
 
 test("commit seconds come from the actual cutoff entry across subsecond boundaries and the supported UTC range", async () => {

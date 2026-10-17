@@ -87,11 +87,11 @@ export function rewriteArchiveFile(dir: string, commit: string, path: string, by
   return git(dir, ["hash-object", "-w", "-t", "commit", "--stdin"], body.replace(`tree ${root}\n`, `tree ${changed}\n`));
 }
 
-/** Add one invalid archive-tree leaf, preserving a valid Git object graph. */
-export function invalidArchiveLeaf(dir: string, commit: string, mode: "100644" | "100755" | "120000" | "160000", blob: string): string {
+/** Add one unexpected archive-tree entry, preserving valid Git objects. */
+export function invalidArchiveLeaf(dir: string, commit: string, mode: "100644" | "100755" | "120000" | "160000" | "40000", blob: string): string {
   const root = git(dir, ["rev-parse", `${commit}^{tree}`]);
   const rows = git(dir, ["ls-tree", root]);
-  const changed = git(dir, ["mktree"], `${rows}\n${mode} ${mode === "160000" ? "commit" : "blob"} ${mode === "160000" ? commit : blob}\tz\n`);
+  const changed = git(dir, ["mktree"], `${rows}\n${mode} ${mode === "160000" ? "commit" : mode === "40000" ? "tree" : "blob"} ${mode === "160000" ? commit : blob}\tz\n`);
   const body = new TextDecoder().decode(new Uint8Array(execFileSync("git", ["-C", dir, "cat-file", "commit", commit], { env })));
   return git(dir, ["hash-object", "-w", "-t", "commit", "--stdin"], body.replace(`tree ${root}\n`, `tree ${changed}\n`));
 }
