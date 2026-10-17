@@ -165,11 +165,23 @@ describe("both MCP wire revisions, each by its own rules", () => {
     writeFileSync(join(home, "config.json"), JSON.stringify({ v: 1, key: "device", ...configOf() }));
     const spawn = (pin: "legacy" | "modern", ...flags: string[]) => {
       const c = client(pin);
-      return { c, transport: new StdioClientTransport({ command: process.execPath, args: [CLI, "mcp", ...flags], env: { ...process.env, ARTROOM_HOME: home } as Record<string, string>, stderr: "pipe" }) };
+      const transport = new StdioClientTransport({ command: process.execPath, args: [CLI, "mcp", ...flags], env: { ...process.env, ARTROOM_HOME: home } as Record<string, string>, stderr: "pipe" });
+      const errors: unknown[] = [], diagnostics: string[] = [];
+      c.onerror = error => { errors.push(error); };
+      transport.stderr?.on("data", (chunk: Buffer) => { diagnostics.push(chunk.toString("utf8")); });
+      const observed = () => {
+        const points = diagnostics.join("").split("\n").filter(line => line.startsWith("dap.metric ")).map(line => JSON.parse(line.slice("dap.metric ".length)) as { schema: string; blobs: string[] });
+        expect(points.some(p => p.blobs[0] === "tools-list")).toBe(true);
+        expect(points.some(p => p.blobs[0] === "tool-call")).toBe(true);
+        expect(points.every(p => p.schema === "mcp-metrics-v1")).toBe(true);
+        expect(JSON.stringify(points)).not.toContain(b64url(secret));
+        expect(errors).toEqual([]);
+      };
+      return { c, transport, observed };
     };
     const results: Record<string, unknown>[] = [];
     for (const pin of ["legacy", "modern"] as const) {
-      const { c, transport } = spawn(pin);
+      const { c, transport, observed } = spawn(pin);
       await c.connect(transport);
       const names = (await c.listTools()).tools.map((t) => t.name);
       expect(names).toContain("member.role");
@@ -178,6 +190,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
       const act = await c.callTool({ name: "member.role", arguments: { on: 1, fields: { role: "member" }, idempotencyKey: `stdio-${pin}` } });
       results.push(room.structuredContent as Record<string, unknown>, act.structuredContent as Record<string, unknown>);
       await c.close();
+      observed();
     }
     // The same structured content for room, and the same native outcome for the act, under the one key.
     expect(results[0]).toEqual(results[2]);
@@ -191,6 +204,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
     const signed = await generic.c.callTool({ name: "act", arguments: { target: "membership", kind: "set-role", digest: "platform:membership@2", on: 1, fields: { role: "member" }, idempotencyKey: "stdio-generic" } });
     expect(signed.structuredContent).toMatchObject({ answer: "accepted", tool: "act" });
     await generic.c.close();
+    generic.observed();
   }, 120_000);
 
   // Invariant: the HTTP transport decodes a body once, as UTF-8, so a character split across chunks arrives whole; answers null,

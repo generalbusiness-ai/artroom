@@ -35,6 +35,7 @@ import { CustodyError, Lost, meaningOf, type Envelope, type Identity } from "./c
 import { McpHttp, SessionFull, type SessionRow } from "./http.ts";
 import type { McpConfig, Root } from "./inventory.ts";
 import { McpService } from "./service.ts";
+import { McpMetrics, mcpRead, type McpMetricOptions } from "./metrics.ts";
 import { sqliteStore, type Sql, type SqliteCustodyBounds } from "./sqlite-custody.ts";
 import { Wire } from "./wire.ts";
 
@@ -91,10 +92,12 @@ export type Authorized = { ok: true; by: "admin" | "controller"; member: MemberI
  * holds `membership.manage` or is the recorded controller of the agent member named.
  */
 export async function authorityOf(ports: Authority, membership: ScopeRef, actor: KeyId, agentHandle: MemberId | null): Promise<Authorized> {
+  mcpRead();
   const key = (await ports.observe(membership, { key: actor })) as KeyStanding | null;
   if (!key || key.keyState !== "active" || key.memberState !== "active") return { ok: false };
   if (key.actions.includes("membership.manage")) return { ok: true, by: "admin", member: key.member };
   if (agentHandle !== null) {
+    mcpRead();
     const agent = (await ports.observe(membership, { member: agentHandle })) as MemberStanding | null;
     if (agent && agent.memberState !== "unknown" && agent.controller === key.member) return { ok: true, by: "controller", member: key.member };
   }
@@ -256,6 +259,8 @@ export class HostedRegistry {
 // ---------------------------------------------------------------- the agent
 
 export interface AgentPorts extends Authority {
+  /** Separate MCP observation map; never a native input or an authority read. */
+  metrics?: McpMetricOptions;
   /** This object's own ID, as the registry allotted it. */
   id: string;
   /** The Worker's own routes, on its own origin. */
@@ -290,12 +295,14 @@ class Queue {
 
 export class HostedAgent {
   readonly #control: ControlPlane;
+  readonly #metrics: McpMetrics;
   #service: McpService | null = null;
   #http: McpHttp | null = null;
   readonly #failures = new Map<string, number[]>();
   /** Control operations run one at a time in this object: a retry of `create` waits for the first and then finds its answer. */
   readonly #controls = new Queue();
   constructor(private readonly sql: Sql, private readonly ports: AgentPorts) {
+    this.#metrics = new McpMetrics(ports.metrics);
     sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK (id = 1), op TEXT NOT NULL, seed BLOB NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, membership TEXT NOT NULL, handle TEXT NOT NULL, config TEXT NOT NULL, bearer TEXT, answer TEXT, created TEXT NOT NULL, updated TEXT NOT NULL)`);
     sql.exec(`CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, row TEXT NOT NULL, created INTEGER NOT NULL)`);
     this.#control = new ControlPlane(sql, ports.controlBudget?.budget, ports.controlBudget?.reserve);
@@ -327,6 +334,7 @@ export class HostedAgent {
     const read = async (): Promise<McpConfig> => { await this.ports.configHold?.(); return this.#row()?.config ?? row.config; };
     this.#service = new McpService({
       service: row.config.service, fetch: this.ports.fetch, signer: secretSigner(row.seed), custody: sqliteStore(this.sql, this.ports.custodyBounds, this.ports.now), now: this.ports.now,
+      ...(this.ports.metrics ? { metrics: this.ports.metrics } : {}),
       ...(this.ports.every ? { every: this.ports.every } : {}), ...(this.ports.pause ? { pause: this.ports.pause } : {}),
       config: {
         read,
@@ -376,7 +384,10 @@ export class HostedAgent {
 
   /** The registry's call: make the key, enrol it, mint the bearer. Idempotent on `op`; resumable at every step; one at a time. */
   create(op: string, request: ControlRequest, link: AgentKeyInvitation): Promise<ControlAnswer> {
-    return this.#controls.run(() => this.#create(op, request, link));
+    return this.#metrics.call("enrol", () => this.#controls.run(() => this.#create(op, request, link)), result => ({
+      end: result.status >= 500 ? "unavailable" : result.status >= 400 ? "refused" : "ok",
+      reason: typeof result.body["error"] === "string" ? result.body["error"] : "none", bytes: utf8(JSON.stringify(result)).length,
+    }));
   }
 
   async #create(op: string, request: ControlRequest, link: AgentKeyInvitation): Promise<ControlAnswer> {
@@ -442,6 +453,7 @@ export class HostedAgent {
     if (!entry.ok) return answer(503, { error: "unresolved", op, rule: "read-back" });
     const input = entry.value.entry.input;
     if (entry.value.hash !== fact.hash || input.type !== "act" || canonicalize(input.signed) !== canonicalize(kept.record.envelope.signed)) return answer(409, { error: "enrol", rule: "entry" });
+    mcpRead();
     const standing = (await this.ports.observe(M, { key: signer.key })) as KeyStanding | null;
     if (!standing || standing.keyState !== "active") return answer(503, { error: "unresolved", op, rule: "key-not-active" });
     this.ports.fault?.("accepted");

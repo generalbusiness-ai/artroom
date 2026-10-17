@@ -13,6 +13,7 @@ import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, ty
 import { ERROR_BYTES, failed } from "../src/service.ts";
 import { finding } from "../src/errors.ts";
 import { fileStore } from "../src/node.ts";
+import type { McpMetricOptions, McpMetricPoint } from "../src/metrics.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
 /**
@@ -27,7 +28,7 @@ const secret = () => crypto.getRandomValues(new Uint8Array(32));
 interface Served { stand: StandIn; service: McpService; config: McpConfig; clock: { now: number }; key: Uint8Array }
 
 /** A room on the stand-in: the six platform scopes and the given lanes, for a caller of `role` with that role's first actions. */
-function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore; observe?: (url: string) => void } = {}): Served {
+function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore; observe?: (url: string) => void; metrics?: McpMetricOptions } = {}): Served {
   const key = secret();
   const signer = secretSigner(key);
   const stand = new StandIn(signer.key, role, FIRST_ACTIONS_OF["platform:membership@2"]![role]!);
@@ -40,6 +41,7 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
   const clock = { now: START };
   const service = new McpService({ service: SERVICE, fetch: options.observe ? (url, init) => { options.observe!(url); return stand.fetch(url, init); } : stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
     ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
+    ...(options.metrics ? { metrics: options.metrics } : {}),
     config: { read: async () => structuredClone(config), addRoot: async (root) => { config.roots = [...(config.roots ?? []), root]; } } });
   return { stand, service, config, clock, key };
 }
@@ -81,7 +83,8 @@ describe("what a call costs, end to end", () => {
   // scope refuses on a read one signed-read fallback for that read.
   test("reads per tool, warm and cold, with expired, refused and forbidden sessions", async ({ annotate }) => {
     // --generic=add lists every tool, so one room measures them all.
-    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add" });
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add", metrics: { report: point => { metrics.push(point); } } });
     await s.service.page();
     const M = s.config.repository!.membership.scope;
     const comment = await s.service.call("issue.comment", { target: 1, fields: { body: "First." }, idempotencyKey: "c-0" });
@@ -122,8 +125,16 @@ describe("what a call costs, end to end", () => {
       const name = label.split(" ")[0]!;
       // Cold: the session forgotten, as a process starting would hold none.
       s.service.reads.forget(M);
+      const metricStart = metrics.length;
       const cold = await counted(s, () => s.service.call(name, args()));
       const warm = await counted(s, () => s.service.call(name, args()));
+      // Dynamic act tool names are outside the closed metric name map. The
+      // generic tools retain exact measured attempts, including sessions.
+      if (!name.includes(".")) {
+        const calls = metrics.slice(metricStart).filter(p => p.blobs[0] === "tool-call");
+        expect(calls.map(p => p.doubles[2]), label).toEqual([reads(cold.requests) + sessions(cold.requests), reads(warm.requests) + sessions(warm.requests)]);
+        expect(calls.map(p => p.doubles[4]), label).toEqual([cold.bytes, warm.bytes]);
+      }
       expect([cold.result.isError, warm.result.isError], `${label}: ${JSON.stringify(warm.result.structuredContent)}`).toEqual([false, false]);
       expect(sessions(cold.requests), label).toBe(1);
       expect(sessions(warm.requests), label).toBe(0);
@@ -325,13 +336,15 @@ describe("what a call costs, end to end", () => {
   // This is the actual MCP service over the labelled HTTP stand-in, not Native.
   test.each(["query", "head"] as const)("final-page continuation does not cross a different %s", async (change) => {
     const urls: string[] = [];
-    const s = roomOf("admin", [issueDemo], { observe: url => urls.push(url) });
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo], { observe: url => urls.push(url), metrics: { report: point => { metrics.push(point); } } });
     await s.service.page();
     const lane = laneOf(s, 1);
     for (let i = 0; i < 9; i++) lane.final.push({ id: 100 + i, type: "merge", state: "published", revision: 0, opened: null, parties: {}, refs: {}, values: {}, attributed: [] } as unknown as Item);
     const missed = await s.service.call("wait", { scope: 1, item: 999, type: "merge", seconds: 1 });
     expect(missed.structuredContent["timedOut"]).toBe(true);
     urls.length = 0;
+    metrics.length = 0;
     if (change === "query") {
       const found = await s.service.call("wait", { scope: 1, item: 100, type: "merge", seconds: 1 });
       expect([found.structuredContent["timedOut"], (found.structuredContent["item"] as Item | undefined)?.id]).toEqual([false, 100]);
@@ -344,6 +357,10 @@ describe("what a call costs, end to end", () => {
     expect(cursors.length).toBeGreaterThan(0);
     expect(cursors[0], "the new query/head must not send an older continuation").toBeNull();
     expect(cursors.length).toBeLessThanOrEqual(4);
+    const observation = metrics.filter(point => point.blobs[0] === "tool-call" && point.blobs[3] === "wait");
+    expect(observation).toHaveLength(1);
+    expect(observation[0]!.doubles[2], "operation-owned reads agree with actual transport calls").toBe(urls.length);
+    expect(observation[0]!.doubles[3], "typed final-item page attempts are counted").toBe(cursors.length);
   });
 
   test("a final-item read cannot be labelled with an earlier summary head", async () => {

@@ -328,6 +328,82 @@ caller's `idempotencyKey`, in the config directory's
 - **Names.** A capability or step name longer than 128 bytes is refused
   whole, before anything is kept or sent.
 
+## Operational metrics
+
+`dap mcp` writes `dap.metric {json}` lines to stderr. Stdout remains the
+stdio protocol. Each JSON record has `schema: "mcp-metrics-v1"` and the
+point's `indexes`, `blobs` and `doubles`. Hosted agent objects write the
+same point map through the existing optional METRICS binding. These
+observations grant no authority and contain no signed input, credential,
+invitation, bearer, scope index or caller-supplied request identity.
+
+The point has no index, nine blobs and six doubles:
+
+| Blob | Meaning and allowed values |
+|---|---|
+| 1 | `tools-list`, `tool-call`, `custody`, or the terminal `metric-dropped` summary |
+| 2 | The configured public deployment, at most 128 UTF-8 bytes; `local` by default in the CLI; `unknown` for invalid context |
+| 3 | Worker version UUID in lowercase, or `unknown` |
+| 4 | One of the fixed names below; a summary uses `list` |
+| 5 | `ok`, `refused`, `error`, `unavailable`; a summary uses `dropped` |
+| 6 | `none`, an allowed reason below, or a persisted custody phase; a summary uses `summary` |
+| 7 | Server-minted request ID, sixteen lowercase hexadecimal characters, or `none` |
+| 8 | `none`; no caller trace is copied into this map |
+| 9 | Exactly `mcp-metrics-v1` |
+
+The fixed names are `list`, `room`, `inspect`, `create`, `join`, `prepare`,
+`items`, `steps`, `step`, `record`, `sends`, `text`, `wait`, `settle`,
+`credential`, `actions`, `act` and hosted `enrol`. Act tool names derived
+from declarations are outside this first map. Their events are dropped
+and counted as invalid fields; their names are not copied or redacted.
+The tools continue to run normally.
+
+The native reason allowlist is:
+
+```
+revision-moved alias duplicate-relation required-unset scope-full
+bad-intent misaddressed expired scope-refused unknown-act bad-field
+no-item final fact-mismatch unauthorized guard-failed capability-refused
+slot-full type-full entry-too-large send-unresolved unknown-message
+unsupported-definition bad-input dependency-unavailable busy clock-behind
+scope-provisional guard-incomplete authority-unavailable unavailable
+rate-limited idempotency-mismatch not-found wrong-incarnation forbidden
+history-unavailable too-large sessions-unavailable bad-request replayed
+```
+
+The server reasons are `exception`, `shape`, `stale-descriptor`, `restart`,
+`transport`, `custody`, `credential`, `target`, `unknown-tool`, `read`,
+`conflicting`, `full`, `locked`, `unreadable`, `terminal` and `unkept`.
+Record phases are `prepared`, `sent`, `unknown`, `accepted`, `refused`,
+`mismatch` and `settled`. Preparation-step phases are `prepared`, `sent`,
+`unknown` and `answered`.
+
+| Kind | Doubles 1 through 6 |
+|---|---|
+| `tools-list` | 1, duration in ms, tools on this page, page bytes, read attempts, generation changed (0 or 1) |
+| `tool-call` | 1, duration in ms, read attempts, native page attempts, whole service result bytes, 0 |
+| `custody` | 1, 0, 0, 0, 0, subject (0 for record, 1 for preparation step); blob 6 is its new persisted phase |
+| `metric-dropped` | 1, loss bitmask, events lost, 0, 0, 0 |
+
+Numbers are whole values from zero through 2,147,483,647. List bytes count
+the JSON `{ tools, nextCursor? }`; call bytes count the service result
+before wire-specific framing. A generation change means that this listed
+page's generation differs from the service's last listed generation,
+not a count of notifications sent. Read attempts include session requests
+and signed-read fallbacks. Page attempts count item, history, outbox and
+log page requests. Hosted enrolment also counts its own direct authority
+reads. Counts belong to each concurrent operation, not a shared delta.
+
+A custody event follows a successful persisted phase change. An observed
+answer whose write failed emits no completed phase. Record and step
+phases remain distinct. Invalid fields are dropped before a point is
+retained. Loss bits are 1 for budget, 2 for invalid fields and 16 for
+overflow. Each operation retains at most 248 phase events, one completion
+and one summary, within 250 points. Reporters are not awaited; a failed
+write cannot replace a tool result, and a summary cannot prove its own
+presence. The deployment check excludes this map when judging scope
+turn coverage.
+
 ## Tool reference
 
 ### The generic tools

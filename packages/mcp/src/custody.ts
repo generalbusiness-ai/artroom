@@ -59,6 +59,7 @@
 
 import type { Answer, Beside, DeclaredDefinition, Digest, KeyId, PlatformDefinition, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, intentDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { custodyTransition, custodyStepTransition } from "./metrics.ts";
 
 export const UNRESOLVED_MOST = 256;
 export const OUTCOMES_INLINE = 64;
@@ -224,22 +225,23 @@ export class Custody {
    * fails here settles nothing, and what is reported must say so: the record stays `sent` on disk, the act may have taken
    * effect, and settle under the same key resolves it. It is never "nothing was sent".
    */
-  async #outcomeKept(id: string, record: CustodyRecord, answer: Answer["answer"] | "lost", outcome: () => Promise<void>): Promise<void> {
+  async #outcomeKept(id: string, record: CustodyRecord, answer: Answer["answer"] | "lost", outcome: () => Promise<void>, from: Phase): Promise<void> {
     try {
       await outcome();
       record.updated = this.now();
-      await this.#write(id, record);
+      await this.#write(id, record, false, from);
     } catch (error) {
       if (error instanceof CustodyError && error.why.held === "too-large") throw error;
       throw new CustodyError({ held: "unkept", answer });
     }
   }
 
-  async #write(id: string, record: CustodyRecord, dispatch = false): Promise<void> {
+  async #write(id: string, record: CustodyRecord, dispatch = false, from: Phase | null = record.phase): Promise<void> {
     if (bytesOf(record) > RECORD_BYTES) throw new CustodyError({ held: "too-large" });
     // A store may refuse a write by its own account (`full`: the hosted store's budget, before anything is dispatched); any
     // other failure is a storage failure, which settles nothing.
     try { await this.store.write(id, record, dispatch ? { dispatch: true } : {}); } catch (error) { throw error instanceof CustodyError ? error : new CustodyError({ held: "unreadable" }); }
+    custodyTransition(from, record.phase);
   }
 
   /**
@@ -327,7 +329,7 @@ export class Custody {
         const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at, ...(standalone ? { standalone: true as const } : {}) };
         const size = bytesOf(record);
         if (size + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes: size });
-        await this.#write(id, record);
+        await this.#write(id, record, false, null);
         return record;
       } catch (error) {
         // No record came of it: what was admitted for this identity is released.
@@ -348,6 +350,7 @@ export class Custody {
     const id = identityId(identity);
     return this.#locked(id, options.notAfter, async () => {
       const record = await this.#kept(id, identity, meaning, build, options.bytes ?? 0);
+      const previous = record.phase;
       if (TERMINAL.has(record.phase)) {
         const last = await this.decided(id, record);
         if (record.phase !== "refused" || !options.resubmit) {
@@ -362,12 +365,12 @@ export class Custody {
           record.attempt++;
           record.phase = "sent";
           record.updated = this.now();
-          await this.#write(id, record, true);
+          await this.#write(id, record, true, previous);
         });
       } else {
         record.phase = "sent";
         record.updated = this.now();
-        await this.#write(id, record, true);
+        await this.#write(id, record, true, previous);
       }
       let answer: Answer;
       try {
@@ -375,12 +378,12 @@ export class Custody {
       } catch (error) {
         if (!(error instanceof Lost)) throw error;
         record.phase = "unknown";
-        await this.#outcomeKept(id, record, "lost", async () => { await this.#outcome(id, record, { at: this.now(), lost: true, attempt: record.attempt }); });
+        await this.#outcomeKept(id, record, "lost", async () => { await this.#outcome(id, record, { at: this.now(), lost: true, attempt: record.attempt }); }, "sent");
         return { record, lost: true };
       }
       // `unavailable` resolves nothing; a definitive answer does.
       record.phase = answer.answer === "unavailable" ? "unknown" : answer.answer;
-      await this.#outcomeKept(id, record, answer.answer, async () => { await this.#outcome(id, record, { at: this.now(), answer, attempt: record.attempt }); });
+      await this.#outcomeKept(id, record, answer.answer, async () => { await this.#outcome(id, record, { at: this.now(), answer, attempt: record.attempt }); }, "sent");
       return { record, answer, retained: false };
     });
   }
@@ -402,10 +405,11 @@ export class Custody {
       let receipt: Receipt | null = null;
       try { receipt = await read(fresh.envelope); } catch (error) { if (!(error instanceof Lost)) throw error; }
       if (receipt) {
+        const previous = fresh.phase;
         fresh.phase = "accepted";
         await this.#outcome(id, fresh, { at: this.now(), settled: receipt, attempt: fresh.attempt });
         fresh.updated = this.now();
-        await this.#write(id, fresh);
+        await this.#write(id, fresh, false, previous);
       }
       return { record: fresh, receipt, decided: await this.decided(id, fresh) };
     });
@@ -423,8 +427,10 @@ export class Custody {
     if (!record) throw new CustodyError({ held: "unreadable" });
     return this.#locked(id, record.envelope.signed.intent.notAfter, async () => {
       const fresh = (await this.#read(id))!;
+      const before = fresh.phase;
       const intent = intentDigest(fresh.envelope.signed.intent);
       const sid = stepId({ intent, resource, capability, step });
+      const stepBefore = fresh.steps[sid]?.phase ?? null;
       const entry: Step = fresh.steps[sid] ?? { intent, resource, capability, step, phase: "prepared", answers: [] };
       // A standalone step with a decisive answer is terminal: its answer is returned again, and nothing is sent.
       if (fresh.standalone && entry.phase === "answered") {
@@ -436,7 +442,8 @@ export class Custody {
       entry.phase = "sent";
       fresh.steps[sid] = entry;
       if (fresh.standalone) fresh.phase = "sent";
-      await this.#write(id, fresh, true);
+      await this.#write(id, fresh, true, before);
+      custodyStepTransition(stepBefore, entry.phase);
       let answer: Answer | null = null;
       try { answer = await deliver(fresh.envelope.signed); } catch (error) { if (!(error instanceof Lost)) throw error; }
       entry.phase = answer === null || answer.answer === "unavailable" ? "unknown" : "answered";
@@ -444,12 +451,14 @@ export class Custody {
       // A step keeps its first answer and its latest 63 (see the header): the first is what the resource repeats for the same step.
       if (entry.answers.length > OUTCOMES_INLINE) entry.answers.splice(1, entry.answers.length - OUTCOMES_INLINE);
       // A standalone record is settled, and terminal, when every step it holds is decided; until then it stays unresolved.
+      const previous = fresh.phase;
       if (fresh.standalone) fresh.phase = Object.values(fresh.steps).every((st) => st.phase === "answered") ? "settled" : "unknown";
       // The step was sent and answered before this write: a store that fails here keeps the step `sent`, and what is reported
       // says so, with the step's identity, never that nothing was sent (the same rule as a dispatch's outcome).
       try {
         fresh.updated = this.now();
-        await this.#write(id, fresh);
+        await this.#write(id, fresh, false, previous);
+        custodyStepTransition("sent", entry.phase);
       } catch (error) {
         if (error instanceof CustodyError && error.why.held === "too-large") throw error;
         throw new CustodyError({ held: "unkept", answer: answer === null ? "lost" : answer.answer, step: { resource: resource.scope, capability, step } });
