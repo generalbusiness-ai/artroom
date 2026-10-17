@@ -1,9 +1,12 @@
-# Keep Lending drafts after refusal
+# Lending drafts, confirmed handles and recovery wording
 
-Source child `a6cd648c`, promise `a2db9f95`, handles the first of four
+Current Source child `57878f81`, promise `8f268c82`, combines the four
 nonblocking P3 findings under `6bfce701` / `9253b465`. It starts from Main
-`55e1970a5`. Archive review remains priority 1; final composition, gate,
-review and landing wait behind the archive candidate.
+`55e1970a5`. The draft-only child `a6cd648c` / `a2db9f95` produced local
+checkpoint `a53744bc`; `c0218075` retires that narrower request toward
+this combined outcome before any Source artifact or full gate. Its
+implementation and original attempts continue here. Archive remains
+priority 1; final composition, gate, review and landing wait behind it.
 
 The renderer previously cleared donation and cancellation inputs after
 both a recorded act and a refusal. It also cleared a cancellation reason
@@ -15,6 +18,21 @@ name and description after donation, or the reason after cancellation.
 Refused and unknown outcomes preserve drafts. Publication, borrowing and
 returning consume neither form. Native authority, staff controls, request
 custody and epoch fencing are unchanged.
+
+Post-join discovery now reads this device's active key and member from
+authenticated membership before returning an identity. The response must
+be complete, bind the full membership scope/incarnation and pin the
+current application membership version. Missing, contradictory or
+ambiguous key/member rows do not confirm a handle. The renderer stores
+the confirmed handle and states confirmation only after discovery.
+Existing stored identities and original pending-request bindings are not
+migrated or rebound by this change.
+
+The README and demo script distinguish local scripted renderer checks
+from the retained hosted runs. Check documentation now says that it
+submits no new lending or join act. Its reads may sign and send
+read-session authentication. The custody check, act submission and retry
+rules are unchanged.
 
 ## Focused evidence
 
@@ -46,11 +64,38 @@ relevant warning/error logs and interaction results were checked.
 Desktop and mobile screenshots were inspected, including the empty
 original donation fields and retained repaired donation/reason values.
 
+The extended rendered witness then reproduced stale handle display in
+both viewports (`86493`, exit 1, fourteen passes and two assertion
+failures). A scripted discovery returned `@confirmed`, but the renderer
+stored and displayed `@advertised`. After the presentation correction,
+all sixteen checks passed (`59518`, exit 0), including unavailable
+membership without handle confirmation. The final handle screenshots
+were inspected at both viewport sizes. These ports remain stand-ins;
+the authentication data source is checked separately below.
+
+The existing real Scope/SQLite Lending scenario was strengthened with a
+conflicting advertised handle after a native join. Before the discovery
+repair it failed (`85371`, exit 1): the identity said `@not-visitor` when
+the device's actual authenticated member was `@visitor`. The repaired
+scenario passed (`24924`, exit 0); after the final membership-version
+guard it passed again (`16336`, exit 0). It also continues through the
+visitor's native donation. Scope, membership, sessions, WebCrypto and
+SQLite are real; the scenario's existing Git host and clock remain
+labelled stand-ins. It proves no hosted provider behavior.
+
 Browser typechecking and the existing model/custody focus passed
 (`84451`, exit 0): nine tests in two files. The existing-lock offline
 install (`44183`) exited zero without manifest or lock changes. The owned
 asset generator ran; all three disk assets and the Worker module
-reproduce exactly. Only the generated JavaScript and Worker module differ.
+reproduce exactly. Among the generated assets, only JavaScript and the
+Worker module differ.
+
+The new membership projection's first test compilation rejected two
+attempts to mutate readonly fixture data. Immutable replacement fixtures
+fix those errors. Browser types and all nine model/custody cases then
+passed (`70081`, exit 0), including missing-key, contradictory handle and
+ambiguous-key observations. Final browser and Scope test typechecks
+also passed. The owned assets were regenerated after the final changes.
 
 Original records are retained outside the checkout:
 
@@ -61,9 +106,17 @@ Original records are retained outside the checkout:
 - `/tmp/artroom-lending-refused-drafts-repaired/report.json`
 - `/tmp/artroom-lending-refused-drafts-model-custody-focus.log`
 - `/tmp/artroom-lending-refused-drafts-types.log`
+- `/tmp/artroom-lending-p3-original-handle-browser.log`
+- `/tmp/artroom-lending-p3-repaired-handle-browser.log`
+- `/tmp/artroom-lending-p3-native-original-focus.log`
+- `/tmp/artroom-lending-p3-membership-native-focus.log`
+- `/tmp/artroom-lending-p3-membership-version-focus.log`
+- `/tmp/artroom-lending-p3-membership-types.log`
+- `/tmp/artroom-lending-p3-membership-fixtures-types.log`
+- `/tmp/artroom-lending-p3-membership-fixtures-model-focus.log`
 
 These references grant no external-file or execution access. A later
 Source review will receive its own finite, exact evidence grant. No full
-gate or Source approval has occurred for this slice. The other three P3
-findings remain owed. All six hosted outputs remain untouched; no provider
+gate or Source approval has occurred for this combined candidate. All four
+P3 outcomes still owe exact reviewed landing. All six hosted outputs remain untouched; no provider
 operation, deployment or publication ran.

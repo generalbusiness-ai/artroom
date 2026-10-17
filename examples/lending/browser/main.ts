@@ -111,10 +111,11 @@ async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Pro
     if (expectedEpoch !== epoch) return;
     const stored = await remembered.load();
     if (expectedEpoch !== epoch || rememberedContext(stored) !== previous || stored?.device.publicKey !== device.publicKey) return;
-    const next: Remembered = { v: 1, device, seat, ...(matched.ok ? { identity: matched.identity } : {}) };
+    const confirmedSeat = matched.ok ? { ...seat, handle: matched.identity.member.member } : seat;
+    const next: Remembered = { v: 1, device, seat: confirmedSeat, ...(matched.ok ? { identity: matched.identity } : {}) };
     await remembered.save(next);
     if (expectedEpoch !== epoch) return;
-    if (!matched.ok) notice = { kind: "plain", text: matched.reason };
+    notice = { kind: "plain", text: matched.ok ? `The room confirmed your handle: ${confirmedSeat.handle}.` : matched.reason };
     // Every remembered writer takes this lock. Open the committed context before releasing it.
     await open(next);
   });
@@ -122,7 +123,7 @@ async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Pro
 function joined(device: DeviceKey, outcome: JoinOutcome | null, expectedEpoch = epoch): Promise<void> | void {
   if (expectedEpoch !== epoch) return;
   if (outcome === null) return;
-  if (outcome.status === "joined") { notice = { kind: "plain", text: `You joined as ${outcome.seat.handle}.` }; keptJoin = null; return seated(device, outcome.seat, expectedEpoch); }
+  if (outcome.status === "joined") { notice = { kind: "plain", text: "Your join was recorded. Confirming your membership…" }; keptJoin = null; return seated(device, outcome.seat, expectedEpoch); }
   notice = { kind: outcome.status === "refused" ? "refusal" : "plain", text: outcome.reason };
   if (outcome.status === "refused") keptJoin = null;
   if (outcome.status === "unknown" && outcome.seat) keptJoin = outcome.seat;
