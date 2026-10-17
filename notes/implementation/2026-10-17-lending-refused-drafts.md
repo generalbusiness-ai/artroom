@@ -8,8 +8,9 @@ original scope on actual Main
 That Main includes the reviewed Judge, journey plan and capacity preparation.
 Complete review `0ad4e770` found one Lending draft-loss issue. This successor
 repairs that boundary and its owned generated assets; the other scopes keep
-their reviewed runtime and test bytes. One gate is due at the changed
-composition freeze, followed by complete exact-head re-review. Earlier
+their reviewed runtime and test bytes. The one repaired-composition gate failed an unchanged archive timeout;
+its result and separate diagnostics are recorded below. Complete
+exact-head re-review and explicit residue disposition remain due. Earlier
 Source IDs, dependency waits and gate results below are historical checkpoints.
 All original attempts and the complete five-scope conditions remain recorded.
 
@@ -369,3 +370,56 @@ outputs. All other P3 runtime/test leaves remain exact to the fully reviewed
 pre-repair composition; a new gate must cover this changed implementation.
 All earlier failed Judge gates and their cause-unknown qualifications remain.
 No approval, deployment or operational/root acceptance is inferred.
+
+
+## Repaired composition gate result
+
+Original gate 42187 closed with exit 1 (`809e1b`) at clean freeze
+`f4976192ed8027bf44065df5aff8e0e2e7e07cc1`, tree
+`7ea1894608934d3b2f2962e220619008f0aaacb4`: 1,574 Vitest passes,
+one unchanged Git archive parent test timeout at its original 5,000 ms,
+and three skips. Node and Counter were not reached. The failed gate
+remains failed; earlier passing runs do not cover this repair.
+
+The exact failed case passed once at the same deadline in separate
+run 58872, exit 0 (`0332e7`): one pass, ten unselected, 2.88 s body.
+The originally unreached Node and Counter stages then passed 25 and
+55 cases. This separate evidence is no passing gate or cause diagnosis.
+The original gate also retains an unattributed Durable Object I/O-context
+warning in Vitest's timeout abort helper. Both the new deadline failure
+and that warning require an explicit reviewer disposition; no earlier
+Judge disposition transfers. No source, assertion, deadline or pool
+was changed for diagnostics. No whole gate is repeated.
+
+Only these five delivery notes change after the tested freeze. All runtime,
+test, dependency and generated asset leaves remain exact. Complete fresh
+31-path/32-subject review remains required before landing, with all five
+scopes and historical failures intact. Full-root and operational duties
+remain open.
+
+
+Gate cost was 491.373 s elapsed and 634.208 child CPU seconds on
+macOS 27.0.1 arm64 with 18 logical CPUs. Pre-run load was
+2.307/2.831/3.377; installation was skipped because the dependency view
+matched the unchanged lock. Typechecking took 7.8 s elapsed/27.6 CPU;
+tests took 483.3 s/606.3 CPU. These are observations, not evidence that
+load caused the failure. Original log SHA256:
+`e1db68d118d3cf45434ee7bc105a0b4f850e3b7c3ca3aa22bfed45817e000955`.
+
+The exact timeout subject is
+`packages/git/test/journal-layout.test.ts:57`, “a validated parent extends
+only its final segment and cumulative input set; retrying the same
+manifest on the original parent gives the same commit”. The file's Git
+mode/blob is exact to current Main. The diagnostic process took 7.556 s
+elapsed and 9.240 child CPU seconds, including the unreached downstream
+stages. The original Scope stderr also contains explicit scripted reset
+faults and the SQL retention fault inserted by the existing fixture at
+`packages/scope/test/application-establish.test.ts:160–162`. That does
+not identify the cause or actor of the separate abort-context warning.
+No warning is suppressed or treated as harmless by this delivery.
+
+The original deferred-reply reproduction and repaired 22-case browser
+checks remain separate from gate coverage. They use the actual renderer
+and four explicit scripted ports. The fresh finite public projection
+retains their expected/actual values, original failure counts, final
+checks and screenshot metadata, without granting raw files or execution.

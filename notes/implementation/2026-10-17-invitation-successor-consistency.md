@@ -8,8 +8,9 @@ original scope on actual Main
 That Main includes the reviewed Judge, journey plan and capacity preparation.
 Complete review `0ad4e770` found one Lending draft-loss issue. This successor
 repairs that boundary and its owned generated assets; the other scopes keep
-their reviewed runtime and test bytes. One gate is due at the changed
-composition freeze, followed by complete exact-head re-review. Earlier
+their reviewed runtime and test bytes. The one repaired-composition gate failed an unchanged archive timeout;
+its result and separate diagnostics are recorded below. Complete
+exact-head re-review and explicit residue disposition remain due. Earlier
 Source IDs, dependency waits and gate results below are historical checkpoints.
 All original attempts and the complete five-scope conditions remain recorded.
 
@@ -272,3 +273,29 @@ outputs. All other P3 runtime/test leaves remain exact to the fully reviewed
 pre-repair composition; a new gate must cover this changed implementation.
 All earlier failed Judge gates and their cause-unknown qualifications remain.
 No approval, deployment or operational/root acceptance is inferred.
+
+
+## Repaired composition gate result
+
+Original gate 42187 closed with exit 1 (`809e1b`) at clean freeze
+`f4976192ed8027bf44065df5aff8e0e2e7e07cc1`, tree
+`7ea1894608934d3b2f2962e220619008f0aaacb4`: 1,574 Vitest passes,
+one unchanged Git archive parent test timeout at its original 5,000 ms,
+and three skips. Node and Counter were not reached. The failed gate
+remains failed; earlier passing runs do not cover this repair.
+
+The exact failed case passed once at the same deadline in separate
+run 58872, exit 0 (`0332e7`): one pass, ten unselected, 2.88 s body.
+The originally unreached Node and Counter stages then passed 25 and
+55 cases. This separate evidence is no passing gate or cause diagnosis.
+The original gate also retains an unattributed Durable Object I/O-context
+warning in Vitest's timeout abort helper. Both the new deadline failure
+and that warning require an explicit reviewer disposition; no earlier
+Judge disposition transfers. No source, assertion, deadline or pool
+was changed for diagnostics. No whole gate is repeated.
+
+Only these five delivery notes change after the tested freeze. All runtime,
+test, dependency and generated asset leaves remain exact. Complete fresh
+31-path/32-subject review remains required before landing, with all five
+scopes and historical failures intact. Full-root and operational duties
+remain open.
