@@ -33,7 +33,7 @@ test("a reservation that an item holds, on real storage: the entry that opens th
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: definition.declared as never, rules } : null) } }));
   try {
     const stub = stubOf(name);
-    const founded = await stub.found(signIntent(founding, rita.secret), MADE);
+    const founded = await stub.create(signIntent(founding, rita.secret), MADE);
     if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
     const scope = founded.receipt.fact.at;
     const said = (answer: Answer) => [answer.answer, "reason" in answer ? answer.reason : null];

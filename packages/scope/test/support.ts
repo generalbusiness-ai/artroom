@@ -50,7 +50,7 @@ export function founding(notAfter: Timestamp = at(60), under: ValidDefinition = 
 }
 
 /** The object's surface as a caller over RPC has it: each method, answered in a promise. */
-type Surface = Pick<TestScope, "found" | "submit" | "prepare" | "settle" | "checkpoint" | "summary" | "items" | "history" | "entry" | "outbox">;
+type Surface = Pick<TestScope, "create" | "submit" | "prepare" | "settle" | "checkpoint" | "summary" | "items" | "history" | "entry" | "outbox">;
 export type Remote = { [K in keyof Surface]: (...args: Parameters<Surface[K]>) => Promise<Awaited<ReturnType<Surface[K]>>> };
 
 /** The object with that name, for the pool's own functions: eviction, the alarm, a look at its storage. */
@@ -133,12 +133,12 @@ export class Lane {
 }
 
 /** Found a scope on real storage, with its clock at the start. `bounds` and `reads` replace the defaults for this scope only. `under`: a variant of the definition above, with the same grants. */
-export async function found(bounds: Partial<Bounds> = {}, reads: Partial<ReadBounds> = {}, under: ValidDefinition = definition): Promise<Lane> {
+export async function create(bounds: Partial<Bounds> = {}, reads: Partial<ReadBounds> = {}, under: ValidDefinition = definition): Promise<Lane> {
   const { signed, name } = founding(at(60), under);
   const c = controls(name, START);
   c.bounds = { ...PROPOSED_BOUNDS, ...bounds };
   c.reads = { ...READ_BOUNDS, ...reads };
-  const answer = await stubOf(name).found(signed, under.declared);
+  const answer = await stubOf(name).create(signed, under.declared);
   if (answer.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(answer)}`);
   return new Lane(name, c, answer.receipt.fact.at, answer.receipt, signed);
 }

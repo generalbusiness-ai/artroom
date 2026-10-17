@@ -13,7 +13,7 @@ const ENDS = ["answer", "idle", "busy", "clock-behind", "unavailable"] as const;
 const ANSWERS = ["accepted", "refused", "unavailable", "mismatch", "none", "mixed"];
 export const STEPS = ["retained-replies", "owner", "judged"] as const;
 export const EVENTS = ["outside-call-failed", "outside-replies-failed", "outside-recovery-failed"] as const;
-export const METRIC_PLACES = ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "operations", "history", "entries", "outbox", "duty", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
+export const METRIC_PLACES = ["create", "acts", "preparations", "rpc:create", "rpc:acts", "rpc:preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "operations", "history", "entries", "outbox", "duty", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
 // An exhaustive union makes a new contract reason an explicit schema decision.
 const REASONS: Record<RefusalReason | UnavailableReason | MismatchReason | ReadRefusal | SessionRefusal, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true,
@@ -51,7 +51,7 @@ function valid(point: MetricPoint): boolean {
   const [count, duration, a, c, e, flag] = d as [number, number, number, number, number, number];
   if (kind === "metric-dropped") return b[3] === "metrics" && b[4] === "dropped" && b[5] === "summary" && b[8] === "none" && count === 1 && duration <= 31 && c <= a && e <= c;
   if (flag > count) return false;
-  if (kind === "turn") return ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations", "alarm", "dispatch", "mixed"].includes(b[3]!) && ends.has(b[4] ?? "") && ANSWERS.includes(b[8] ?? "") && (b[4] === "answer" || b[8] === "none");
+  if (kind === "turn") return ["create", "acts", "preparations", "rpc:create", "rpc:acts", "rpc:preparations", "alarm", "dispatch", "mixed"].includes(b[3]!) && ends.has(b[4] ?? "") && ANSWERS.includes(b[8] ?? "") && (b[4] === "answer" || b[8] === "none");
   if (count !== 1) return false;
   switch (kind) {
     case "route": return ["ok", "refused", "error"].includes(b[4]!) && ["2xx", "3xx", "4xx", "5xx"].includes(b[5]!) && ["turn", "pre-turn"].includes(b[8]!) && a === 0 && c === 0 && e === 0 && flag === 0;

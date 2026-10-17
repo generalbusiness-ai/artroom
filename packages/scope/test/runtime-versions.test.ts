@@ -41,7 +41,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: "platform:register@2", creator: null, cause: intentDigest(install), ordinal: 0 }));
   const host = outsideOf(R.name);
   wired.set(R.name, () => ({ outside: host }));
-  expect((await R.stub.found(signIntent(install, keys.paul.secret), "platform:register@2")).answer).toBe("accepted");
+  expect((await R.stub.create(signIntent(install, keys.paul.secret), "platform:register@2")).answer).toBe("accepted");
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
   const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@2", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
   const D = new Platform(scopeIdOf(seed));

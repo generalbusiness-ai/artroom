@@ -9,39 +9,39 @@ import { inbox, platform } from "@generalbusiness/dap-platform";
 import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability, type CapabilityScript } from "../src/testing.ts";
 import { Node, founding as creationIn, net, routed, soon } from "./net.ts";
-import { HOLD, START, at, definition, found, founding, reader, rita, stubOf, una } from "./support.ts";
+import { HOLD, START, at, definition, create, founding, reader, rita, stubOf, una } from "./support.ts";
 
 describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   test("entry 0 holds the seed, the signed intent and a minted incarnation, and the scope answers under its own name only", async () => {
-    const s = await found();
+    const s = await create();
     expect(await s.stub.entry(reader, 0)).toMatchObject({
       ok: true, at: { seq: 0, hash: s.genesis.fact.hash },
       value: { entry: { seq: 0, prev: null, at: { scope: s.name, inc: s.at.inc, kind: "directory" }, input: { type: "genesis", inc: s.at.inc, founding: s.signed, decision: "applied" } } },
     });
     expect([isIncarnation(s.at.inc), s.genesis.intent, s.genesis.definition]).toEqual([true, intentDigest(s.signed.intent), definition.digest]);
     // The same founding again is answered from the genesis: the same receipt, with the incarnation minted the first time.
-    expect(await s.stub.found(s.signed, definition.declared)).toEqual({ answer: "accepted", receipt: s.genesis });
+    expect(await s.stub.create(s.signed, definition.declared)).toEqual({ answer: "accepted", receipt: s.genesis });
     expect(await s.head()).toEqual({ seq: 0, hash: s.genesis.fact.hash });
 
     // Another founding intent asks for another seed. Its digest is not this object's name, nor the name of an object with no entry.
     const other = founding();
     const empty = stubOf(founding().name);
     const unverified = { answer: "refused", reason: "source-unverified" };
-    expect([await s.stub.found(other.signed, definition.declared), await empty.found(other.signed, definition.declared)]).toEqual([unverified, unverified]);
+    expect([await s.stub.create(other.signed, definition.declared), await empty.create(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
     // A platform definition is supplied in code, by its name and version. This runtime holds none of that name, so it founds nothing
     // under it. The whole-scope rule for a version that lacks one rule is shown on real scopes in `membership.test.ts`, by a control,
     // and where a founding stops in `founding-real.test.ts`.
-    expect(await stubOf(other.name).found(other.signed, "platform:task@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await stubOf(other.name).create(other.signed, "platform:task@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 
   test("once a scope has a genesis it runs under its pinned definition and no other", async () => {
-    const s = await found();
+    const s = await create();
     const [hold] = await s.holds(1);
     // The same lane, but the end of a hold tells nobody. A founding under it reaches the scope when the hold is due.
     const other = variant(definition.declared, (def) => { def.timed["hold-end"].attention = []; });
     s.c.clock.now = at(HOLD);
-    expect(await s.stub.found(founding(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
+    expect(await s.stub.create(founding(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
     // The turn drained first, as every turn does, and the end it wrote is the pinned definition's.
     expect((await s.entries(4)).map((e) => e.effects)).toEqual([[{ effect: "hold", item: hold, change: "end", epoch: 2 }, { effect: "attention", item: hold, members: [una.member], reason: "hold ended" }]]);
   });
@@ -60,14 +60,14 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const c = controls(name, START);
     const stub = stubOf(name);
     // The first founding reads the fact. Unread, it waits and records nothing.
-    expect(await stub.found(signed, naming.declared)).toEqual({ answer: "unavailable", reason: "dependency-unavailable" });
+    expect(await stub.create(signed, naming.declared)).toEqual({ answer: "unavailable", reason: "dependency-unavailable" });
     expect(await stub.summary(reader)).toEqual({ ok: false, reason: "not-found" });
     c.foreign.set(proof.hash, { entry, under: "lane" });
-    const first = await stub.found(signed, naming.declared);
+    const first = await stub.create(signed, naming.declared);
     expect(first).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 0 } } });
     // The fact is lost. The same founding again is a repeat: it reads no fact, and is answered from the genesis.
     c.foreign.clear();
-    expect(await stub.found(signed, naming.declared)).toEqual(first);
+    expect(await stub.create(signed, naming.declared)).toEqual(first);
     expect(await stub.summary(reader)).toMatchObject({ ok: true, at: { seq: 0 } });
   });
 
@@ -77,7 +77,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     // The namespace `AS_DEPLOYED` is the class `ScopeObject`, with the ports of `production()` and nothing else. It is not the class that
     // `wrangler.jsonc` names: that is `DeployedScope`, which adds the namespace, the authority of a repository and read sessions.
     const deployed = stubOf(name, env.AS_DEPLOYED);
-    const founded = await deployed.found(signed, definition.declared);
+    const founded = await deployed.create(signed, definition.declared);
     if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
     const { at, seq, hash } = founded.receipt.fact;
     expect([at.scope, seq]).toEqual([name, 0]);
@@ -96,7 +96,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     // rule. Every mark has its rule, so the definition is one that this runtime can run, and the scope is founded.
     const first = asked(timeOf(Date.now() + 60_000));
     const deployed = scopeIdOf(seedOf(first, NAMED));
-    expect(await stubOf(deployed, env.AS_DEPLOYED).found(signIntent(first, rita.secret), NAMED)).toMatchObject({ answer: "accepted", receipt: { definition: NAMED, fact: { at: { scope: deployed }, seq: 0 } } });
+    expect(await stubOf(deployed, env.AS_DEPLOYED).create(signIntent(first, rita.secret), NAMED)).toMatchObject({ answer: "accepted", receipt: { definition: NAMED, fact: { at: { scope: deployed }, seq: 0 } } });
     expect(await stored(deployed, "SELECT COUNT(*) AS n FROM entry", env.AS_DEPLOYED)).toEqual([{ n: 1 }]);
 
     // The rest is in the namespace `NET`: the deployed class and its definitions port, with the test clock, authority and readers.
@@ -106,7 +106,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       const name = scopeIdOf(seedOf(intent, NAMED));
       const I = new Node(name, inbox as unknown as DeclaredDefinition);
       // The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
-      const founded = await I.stub.found(signIntent(intent, rita.secret), NAMED);
+      const founded = await I.stub.create(signIntent(intent, rita.secret), NAMED);
       if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
       const ref: ScopeRef = founded.receipt.fact.at;
       expect([ref.scope, founded.receipt.fact.seq, founded.receipt.definition]).toEqual([name, 0, NAMED]);
@@ -170,7 +170,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       expect([await I.stub.summary(reader), await read(7), await I.stub.deliver({ ...notified, n: 1 })]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }, { answer: "retry", reason: "unavailable" }]);
       expect(await stored(name, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 3 }]);
       const lost = asked(soon(60));
-      expect(await new Node(scopeIdOf(seedOf(lost, NAMED)), I.declared).stub.found(signIntent(lost, rita.secret), NAMED)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+      expect(await new Node(scopeIdOf(seedOf(lost, NAMED)), I.declared).stub.create(signIntent(lost, rita.secret), NAMED)).toEqual({ answer: "refused", reason: "unsupported-definition" });
       expect(await stored(scopeIdOf(seedOf(lost, NAMED)), "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
       net.platformCode = true;
 
@@ -178,7 +178,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       // without it: a declared definition holds no mark, and nothing is founded.
       const other = asked(soon(60));
       const declared = scopeIdOf(seedOf(other, definitionDigest(I.declared)));
-      expect(await new Node(declared, I.declared).stub.found(signIntent(other, rita.secret), I.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+      expect(await new Node(declared, I.declared).stub.create(signIntent(other, rita.secret), I.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
       expect(await stored(declared, "SELECT COUNT(*) AS n FROM entry")).toEqual([{ n: 0 }]);
     } finally {
       net.platformCode = true;
@@ -202,7 +202,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const asked: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000) };
     const seed: Seed = { v: 1, kind: "directory", definition: staged.digest, creator: null, cause: intentDigest(asked), ordinal: 0 };
     const deployed = stubOf(scopeIdOf(seed), env.AS_DEPLOYED);
-    const founded = await deployed.found(signIntent(asked, rita.secret), staged.declared);
+    const founded = await deployed.create(signIntent(asked, rita.secret), staged.declared);
     if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
     const at = founded.receipt.fact.at;
     const intent = (kind: string, more: Partial<Intent>): Intent => ({ v: 1, to: at, actor: rita.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000), ...more });
@@ -217,7 +217,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     // A runtime that lacks the code founds no scope under the definition, and writes nothing: the namespace `NET` with no capability.
     net.capability = null;
     const lacking = creationIn(staged, fields);
-    expect(await new Node(lacking.name, staged.declared).stub.found(lacking.signed, staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await new Node(lacking.name, staged.declared).stub.create(lacking.signed, staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
 
     // A STAND-IN from here on: the scripted test capability answers from the table below. It reads no hold and no repository.
     try {
@@ -225,7 +225,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       net.capability = {};
       const { signed, name } = creationIn(staged, fields);
       const L = new Node(name, staged.declared);
-      expect(await L.stub.found(signed, staged.declared)).toMatchObject({ answer: "accepted" });
+      expect(await L.stub.create(signed, staged.declared)).toMatchObject({ answer: "accepted" });
       const commitment = (await L.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
       await L.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } });
       const report = { fields: { commitment, commit }, expected: { commitment: 2 } };

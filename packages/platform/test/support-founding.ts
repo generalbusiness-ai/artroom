@@ -74,7 +74,7 @@ export class Register extends Ledger {
   }
 
   /** A founding by that key: the `found` act, with the fields of a founding intent. Returns the judgment. */
-  found(who: Actor, more: Record<string, string> = {}, key = "a founding"): ActJudgment {
+  create(who: Actor, more: Record<string, string> = {}, key = "a founding"): ActJudgment {
     return this.act(who, "found", { expected: { register: this.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key, ...more }, idempotencyKey: key });
   }
 

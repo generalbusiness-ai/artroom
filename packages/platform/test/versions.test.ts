@@ -88,11 +88,11 @@ const inGenesis = (definition: PlatformDefinition): RuleGiven => ({ input: { typ
 test("a rule reads its own version from the scope's genesis: the register of each version seeds the directory of the same version, and membership of each version writes its own first lists, with destination.read-token only at version 2", () => {
   const signed = { intent: { v: 1, to: null, actor: rita.key, kind: "found", fields: {} } };
   const at = { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` };
-  const found = (definition: PlatformDefinition) => ({ input: { type: "act", signed }, own: (seq: number) => (seq === 0 ? { entry: { input: { type: "genesis", seed: genesisOf(definition) } } } : null), resolved: { at } }) as unknown as RuleGiven;
-  expect((["platform:register@1", "platform:register@2", "platform:register@3"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2", "platform:directory@3"]);
-  expect(directorySeed(found(FILE_PUBLICATION_COHORT.register)).definition).toBe(FILE_PUBLICATION_COHORT.directory);
-  expect(directorySeed(found(PARTITION_COHORT.register)).definition).toBe(PARTITION_COHORT.directory);
-  expect([DEMO_REGISTER, WEB_DEMO_REGISTER].map(named => directorySeed(found(named)).definition)).toEqual(["platform:directory@3", WEB_DEMO_COHORT.directory]);
+  const create = (definition: PlatformDefinition) => ({ input: { type: "act", signed }, own: (seq: number) => (seq === 0 ? { entry: { input: { type: "genesis", seed: genesisOf(definition) } } } : null), resolved: { at } }) as unknown as RuleGiven;
+  expect((["platform:register@1", "platform:register@2", "platform:register@3"] as const).map((named) => directorySeed(create(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2", "platform:directory@3"]);
+  expect(directorySeed(create(FILE_PUBLICATION_COHORT.register)).definition).toBe(FILE_PUBLICATION_COHORT.directory);
+  expect(directorySeed(create(PARTITION_COHORT.register)).definition).toBe(PARTITION_COHORT.directory);
+  expect([DEMO_REGISTER, WEB_DEMO_REGISTER].map(named => directorySeed(create(named)).definition)).toEqual(["platform:directory@3", WEB_DEMO_COHORT.directory]);
 
   const roleTable = (platform("platform:membership@1")!.rules["role-table"] as Extract<PlatformRule, { place: "effect" }>);
   const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as unknown as readonly { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));

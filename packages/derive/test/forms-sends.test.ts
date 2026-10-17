@@ -234,7 +234,7 @@ describe("sends (section 6.6)", () => {
     const K = born(C, split.seq).child;
     expect(K.last.sends.map((s) => [s.n, s.message.class, s.to])).toEqual([[0, "result", C.at], [1, "advisory", D.at]]);
     // A directory records no directory of its own. The index row of its genesis act is not made.
-    expect(founded(variant(desk, (d) => { d.acts.found.sends = [{ index: { fields: {} } }]; })).last.sends).toEqual([]);
+    expect(founded(variant(desk, (d) => { d.acts["found"].sends = [{ index: { fields: {} } }]; })).last.sends).toEqual([]);
   });
 
   test("the validator bounds what one entry can send and tell, and refuses a send that it cannot bound or address", () => {

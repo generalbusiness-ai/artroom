@@ -33,7 +33,7 @@ export interface ClaimStep { signed: SignedIntent; accepted?: FactRef }
  */
 export interface PendingClaim {
   register: ScopeId; intent: Digest; handle: string;
-  found?: ClaimStep;
+  "found"?: ClaimStep;
   repository?: Repository;
   seat?: ClaimStep;
   firstKey?: ClaimStep;

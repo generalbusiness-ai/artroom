@@ -30,7 +30,7 @@ function walked(c: Case) {
   });
 }
 /** What a row expects of the record: its `start`, its F, its stops and the count of the parent walk. */
-const found = (c: Case) => { const w = walked(c); return w.result === "recorded" ? [w.record.start, w.record.F, w.record.stops, w.record.visited] : w; };
+const walkResult = (c: Case) => { const w = walked(c); return w.result === "recorded" ? [w.record.start, w.record.F, w.record.stops, w.record.visited] : w; };
 
 describe("the ancestry walk and the guard `ancestry` (authority note, section 6.2; scope contract, section 16.4)", () => {
   test("the cases of the three witness tables, as rows of one table: the start is never a stop, an own ref never hides a foreign one, published history is never listed, and an own root is a stop only on a prior check (T23)", () => {
@@ -70,7 +70,7 @@ describe("the ancestry walk and the guard `ancestry` (authority note, section 6.
       [{ name: "a start that is no object ID", graph: {}, commit: X.toUpperCase(), refs: [] }, { result: "unreadable", reason: "bad-object-id", object: X.toUpperCase() }],
       [{ name: "a root that the lane's records do not hold as live for the commit", graph: { [X]: [D] }, commit: X, own: [[5, U]], refs: [[S, X, 5]] }, { result: "unreadable", reason: "no-live-root", object: null }],
     ];
-    expect(rows.map(([c]) => [c.name, found(c)])).toEqual(rows.map(([c, expected]) => [c.name, expected]));
+    expect(rows.map(([c]) => [c.name, walkResult(c)])).toEqual(rows.map(([c, expected]) => [c.name, expected]));
   });
 
   test("the guard: the check record of this intent, recorded, for this commit; what was read still fits the lane's records; and F passes the row of its act", () => {

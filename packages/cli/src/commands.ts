@@ -32,7 +32,7 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Created, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, activeDirectory, partitionIndexes, wellFormedInvitation, isCreationOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, ShapeError, TransportError, activeDirectory, partitionIndexes, wellFormedInvitation, isCreationOffer, readCredential, declaredHandle, create, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type Session, type CreationOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
@@ -397,7 +397,7 @@ export function install(ctx: Context, service: string, options: InstallOptions =
     if (before?.plan && selectedPlan(before.plan.definition)) return failed("Refused: install-pending. The retained selected plan must use its original cohort and request; run install --planned.");
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry dap install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed, key } = await installing(ctx, options, signing(ctx));
-    const { answer } = await found(transportOf(ctx, service), signed, NEW_REGISTER);
+    const { answer } = await create(transportOf(ctx, service), signed, NEW_REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
     return done(`Installed: register ${receipt.fact.at.scope}, under ${NEW_REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one founder key.`);
@@ -568,7 +568,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
     if (strictCustody) await saveCohortConfig(ctx, pending);
     else await ctx.store.save(pending);
   } else if (strictCustody) await readBackCohortConfig(ctx, before!);
-  const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
+  const { answer } = await create(transportOf(ctx, plan.service), plan.founding, plan.definition);
   const receipt = accepted(answer, null, "Installed").receipt;
   if (!matches(receipt)) {
     return failed("Held: the install acknowledgement does not match the planned register's exact identity. The plan is kept.");
@@ -666,7 +666,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
     if (config.claim && !options.again) {
       pending = config.claim;
       if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
-      if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
+      if (pending["found"] && (!validStep(pending["found"], register, signer.key, "found") || intentDigest(pending["found"].signed.intent) !== pending.intent || pending["found"].signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
     } else {
       let offered: CreationOffer | undefined;
       if (ctx.creationOffer) {
@@ -695,11 +695,11 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       const shape = platform(definition)!.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
       const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, items, null, fields) }, signing(ctx));
-      pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
+      pending = { register: register.scope, intent: intentDigest(signed.intent), handle, "found": { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
     const keep = async (next: PendingClaim) => { await ctx.store.save({ ...base, claim: next }); pending = next; };
-    if (!pending.found) {
+    if (!pending["found"]) {
       // Legacy records did not preserve the envelope. A real admitted
       // directory retains the original claim, so recover that exact signature
       // as already accepted. Never submit a reconstructed or fresh found.
@@ -760,11 +760,11 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
       }
       return receipt.fact;
     };
-    const creationFact = await submitted(pending.found!, register, R, "Created");
-    if (!pending.found!.accepted) {
+    const creationFact = await submitted(pending["found"]!, register, R, "Created");
+    if (!pending["found"]!.accepted) {
       // An unavailable answer also requires the same request on retry. Even
       // an expired/refused envelope remains saved: only --again replaces it.
-      await keep({ ...pending, found: { signed: pending.found!.signed, accepted: creationFact } });
+      await keep({ ...pending, "found": { signed: pending["found"]!.signed, accepted: creationFact } });
     } else if (!pending.repository) {
       // Wake recorded creation after a settings restart. This read does not
       // settle the found or change its already accepted request bytes.

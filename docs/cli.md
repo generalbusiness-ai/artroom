@@ -205,9 +205,8 @@ an independent review of the code are still required for this follow-up.
 
 **`dap create <name> [--handle @you] [--branch main] [--again]`**
 
-`found` remains an alias for one release and prints `dap create` as the new
-command name. The existing `claim` command remains compatible with retained
-workflows. All three commands use the same creation and recovery code.
+The existing `claim` command remains available for retained workflows.
+Both commands use the same creation and recovery code.
 
 The command signs the register's recorded `found` act. It waits until the
 directory, membership, the rules scope and the destination are created and

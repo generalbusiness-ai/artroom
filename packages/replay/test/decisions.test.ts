@@ -17,7 +17,7 @@ test("replay admission counts the actual register's legacy cleanup closure and p
   // The signed intents are test inputs; no host runs or answers. These small
   // replay budgets are controlled test inputs, not production capacity claims.
   const scope = new Register();
-  expect(scope.found(keys.rita).result).toBe("write");
+  expect(scope.create(keys.rita).result).toBe("write");
   expect([scope.last.seq, scope.state.outstanding().outcomes]).toEqual([1, [{ owner: registerPlatform.named, kind: "create-repository", entries: 6, unsent: 1 }]]);
   // This legacy kind has no counted attempts in its data. Six possible
   // outcomes each reserve the owner's 12-entry cleanup closure and the
@@ -57,7 +57,7 @@ const DATA: PlatformData = {
     board: { many: false, max: 1, initial: "open", states: { open: { final: false } }, parties: { opener: { fixed: true, required: true, list: false, author: false } }, refs: {}, values: {} },
     job: { many: false, max: 1, initial: "open", states: { open: { final: false } }, parties: {}, refs: { owner: { fixed: false, required: true, to: { type: "scope", kind: "lane" } } }, values: {}, holds: { decisions: { stop: 1 } } },
   },
-  acts: { found: { ...form, step: "open", on: "board", grant: "found", fields: { opener: { type: "member", required: true } }, effects: [{ party: { slot: "opener", from: { field: "opener" } } }] } },
+  acts: { "found": { ...form, step: "open", on: "board", grant: "found", fields: { opener: { type: "member", required: true } }, effects: [{ party: { slot: "opener", from: { field: "opener" } } }] } },
   receives: {
     start: { ...form, class: "tell", message: "start", from: { kind: "lane" }, opens: "job", effects: [{ ref: { slot: "owner", from: { sender: true } } }] },
     stop: { ...form, class: "tell", message: "stop", from: { kind: "lane" }, opens: null, also: { job: { item: "job", one: true } }, bound: { of: "also.job", where: [{ equals: { a: { sender: true }, b: { slot: "owner", of: "also.job" } } }] }, guards: [{ of: "also.job", equals: { a: { const: true }, b: { const: false } }, reason: "not-ready" }] },

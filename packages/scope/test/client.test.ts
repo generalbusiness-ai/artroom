@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { SELF } from "cloudflare:test";
 import { expect, test } from "vitest";
-import { ScopeHandle, bindingTransport, found, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
+import { ScopeHandle, bindingTransport, create, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
 import { newIncarnation } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "@generalbusiness/dap-derive";
 import { deskDefinition, grantOf, ticketDefinition } from "@generalbusiness/dap-derive/testing";
@@ -20,7 +20,7 @@ test.each(transports)("a scope handle over %s: an act returns its receipt; the e
   const signer = secretSigner(rita.secret);
   const now = timeMs(net.clock.now)!;
   const founding = await signedIntent(signer, { to: null, kind: "found", fields: { source: "a repository" } }, { now });
-  const { answer, scope } = await found(transport(), founding, deskDefinition.declared, [ticketDefinition.declared], reader);
+  const { answer, scope } = await create(transport(), founding, deskDefinition.declared, [ticketDefinition.declared], reader);
   if (answer.answer !== "accepted" || !scope) throw new Error(`not founded: ${JSON.stringify(answer)}`);
   const at = answer.receipt.fact.at;
   expect(scope).toBeInstanceOf(ScopeHandle);

@@ -70,7 +70,7 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
     const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
     wired.set(R.name, () => ({ outside: host }));
-    expect((await R.stub.found(signIntent(install, paul.secret), REGISTER)).answer).toBe("accepted");
+    expect((await R.stub.create(signIntent(install, paul.secret), REGISTER)).answer).toBe("accepted");
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
     const D = new Platform(scopeIdOf(seed));

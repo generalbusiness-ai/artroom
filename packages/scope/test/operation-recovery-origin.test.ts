@@ -6,7 +6,7 @@ import type { EffectAnswer, EffectRequest, OperationStatus, Outside } from "../s
 import type { LateAnswers } from "../src/operations.ts";
 import { owners, wired } from "./outside.ts";
 import { open } from "./operation-opening.ts";
-import { START, at, found, reader, rita } from "./support.ts";
+import { START, at, create, reader, rita } from "./support.ts";
 
 // Real ScopeObject, SQLite operation/send rows, restart and accepted-act
 // notification. The owner metadata, resolver's immutable origin proof,
@@ -14,7 +14,7 @@ import { START, at, found, reader, rita } from "./support.ts";
 // the driver's metadata boundary on a generic scope, not native
 // Destination authority or a native migration; those have separate witnesses.
 test.each(["change", "application"] as const)("%s: a sent recovery and its late original answer stay pending without publication origin proof, then an accepted act resumes that same answer", async mode => {
-  const s = await found({ deliveryBatch: 1 });
+  const s = await create({ deliveryBatch: 1 });
   const sent: EffectRequest[] = [], recovered: EffectRequest[] = [];
   let sourceVerified = true;
   const proof = mode === "application" ? scriptedApplicationOrigin() : scriptedOrigin();

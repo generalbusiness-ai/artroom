@@ -337,7 +337,7 @@ export const desk: DeclaredDefinition = {
     },
   },
   acts: {
-    found: act({ step: "open", on: "repo", grant: "found", fields: { source: { ...text, required: true } }, effects: [{ value: { slot: "source", from: { field: "source" } } }] }),
+    "found": act({ step: "open", on: "repo", grant: "found", fields: { source: { ...text, required: true } }, effects: [{ value: { slot: "source", from: { field: "source" } } }] }),
     "open-issue": act({
       step: "open", on: "issue", grant: "open-issue", fields: { title: { ...text, required: true } }, effects: [{ value: { slot: "title", from: { field: "title" } } }],
       sends: [{ create: { ...makeTicket, fields: { opener: { signer: true }, title: { field: "title" } }, result: { applied: [{ state: "created" }], refused: [{ state: "refused" }], conflict: [{ state: "conflicted" }] } } }],

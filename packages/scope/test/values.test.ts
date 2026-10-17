@@ -30,7 +30,7 @@ test("a value beside an intent, on real storage: the scope reads it only for a p
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: data as never, rules: gateRules().rules } : null) } }));
   try {
     const stub = stubOf(name);
-    const founded = await stub.found(signIntent(founding, rita.secret), MADE);
+    const founded = await stub.create(signIntent(founding, rita.secret), MADE);
     if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
     const scope = founded.receipt.fact.at;
     const grants = [grantOf(rita, scope, ["gate.issue"])];
@@ -93,7 +93,7 @@ test.each(["gate-proof-1", DOMAINS.definition])("an owner's evidence value in %s
   const out = outsideOf(name);
   wired.set(name, () => ({ outside: out, definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => named === MADE ? { data: data as never, rules: code.rules } : null } }));
   try {
-    const founded = await stubOf(name).found(signIntent(founding, rita.secret), MADE);
+    const founded = await stubOf(name).create(signIntent(founding, rita.secret), MADE);
     if (founded.answer !== "accepted") return expect.fail(`the scope was not founded: ${JSON.stringify(founded)}`);
     const scope = founded.receipt.fact.at;
     const issue: Intent = { v: 1, to: scope, actor: rita.key, kind: "issue", on: null, expected: {}, fields: { hash: textDigest("one") }, idempotencyKey: crypto.randomUUID(), notAfter: at(60) };

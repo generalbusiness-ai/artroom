@@ -38,7 +38,7 @@ test("standing grammar admits only the closed, safe platform singleton declarati
     (d: any) => { d.standing.entries = Number.MAX_SAFE_INTEGER; },
   ];
   for (const change of invalid) expect(validateDefinition(standingData(change), PROPOSED_BOUNDS, PROFILES, { platform: true }).ok, String(change)).toBe(false);
-  const noDefault = standingData(d => { delete d.items.repo.values.count.default; d.acts.found.effects.push({ value: { slot: "count", from: { const: 0 } } }); });
+  const noDefault = standingData(d => { delete d.items.repo.values.count.default; d.acts["found"].effects.push({ value: { slot: "count", from: { const: 0 } } }); });
   expect(validateDefinition(noDefault, PROPOSED_BOUNDS, PROFILES, { platform: true }).ok).toBe(true);
   const zero = standingData(d => { d.standing.max = 0; d.items.repo.values.count.of.max = 0; d.acts.set.fields.next.max = 0; d.acts.advance.fields.next.max = 0; });
   expect(validateDefinition(zero, PROPOSED_BOUNDS, PROFILES, { platform: true }).ok).toBe(true);

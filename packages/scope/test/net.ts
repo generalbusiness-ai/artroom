@@ -135,7 +135,7 @@ export async function desk(): Promise<Node> {
   net.hold = net.deaf = null;
   const { signed, name } = founding(deskDefinition, { source: "a repository" });
   const node = new Node(name, deskDefinition.declared);
-  const answer = await node.stub.found(signed, deskDefinition.declared, [ticketDefinition.declared]);
+  const answer = await node.stub.create(signed, deskDefinition.declared, [ticketDefinition.declared]);
   if (answer.answer !== "accepted") throw new Error(`the desk was not founded: ${JSON.stringify(answer)}`);
   await settle(node);
   return node;

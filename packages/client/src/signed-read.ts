@@ -80,7 +80,7 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
   return {
     // Delegate with the original receiver, including prototype methods and
     // methods that read class-private fields; object spread loses those.
-    found: (...args) => transport.found(...args),
+    create: (...args) => transport.create(...args),
     submit: (...args) => transport.submit(...args),
     prepare: (...args) => transport.prepare(...args),
     settle: (...args) => transport.settle(...args),

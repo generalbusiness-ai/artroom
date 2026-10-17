@@ -9,7 +9,7 @@ import { Metrics, type Metric, type MetricBinding } from "./metrics.ts";
 export interface MetricEnvironment { METRICS?: MetricBinding; DEPLOYMENT?: string; VERSION_METADATA?: { id: string } }
 export interface OperationalIdentity { request: string | null; trace: string | null }
 /** Internal RPC surface only. It cannot name a driver, operator or authority method. */
-export const OBSERVED_METHODS = ["found", "submit", "prepare", "settle", "summary", "items", "queryItems", "history", "entry", "outbox", "duty", "log", "retained", "session", "stream", "incidents", "waiting", "requests", "credential", "reservationSnapshot"] as const;
+export const OBSERVED_METHODS = ["create", "submit", "prepare", "settle", "summary", "items", "queryItems", "history", "entry", "outbox", "duty", "log", "retained", "session", "stream", "incidents", "waiting", "requests", "credential", "reservationSnapshot"] as const;
 export type ObservedMethod = typeof OBSERVED_METHODS[number];
 export const operationPlace = (method: ObservedMethod): string => ({ submit: "acts", prepare: "preparations", entry: "entries", session: "sessions", queryItems: "query-items", reservationSnapshot: "reservation-snapshot" } as Partial<Record<ObservedMethod, string>>)[method] ?? method;
 interface Invocation {
@@ -88,7 +88,7 @@ function location(request: Request): { place: string; scope: string | null } {
   if (!admittedRequestUrl(request.url)) return { place: "other", scope: null };
   const path = new URL(request.url).pathname, parts = path.split("/");
   if (parts[1] === "v1" && parts[2] === "scopes") {
-    if (!parts[3]) return { place: "found", scope: null };
+    if (!parts[3]) return { place: "create", scope: null };
     let scope: string | null = null;
     try { const decoded = decodeURIComponent(parts[3]); if (isScopeId(decoded)) scope = decoded; } catch { /* invalid name, no free text */ }
     const route = parts[4] || "summary";
@@ -105,7 +105,7 @@ export async function measuredRequest(request: Request, env: MetricEnvironment, 
   if (operational()) return serve();
   const identity = correlation(request.headers.get("traceparent")), where = location(request);
   const context = operationContext(env, where.scope, where.place, identity), started = performance.now();
-  context.httpPublic = ["found", "acts", "preparations"].includes(where.place);
+  context.httpPublic = ["create", "acts", "preparations"].includes(where.place);
   return measured(context, async () => {
     const response = await serve(), status = response.status, statusClass = `${Math.floor(status / 100)}xx`;
     metric({ kind: "route", place: where.place, end: status < 400 ? "ok" : status < 500 ? "refused" : "error", reason: statusClass, answer: !context.turn.known ? "unobserved" : context.turn.entered ? "turn" : "pre-turn", duration: Math.max(0, Math.floor(performance.now() - started)) });

@@ -178,7 +178,7 @@ function transport(baseURL, send) {
 /** Future explicit execution: one POST, no automatic retry or configuration. */
 export async function postInstall(baseURL, publicPlan, send) {
   const plan = checkedPlan(publicPlan);
-  try { return await transport(baseURL, send).found(plan.signedInstall, REGISTER); }
+  try { return await transport(baseURL, send).create(plan.signedInstall, REGISTER); }
   catch (failure) { throw error(failure, "request-unknown"); }
 }
 export async function postCreation(baseURL, signedCreation, send) {

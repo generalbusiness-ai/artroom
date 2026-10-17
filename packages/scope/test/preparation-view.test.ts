@@ -6,12 +6,12 @@ import { PREPARATION_BOUNDS as B, PreparationBudget } from "../src/preparation-b
 import { preparationScope } from "../src/preparation-scope.ts";
 import { preparationView } from "../src/preparation-view.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 
 test("metadata-first state pages preserve first-ID and lookahead without loading large unreturned bodies", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const actual = sqlOf(state), store = new SqliteStore(actual), sample = store.item(0)!;
     // Synthetic item rows exercise storage selection only, not judgments.
@@ -39,7 +39,7 @@ test("metadata-first state pages preserve first-ID and lookahead without loading
 });
 
 test("current exact native membership and rules callbacks agree with the complete store on bounded fixtures", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = sqlOf(state), store = new SqliteStore(sql), sample = store.item(0)!, genesis = JSON.parse(store.stored(0)!.bytes);
     const membership: ScopeRef = { scope: scopeIdOf({ ...genesis.input.seed, kind: "membership", ordinal: 100 }), inc: newIncarnation(new Uint8Array(16).fill(1)), kind: "membership" };
@@ -63,7 +63,7 @@ test("current exact native membership and rules callbacks agree with the complet
 
 test("state facade refuses an oversized first body, unsupported method and ambiguous incarnation without permission", async () => {
   for (const fault of ["body", "method", "ambiguous", "candidates"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const actual = sqlOf(state), store = new SqliteStore(actual), sample = store.item(0)!, at = store.scope()!.at;
       store.putItem({ ...sample, id: 10, type: "repository", state: "open", values: { text: "x".repeat(B.bytes + 1) } });

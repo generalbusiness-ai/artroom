@@ -818,7 +818,7 @@ export class McpService {
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try {
-        const founded = await this.#reads.transport.found(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
+        const founded = await this.#reads.transport.create(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
         // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
         return founded.answer === "refused" ? { answer: "refused", reason: founded.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : founded as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }

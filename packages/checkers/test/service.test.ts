@@ -207,7 +207,7 @@ describe("the checker service (authority note, section 3.11; I3 plan, T35). The 
         answers: ["check-error report-malformed, kept, ran", "kept", "check-error report-malformed, admitted"], runs: 1,
         sent: Array(3).fill([true, "check-error", "report-malformed", detailsDigest({ provenance: safe(first, run) })]),
         record: { provenance: safe(first, run) },
-        found: ["check-error report-malformed, admitted", "nothing: closed", 0], again: { provenance: safe(later, "a-run") }, same: safe(first, run),
+        "found": ["check-error report-malformed, admitted", "nothing: closed", 0], again: { provenance: safe(later, "a-run") }, same: safe(first, run),
       });
     }
     // One reading: a report whose member gives another value at each read is judged and recorded from the same reading. Here the image is

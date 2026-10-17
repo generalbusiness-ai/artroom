@@ -353,7 +353,7 @@ describe("the validator: effect forms (section 6.6)", () => {
       ["a source of a timed rule whose type only the commit knows", timed({ value: { slot: "text", from: { scope: true } } }), "timed-partial"],
       ["a timed rule that copies one slot of its item into another, and empties a third", timed({ party: { slot: "helper", from: { slot: "owner" } } }, { value: { slot: "text", from: null } }), null],
       // Sources.
-      ["an opening whose only effect on a required slot empties it", refusal((d) => { d.acts.found.effects[0].value.from = null; }, desk), "required-unset"],
+      ["an opening whose only effect on a required slot empties it", refusal((d) => { d.acts["found"].effects[0].value.from = null; }, desk), "required-unset"],
       ["a source that is none", edit({ value: { slot: "text", from: { none: true } } }), "shape"],
       ["a constant that is not a value of the slot", edit({ value: { slot: "size", from: { const: "big" } } }), "shape"],
       ["a position into a slot that is no integer", refusal((d) => { d.acts.rank.effects[0].value.slot = "text"; }), "name"],

@@ -4,12 +4,12 @@ import type { EffectRequest, OperationStatus, Outside } from "../src/index.ts";
 import type { LateAnswers } from "../src/operations.ts";
 import { owners, wired } from "./outside.ts";
 import { open } from "./operation-opening.ts";
-import { found, reader } from "./support.ts";
+import { create, reader } from "./support.ts";
 
 // Real ScopeObject and SQLite send/outcome rows; the owner and outside are
 // SCRIPTED. This shows the dispatch phase, not native file supersession.
 test("a known local refusal is recorded before the sent mark; a later stale signal never recalls or resends an unknown original", async () => {
-  const s = await found();
+  const s = await create();
   const sent: EffectRequest[] = [];
   let stale = true, checked = 0, notified = 0, late: LateAnswers | undefined;
   const outside: Outside = { accepts: () => true, send: async request => { sent.push(request); return null; }, late: give => { late = give; }, judged: () => { notified++; } };

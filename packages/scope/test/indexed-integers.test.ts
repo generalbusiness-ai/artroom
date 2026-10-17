@@ -34,7 +34,7 @@ test("native integer indexes retain exact duplicate and boundary keys across fin
   const name = scopeIdOf(seed); controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: named => named === MADE ? { data: data as never, rules } : null } }));
   try {
-    const stub = stubOf(name), founded = await stub.found(signIntent(founding, rita.secret), MADE);
+    const stub = stubOf(name), founded = await stub.create(signIntent(founding, rita.secret), MADE);
     if (founded.answer !== "accepted") return expect.fail(`indexed fixture was not founded: ${JSON.stringify(founded)}`);
     const scope = founded.receipt.fact.at;
     const act = (kind: string, over: Partial<Intent>): Promise<Answer> => stub.submit(signIntent({ v: 1, to: scope, actor: rita.key, kind, on: null, expected: {}, fields: {}, idempotencyKey: crypto.randomUUID(), notAfter: at(60), ...over }, rita.secret), [grantOf(rita, scope, ["gate.issue"])]);

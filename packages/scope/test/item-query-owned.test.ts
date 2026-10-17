@@ -8,7 +8,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { sessionRoom } from "./support/session-room.ts";
 import { mintSession, readerOf } from "../src/sessions.ts";
 import { net } from "./net.ts";
-import { at, found, rita } from "./support.ts";
+import { at, create, rita } from "./support.ts";
 
 /** Passive native SQL observation only while the real object's query runs.
  * Constructor/setup/background work is excluded, not advertised as bounded. */
@@ -51,11 +51,11 @@ async function measured(state: DurableObjectState, instance: object, encoded: un
   } finally { if (descriptor) Object.defineProperty(target, "exec", descriptor); else Reflect.deleteProperty(target, "exec"); ItemQueryBudget.prototype.spend = spend; }
 }
 
-const queryOf = (scope: Awaited<ReturnType<typeof found>>): ItemQuery => ({ v: 1, scope: scope.at, type: "commitment", states: ["accepted"], ids: null, limit: 100, cursor: null });
+const queryOf = (scope: Awaited<ReturnType<typeof create>>): ItemQuery => ({ v: 1, scope: scope.at, type: "commitment", states: ["accepted"], ids: null, limit: 100, cursor: null });
 const header = (query: ItemQuery, now = () => Date.parse(at(0))) => signedReader(secretSigner(rita.secret), query.scope.scope, "query-items", itemQueryArgument(query)!, { now });
 
 test("native query rejects malformed input and headers before protected SQL and charges cold and warm local signer work", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const query = queryOf(scope), encoded = encodeItemQueryParameter(query)!, reader = await header(query);
   await scope.restart();
   const got = await scope.inside(async (state, instance) => {
@@ -83,7 +83,7 @@ test("native query rejects malformed input and headers before protected SQL and 
 });
 
 test("native query keeps unknown signer evidence distinct and rechecks expiry after its last body SQL", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const query = queryOf(scope), encoded = encodeItemQueryParameter(query)!, reader = await header(query);
   const got = await scope.inside(async (state, instance) => {
     // Derived-index damage only: genuine immutable entries/genesis stay intact.

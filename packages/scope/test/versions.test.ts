@@ -39,7 +39,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
       send: (request) => lifetime.wait(() => host.send(request)),
       late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
-    expect((await R.stub.found(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
+    expect((await R.stub.create(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     // Version 1 of the register seeds the directory under version 1.
     const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };

@@ -9,7 +9,7 @@ import { preparationScope } from "../src/preparation-scope.ts";
 import { ReadPreparation, type PreparationSupport } from "../src/read-preparation.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { testPorts } from "../src/testing.ts";
-import { found, type Lane } from "./support.ts";
+import { create, type Lane } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 function support(scope: Lane, store: SqliteStore): PreparationSupport {
@@ -18,7 +18,7 @@ function support(scope: Lane, store: SqliteStore): PreparationSupport {
 }
 
 test("preparation reads genuine native pinned content without legacy Store readers and caches only successful raw content", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const actual = sqlOf(state), store = new SqliteStore(actual), native = support(scope, store);
     store.scope = () => { throw new Error("legacy scope reader forbidden"); };
@@ -41,7 +41,7 @@ test("preparation reads genuine native pinned content without legacy Store reade
 });
 
 test("missing declarations can arrive later and cached content rechecks current whole-runtime support", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = sqlOf(state), store = new SqliteStore(sql), entry = JSON.parse(store.stored(0)!.bytes), named = entry.input.seed.definition;
     const kept = store.retained("definition", named)!; store.forget("definition", named);
@@ -57,7 +57,7 @@ test("missing declarations can arrive later and cached content rechecks current 
 });
 
 test("an elapsed preparation latches unavailable and installs no late immutable declaration cache", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const actual = sqlOf(state), store = new SqliteStore(actual), native = support(scope, store);
     let active = true, expire = true, bodies = 0;
@@ -74,7 +74,7 @@ test("an elapsed preparation latches unavailable and installs no late immutable 
 
 test("scope metadata distinguishes missing, malformed and oversized before genesis or definition transfer", async () => {
   for (const fault of ["missing", "malformed", "oversized"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const actual = sqlOf(state), store = new SqliteStore(actual), native = support(scope, store), original = store.scope()!;
       if (fault === "missing") state.storage.sql.exec("DELETE FROM meta WHERE k='scope'");
@@ -98,7 +98,7 @@ test("scope metadata distinguishes missing, malformed and oversized before genes
 
 test("declaration admission precedes body transfer and canonical domain identity must match the genesis pin", async () => {
   for (const fault of ["oversized", "digest", "malformed"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const actual = sqlOf(state), store = new SqliteStore(actual), named = JSON.parse(store.stored(0)!.bytes).input.seed.definition;
       const kept = store.retained("definition", named)!, changed = JSON.parse(kept.bytes); changed.name += "-different";
@@ -116,7 +116,7 @@ test("declaration admission precedes body transfer and canonical domain identity
 });
 
 test("one operation cannot recapture a new genesis allowance and post-await changes cannot reuse its frame", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = sqlOf(state), store = new SqliteStore(sql), native = support(scope, store);
     let policy = "first";
@@ -147,7 +147,7 @@ function pin(state: DurableObjectState, named: PlatformDefinition) {
 }
 
 test("platform preparation uses exact current catalog versions and whole native support, never a newest fallback", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const store = new SqliteStore(sqlOf(state)), native = support(scope, store), loader = new ReadPreparation(sqlOf(state), native);
     const results = Object.keys(VERSIONS).map(named => {
@@ -167,7 +167,7 @@ test("platform preparation uses exact current catalog versions and whole native 
 });
 
 test("exact-catalog preparation refuses fallback to a different runnable native version", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     pin(state, "platform:directory@8");
     const store = new SqliteStore(sqlOf(state)), core = new Scope(scope.name, store, { ...production(), ...testPorts(scope.c) }, scope.c.bounds);

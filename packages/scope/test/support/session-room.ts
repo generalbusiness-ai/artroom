@@ -32,7 +32,7 @@ export async function sessionRepository(life: ReturnType<typeof nativeFixtureLif
     const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "bounded-reference", ...(demo ? { policy: "open", purpose: DEMO_PURPOSE } : { policy: "keys", founders: [rita.key] }) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = life.platform(scopeIdOf({ v: 1, kind: "register", definition: registerPin, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name); life.wire(R.name, () => ({ outside: host }));
-    expect(await life.wait(() => R.stub.found(signIntent(install, rita.secret), registerPin))).toMatchObject({ answer: "accepted" });
+    expect(await life.wait(() => R.stub.create(signIntent(install, rita.secret), registerPin))).toMatchObject({ answer: "accepted" });
     const register = await life.wait(() => R.at());
     const found = await life.wait(() => R.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }));
     const seed: Seed = { v: 1, kind: "directory", definition: directoryPin, creator: register, cause: intentDigest(found.intent), ordinal: 0 };

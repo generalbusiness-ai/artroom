@@ -22,7 +22,7 @@ const data: PlatformData = {
     },
   },
   acts: {
-    found: { ...form, step: "open", on: "board", grant: "found" },
+    "found": { ...form, step: "open", on: "board", grant: "found" },
     add: {
       ...form, step: "open", on: "row", grant: "add", fields: { key: { ...digest, required: true }, category: { ...digest, required: true } },
       effects: [{ ref: { slot: "key", from: { field: "key" } } }, { value: { slot: "category", from: { field: "category" } } }, { value: { slot: "other", from: { field: "key" } } }],

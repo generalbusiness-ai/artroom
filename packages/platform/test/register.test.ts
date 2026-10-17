@@ -93,21 +93,21 @@ test("a register is founded by an install intent, under its own definition and n
     .toEqual(["register", "active", null, "install", REGISTER, true, { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }]);
 
   const install = installing(paul, "keys", []);
-  const found = (seed = registerSeed(install), founding = install, definition = registerDefinition, rules = registerPlatform) => {
+  const create = (seed = registerSeed(install), founding = install, definition = registerDefinition, rules = registerPlatform) => {
     const s = new Ledger(definition);
     return judgeGenesis(s.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding }, { clock: clockOf(s.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules }).result;
   };
   const byCreation = installing(paul, "keys", [], "found");
   expect([
-    found(),
+    create(),
     // A register is asked for by an `install`, and a `found` asks for none.
-    found(registerSeed(byCreation), byCreation),
+    create(registerSeed(byCreation), byCreation),
     // The register's definition founds a register, and no directory.
-    found(registerSeed(install, { kind: "directory" })),
+    create(registerSeed(install, { kind: "directory" })),
     // A register is founded under its own definition, and under no other.
-    found(registerSeed(install, { definition: deskDefinition.digest }), install, deskDefinition),
+    create(registerSeed(install, { definition: deskDefinition.digest }), install, deskDefinition),
     // No other kind of scope has no creator.
-    found(registerSeed(install, { kind: "membership" })),
+    create(registerSeed(install, { kind: "membership" })),
   ]).toEqual(["write", "refused", "source-unverified", "source-unverified", "source-unverified"]);
   // The first delivery's founding of a directory, by a `found` intent, stands as it was.
   expect(founded().at.kind).toBe("directory");
@@ -118,10 +118,10 @@ test("a register is founded by an install intent, under its own definition and n
 test("a founding opens one claim and one creation of three attempts; a key outside the policy opens none; the same intent again opens nothing; the first confirmed creation is selected, sets the repository and sends the `create` of the directory, a later one opens its deletion, a returned credential opens its revocation, each cleanup's own answer settles its attempt, and an outcome whose body does not follow is refused", () => {
   const r = new Register();
   // Case a: a `found` by a key that is not in `founders`, under the policy `keys`.
-  expect([r.found(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
+  expect([r.create(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
   // Section 12.1.1, the row `found`, and row r of the table of marks: a founding whose `founderHandle` is no handle is refused
   // `bad-field`, named `bad-handle`, by the register's own rule `handle-form`, and opens no claim.
-  expect([r.found(rita, { founderHandle: "@Rita" }, "no handle"), r.found(rita, { founderHandle: "rita" }, "no at-sign"), r.state.count("claim", "pending")])
+  expect([r.create(rita, { founderHandle: "@Rita" }, "no handle"), r.create(rita, { founderHandle: "rita" }, "no at-sign"), r.state.count("claim", "pending")])
     .toMatchObject([{ result: "refused", reason: "bad-field", name: "bad-handle" }, { result: "refused", reason: "bad-field", name: "bad-handle" }, 0]);
 
   const signed = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: paul.key } });

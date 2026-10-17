@@ -152,9 +152,9 @@ export class ScopeHandle {
  * children. `beside`: the detached texts that the founding intent's fields
  * name. A founding is retried with the same signed intent, like an act.
  */
-export async function found(
+export async function create(
   transport: Transport, founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},
 ): Promise<{ answer: Created; scope: ScopeHandle | null }> {
-  const answer = await transport.found(founding, definition, definitions, beside);
+  const answer = await transport.create(founding, definition, definitions, beside);
   return { answer, scope: answer.answer === "accepted" ? new ScopeHandle(transport, answer.receipt.fact.at.scope, reader) : null };
 }

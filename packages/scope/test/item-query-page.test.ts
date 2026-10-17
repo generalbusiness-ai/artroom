@@ -11,7 +11,7 @@ import { production } from "../src/ports.ts";
 import { ReadPreparation } from "../src/read-preparation.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { testPorts } from "../src/testing.ts";
-import { at, found, rita, type Lane } from "./support.ts";
+import { at, create, rita, type Lane } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 function frameOf(lane: Lane, state: DurableObjectState) {
@@ -47,7 +47,7 @@ function page(result: ReturnType<typeof itemQueryPage>) {
 }
 
 test("native synchronous pages merge selected states without omissions or duplicate IDs and ignore large unrelated populations", async () => {
-  const lane = await found();
+  const lane = await create();
   const got = await lane.inside(state => {
     state.storage.transactionSync(() => {
       for (let n = 0; n < 203; n++) write(state, item(1000 + n, ["accepted", "done", "offered"][n % 3]!));
@@ -95,7 +95,7 @@ test("native synchronous pages merge selected states without omissions or duplic
 });
 
 test("native byte admission loads only a fitting nonempty prefix and resumes at the first unreturned row", async () => {
-  const lane = await found();
+  const lane = await create();
   const got = await lane.inside(state => {
     write(state, item(1000, "offered", "雪".repeat(60_000)));
     write(state, item(1001, "offered", "🙂".repeat(30_000)));
@@ -114,7 +114,7 @@ test("native byte admission loads only a fitting nonempty prefix and resumes at 
 });
 
 test("exact full envelope bytes include framing and reclaim the cursor on a complete final prefix", async () => {
-  const lane = await found();
+  const lane = await create();
   const got = await lane.inside(async (state, instance) => {
     const frame = frameOf(lane, state), query = queryOf(lane, { states: ["offered"] }), second = item(1001, "offered", "");
     // Independent fixed full-envelope byte target, not the executor's
@@ -148,7 +148,7 @@ test("exact full envelope bytes include framing and reclaim the cursor on a comp
 });
 
 test("native sparse IDs use PK metadata and empty selections or semantic refusals read no item SQL", async () => {
-  const lane = await found();
+  const lane = await create();
   const got = await lane.inside(state => {
     for (let n = 0; n < 1000; n++) write(state, item(1000 + n));
     const frame = frameOf(lane, state), query = queryOf(lane), watch = watched(state);
@@ -167,7 +167,7 @@ test("native sparse IDs use PK metadata and empty selections or semantic refusal
 });
 
 test("genuine native checkpoint makes an old continuation stale at a new prepared head", async () => {
-  const lane = await found();
+  const lane = await create();
   // This row is genuinely opened/assigned, under the fixture's labelled
   // test authority. No public signed/session eligibility is claimed.
   const id = await lane.commitment();
@@ -185,7 +185,7 @@ test("genuine native checkpoint makes an old continuation stale at a new prepare
 });
 
 test("unsupported metadata, malformed native records and caller deadline expiry have no body fallback or partial response", async () => {
-  const lane = await found();
+  const lane = await create();
   const got = await lane.inside(state => {
     const frame = frameOf(lane, state), query = queryOf(lane, { states: ["offered"] });
     write(state, item(1000), canonicalize(item(1000)) + " ");

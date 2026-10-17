@@ -5,7 +5,7 @@ import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-by
 import { health, HealthProbe } from "../src/health.ts";
 import { LATE } from "../src/turn.ts";
 import { controls } from "../src/testing.ts";
-import { at, found, rita, type Remote } from "./support.ts";
+import { at, create, rita, type Remote } from "./support.ts";
 
 const version = "01234567-89ab-cdef-0123-456789abcdef";
 const settings = { SESSION_SECRET: "an ephemeral test secret longer than 32 bytes", DEPLOYMENT: "health-test", VERSION_METADATA: { id: version } };
@@ -84,7 +84,7 @@ test("native readiness reports absent, active register, non-register, provisiona
   const object = env.SCOPES.get(env.SCOPES.idFromName(name));
   const peer = object as unknown as Remote & { readiness(): Promise<string> };
   expect(await peer.readiness()).toBe("absent");
-  expect((await peer.found(signIntent(intent, rita.secret), "platform:register@3")).answer).toBe("accepted");
+  expect((await peer.create(signIntent(intent, rita.secret), "platform:register@3")).answer).toBe("accepted");
   expect(await peer.readiness()).toBe("ready");
   const native = await runInDurableObject(object, (_instance, state) => ({ rows: state.storage.sql.exec("SELECT * FROM entry ORDER BY seq").toArray(), meta: state.storage.sql.exec("SELECT v FROM meta WHERE k='scope'").toArray()[0]!["v"] }));
   const envReady = { ...settings, SCOPES: env.SCOPES, ARTIFACTS_CONFIG: artifacts(name) };
@@ -98,6 +98,6 @@ test("native readiness reports absent, active register, non-register, provisiona
   await runInDurableObject(object, (_instance, state) => { state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", native.meta).toArray(); });
   expect(await peer.readiness()).toBe("ready");
   expect(await runInDurableObject(object, (_instance, state) => state.storage.sql.exec("SELECT * FROM entry ORDER BY seq").toArray())).toEqual(native.rows);
-  const lane = await found();
+  const lane = await create();
   expect(await (lane.object as unknown as { readiness(): Promise<string> }).readiness()).toBe("not-ready");
 });

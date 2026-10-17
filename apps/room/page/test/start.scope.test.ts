@@ -45,7 +45,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     const install = await signedIntent(installer, { to: null, kind: "install", fields: { host: host.host, namespace: host.namespace, policy: "open", purpose: DEMO_PURPOSE } }, { now: lifetime.now() });
     const seed: Seed = { v: 1, kind: "register", definition: WEB_DEMO_REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
     const R = lifetime.platform(scopeIdOf(seed));
-    expect((await lifetime.wait(() => R.stub.found(install, WEB_DEMO_REGISTER))).answer).toBe("accepted");
+    expect((await lifetime.wait(() => R.stub.create(install, WEB_DEMO_REGISTER))).answer).toBe("accepted");
     const register = await lifetime.wait(() => R.at());
     const wire = (name: ScopeId) => lifetime.outside(name, (given, sql) => host.outside(given, sql, host.bindings(R.name)));
     wire(R.name);
@@ -56,7 +56,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     const legacyInstall = await signedIntent(installer, { to: null, kind: "install", fields: { host: host.host, namespace: host.namespace, policy: "open", purpose: DEMO_PURPOSE } }, { now: lifetime.now() });
     const legacySeed: Seed = { v: 1, kind: "register", definition: DEMO_REGISTER, creator: null, cause: intentDigest(legacyInstall.intent), ordinal: 0 };
     const L = lifetime.platform(scopeIdOf(legacySeed));
-    expect((await lifetime.wait(() => L.stub.found(legacyInstall, DEMO_REGISTER))).answer).toBe("accepted");
+    expect((await lifetime.wait(() => L.stub.create(legacyInstall, DEMO_REGISTER))).answer).toBe("accepted");
     const legacyRegister = await lifetime.wait(() => L.at());
     const bindings = { SCOPES: env.PLATFORM, DEPLOYMENT: TEST_DEPLOYMENT, DEMO_START_CONFIG: canonicalize({ v: 2, origin, deployment: TEST_DEPLOYMENT, register, definition: WEB_DEMO_REGISTER, legacy: { register: legacyRegister, definition: DEMO_REGISTER } }) };
     const native: Fetch = (url, init) => lifetime.wait(() => worker.fetch(new Request(url, init), bindings));
@@ -113,7 +113,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
           expect(signed.intent.fields["recoveryKey"]).not.toBe(installer.key);
           expect(signed.intent.fields["recoveryKey"]).not.toBe(signed.intent.actor);
         }
-        const stage = signed.intent.kind === "found" ? kept.config.claim.found : signed.intent.kind === "seat" ? kept.config.claim.seat : kept.config.claim.firstKey;
+        const stage = signed.intent.kind === "found" ? kept.config.claim["found"] : signed.intent.kind === "seat" ? kept.config.claim.seat : kept.config.claim.firstKey;
         expect(canonicalize(stage.signed) === canonicalize(signed)).toBe(true);
         sent.push(structuredClone(signed));
       }
@@ -154,8 +154,8 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     const descriptor = JSON.parse(values.get(`artroom-page-start:${origin}`)!) as { secret: string; operation: string };
     const journal = JSON.parse(values.get([...values.keys()].find(key => key.startsWith("artroom-page-claim:"))!)!);
     const kept = JSON.parse(journal.claims[descriptor.operation]);
-    expect(canonicalize(kept.completed.found.signed) === canonicalize(original)).toBe(true);
-    expect([kept.completed.found.signed.intent.idempotencyKey, kept.completed.found.signed.intent.notAfter]).toEqual([original.intent.idempotencyKey, original.intent.notAfter]);
+    expect(canonicalize(kept.completed["found"].signed) === canonicalize(original)).toBe(true);
+    expect([kept.completed["found"].signed.intent.idempotencyKey, kept.completed["found"].signed.intent.notAfter]).toEqual([original.intent.idempotencyKey, original.intent.notAfter]);
     const O = lifetime.platform(completed.repository!.directory.scope), M = lifetime.platform(completed.repository!.membership.scope);
     expect((await lifetime.wait(() => O.summary())).value.definition).toBe(WEB_DEMO_COHORT.directory);
     const Q = lifetime.platform(completed.repository!.rules);

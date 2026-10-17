@@ -23,7 +23,7 @@ test("demo offer exposes only its configured register and admits a previously un
     const register=lifetime.platform(scopeIdOf(seed));
     // Park create-repository rather than sending any provider request.
     lifetime.outside(register.name,()=>({accepts:()=>false,send:async()=>null}));
-    expect((await lifetime.wait(()=>register.stub.found(install,WEB_DEMO_REGISTER))).answer).toBe("accepted");
+    expect((await lifetime.wait(()=>register.stub.create(install,WEB_DEMO_REGISTER))).answer).toBe("accepted");
     const at=await lifetime.wait(()=>register.at()), origin="https://artroom-rehearsal.inguz.workers.dev";
     const deployment="TEST demo runtime identity", config={v:2 as const,origin,deployment,register:at,definition:WEB_DEMO_REGISTER};
     const bindings={DEPLOYMENT:deployment,SCOPES:env.PLATFORM as unknown as Binding,DEMO_START_CONFIG:canonicalize(config)};
@@ -43,7 +43,7 @@ test("demo offer exposes only its configured register and admits a previously un
     const oldInstall=await signedIntent(installer,{to:null,kind:"install",fields:{host:"github.com",namespace:"generalbusiness-ai",policy:"keys",founders:[installer.key]}},{now:lifetime.now()});
     const oldSeed:Seed={v:1,kind:"register",definition:"platform:register@3",creator:null,cause:intentDigest(oldInstall.intent),ordinal:0};
     const old=lifetime.platform(scopeIdOf(oldSeed));lifetime.outside(old.name,()=>({accepts:()=>false,send:async()=>null}));
-    expect((await lifetime.wait(()=>old.stub.found(oldInstall,"platform:register@3"))).answer).toBe("accepted");
+    expect((await lifetime.wait(()=>old.stub.create(oldInstall,"platform:register@3"))).answer).toBe("accepted");
     const oldAt=await lifetime.wait(()=>old.at());
     const forbidden=await signedIntent(newcomer,{to:oldAt,kind:"found",expected:{register:1},fields:{branch:"main",founderHandle:"@newcomer",recoveryKey:installer.key}},{now:lifetime.now()});
     expect(await lifetime.wait(()=>old.stub.submit(forbidden,[]))).toMatchObject({answer:"refused",reason:"unauthorized"});
@@ -51,7 +51,7 @@ test("demo offer exposes only its configured register and admits a previously un
     const legacyInstall=await signedIntent(installer,{to:null,kind:"install",fields:{host:"github.com",namespace:"generalbusiness-ai",policy:"open",purpose:DEMO_PURPOSE}},{now:lifetime.now()});
     const legacySeed:Seed={v:1,kind:"register",definition:DEMO_REGISTER,creator:null,cause:intentDigest(legacyInstall.intent),ordinal:0};
     const legacy=lifetime.platform(scopeIdOf(legacySeed));lifetime.outside(legacy.name,()=>({accepts:()=>false,send:async()=>null}));
-    expect((await lifetime.wait(()=>legacy.stub.found(legacyInstall,DEMO_REGISTER))).answer).toBe("accepted");
+    expect((await lifetime.wait(()=>legacy.stub.create(legacyInstall,DEMO_REGISTER))).answer).toBe("accepted");
     const legacyAt=await lifetime.wait(()=>legacy.at());
     bindings.DEMO_START_CONFIG=canonicalize({...config,legacy:{register:legacyAt,definition:DEMO_REGISTER}});
     const selected=()=>demoCreationRoute(new Request(`${origin}/v1/demo/founding-offer?register=${legacyAt.scope}&inc=${legacyAt.inc}`),bindings);

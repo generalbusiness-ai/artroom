@@ -258,7 +258,7 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   // STAND-IN: the Git host of this register.
   const host = outsideOf(R.name);
   wired.set(R.name, () => ({ outside: host }));
-  const installed = await R.stub.found(signIntent(install, paul.secret), registerPin);
+  const installed = await R.stub.create(signIntent(install, paul.secret), registerPin);
   if (installed.answer !== "accepted") throw new Error(`no register: ${JSON.stringify(installed)}`);
   const register = await R.at();
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });

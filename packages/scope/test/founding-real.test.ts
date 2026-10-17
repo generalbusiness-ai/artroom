@@ -69,7 +69,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       send: (request) => lifetime.wait(() => host.send(request)),
       late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
-    expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
+    expect(await R.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
     const register = await R.at();
 
     // Step 1: the founder's claim. The policy is `keys`, and rita's key is a founder's. No grant judges the act. The entry fixes the

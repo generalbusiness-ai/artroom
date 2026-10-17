@@ -24,7 +24,7 @@ describe("replay of histories the runtime wrote, read through the Worker's read 
     net.hold = net.deaf = null;
     const { signed, name } = founding(definition, { title: "A lane", opener: rita.member });
     const L = new Node(name, definition.declared);
-    expect(await L.stub.found(signed, definition.declared)).toMatchObject({ answer: "accepted" });
+    expect(await L.stub.create(signed, definition.declared)).toMatchObject({ answer: "accepted" });
     const commitment = (await L.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } })).fact.seq;
     const assigned = (await L.did(rita, "assign", { on: commitment, expected: { on: 1 }, fields: { performer: una.member } })).fact;   // under the rule `not-self`
     await L.did(una, "take-hold", { fields: { commitment }, expected: { commitment: 2 } });
@@ -83,7 +83,7 @@ test("explicit recorded durability has its own native pin and replay; unsupporte
   const fields = { title: "A recorded lane", opener: rita.member };
   const { signed, name } = founding(explicit, fields);
   const L = new Node(name, explicit.declared);
-  expect(await L.stub.found(signed, explicit.declared)).toMatchObject({ answer: "accepted", receipt: { definition: explicit.digest, fact: { seq: 0 } } });
+  expect(await L.stub.create(signed, explicit.declared)).toMatchObject({ answer: "accepted", receipt: { definition: explicit.digest, fact: { seq: 0 } } });
   const retained = await source.retained(name, "definition", explicit.digest, { bytes: 1024 * 1024 });
   expect(retained.ok && retained.input.bytes).toBe(canonicalize(explicit.declared));
   const replayed = await verify(source, { mode: "replay", scope: name, grants: "as-recorded" });
@@ -94,7 +94,7 @@ test("explicit recorded durability has its own native pin and replay; unsupporte
     const declared = { ...explicit.declared, level: { name: level, version: 1 as const } };
     const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(declared), creator: null, cause: intentDigest(signed.intent), ordinal: 0 };
     const rejected = new Node(scopeIdOf(seed), declared);
-    expect(await rejected.stub.found(signed, declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await rejected.stub.create(signed, declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
     expect(await rejected.stub.summary("a test reader")).toEqual({ ok: false, reason: "not-found" });
     const counts = await runInDurableObject(env.NET.get(env.NET.idFromName(rejected.name)), (_instance, state) => state.storage.sql.exec("SELECT (SELECT COUNT(*) FROM entry) AS entries, (SELECT COUNT(*) FROM operation) AS operations").toArray());
     expect(counts).toEqual([{ entries: 0, operations: 0 }]);

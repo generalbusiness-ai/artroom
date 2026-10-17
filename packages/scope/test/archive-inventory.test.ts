@@ -11,7 +11,7 @@ import { MemorySource, verify } from "@generalbusiness/artroom-replay";
 import { variant } from "@generalbusiness/dap-derive/testing";
 import { ArchiveBudget, type ArchiveCost } from "../src/archive-budget.ts";
 import { inventoryArchive, type ArchivePolicyRegistry, type ReviewedArchivePolicy } from "../src/archive-inventory.ts";
-import { definition, found, rita, type Lane } from "./support.ts";
+import { definition, create, rita, type Lane } from "./support.ts";
 
 const variants = ["genesis", "act", "delivery", "timed", "diagnosis", "outcome", "preparation", "checkpoint"] as const;
 const base = variant(definition.declared, data => {
@@ -34,7 +34,7 @@ const entryReads = (calls: { query: string }[]) => calls.filter(call => call.que
 const payloadReads = (calls: { query: string; key: unknown }[]) => calls.filter(call => call.query.startsWith("SELECT bytes FROM retained_value") || call.query.startsWith("SELECT bytes FROM retained_input") && call.key !== "definition");
 
 test("a covered native fixed prefix selects validated declaration keys and explicit text omissions, excludes later entries and returns no payload bytes", async () => {
-  const lane = await found({}, {}, base), body = "private detached fixture body", digest = textDigest(body);
+  const lane = await create({}, {}, base), body = "private detached fixture body", digest = textDigest(body);
   const answer = await lane.stub.submit(lane.intent(rita, "remark", { on: 0, fields: { text: digest } }), lane.grants(), { texts: [body] });
   expect(answer).toMatchObject({ answer: "accepted" });
   const through = await lane.head();
@@ -59,7 +59,7 @@ test("a covered native fixed prefix selects validated declaration keys and expli
 });
 
 test("forbidden final metadata and missing reviewed inline-class coverage fail before any local entry or retained payload body", async () => {
-  const lane = await found({}, {}, base);
+  const lane = await create({}, {}, base);
   const signed = lane.intent(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
   expect(await lane.submit(signed)).toMatchObject({ answer: "accepted" });
   const through = await lane.head();
@@ -78,7 +78,7 @@ test("forbidden final metadata and missing reviewed inline-class coverage fail b
 });
 
 test("native metadata/body or final cutoff drift cannot publish a completed inventory", async () => {
-  const lane = await found({}, {}, base);
+  const lane = await create({}, {}, base);
   await lane.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
   const through = await lane.head();
   let changed = false;
@@ -88,7 +88,7 @@ test("native metadata/body or final cutoff drift cannot publish a completed inve
     sql.exec("UPDATE entry SET bytes = replace(bytes, 'A lane', 'B lane') WHERE seq = 0");
   });
   expect(changedBody.result).toEqual({ ok: false, reason: "mismatch" });
-  const other = await found({}, {}, base); await other.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
+  const other = await create({}, {}, base); await other.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
   const cutoff = await other.head(); let pins = 0;
   const changedCutoff = await scan(other, cutoff, registry, {}, (query, sql) => {
     if (!query.startsWith("SELECT k, octet_length(v)")) return;
@@ -98,7 +98,7 @@ test("native metadata/body or final cutoff drift cannot publish a completed inve
 });
 
 test("one native pass admits its exact measured call/byte/node limits and refuses the next unit without a phase reset", async () => {
-  const lane = await found({}, {}, base), through = await lane.head(), baseline = await scan(lane, through);
+  const lane = await create({}, {}, base), through = await lane.head(), baseline = await scan(lane, through);
   expect(baseline.result.ok).toBe(true);
   if (!baseline.result.ok) return;
   const cost = baseline.result.inventory.cost;
@@ -113,7 +113,7 @@ test("one native pass admits its exact measured call/byte/node limits and refuse
 const leaf = (name: string, child?: Digest) => variant({
   format: "artroom-definition-1", name, profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "found",
   items: { root: { many: false, max: 1, states: { live: { final: false } }, initial: "live", parties: {}, refs: {}, values: {} } },
-  acts: { found: { step: "open", on: "root", grant: "found", also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] },
+  acts: { "found": { step: "open", on: "root", grant: "found", also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] },
     spawn: { step: child ? "transition" : "comment", on: "root", grant: "spawn", also: {}, fields: {}, guards: [], effects: [], sends: child ? [{ create: { kind: "lane", definition: child, fields: {}, result: {} } }] : [], attention: [] } },
   receives: {}, timed: {}, rules: {},
 } satisfies DeclaredDefinition, () => {});
@@ -124,7 +124,7 @@ async function keep(lane: Lane, definitions: readonly ValidDefinition[]) {
 test("archive-only closure requires a missing unused child; later bytes complete the same cutoff while ordinary replay and later unrelated inputs remain unchanged", async () => {
   const child = leaf("late-child");
   const parent = variant(base.declared, data => { data.acts["link"].sends.push({ create: { kind: "lane", definition: child.digest, fields: {}, result: {} } }); });
-  const lane = await found({}, {}, parent), through = await lane.head(), policies = new Map([[parent.digest, policy(parent)], [child.digest, policy(child)]]);
+  const lane = await create({}, {}, parent), through = await lane.head(), policies = new Map([[parent.digest, policy(parent)], [child.digest, policy(child)]]);
   const rows = await lane.sealed();
   const history = { scope: lane.at, entries: rows.map(row => ({ seq: row.entry.seq, hash: row.hash, bytes: canonicalize(row.entry) })), retained: [{ kind: "definition" as const, digest: parent.digest, bytes: canonicalize(parent.declared) }] };
   expect((await verify(new MemorySource([history]), { mode: "replay", scope: lane.name, grants: "as-recorded" })).report.result).toBe("consistent");
@@ -170,7 +170,7 @@ function outcomes(definition: ValidDefinition): ReviewedArchivePolicy {
 
 test("an uncovered additional root at the final planned position aborts before ANY earlier rule/value/snapshot payload read or result", async () => {
   const root = variant(base.declared, data => { data.rules["always"] = "true"; });
-  const good = leaf("covered-root"), uncovered = leaf("uncovered-final-root"), lane = await found({}, {}, root);
+  const good = leaf("covered-root"), uncovered = leaf("uncovered-final-root"), lane = await create({}, {}, root);
   const ruleBytes = "true", rule = digestBytes(utf8(ruleBytes));
   await lane.inside(state => { state.storage.sql.exec("INSERT INTO retained_input (kind, digest, bytes) VALUES ('rule', ?, ?)", rule, ruleBytes); });
   await keep(lane, [good, uncovered]);
@@ -202,7 +202,7 @@ function chain(prefix: string, length: number): ValidDefinition[] {
   return nodes;
 }
 async function graph(lengths: readonly number[]) {
-  const lane = await found({}, {}, base), groups = lengths.map((length, n) => chain(`graph-${n}`, length)), nodes = groups.flat();
+  const lane = await create({}, {}, base), groups = lengths.map((length, n) => chain(`graph-${n}`, length)), nodes = groups.flat();
   await keep(lane, nodes);
   const through = await appendOutcomes(lane, groups.map(group => group[0]!.digest));
   const policies = new Map([[base.digest, outcomes(base)], ...nodes.map(node => [node.digest, policy(node)] as const)]);
@@ -241,7 +241,7 @@ test("a genuine native pin to legacy membership refuses before local entry/depen
   controls(name, START);
   wired.set(name, () => ({ definitions: { read: async () => ({ ok: false, reason: "unavailable" }), platform: version => version === named ? { data, rules: { "settle-counter": { place: "effect", most: 1, run: () => [] } } } : null } }));
   try {
-    const answer = await stubOf(name).found(signIntent(intent, rita.secret), named);
+    const answer = await stubOf(name).create(signIntent(intent, rita.secret), named);
     if (answer.answer !== "accepted") return expect.fail(JSON.stringify(answer));
     const { result, bodies } = await runInDurableObject(objectOf(name), (_instance, state) => {
       const bodies: string[] = [];
@@ -255,7 +255,7 @@ test("a genuine native pin to legacy membership refuses before local entry/depen
 
 test("all eight closed local variants plan only native typed consumers; checkpoint state and unrelated digest strings add no dependency", async () => {
   // Synthetic closed forms test consumer coverage, not admitted judgments.
-  const lane = await found({}, {}, base), unrelated = textDigest("not a dependency"), omitted = textDigest("omitted text");
+  const lane = await create({}, {}, base), unrelated = textDigest("not a dependency"), omitted = textDigest("omitted text");
   const signed = lane.intent(rita, "remark", { on: 0, fields: { text: omitted } });
   const through = await appendInputs(lane, [
     { type: "act", signed, authority: [], presented: {} },
@@ -279,7 +279,7 @@ test("all eight closed local variants plan only native typed consumers; checkpoi
 });
 
 test("the original native pass deadline fences local planning and unreadable owner evidence cannot become an empty dependency claim", async () => {
-  const lane = await found({}, {}, base), through = await appendOutcomes(lane, [base.digest]);
+  const lane = await create({}, {}, base), through = await appendOutcomes(lane, [base.digest]);
   const reviewed = outcomes(base), policies = new Map([[base.digest, reviewed]]);
   let time = 0;
   const timeout = await scan(lane, through, policies, {}, query => { if (query.startsWith("SELECT bytes FROM entry")) time = 10; }, { now: () => time, milliseconds: 10 });

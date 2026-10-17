@@ -45,7 +45,7 @@ async function weighing(change: Parameters<typeof weigherWith>[0] = () => {}, fi
   const name = scopeIdOf(seed);
   const c = controls(name, START);
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: (named) => (named === MADE ? { data: data as never, rules: weigherRules(seen, first).rules } : null) } }));
-  const founded = await stubOf(name).found(signIntent(founding, rita.secret), MADE);
+  const founded = await stubOf(name).create(signIntent(founding, rita.secret), MADE);
   if (founded.answer !== "accepted") throw new Error(`the scope was not founded: ${JSON.stringify(founded)}`);
   const scope = founded.receipt.fact.at;
   const script: Script = { asked: [], silent: new Set(), required: ["c1"], beside: null, after: null };

@@ -26,7 +26,7 @@ import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, intentDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
+import { ScopeHandle, declaredHandle, create, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
 import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { grantOf, keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import type { Checkpointed, Delivery, EffectAnswer, EffectRequest } from "@generalbusiness/artroom-scope";
@@ -92,7 +92,7 @@ export const officeDefinition = {
     },
   },
   acts: {
-    found: {
+    "found": {
       step: "open", on: "repository", grant: "office.found", also: {},
       fields: { readme: { type: "text", max: 4096, detached: true, required: false } },
       guards: [], effects: [{ value: { slot: "readme", from: { field: "readme" } } }], sends: [], attention: [],
@@ -477,7 +477,7 @@ export async function graph(creationTransport: Transport = transport): Promise<G
   const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
   // Native service by default. The dedicated wire witness supplies HTTP.
   // Both receive the exact declaration closure and detached text beside it.
-  const { answer, scope } = await found(creationTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
+  const { answer, scope } = await create(creationTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
   expect(answer.answer).toBe("accepted");
   expect(scope).not.toBeNull();
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);

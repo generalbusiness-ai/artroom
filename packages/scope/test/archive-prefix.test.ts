@@ -7,12 +7,12 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
 import { ArchiveBudget } from "../src/archive-budget.ts";
 import { archivePrefixMetadata } from "../src/archive-prefix.ts";
-import { definition, found, rita } from "./support.ts";
+import { definition, create, rita } from "./support.ts";
 
 const syntheticHash = textDigest("synthetic prefix row, not a verified entry");
 const certified = new Set([definition.digest]);
 test("native prefix admission binds the original cutoff and full pin before entry JSON/body reads", async () => {
-  const lane = await found(), through = await lane.head();
+  const lane = await create(), through = await lane.head();
   await lane.did(rita, "remark", { on: 0, fields: { text: "later unrelated input" } });
   const result = await lane.inside(state => {
     const queries: string[] = [], budget = new ArchiveBudget();
@@ -30,7 +30,7 @@ test("native prefix admission binds the original cutoff and full pin before entr
 });
 
 test("native incarnation, cutoff, gap and size damage cannot yield prefix admission; an unadmitted pin fails before positions", async () => {
-  const lane = await found();
+  const lane = await create();
   await lane.did(rita, "remark", { on: 0, fields: { text: "bounded second entry" } });
   const through = await lane.head();
   const result = await lane.inside(state => {
@@ -63,7 +63,7 @@ test("native incarnation, cutoff, gap and size damage cannot yield prefix admiss
   expect(result.gap.reason).toBe("incomplete");
   // The declaration is a genuine native pin, not an asserted flag.
   // No certificate is granted to it. It fails before any prefix projection.
-  const legacy = await found();
+  const legacy = await create();
   const refusal = await legacy.inside(state => {
     const queries: string[] = [];
     try { archivePrefixMetadata({ exec(query, ...args) { queries.push(query); return state.storage.sql.exec(query, ...args); } }, legacy.at, legacy.genesis.fact, PROPOSED_BOUNDS, new ArchiveBudget(), new Set()); return { reason: "admitted", queries }; }
@@ -74,7 +74,7 @@ test("native incarnation, cutoff, gap and size damage cannot yield prefix admiss
 });
 
 test("real scalar rows admit exactly 4096 positions and refuse 4097 without JSON inspection", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     const sql = state.storage.sql;
     sql.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x + 1 FROM n WHERE x < 4096) INSERT INTO entry (seq, hash, time, bytes, size) SELECT x, ?, 'synthetic', '{}', 2 FROM n", syntheticHash);
@@ -97,7 +97,7 @@ test("real scalar rows admit exactly 4096 positions and refuse 4097 without JSON
 });
 
 test("stored bytes over the cumulative JSON-work allowance refuse before entry JSON or body projection", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     const sql = state.storage.sql, bytes = '"' + "x".repeat(128 * 1024 - 2) + '"';
     sql.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x + 1 FROM n WHERE x < 33) INSERT INTO entry (seq, hash, time, bytes, size) SELECT x, ?, 'synthetic', ?, ? FROM n", syntheticHash, bytes, bytes.length);

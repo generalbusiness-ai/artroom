@@ -6,7 +6,7 @@ import { signerOf } from "../src/entry-signer.ts";
 import { LocalSigners, SIGNER_INDEX_BOUNDS as B } from "../src/local-signers.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { Wakes } from "../src/outbox.ts";
-import { at, found, rita, una, vic, type Lane } from "./support.ts";
+import { at, create, rita, una, vic, type Lane } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 const resetLegacy = (state: DurableObjectState) => {
@@ -15,7 +15,7 @@ const resetLegacy = (state: DurableObjectState) => {
 };
 
 test("native append signer evidence preserves every classifier variant, inclusive time and unknown versus negative", async () => {
-  const scope = await found(); await scope.hold();
+  const scope = await create(); await scope.hold();
   const entries = await scope.entries(), genesis = entries[0]!, act = entries[1]!;
   if (genesis.input.type !== "genesis" || act.input.type !== "act") return expect.fail("fixture lacks native signed entries");
   expect(signerOf(genesis)).toBe(rita.key);
@@ -51,7 +51,7 @@ test("native append signer evidence preserves every classifier variant, inclusiv
 /** Synthetic canonical/hash-linked journal extension on real isolated SQLite.
  * No judgment/replay or public authority is claimed for these extra records. */
 async function journal(count: number, padding = 0): Promise<Lane> {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   await scope.inside(state => {
     const store = new SqliteStore(sqlOf(state));
     const sample = JSON.parse(store.stored(1)!.bytes) as Entry;
@@ -165,7 +165,7 @@ test("signer migration rejects generation, version, missing, corrupt, backward a
 });
 
 test("native history and signer maintenance roll back together and forged signer row metadata grants nothing", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const got = await scope.inside(state => {
     const store = new SqliteStore(sqlOf(state)), before = store.scope()!, sample = JSON.parse(store.stored(1)!.bytes) as Entry;
     try {
@@ -221,7 +221,7 @@ test("signer maintenance owns one wake, migrates on activation and yields to nat
 
 test("legacy scope metadata is admitted before construction, proof and maintenance, and malformed is not absent", async () => {
   for (const fault of ["oversized", "malformed"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const actual = sqlOf(state), original = state.storage.sql.exec("SELECT v FROM meta WHERE k='scope'").one()["v"] as string;
       const value = JSON.parse(original); value.padding = "x".repeat(B.controlBytes + 1);

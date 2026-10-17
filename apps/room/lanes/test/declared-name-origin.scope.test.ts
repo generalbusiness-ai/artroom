@@ -44,7 +44,7 @@ test("native reserve refuses declared-name applications across rooms and inside 
       send: request => lifetime.wait(() => host.send(request)),
       late: deliver => { lifetime.active(); host.late(deliver); },
     } }));
-    expect(await R.stub.found(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.create(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
     const found = await R.intent(who, "found", { expected: await R.expected({ register: 0 }),
       fields: { branch: "main", founderHandle: label === "A" ? "@rita" : "@sam", recoveryKey: recovery.key } });
     const seed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory,

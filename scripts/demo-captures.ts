@@ -353,7 +353,7 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
       const journal = JSON.parse(localStorage.getItem(key)!);
       if (journal.v !== 2 || typeof journal.claims[journal.active] !== "string") return null;
       const kept = JSON.parse(journal.claims[journal.active]);
-      return { operation: journal.active as string, count: Object.keys(journal.claims).length, label: kept.label as string, signed: kept.config.claim?.found?.signed as unknown };
+      return { operation: journal.active as string, count: Object.keys(journal.claims).length, label: kept.label as string, signed: kept.config.claim?.["found"]?.signed as unknown };
     });
     if (!pending || pending.operation !== originalOperation || pending.count !== 1 || pending.label !== "Field notebook" || canonicalize(pending.signed) !== attempts[0]) throw new Error("Private recovery did not keep the original local label and exact signed envelope.");
     await tab.screenshot({ path: join(out, "create-room-pending-mobile.png") });

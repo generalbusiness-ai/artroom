@@ -18,7 +18,7 @@ async function fixture(entries = 8) {
   const seed: Seed = { v: 1, kind: "directory", definition: named, creator: null, cause: intentDigest(founding), ordinal: 0 }, name = scopeIdOf(seed);
   controls(name, START).bounds = { ...PROPOSED_BOUNDS, scopeEntries: entries };
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: version => version === named ? { data, rules: { "settle-counter": { place: "effect", most: 1, run: () => [] } } } : null } }));
-  return { name, seed, answer: await stubOf(name).found(signIntent(founding, rita.secret), named), close: () => wired.delete(name) };
+  return { name, seed, answer: await stubOf(name).create(signIntent(founding, rita.secret), named), close: () => wired.delete(name) };
 }
 const metadata = (name: string) => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec<{ k: string; v: string }>("SELECT k, v FROM meta ORDER BY k").toArray());
 const put = (name: string, key: string, value: string | null) => runInDurableObject(objectOf(name), (_instance, state) => {

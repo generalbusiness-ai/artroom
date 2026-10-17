@@ -72,7 +72,7 @@ async function story(lifetime: Lifetime): Promise<void> {
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
 
   /** A room of one cohort, founded by its admin through the command: install with the cohort, wire the host stand-in, create. */
-  const found = async (admin: Context, cohort: "counting-commitments" | "application", namespace: string, name: string, handle: string) => {
+  const create = async (admin: Context, cohort: "counting-commitments" | "application", namespace: string, name: string, handle: string) => {
     const installed = await run(admin, "install", SERVICE, "--host", "git.example", "--namespace", namespace, "--cohort", cohort);
     expect(installed.code, installed.lines.join("\n")).toBe(0);
     const R = node((await admin.store.config())!.register!.scope);
@@ -130,7 +130,7 @@ async function story(lifetime: Lifetime): Promise<void> {
     return (JSON.parse(new TextDecoder().decode(bytes)) as { signed: SignedIntent }).signed;
   };
   /** Enrol one agent by the command's `join`, and witness the receipt, the member and key items, and the role's acts. */
-  const enrol = async (room: Awaited<ReturnType<typeof found>>, agent: Context, text: string, handle: string, definition: string) => {
+  const enrol = async (room: Awaited<ReturnType<typeof create>>, agent: Context, text: string, handle: string, definition: string) => {
     expect(agentKeyInvitationOf(text)?.definition, "the link carries the membership's exact pin").toBe(definition);
     const enrolled = await run(agent, "join", text);
     expect(enrolled, enrolled.lines.join("\n")).toEqual({ code: 0, lines: [`Enrolled independent agent ${handle}. Native agent and controller bindings verified.`] });
@@ -160,7 +160,7 @@ async function story(lifetime: Lifetime): Promise<void> {
 
   // ---- The Counting cohort: membership@5. Two agents, each its own configuration and key.
   const rita = person();
-  const counter = await found(rita, "counting-commitments", "artroom", "counter", "@rita");
+  const counter = await create(rita, "counting-commitments", "artroom", "counter", "@rita");
   expect([(await counter.M.summary()).value.definition, COUNTING_COHORT.membership]).toEqual(["platform:membership@5", "platform:membership@5"]);
   expect((await node(counter.repository.directory.scope).summary()).value.definition).toBe(COUNTING_COHORT.directory);
   const bots = [person(), person()];
@@ -179,7 +179,7 @@ async function story(lifetime: Lifetime): Promise<void> {
 
   // ---- The application cohort: membership@4, in another register. One agent.
   const lia = person();
-  const library = await found(lia, "application", "elsewhere", "library", "@lia");
+  const library = await create(lia, "application", "elsewhere", "library", "@lia");
   expect([(await library.M.summary()).value.definition, APPLICATION_COHORT.membership]).toEqual(["platform:membership@4", "platform:membership@4"]);
   const third = await enrol(library, person(), await link(lia, library.membership, "@bot3", "@lia"), "@bot3", "platform:membership@4");
   expect([first.key, second.key]).not.toContain(third.key);

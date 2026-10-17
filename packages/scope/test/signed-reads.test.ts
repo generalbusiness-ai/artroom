@@ -30,7 +30,7 @@ async function installed(who: Actor, before?: (name: ScopeId) => void, founders:
   const install: Intent = { v: 1, to: null, actor: who.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: founders.map((f) => f.key) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
   before?.(R.name);
-  expect(await R.stub.found(signIntent(install, who.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+  expect(await R.stub.create(signIntent(install, who.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   return R;
 }
 

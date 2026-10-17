@@ -91,7 +91,7 @@ test("a native application publishes once after missing proof, keeps later sourc
       };
     });
     wire(R);
-    expect(await R.stub.found(signIntent(install, rita.secret), cohort.register)).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.create(signIntent(install, rita.secret), cohort.register)).toMatchObject({ answer: "accepted" });
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const seed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
     const D = life.platform(scopeIdOf(seed));

@@ -54,7 +54,7 @@ function isAnswer(v: unknown): v is Answer {
 
 /** For each operation, whether a reply is an answer of that operation. */
 export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => reply is Awaited<ReturnType<ScopeApi[K]>> } = {
-  found: isCreated,
+  create: isCreated,
   submit: isAnswer,
   prepare: isAnswer,
   settle: isRead(isReceipt),

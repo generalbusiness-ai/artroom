@@ -2,12 +2,12 @@ import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import { timeOf } from "@generalbusiness/dap-derive";
 import { REQUEST_AGE_MS, REQUEST_ROWS, RequestIndex, requestQuery } from "../src/request-index.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 // Actual SQLite, with directly seeded operational rows. This is a sidecar
 // boundary witness; it does not yet prove the production instrumentation.
 test("the sidecar completely expires a backlog, evicts only at capacity, pages newest first and never changes a native entry", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await runInDurableObject(lane.object, (_instance, state) => {
     const sql = { exec: (query: string, ...args: (number | string | null)[]) => state.storage.sql.exec(query, ...args) };
     const before = sql.exec("SELECT seq, hash, bytes FROM entry ORDER BY seq").toArray();
@@ -51,7 +51,7 @@ test("the sidecar completely expires a backlog, evicts only at capacity, pages n
 });
 
 test("invalid correlation queries do no SQL and a sidecar insert fault cannot alter the committed native history", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await runInDurableObject(lane.object, (_instance, state) => {
     let calls = 0, fault = false;
     const index = new RequestIndex({ exec: (query, ...args) => {

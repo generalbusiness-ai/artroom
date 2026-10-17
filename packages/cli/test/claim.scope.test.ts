@@ -25,7 +25,7 @@ const reader = "a test reader";
 // its Git host settings were set; the scheduler is `pause`, which runs the dispatchers only, so that no pass of the register's
 // operations driver runs but the one its own object starts; and the clock is the namespaces' scripted clock.
 describe("claim resumes a claim it gave up on. The Git host and the scheduler are STAND-INs", () => {
-  test("create and the printing found alias keep exact requests across loss before found delivery and after accepted seat/first-key replies; settings restart and --again preserve distinct founds, with no duplicate enrollment or signing-key exposure", async () => {
+  test("create keeps exact requests across loss before creation delivery and after accepted seat/first-key replies; the removed alias changes no custody; settings restart and --again preserve distinct creations, with no duplicate enrollment or signing-key exposure", async () => {
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
     const cleanups: (() => void)[] = [];
     let closed = false;
@@ -65,7 +65,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   let watchingAgain = false;
   const watched: { diagnostic: ReturnType<typeof captureSignedSummary> | null; unavailable: boolean } = { diagnostic: null, unavailable: false };
   let watchedGets = 0;
-  const sent: Record<string, SignedIntent[]> = { found: [], seat: [], "first-key": [] };
+  const sent: Record<string, SignedIntent[]> = { "found": [], seat: [], "first-key": [] };
   const fetch = (async (url: string, init?: RequestInit) => owner.required(async () => {
     owner.active();
     requestedPaths.push(new URL(url).pathname);
@@ -169,7 +169,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   beforeCreation = true;
   const unsent = await run("create", "demo", "--handle", "@rita");
   expect(unsent).toMatchObject({ code: 1, lines: [expect.stringMatching(/^No answer:/)] });
-  const savedCreation = (await configOf())!.claim!.found!.signed;
+  const savedCreation = (await configOf())!.claim!["found"]!.signed;
   const beforeCheck = await configOf();
   const beforeCheckPosts = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
   let checkPauses = 0;
@@ -185,8 +185,11 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([(await founds()).length, sent["found"]!.length]).toEqual([0, 1]);
   await owner.required(async () => rita.store.save(beforeLegacy));
   unavailableCreation = true;
-  expect(await run("found", "demo")).toEqual({ code: 1, lines: ["Use dap create instead of dap found. The found alias remains for one release.", `Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect dap log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
-  expect((await configOf())!.claim!.found!.signed).toEqual(savedCreation);
+  const beforeRemovedAlias = await configOf();
+  expect((await run("found", "demo")).code).toBe(2);
+  expect(await configOf()).toEqual(beforeRemovedAlias);
+  expect(await run("create", "demo")).toEqual({ code: 1, lines: [`Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect dap log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
+  expect((await configOf())!.claim!["found"]!.signed).toEqual(savedCreation);
   expect((await founds()).length).toBe(0);
   advanceClock();
   await owner.required(() => R.restart());
@@ -195,7 +198,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   const resume = "run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.";
   expect(first).toEqual({ code: 1, lines: [`Gave up waiting for the directory after 3 reads. What was asked may still take effect; ${resume}`] });
   const pending = (await configOf())!;
-  expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", found: { signed: savedCreation, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);
+  expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", "found": { signed: savedCreation, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);
   expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation]);
   await noSecret();
   expect([(await founds()).length, host.sent.length]).toEqual([1, 0]);
@@ -215,7 +218,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect(safeDiagnostic.records.filter(record => record.phase === "final-summary" && (record.stage === "local-summary-eligible" || record.stage === "genesis-root-summary-eligible" || record.stage === "genesis-root-summary-ineligible" || record.stage === "request-refused")).map(record => record.stage)).toEqual([expect.stringMatching(/^(local-summary-eligible|genesis-root-summary-eligible)$/)]);
   expect(requestedPaths.slice(beforeMismatch).every((path) => path.startsWith(`/v1/scopes/${R.name}`))).toBe(true);
   const second = (await configOf())!.claim!;
-  expect([(await founds()).length, second.intent === pending.claim!.intent, second.found!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
+  expect([(await founds()).length, second.intent === pending.claim!.intent, second["found"]!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
   await noSecret();
 
   // The Git host's settings are set, and the register's object restarts. The host will create each repository.
@@ -260,7 +263,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeUnavailableMarker);
   // A real receipt for the first claim cannot skip the second found step,
   // even though it has the same register, incarnation and signing key.
-  await owner.required(async () => rita.store.save({ ...originalSeated, claim: { ...seatedPending, found: { signed: seatedPending.found!.signed, accepted: pending.claim!.found!.accepted! } } }));
+  await owner.required(async () => rita.store.save({ ...originalSeated, claim: { ...seatedPending, "found": { signed: seatedPending["found"]!.signed, accepted: pending.claim!["found"]!.accepted! } } }));
   const beforeMarker = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
   expect(await run("claim", "demo")).toEqual({ code: 1, lines: ["The saved accepted fact does not match this exact claim step; nothing was submitted."] });
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeMarker);
@@ -297,7 +300,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([(await founds()).length, host.attempts.sort()]).toEqual([2, [`${(await founds())[0]!.seq}:0#1`, `${(await founds())[1]!.seq}:0#1`].sort()]);
   expect([(await enrollment("seat")).length, (await enrollment("first-key")).length]).toEqual([1, 1]);
   expect(sent["first-key"]).toEqual([keyedPending.firstKey!.signed, keyedPending.firstKey!.signed]);
-  expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation, second.found!.signed, second.found!.signed]); // The mismatched reply retries only its exact admitted envelope.
+  expect(sent["found"]).toEqual([savedCreation, savedCreation, savedCreation, second["found"]!.signed, second["found"]!.signed]); // The mismatched reply retries only its exact admitted envelope.
   await noSecret();
   // A legacy digest can recover its exact admitted found from the real
   // directory's retained claim, and its already admitted enrollment from

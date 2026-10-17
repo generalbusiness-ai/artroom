@@ -172,7 +172,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
       return false;
     };
     wire(R.name);
-    expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+    expect(await R.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
     const register = await R.at();
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };

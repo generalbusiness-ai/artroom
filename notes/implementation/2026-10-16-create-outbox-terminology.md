@@ -67,3 +67,41 @@ the frozen final implementation and independent exact Source review.
 
 No approval, landing, push, publication or provider operation is claimed.
 The Cloudflare hold remains in force.
+
+
+## Create operation checkpoint
+
+The SDK, ScopeApi, HTTP/RPC implementations and native test stubs now
+call create() instead of found(). No public method alias was added. The
+CLI's previous one-release found alias is removed; create and the existing
+claim recovery workflow remain. The existing native claim test now checks
+that the removed command returns usage and leaves custody untouched, then
+continues the same original request through create. Its focused run passes
+in /tmp/artroom-create-outbox-removed-cli-alias-focus.log.
+
+Pinned act names and existing saved-claim keys remain explicit quoted
+literals. In particular, old claim envelopes are neither replaced nor
+re-signed for the terminology change. Native genesis, receipt and
+initial-object bytes remain under their original versions. The unsigned
+operational method/place labels now say create and rpc:create. Broader
+local variables, filenames, discovery URLs, prose, literal/version
+inventory and outbox work are still pending.
+
+The first two compiler attempts of the operation pass found incomplete
+transport/method bindings and accidental substitutions of seven ordinary
+lookup spreads and three pinned act accesses. These are corrected; no
+spreads or old act values are changed in the current diff. Original logs
+create-operation-first-types.log and create-operation-second-types.log
+remain under /tmp/artroom-create-outbox-. The complete third root
+compiler invocation passes in create-operation-third-types.log there.
+These failed compiler attempts are not passing evidence.
+
+Focused existing checks then pass: thirteen native cases across five
+files (genesis, native telemetry, SDK client, CLI claim and Page Start),
+eleven client protocol/signed-read cases, and fifteen platform version
+and register cases. Logs use that prefix with
+create-operation-first-native-focus.log,
+create-operation-client-focus.log and
+create-operation-platform-focus.log. The separate alias-removal run is
+one additional execution of its changed claim case, not a union gate.
+No full gate, Source review or provider operation has run for this slice.

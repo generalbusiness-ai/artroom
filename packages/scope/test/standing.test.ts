@@ -32,7 +32,7 @@ test("C1 native admission reserves before new work, rolls back ordinary/owed mar
   const rules = { "settle-counter": { place: "effect" as const, most: 1, run() { reached++; return [{ effect: "value" as const, item: 0, slot: "count", value: next }]; } } };
   wired.set(name, () => ({ transport: null, owners: { rules: () => null, reserves: () => extra }, definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: named => named === MADE ? { data, rules } : null } }));
   try {
-    const stub = stubOf(name), receiver = objectOf(name) as unknown as Pick<ScopeObject, "deliver">, creationAnswer = await stub.found(signIntent(founding, rita.secret), MADE);
+    const stub = stubOf(name), receiver = objectOf(name) as unknown as Pick<ScopeObject, "deliver">, creationAnswer = await stub.create(signIntent(founding, rita.secret), MADE);
     if (creationAnswer.answer !== "accepted") return expect.fail(JSON.stringify(creationAnswer));
     const scope = creationAnswer.receipt.fact.at;
     // A different, fully named scope is a scripted result source, not a live peer.
@@ -129,7 +129,7 @@ test("C1 genesis at B minus one refuses with no entry; absent native selection r
   control.bounds = { ...PROPOSED_BOUNDS, scopeEntries: 7 };
   wired.set(name, () => ({ definitions: { read: () => Promise.resolve({ ok: false, reason: "unavailable" }), platform: named => named === MADE ? { data, rules: { "settle-counter": { place: "effect", most: 1, run: () => [] } } } : null } }));
   try {
-    expect(await stubOf(name).found(signIntent(founding, rita.secret), MADE)).toMatchObject({ answer: "refused", reason: "scope-full" });
+    expect(await stubOf(name).create(signIntent(founding, rita.secret), MADE)).toMatchObject({ answer: "refused", reason: "scope-full" });
     const empty = await runInDurableObject(objectOf(name), (_instance, state) => {
       const calls: { query: string; rows: number }[] = [];
       const store = new SqliteStore({ exec: (query, ...args) => { const result = state.storage.sql.exec(query, ...args); const rows = result.toArray(); calls.push({ query, rows: rows.length }); return { toArray: () => rows, one: () => rows[0] } as never; }, transaction: work => state.storage.transactionSync(work) });

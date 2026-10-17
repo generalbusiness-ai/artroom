@@ -9,7 +9,7 @@ import type { OperationRules } from "@generalbusiness/dap-derive";
 import { ArchiveBudget } from "../src/archive-budget.ts";
 import { archivePrefixMetadata } from "../src/archive-prefix.ts";
 import { archivePrivacyMetadata, type ArchiveSupport } from "../src/archive-privacy.ts";
-import { definition, found, rita, type Lane } from "./support.ts";
+import { definition, create, rita, type Lane } from "./support.ts";
 
 const support: ArchiveSupport = { named: definition.digest, definition, owners: new Map(), records: new Map(), preparations: new Map() };
 async function scan(lane: Lane, supplied: ArchiveSupport = support, calls = 16384) {
@@ -40,7 +40,7 @@ async function damageLast(lane: Lane, change: (entry: Entry) => void) {
 }
 
 test("whole native prefix classification reaches every selected position without fetching entry or retained bodies", async () => {
-  const lane = await found();
+  const lane = await create();
   await lane.did(rita, "remark", { on: 0, fields: { text: "metadata classification" } });
   const result = await scan(lane);
   expect(result.reason).toBe("admitted"); expect(result.positions).toEqual([0, 1]);
@@ -49,7 +49,7 @@ test("whole native prefix classification reaches every selected position without
 });
 
 test("a copied foreign use in the last selected position refuses the whole prefix with no copied-value/text body read", async () => {
-  const lane = await found();
+  const lane = await create();
   await lane.did(rita, "remark", { on: 0, fields: { text: "last position" } });
   await damageLast(lane, entry => { entry.uses = [{ fact: lane.genesis.fact, content: lane.genesis.fact.hash }]; });
   const result = await scan(lane);
@@ -58,7 +58,7 @@ test("a copied foreign use in the last selected position refuses the whole prefi
 });
 
 test("unknown operation owners and declared custom owner domains in a last position cannot be classified as absent", async () => {
-  const lane = await found();
+  const lane = await create();
   await lane.did(rita, "remark", { on: 0, fields: { text: "last owner" } });
   await damageLast(lane, entry => { entry.effects = [...entry.effects, { effect: "operation", k: 0, owner: "hold@1", kind: "check", attempts: 1 }]; });
   expect((await scan(lane)).reason).toBe("unsupported-archive-cohort");
@@ -70,13 +70,13 @@ test("unknown operation owners and declared custom owner domains in a last posit
 });
 
 test("changed incarnation, an unknown consumer variant and a stopped scan never publish partial privacy admission", async () => {
-  const lane = await found();
+  const lane = await create();
   await lane.did(rita, "remark", { on: 0, fields: { text: "last variant" } });
   await damageLast(lane, entry => { entry.input.type = "new-consumer" as never; });
   expect((await scan(lane)).reason).toBe("unavailable");
   await damageLast(lane, entry => { entry.input.type = "act"; entry.at.inc = "wrong-incarnation" as never; });
   const changed = await scan(lane); expect(changed.reason).toBe("unavailable"); expect(changed.positions).toEqual([]);
-  const stopped = await scan(await found(), support, 7);
+  const stopped = await scan(await create(), support, 7);
   expect(stopped.reason).toBe("limit"); expect(stopped.positions).toEqual([]);
   expect(stopped.queries.filter(row => row.query.includes("AS usesType"))).toEqual([]);
 });

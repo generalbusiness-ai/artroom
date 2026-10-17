@@ -9,7 +9,7 @@ import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import { outsideOf } from "../src/worker.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import { NO_OUTSIDE, type EffectRequest } from "../src/operations.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 const ACCOUNT = { id: 285042784, login: "generalbusiness-ai", type: "Organization" } as const;
 const CONFIG = { issuer: "Iv1.scripted", installationId: 99, account: ACCOUNT, maxBytes: 1024 * 1024, privateRepositories: true, publicReads: false, credentialIdentity: "adapter-attempt" };
@@ -80,7 +80,7 @@ function destinationGiven(register: Ledger, creator: ScopeRef): OutsideGiven {
 // Invariant: production configuration routes a real bound register request to
 // exactly one explicitly authorized provider creation and records only metadata.
 test("explicit factory configuration creates the claim's exact name through scripted HTTP and retains no secret in the judged entry", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const f = registerFixture();
     const requests: Request[] = [];
@@ -137,7 +137,7 @@ test("explicit factory configuration creates the claim's exact name through scri
 // Invariant: authority and visibility are never defaulted; unusable or missing
 // operator configuration leaves the factory disabled before a provider request.
 test("absent, malformed or contradictory configuration disables effects, and absent creation authority leaves creation unavailable", async () => {
-  const storage = await found();
+  const storage = await create();
   await storage.inside(async (state) => {
     const f = registerFixture();
     const request = f.claim();

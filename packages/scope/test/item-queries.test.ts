@@ -10,7 +10,7 @@ import { api } from "../src/worker.ts";
 import { env } from "cloudflare:workers";
 import { net, soon } from "./net.ts";
 import { rita as memberRita, routed } from "./repository.ts";
-import { at, found, rita, una, type Lane } from "./support.ts";
+import { at, create, rita, una, type Lane } from "./support.ts";
 
 const queryOf = (scope: Lane, over: Partial<ItemQuery> = {}): ItemQuery => ({ v: 1, scope: scope.at, type: "commitment", states: ["accepted"], ids: null, limit: 100, cursor: null, ...over });
 const read = (scope: Lane, query: ItemQuery, reader: unknown) => (scope.object as unknown as {
@@ -21,7 +21,7 @@ const header = (scope: Lane, query: ItemQuery, who = rita, arg = itemQueryArgume
 // The actual native object owns decoding, proof/preparation and the synchronous page.
 // The lane's existing creator/authority ports remain the labelled fixture stand-ins.
 test("native owned signed query binds its exact page, permits live and empty, and refuses final or mixed even for empty IDs", async () => {
-  const scope = await found(); await scope.commitment();
+  const scope = await create(); await scope.commitment();
   const query = queryOf(scope), success = await read(scope, query, await header(scope, query));
   expect(success.ok).toBe(true);
   if (!success.ok) return;
@@ -41,7 +41,7 @@ test("native owned signed query binds its exact page, permits live and empty, an
 });
 
 test("native owned query refuses substituted arguments and exposes selection errors only to scoped authority", async () => {
-  const scope = await found();
+  const scope = await create();
   const query = queryOf(scope);
   expect(await read(scope, query, await header(scope, query, rita, "summary"))).toEqual({ ok: false, reason: "forbidden" });
   const absent = queryOf(scope, { type: "not-a-declared-type" });

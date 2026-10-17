@@ -6,11 +6,11 @@ import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes"
 import { ArchiveBudget } from "../src/archive-budget.ts";
 import { observationDependency } from "@generalbusiness/dap-derive";
 import { ArchiveRetainedReader, readArchiveProbe } from "../src/archive-retained.ts";
-import { definition, found } from "./support.ts";
+import { definition, create } from "./support.ts";
 
 const missing = "sha256:" + "d".repeat(64) as `sha256:${string}`;
 test("native definition-key selection validates canonical bytes and charges cache hits without aliasing the value table", async () => {
-  const lane = await found();
+  const lane = await create();
   const actual = await lane.inside(state => {
     const queries: string[] = [], budget = new ArchiveBudget(), reader = new ArchiveRetainedReader({ exec(query, ...args) { queries.push(query); return state.storage.sql.exec(query, ...args); } }, budget);
     state.storage.sql.exec("INSERT INTO retained_value (domain, digest, bytes) VALUES (?, ?, ?)", DOMAINS.definition, definition.digest, '"wrong alias"');
@@ -29,7 +29,7 @@ test("native definition-key selection validates canonical bytes and charges cach
 });
 
 test("native oversized and corrupt retained candidates fail before selection, and an invalid probe is never cached as a valid match", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     const queries: string[] = [], reader = new ArchiveRetainedReader({ exec(query, ...args) { queries.push(query); return state.storage.sql.exec(query, ...args); } }, new ArchiveBudget());
     state.storage.sql.exec("INSERT INTO retained_input (kind, digest, bytes) VALUES ('rule', ?, ?)", missing, '"' + "x".repeat(RETAINED_INPUT_BYTES) + '"');
@@ -51,7 +51,7 @@ test("native oversized and corrupt retained candidates fail before selection, an
 });
 
 test("512 failed native probes spend 512 attempts; the next attempt and insufficient byte allowance stop before another body call", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     let calls = 0;
     const native = { exec(query: string, ...args: (string | number | null | ArrayBuffer)[]) { calls++; return state.storage.sql.exec(query, ...args); } };
@@ -69,7 +69,7 @@ test("512 failed native probes spend 512 attempts; the next attempt and insuffic
 });
 
 test("a native body call that returns after the original deadline cannot install a cache value or continue SQL", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     let time = 0, calls = 0;
     const budget = new ArchiveBudget({}, () => time, 10), reader = new ArchiveRetainedReader({ exec(query, ...args) {
@@ -86,7 +86,7 @@ test("a native body call that returns after the original deadline cannot install
 });
 
 test("native ordered probes discard invalid-domain candidates, select the definition key and never fetch candidates after the valid match", async () => {
-  const lane = await found();
+  const lane = await create();
   const result = await lane.inside(state => {
     const queries: { query: string; domain: unknown }[] = [], budget = new ArchiveBudget(), reader = new ArchiveRetainedReader({ exec(query, ...args) { queries.push({ query, domain: args[0] }); return state.storage.sql.exec(query, ...args); } }, budget);
     // Correct bytes in the wrong domain are not a valid first probe.

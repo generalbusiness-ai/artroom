@@ -64,7 +64,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours", "keep", "check", "continue"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], items: ["query"], show: [], verify: ["all"], status: ["request"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours", "keep", "check", "continue"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], items: ["query"], show: [], verify: ["all"], status: ["request"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -90,10 +90,8 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
       return flag("plan") ? planInstall(ctx, first, where) : install(ctx, first, where);
     }
     case "create":
-    case "found":
     case "claim": {
-      const outcome = first === undefined ? needs("a name") : await claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
-      return name === "found" ? { ...outcome, lines: ["Use dap create instead of dap found. The found alias remains for one release.", ...outcome.lines] } : outcome;
+      return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
     }
     case "invite":
       if (flag("check") !== undefined && flag("continue") !== undefined) return { code: 2, lines: ["invite takes --check or --continue, not both.", USAGE] };

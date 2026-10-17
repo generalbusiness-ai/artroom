@@ -272,7 +272,7 @@ beforeAll(async () => {
   R = new Platform(scopeIdOf(registerSeed));
   siteEnv = { SCOPES: publishedScopes, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
   platformOutside.set(R.name, (given, sql) => artifactsOutside(given, sql, siteEnv, host.fetch));
-  expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+  expect(await R.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
   D = new Platform(scopeIdOf({ v: 1, kind: "directory", definition: DIRECTORY, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 }));
   expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });

@@ -33,7 +33,7 @@ function fixture() {
   };
   // Construct before the found entry: its reads must stay live.
   const host = new RegisterHost(given, { host: "git.example", namespace: "artroom", provider });
-  expect(register.found(rita).result).toBe("write");
+  expect(register.create(rita).result).toBe("write");
   const request = (operation: OperationId = "1:0", attempt = 1): EffectRequest => {
     const recorded = register.state.operation(operation)!;
     return { scope: register.at, operation, attempt, owner: recorded.owner, kind: recorded.kind, origin: register.own(Number(operation.split(":")[0]))! };

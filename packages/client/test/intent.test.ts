@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { LATE, MAX_DEPTH, canonicalize, isFieldValue, newIncarnation, publicKeyOf, scopeIdOf, takeBytes, textDigest, verifySessionRequest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, signerSessionRequest, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
+import { ScopeHandle, TransportError, bindingTransport, create, httpTransport, signedIntent, signerSessionRequest, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
 
 test("an asynchronous session signer keeps the original membership request and its session domain while caller data changes", async () => {
   const signer = await webCryptoSigner();
@@ -92,7 +92,7 @@ test("each operation of the handle returns a reply only when it has every member
   const handle = (t: Transport) => new ScopeHandle(t, scope.scope as never);
   const refused = { ok: false, reason: "not-found" };
   const rows: Row[] = [
-    ["found", (t) => found(t, {} as never, d as never).then((f) => f.answer),
+    ["create", (t) => create(t, {} as never, d as never).then((f) => f.answer),
       [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "refused", reason: "source-unverified" }, { answer: "unavailable", reason: "busy" }],
       [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
     ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } },

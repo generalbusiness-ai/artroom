@@ -59,7 +59,7 @@ test("a transport with signed reads signs summary, history, entry, log and retai
   // a class-private receiver. The wrapper must keep its non-read methods.
   class ServiceTransport implements Transport {
     readonly #http = httpTransport("https://scopes.test", { fetch });
-    found = this.#http.found;
+    create = this.#http.create;
     prepare = this.#http.prepare;
     settle = this.#http.settle;
     summary = this.#http.summary;

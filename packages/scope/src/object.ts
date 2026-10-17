@@ -221,7 +221,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners(), { index: this.#requestIndex, now: () => Date.now() });
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
     this.#dispatcher = given.transport ? new Dispatcher(this.#scope, store, { transport: given.transport, clock: ports.clock, capabilities: ports.capabilities }, wakes, bounds) : null;
-    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.found("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
+    this.#operations = new Operations(this.#scope, store, ports, wakes, bounds, (operation, attempt, seq) => { record.record("outcome-conflict", [{ operation, attempt }, { entry: seq }]); });
     this.#clock = ports.clock;
     this.#outside = ports.outside;
     this.#transport = given.transport;
@@ -344,20 +344,20 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     if (parent) return parent.place === place ? work() : inOperation({ ...parent, place, turn: { entered: false, known: true }, httpPublic: false }, work);
     return measuredSync(this.#context(place), work);
   }
-  #publicInvoke<A>(place: "found" | "acts" | "preparations", work: () => Promise<A>): Promise<A> {
+  #publicInvoke<A>(place: "create" | "acts" | "preparations", work: () => Promise<A>): Promise<A> {
     return operational() ? work() : this.#invoke(`rpc:${place}`, work);
   }
   /** The native answer travels untouched beside one operational turn flag. */
   async observed(method: ObservedMethod, args: unknown[], identity: OperationalIdentity, httpPublic = false): Promise<{ value: unknown; turn: boolean }> {
     if (!(OBSERVED_METHODS as readonly string[]).includes(method) || !Array.isArray(args) || args.length > 5) throw Error("Unknown operational route");
-    const base = operationPlace(method), isPublic = ["found", "submit", "prepare"].includes(method);
+    const base = operationPlace(method), isPublic = ["create", "submit", "prepare"].includes(method);
     const context = this.#context(isPublic && httpPublic !== true ? `rpc:${base}` : base, identity);
     const call = this[method] as (...args: unknown[]) => unknown;
     const value = await measured(context, async () => call.apply(this, args));
     return { value, turn: context.turn.entered };
   }
 
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return this.#publicInvoke("found", async () => this.#sent(await this.#scope.found(founding, definition, definitions, beside))); }
+  async create(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> { return this.#publicInvoke("create", async () => this.#sent(await this.#scope.create(founding, definition, definitions, beside))); }
   /**
    * `address`: the caller's address as the Worker's route had it, or null. Only the serving limits of a join read it (`limits.ts`):
    * at a membership scope a join is served through them, and no other act and no other scope is.

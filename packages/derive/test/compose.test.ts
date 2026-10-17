@@ -369,13 +369,13 @@ describe("a diagnosis (section 7.4)", () => {
     const D = founded();
     const S = asker(D);
     const diagnose = (attempts: Attempt[]) => judgeDiagnosis(S.state, ticketDefinition, { of: { seq: 2, n: 0 }, attempts }, { ...reading(S), origin: S.entries[2]!.entry });
-    const found = (attempts: Attempt[]) => {
+    const diagnosisResult = (attempts: Attempt[]) => {
       const j = diagnose(attempts);
       return j.result === "write" && j.draft.input.type === "diagnosis" ? [j.draft.input.finding, j.draft.effects] : j;
     };
     // `undelivered` is terminal and runs the send's clause. The other finding runs none.
-    expect(found(answers("wrong-incarnation", "not-found", "wrong-incarnation"))).toEqual(["undelivered", [{ effect: "state", item: 2, state: "failed" }]]);
-    expect(found(answers("retry", "not-found"))).toEqual(["delivery-unavailable", []]);
+    expect(diagnosisResult(answers("wrong-incarnation", "not-found", "wrong-incarnation"))).toEqual(["undelivered", [{ effect: "state", item: 2, state: "failed" }]]);
+    expect(diagnosisResult(answers("retry", "not-found"))).toEqual(["delivery-unavailable", []]);
     const lost = diagnose(answers("none", "not-found"));
     if (lost.result === "write") S.seal(lost.draft);
     expect(S.last.input).toMatchObject({ type: "diagnosis", finding: "delivery-unavailable" });

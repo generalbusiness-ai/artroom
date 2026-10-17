@@ -121,7 +121,7 @@ export async function hosted(before: (h: Hosted) => void = () => undefined): Pro
   const c = controls(name, START);
   const h = new Hosted();
   wired.set(name, () => h.ports());
-  const founded = await stubOf(name).found(signed, staged.declared);
+  const founded = await stubOf(name).create(signed, staged.declared);
   if (founded.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(founded)}`);
   const lane = (h.s = new Lane(name, c, founded.receipt.fact.at, founded.receipt, signed));
   before(h);

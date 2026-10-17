@@ -107,7 +107,7 @@ export class OperatorRecord {
   }
 
   /** Write one row. A kind or a reference of another form is not written: false. */
-  found(kind: IncidentKind, refs: readonly IncidentRef[]): boolean {
+  record(kind: IncidentKind, refs: readonly IncidentRef[]): boolean {
     if (!KINDS.has(kind) || refs.length > 8 || !refs.every(isRef)) return false;
     const scope = this.#scope();
     this.#sql.exec("INSERT INTO operator_record (time, scope, kind, refs) VALUES (?, ?, ?, ?)", this.#clock.read(), scope ? canonicalize(scope) : null, kind, canonicalize(refs)).toArray();
@@ -127,7 +127,7 @@ export class OperatorRecord {
     const from = (this.#sql.exec("SELECT v FROM operator_mark WHERE k = 'next'").toArray()[0]?.["v"] as number | undefined) ?? 0;
     const rows = store.storedFrom(from, FOLLOW_ENTRIES);
     if (rows.length === 0) return;
-    for (const row of rows) for (const incident of incidentsOf(JSON.parse(row.bytes) as Entry, row.hash)) this.found(incident.kind, incident.refs);
+    for (const row of rows) for (const incident of incidentsOf(JSON.parse(row.bytes) as Entry, row.hash)) this.record(incident.kind, incident.refs);
     this.#sql.exec("INSERT INTO operator_mark (k, v) VALUES ('next', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", from + rows.length).toArray();
   }
 
@@ -189,7 +189,7 @@ export async function sendAgain(
   const time = clock.read();
   const now = timeMs(time)!;
   const logged = (answer: Dispatched["answer"]): Dispatched[] => [...row.attempts, { at: time, answer }];
-  record.found("sent-again", [{ duty: row.duty }]);
+  record.record("sent-again", [{ duty: row.duty }]);
   // As the dispatcher does: the attempt is recorded before it is sent, as unanswered. The send is in no list of sends that are due, so no retry follows.
   store.attempted(seq, n, logged("none"), now);
   const answer = await within(() => transport.send({ to: send.to, from: { at: scope.at, seq, hash: kept.hash }, n, message: send.message }), seconds);

@@ -250,7 +250,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   const membershipAt = await M.at();
   await lifetime.wait(() => runInDurableObject(M.object, (_instance, state) => {
     const record = new OperatorRecord({ exec: (query, ...args) => state.storage.sql.exec(query, ...args) }, { read: () => timeOf(now()) }, () => membershipAt);
-    expect(record.found("bad-input", [{ entry: queuedEntry }])).toBe(true);
+    expect(record.record("bad-input", [{ entry: queuedEntry }])).toBe(true);
   }));
   const beforeCorrelationReads = correlationReads;
   const pendingStatus = await run(rita, "status", "membership");

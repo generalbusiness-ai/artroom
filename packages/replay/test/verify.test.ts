@@ -604,12 +604,12 @@ describe("the value of an observation is derived once from the history of its so
 // (case 10), 18.50 (case 11) and 18.52 (cases 11 and 12). STAND-INS: the data, its rules, every observation and every foreign entry
 // of these histories are made by hand (`weighing.ts`), and each head is anchored. They show what a verifier derives from the rows.
 describe("the rows of `observes`, replayed: the origin, the subject lists, the guards with each row's window, and the values that an observation names", () => {
-  const found = async (g: Weighing, history: MemoryScope = g.served()) => {
+  const replayResult = async (g: Weighing, history: MemoryScope = g.served()) => {
     const got = await verify(new MemorySource([history]), { mode: "replay", scope: g.at.scope, anchors: g.anchors(), platform: g.coded() });
     return [got.report.result, got.report.at?.seq ?? null, got.why];
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const changed = (g: Weighing, seq: number, change: (entry: any) => void) => { const history = g.served(); rewrite(history, seq, change); return found(g, history); };
+  const changed = (g: Weighing, seq: number, change: (entry: any) => void) => { const history = g.served(); rewrite(history, seq, change); return replayResult(g, history); };
   /** The records of `observed` of one entry, as the history holds them. */
   const held = (g: Weighing, seq: number): ObservationUse[] => { const input = entryOf(g.served(), seq).input; return "observed" in input ? [...(input.observed ?? [])] : []; };
   const eleven = (g: Weighing) => new Date(Date.parse(entryOf(g.served(), g.outcome).time) - 11_000).toISOString().replace(".000Z", "Z");
@@ -638,7 +638,7 @@ describe("the rows of `observes`, replayed: the origin, the subject lists, the g
 
   test("18.52 cases 11 and 12: the second list is derived from the recorded observation of the rules, so a record of a key that it does not give is a mismatch; an entry whose row is absent and states `write` is consistent, with `observation-read` under `trusts`", async () => {
     const g = new Weighing("steps");
-    expect([await found(g), held(g, g.outcome).length]).toEqual([["consistent", null, null], 3]);
+    expect([await replayResult(g), held(g, g.outcome).length]).toEqual([["consistent", null, null], 3]);
     expect(await changed(g, g.outcome, (entry) => { entry.input.observed.push(g.seen(keys.vic)); })).toEqual(["mismatch", g.outcome, "the entry holds a record of `observed` of a subject that no row of its form gives"]);
     // Case 12: k3 has no record, so R3 is absent, and it states `write`.
     const absent = new Weighing("absent");
@@ -648,13 +648,13 @@ describe("the rows of `observes`, replayed: the origin, the subject lists, the g
 
   test("18.48 case 10, and 18.50 case 11: an entry whose observation of the rules names a value is derived again with the bytes that the scope keeps by the domain and the digest; without them, or with other bytes under that digest, the replay is incomplete", async () => {
     const g = new Weighing("asked");
-    expect([await found(g), namedBy(held(g, g.outcome)[0]!.observation)]).toEqual([["consistent", null, null], [VALUE.digest]]);
+    expect([await replayResult(g), namedBy(held(g, g.outcome)[0]!.observation)]).toEqual([["consistent", null, null], [VALUE.digest]]);
     const without = g.served();
     without.retained = without.retained.filter((kept) => kept.kind !== "value");
     const other = g.served();
     other.retained = other.retained.map((kept) => (kept.kind === "value" ? { ...kept, bytes: canonicalize(["src/**"]) } : kept));
     const why = `a retained input is missing: the value that an observation of the entry names, ${VALUE.digest}`;
-    expect([await found(g, without), await found(g, other)]).toEqual([["incomplete", g.outcome, why], ["incomplete", g.outcome, why]]);
+    expect([await replayResult(g, without), await replayResult(g, other)]).toEqual([["incomplete", g.outcome, why], ["incomplete", g.outcome, why]]);
   });
 });
 

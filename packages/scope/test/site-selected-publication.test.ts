@@ -48,7 +48,7 @@ async function founding(publish: boolean) {
   roots.push(r.name);
   const host = outsideOf(r.name);
   wired.set(r.name, () => ({ outside: host }));
-  expect(await r.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
+  expect(await r.stub.create(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   const found = await r.intent(rita, "found", { expected: await r.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
   const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: await r.at(), cause: intentDigest(found.intent), ordinal: 0 };
   const d = new Platform(scopeIdOf(seed));

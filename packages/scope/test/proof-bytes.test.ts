@@ -3,7 +3,7 @@ import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, entryHash, utf8 } from "@generalbusiness/artroom-bytes";
 import { ProofBytes, PROOF_BYTE_BOUNDS as B } from "../src/proof-bytes.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
-import { at, found, rita } from "./support.ts";
+import { at, create, rita } from "./support.ts";
 import { outsideOf, pushOf } from "./outside.ts";
 import { open } from "./operation-opening.ts";
 import { namespace } from "../src/namespace.ts";
@@ -11,7 +11,7 @@ import { namespace } from "../src/namespace.ts";
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 
 test("native proof source returns only exact admitted entry bytes and checks full identity before bodies", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(async (state, instance) => {
     const sql = sqlOf(state), store = new SqliteStore(sql), first = store.stored(0)!, identity = new ProofBytes(sql).identity()!;
     const source = instance as { proofSource(fact: unknown, max: number, milliseconds?: number): { fact: unknown; bytes: string } | null };
@@ -42,7 +42,7 @@ test("native proof source returns only exact admitted entry bytes and checks ful
 /** Synthetic canonical entry padding on real SQLite, not native judgments. */
 test("native sender admits truthful UTF8 bytes at the hard bound and refuses B+1 before body transfer", async () => {
   for (const size of [B.body, B.body + 1]) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const sql = sqlOf(state), store = new SqliteStore(sql), original = JSON.parse(store.stored(0)!.bytes) as Entry;
       const entry = { ...original, effects: [...original.effects, { effect: "record" as const, capability: "hold@1" as const, kind: "padding", key: [], state: "padded", values: { text: "é😀" } }] };
@@ -63,7 +63,7 @@ test("native sender admits truthful UTF8 bytes at the hard bound and refuses B+1
 });
 
 test("proof sender bounds scope metadata and retained bodies before transfer and validates both digest bindings", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const sql = sqlOf(state), store = new SqliteStore(sql), first = store.stored(0)!, proof = new ProofBytes(sql), fact = proof.identity()!.genesis;
     const content = digestBytes(utf8(first.bytes)), use = { fact, content };
@@ -86,7 +86,7 @@ test("proof sender bounds scope metadata and retained bodies before transfer and
 });
 
 test("internal proof RPC on a restarted scope starts no parked outside driver", async () => {
-  const scope = await found(), outside = outsideOf(scope.name);
+  const scope = await create(), outside = outsideOf(scope.name);
   outside.accepting = false;
   const [operation] = await open(scope, pushOf(1)) as [OperationId];
   expect(await (scope.object as unknown as { effect(): Promise<number> }).effect()).toBe(0);
@@ -109,7 +109,7 @@ test("internal proof RPC on a restarted scope starts no parked outside driver", 
 });
 
 test("namespace proof capability preflights and never falls back to the materialized generic source", async () => {
-  const scope = await found(), fact = await scope.inside(state => new ProofBytes(sqlOf(state)).identity()!.genesis);
+  const scope = await create(), fact = await scope.inside(state => new ProofBytes(sqlOf(state)).identity()!.genesis);
   let looks = 0, generic = 0, maximum = 0;
   const peer = { source: async () => { generic++; return null; } };
   const binding = { idFromName: (name: string) => name as unknown as DurableObjectId, get: () => { looks++; return peer; } };

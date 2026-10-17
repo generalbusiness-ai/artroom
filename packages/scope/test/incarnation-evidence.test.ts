@@ -3,13 +3,13 @@ import { canonicalize, newIncarnation, scopeIdOf } from "@generalbusiness/artroo
 import { incarnationEvidence } from "../src/incarnation-evidence.ts";
 import { PREPARATION_BOUNDS as B, PreparationBudget } from "../src/preparation-budget.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
-import { found } from "./support.ts";
+import { create } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 const inc = (n: number) => newIncarnation(new Uint8Array(16).fill(n));
 
 test("native incarnation proof skips all same-incarnation subjects and unrelated scopes with two PK seeks", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const store = new SqliteStore(sqlOf(state)), current = store.scope()!;
     const sample = JSON.parse(store.stored(0)!.bytes);
@@ -46,7 +46,7 @@ test("native incarnation proof skips all same-incarnation subjects and unrelated
 });
 
 test("incarnation proof reserves shared calls and body bytes before transfer and latches unavailable", async () => {
-  const scope = await found();
+  const scope = await create();
   const got = await scope.inside(state => {
     const store = new SqliteStore(sqlOf(state)), at = store.scope()!.at;
     store.putObserved({ of: { scope: at.scope, inc: inc(1) }, subject: "member", seq: 0 });
@@ -67,7 +67,7 @@ test("incarnation proof reserves shared calls and body bytes before transfer and
 
 test("incarnation metadata keys are capped before transfer and malformed or mismatched native rows refuse", async () => {
   for (const fault of ["key", "mismatch", "malformed"] as const) {
-    const scope = await found();
+    const scope = await create();
     const got = await scope.inside(state => {
       const store = new SqliteStore(sqlOf(state)), at = store.scope()!.at;
       store.putObserved({ of: { scope: at.scope, inc: inc(1) }, subject: fault === "key" ? "x".repeat(B.keyBytes + 1) : "member", seq: 0 });

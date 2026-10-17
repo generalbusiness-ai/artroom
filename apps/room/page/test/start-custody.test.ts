@@ -42,10 +42,10 @@ test("scripted retained register7 Start keeps its founder key before the CLI bou
       await ctx.store.keep("recovery", new Uint8Array(32).fill(92));
       const intent = { v: 1 as const, idempotencyKey: "20000000-0000-4000-8000-000000000001", actor: keyIdOfSecret(secret!), to: register, kind: "found", on: null, fields: { branch: "main", founderHandle: "@founder", recoveryKey: keyIdOfSecret(new Uint8Array(32).fill(92)) }, expected: { "0": 1 }, notAfter: "2099-01-01T00:00:00Z" };
       original = signIntent(intent, secret!);
-      const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", found: { signed: original } };
+      const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", "found": { signed: original } };
       await ctx.store.save({ ...config, claim: pending });
     } else {
-      expect(canonicalize(config.claim.found?.signed) === canonicalize(original)).toBe(true);
+      expect(canonicalize(config.claim["found"]?.signed) === canonicalize(original)).toBe(true);
       expect(descriptor.secret === founder).toBe(true);
     }
     secret?.fill(0); posts++;
@@ -53,7 +53,7 @@ test("scripted retained register7 Start keeps its founder key before the CLI bou
   });
   cli.checkClaim.mockImplementation(async (ctx: Context) => {
     const config = (await ctx.store.config())!;
-    expect(canonicalize(config.claim?.found?.signed) === canonicalize(original)).toBe(true);
+    expect(canonicalize(config.claim?.["found"]?.signed) === canonicalize(original)).toBe(true);
     return { code: 1, lines: ["SCRIPTED original remains pending"] };
   });
   const first = await startRoom(origin, f.storage, { mode: "continue", label: "Ignored replacement", creationOffer: offerRead, locks });
@@ -132,7 +132,7 @@ test("scripted completed Start handoff returns the enrolled founder seed rather 
     await ctx.store.keep("recovery", new Uint8Array(32).fill(92));
     const secret = (await ctx.store.secret("browser"))!;
     const intent = { v: 1 as const, idempotencyKey: "20000000-0000-4000-8000-000000000002", actor: keyIdOfSecret(secret), to: register, kind: "found", on: null, fields: {}, expected: {}, notAfter: "2099-01-01T00:00:00Z" };
-    const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", found: { signed: signIntent(intent, secret) } };
+    const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", "found": { signed: signIntent(intent, secret) } };
     await ctx.store.save({ ...config, claim: pending });
     await ctx.store.save({ ...config, repository, handle: "@founder" }); secret.fill(0);
     return { code: 0, lines: ["SCRIPTED complete"] };

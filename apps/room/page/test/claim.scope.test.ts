@@ -134,7 +134,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
     expect([unknown.outcome.code, unknown.pending, unknown.repository, unknown.label]).toEqual([1, true, null, "My local label"]);
     const original = sent[0]!;
     const savedBefore = inFlight;
-    expect(activeKept(savedBefore).config.claim.found.signed).toEqual(original);
+    expect(activeKept(savedBefore).config.claim["found"].signed).toEqual(original);
     expect(savedBefore).not.toContain(b64url(secret));
     expect(JSON.stringify(unknown)).not.toContain(activeKept(savedBefore).recovery);
     const uncertainSeat = await second;
@@ -247,7 +247,7 @@ test("a changed Page context stops queued and prepared native claims before deli
     d.lifetime.advance(30_000);
     const complete = await claimRoom(session, configured, storage, "Replacement label", options);
     expect([complete.outcome.code, complete.pending, complete.label]).toEqual([0, false, "Original label"]);
-    expect(sent).toEqual([originals.found, originals.seat, originals.firstKey]);
+    expect(sent).toEqual([originals["found"], originals.seat, originals.firstKey]);
     expect(complete.repository).not.toBeNull();
   } finally { d.done(); }
 });

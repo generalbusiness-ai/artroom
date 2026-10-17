@@ -431,7 +431,7 @@ export class Scope {
    * No grant is asked for: who may found a repository is the authority
    * note's (section 7.1).
    */
-  async found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
+  async create(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
     const refused = (reason: Extract<Created, { answer: "refused" }>["reason"]): Created => ({ answer: "refused", reason });
     const name = this.#name;
     if (!name || !isSigned(founding)) return refused("source-unverified");

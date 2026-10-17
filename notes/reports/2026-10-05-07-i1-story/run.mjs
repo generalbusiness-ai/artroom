@@ -203,7 +203,7 @@ out(`I1 story. Clock starts at ${time()}. Node ${process.version}.`);
 out();
 out("Step 0. Rita founds a desk D (a directory) over the HTTP routes.");
 const founding = await intent(rita, { to: null, kind: "found", fields: { source: "a repository" } });
-const made = await found(transport, founding, deskDefinition.declared, [ticketDefinition.declared], READER);
+const made = await create(transport, founding, deskDefinition.declared, [ticketDefinition.declared], READER);
 if (!made.scope) throw new Error(`the desk was not founded: ${JSON.stringify(made.answer)}`);
 const D = new Seat("D", made.scope, deskDefinition.declared);
 await settle();
