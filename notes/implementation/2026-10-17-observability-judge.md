@@ -390,3 +390,42 @@ leaves, all thirteen landed archive leaves, and all 123 protected
 contract/platform/client/lock leaves remain exact. No additional gate
 is run for this note-only successor. Actual calibration, live SQL/health
 acceptance and storage reporting remain owed.
+
+## Exact review and receipt-read repair
+
+Formal review `7731e1b4` requested changes on exact `1f2aba03`, all
+twenty-one files. F1 found that `POST /settle` was missing from the
+read-attempt count. A remote native receipt lookup is a read despite
+using POST; it does not submit another intent. F2 found `found` in the
+active metrics-v1 HTTP place map, where the collector uses `create`.
+The map is corrected without renaming any native intent or register act.
+The reviewer explicitly found that the disclosed, cause-unknown timeout
+residue would not alone block this bounded Source slice. Both composed
+gates remain failed; focused/downstream passes are not a green gate.
+
+The new actual MCP service witness failed before the F1 repair
+(original session 21783, `268eb9`): after a reply was lost after the
+HTTP stand-in recorded the act, settlement recovered its receipt, but
+reported one read instead of two. The repair counts `POST /settle` as
+one read and zero pages. It still excludes POST creation, intent
+submission and preparation. The concurrent unit witness distinguishes a
+receipt lookup from `POST /acts`.
+
+The ordinary-act witness now also checks retained terminal custody: a
+later settlement makes its normal summary read but no remote receipt
+lookup. A second actual-service witness starts with empty configuration
+and an unresolved signed creation. Its creation/receipt responses are
+explicitly scripted, not Native admission. The first attempted receipt
+lookup fails and counts one read; the second resolves the same signed
+creation and counts one; the terminal lookup uses the retained answer
+and counts zero. Both lookup bodies contain the exact original signed
+request, and the successful endpoint matches its derived created scope.
+The fixture supplies membership explicitly without an inventory read.
+
+The final two affected files pass 24 cases with one existing skip
+(original 32089, `c8e627`); MCP source/test typechecks pass (`7fcc6e`).
+The earlier narrower repaired run passed 23 cases (`65b203`) before the
+creation witness was added. This changed implementation needs one gate
+at its new clean freeze, then fresh exact-head Source review. The
+rejected head, all original failures and both finite evidence grants
+remain preserved; no earlier approval or static advisory is transferred.
