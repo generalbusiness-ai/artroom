@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6383370398741b57a65474a6e6486d51009b735c","text":"Merge retired a covered predecessor; the successor is at docs/mcp-tools.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:63ca36c44bc5d9b6e68dad303e1530e42982ccf9","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/counting-commitments.test.ts."}
