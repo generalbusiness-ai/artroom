@@ -1,10 +1,23 @@
 # Create and outbox terminology
 
-Source child 1a7c88af, promise 75d700a4, implements items 2 to 5 of
-bb2c27ac. The completed spikes slice and its history tag are preserved.
-The isolated branch starts from Directory candidate f45a5ce80 while its
-exact review 584f53a9 proceeds. Directory corrections retain priority;
-this terminology slice cannot land before Directory.
+This Source slice implements items 2 to 5 of bb2c27ac under renewed
+request 1b6d2579 and promise e692fa54, based on Directory's approved Main
+merge 9a1238b7 and stable receipt 731911ea. Creation APIs, transport
+methods, files and ordinary identifiers use create/creation; pending
+work and outbox names replace duties. Pinned data, signed bytes, retained
+recovery requests and fixed initial Git content preserve their meaning.
+No compatibility method or command alias is added.
+
+The completed spikes slice and its history tag are preserved. The six
+unrelated Jam source lookups and their retained bundle copies remain an
+explicit scope clarification for review. No terminology approval,
+landing or passing final gate is claimed at this checkpoint. The sections
+below retain the original implementation checkpoints, failed attempts and
+qualified evidence; they are not a union of passing gate results.
+
+The initial child 1a7c88af / promise 75d700a4 started from Directory
+candidate f45a5ce80. Its mutable artifact basis was later retired, and
+that request is superseded toward the current stable-receipt request.
 
 ## First implementation checkpoint
 
@@ -414,3 +427,40 @@ physical-line change, not a reduction claim. The final repaired head's
 count is recorded separately after freezing it. The gate environment was
 Node 26.12.0, npm 11.20.0, arm64; observed load 1.30 / 1.46 / 1.59.
 No causal performance claim is made from that one load sample.
+
+## Second original gate and fixture repair
+
+Original gate session 52003 at 3306bc283f1980665c63ab6ed2e4a05bdc9f578e,
+tree 304ce6e515f3e51dd0f47829d11e7c31fbb5c5ad, ended CLOSED 1. It used
+the verified dependency view, passed whitespace in 0.1 seconds (0.1 CPU)
+and types in 7.2 seconds (26.3 CPU), then failed tests in 434.8 seconds
+(525.0 CPU). The exact Vitest result is 1,538 pass / 2 fail / 3 skip in
+299 passing, two failing and one skipped file. The Node and Counting
+follow-on gate stages were unrun. The original log is
+/tmp/artroom-create-outbox-3306bc283-first-gate.log, with step logs under
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.9EOFV5NaAx.
+
+Both failures were stale existing witnesses: the CLI story's output regex
+still expected founder key after its prose changed to creator key, and
+the metrics aggregation fixture still emitted found/rpc:found. Those old
+unsigned places are correctly refused by the current metrics schema,
+which made the fixture's accepted-count assertion fail. The fixture now
+emits create/rpc:create; its native-end and count assertions are retained.
+The two affected files pass seven focused cases in
+/tmp/artroom-create-outbox-gate-fixture-repair-focus.log. These are focused
+repair results, not a completed gate.
+
+Before the next freeze, the historical notes/plans/README title changes
+introduced by the prose pass are restored exactly to their pre-prose
+bytes. Two guide references now use an outbox ID and followOutbox(outboxId).
+The Store's type comment and OperatorRecord's record-method comment are
+corrected to current names. No behavior changes with those corrections.
+The standard active documentation link check passes separately.
+
+The protected inventory now also lists active local demo tooling and the
+retained rehearsal plan reader: 206 occurrences in 169 file/line/value
+rows, each checked against the current source. It records the six exact
+Jam lookup locations and their six bundle copies, their segment-selection
+meaning, and both unchanged historical hashes. They are ordinary lookup
+code, not pinned definition literals; requester clarification is pending.
+The original 157/126 checkpoint remains historical preparation above.

@@ -56,7 +56,7 @@ and requires attributed task closure without calling cancelled delivery
 complete. Source-baseline reuse is proposed, with no automatic release or
 main merge. Runtime design and settlement choices still need their named
 owners. The builder should revise with a correction matrix before filing
-independent review. R1 design may continue. No old task, external task or
+independent review. R1 design may continue. No old task, external duty or
 review invitation was closed by this correction; it is not independent
 approval. The ephemeral heads-up failed because the builder inbox was
 full; the durable correction is effective.
@@ -69,7 +69,7 @@ internal correction `a670d34d` requests construction without circular
 creation/source hashes; time-dependent revalidation after preparation;
 complete pinned act semantics; recursive source verification with explicit
 trust and replay limits; distinct refusal, retry and settlement behavior;
-retention and capacity for outstanding pending work; and complete contribution
+retention and capacity for outstanding duties; and complete contribution
 authorship for review. The separate per-scope queue and conservative local
 head validation remain proposed. A corrected exact draft and correction
 matrix are owed before independent review. No protocol or source adoption
@@ -160,7 +160,7 @@ bindings and five historical approval subjects, without establishing
 the narrative safety reasons or completing original conditions. Its
 full design review is unperformed. Reconciliation `b491912f` confirms that partial planning
 reading has closed no promises and approved no design. Original review
-and settlement pending work remains pending.
+and settlement duties remain pending.
 
 R1 revision 3 arrived in `814853a9`, at exact head
 `4b7f77eb3955a9f81a1a502b561f20c86eb7dbc5`. Planner read its complete
@@ -187,7 +187,7 @@ workspaces for plural commitments; no inventory-based settlement of
 unknown creates; correlated publication messages and complete source
 eligibility; evidence for every possible dispatch; explicit publication
 and abort-fence assumptions; object staging and receipt ownership; and
-safe creation replacement with complete resource retirement. Both notes'
+safe founding replacement with complete resource retirement. Both notes'
 whitespace checking passed. No independent verdict, adoption or runtime
 work is claimed.
 
@@ -223,14 +223,14 @@ Direction `d4e07064` governs current commissioning. Older sections below
 record historical approvals, ownership and previous sequencing; they do
 not require legacy support, pre-change replay or completing an obsolete
 architecture. Useful outcomes and test economy are reassessed under the
-new model, and real unknown external pending work remains until safely accounted
+new model, and real unknown external duties remain until safely accounted
 for. Removal accompanies replacements; successful demo alone cannot close
 all-component alignment. Source implementation still needs relevant exact
 independent design adoption.
 
 ## Original credential cleanup audit
 
-Focused read-only audit under gitseq request `c01205f5d967ccef69319549dd1734b3e108a8b0`, with promise `51ef2bd2a3829800872ccd25f072cbe28dc961f1`. Started at approved main `72d6abde5c6dfa993ac441884e8f966a903b932f`; reconciled to `bd520fb926f8161a722c6f1e23ae4aac29e41a66` after the separately reviewed A7 landing. That landing's tree equals approved head `84e25a78883e03f7accf1a18d66d8866eea94195`. The Git paths below are unchanged; Room creation line references were refreshed.
+Focused read-only audit under gitseq request `c01205f5d967ccef69319549dd1734b3e108a8b0`, with promise `51ef2bd2a3829800872ccd25f072cbe28dc961f1`. Started at approved main `72d6abde5c6dfa993ac441884e8f966a903b932f`; reconciled to `bd520fb926f8161a722c6f1e23ae4aac29e41a66` after the separately reviewed A7 landing. That landing's tree equals approved head `84e25a78883e03f7accf1a18d66d8866eea94195`. The Git paths below are unchanged; Room founding line references were refreshed.
 
 The improve skill supplied the handoff format. Four verified fixes were selected under the user's standing autonomous checker instruction. Priorities and effort estimates set review order only. They do not cut scope. Source code was not changed by this audit. These plans have not been implemented or approved for landing.
 
@@ -239,7 +239,7 @@ The improve skill supplied the handoff format. Four verified fixes were selected
 | 1 | [001: Complete token inventories](001-complete-token-inventories.md) | Prevent premature workspace grants and writable “ready” snapshots under incomplete provider replies | M | MED | HIGH | DONE, pending review |
 | 2 | [002: Unknown fork effects](002-retain-unknown-fork-effects.md) | Preserve late-create cleanup through foreign occupancy | M | LOW | HIGH | DONE, pending review |
 | 3 | [003: Terminal publication cleanup](003-retry-terminal-publication-tokens.md) | Retry known credential revocation after a successful landing | M | MED | HIGH | DONE, pending re-review after [review f060871b](#review-f060871b) ([report](#plan-003-report)) |
-| 4 | [004: Creation wake](004-persist-founding-wake.md) | Recover first remote creation effects after host interruption | M | MED | HIGH, static path | DONE, pending review |
+| 4 | [004: Founding wake](004-persist-founding-wake.md) | Recover first remote founding effects after host interruption | M | MED | HIGH, static path | DONE, pending review |
 
 Plans 001 and 002 touch the same workspace cleanup function; serialize their edits or explicitly reconcile the second head. Plan 004 also touches workspaces.ts and should follow that reconciliation. Plan 003 can proceed independently. Every executor must use a gitseq request/promise, preserve unrelated work, run the stated gates and deliver all artifacts at one exact head for checker review.
 
@@ -474,7 +474,7 @@ room holds, bound to exact definition digests with variants where same-name
 definitions differ, generated from the declarations, listed for the
 caller's role on each membership, and told to subscribed clients when the
 role, the active definitions, the lanes' definitions or the configured
-roots change; thirteen generic tools for creation, reads, capability
+roots change; thirteen generic tools for founding, reads, capability
 preparation, waiting, settling and the read credential stand beside them;
 the generic `acts` and `act` pair is a launch mode for hosts with a
 tool-count limit. Both MCP wire revisions are served by their own rules.
@@ -584,7 +584,7 @@ provenance uses only the live own promise/freeze. Provisional freeze
 inheriting old-candidate review staleness. The accepted full Draft 1 review
 is historical assessment evidence carried only across unchanged text.
 Reviewed handoff `b5aab68c` preserves original `34cf52b3` source integration
-and every selected mechanism's bounded evidence pending work. Completion
+and every selected mechanism's bounded evidence duties. Completion
 `09dc707b`, accepted in `5297ec5e`, satisfies only clarification `b9877507`.
 
 ## First Jam release decisions
@@ -671,7 +671,7 @@ Planner direction `37934f82` records proposed defaults and planning
 corrections: valid declared targets and authority, consistent development
 key custody, independent review rather than seed-key mechanics, complete
 prepared-intent context, actual Jam acceptance and N5 provisioning.
-The existing public creation protocol avoids making a convenience SDK
+The existing public founding protocol avoids making a convenience SDK
 export a prerequisite. The later `fdd98295` delta corrects several act
 shapes and names the candidate's Stage 4 limits; further corrections and
 independent design review/adoption remain owed before implementation.
@@ -949,7 +949,7 @@ dispositions, implementation and removal remain owed.
 The 10× useful-invariant/test-economy goal continues under `d4e07064`.
 The source integration sequence below records the previous model; R0/R4
 now reassess each component/test and R3 accounts for actual external
-pending work before any retirement. It is not a requirement to complete an
+duties before any retirement. It is not a requirement to complete an
 obsolete architecture. Historical measurements qualify their exact
 candidate, not the new model's unmeasured validation cost.
 
@@ -1359,7 +1359,7 @@ historical test-cost evidence, not new execution or whole-head approval.
 Planner read the complete commission, invitation, promise and seven-path
 delta from `9451aa24`. Its default CLI output and JSON report partial
 carry accounting and explain that a verified prefix does not prove every
-task, complete publication or every state transition. This source reading
+duty, complete publication or every state transition. This source reading
 is not independent runtime approval. Complete guarded verdict `63af1ce0`
 requests two P2 repairs, with actual sealed binding solely to `4e66accc`
 and all 46 artifacts. Integrity-only replay-off output claims checks it
@@ -1369,7 +1369,7 @@ full/integrity and valid/malformed controls. This is saved synthetic-log
 evidence, not malformed admission by a real Room. The full default
 grammar/call/input/budget and legacy positive/negative assessment retains
 bounded credit; the omission argument does not establish every
-mandatory/advisory/order/pass task. Planner read the complete verdict;
+mandatory/advisory/order/pass duty. Planner read the complete verdict;
 the checker's raw-seal appraisal is not claimed as planner reproduction.
 All original Stage 3 outcomes, ten carry families/A–F and Stage 4 producer
 scope remain owed. The 2,038-test gate is historical builder evidence.
@@ -1592,7 +1592,7 @@ final composed head for their separate review, after the current Stage 5
 review; these earlier publications do not approve that later protocol
 change.
 
-Parent read every cited production path and test pattern. Read-only synthetic provider controls using actual exported Workspaces/SnapshotRepos classes and in-memory SQLite reproduced incomplete inventory acceptance and unknown-duty closure on foreign provenance. They do not establish live provider behavior. Terminal revocation and creation interruption were verified by source control-flow analysis; their plans require meaningful regression tests, including actual DO recovery for creation. No new whole-repository gates, live inference, deployments, remote deletions or credential creation were run as part of the audit. A7's separate exact-head review ran its own gates and fault controls; those are not claimed as audit repros.
+Parent read every cited production path and test pattern. Read-only synthetic provider controls using actual exported Workspaces/SnapshotRepos classes and in-memory SQLite reproduced incomplete inventory acceptance and unknown-duty closure on foreign provenance. They do not establish live provider behavior. Terminal revocation and founding interruption were verified by source control-flow analysis; their plans require meaningful regression tests, including actual DO recovery for founding. No new whole-repository gates, live inference, deployments, remote deletions or credential creation were run as part of the audit. A7's separate exact-head review ran its own gates and fault controls; those are not claimed as audit repros.
 
 ## Canonical mint ownership: contract handoff still needed
 
@@ -1607,8 +1607,8 @@ Design for review under request `10fcfe4e`: [notes/implementation/2026-10-02-can
 - Unsigned checker jobs: trusted bound producers under adopted R-EXEC-8, with new authority design request `f12cef6bae7bf4c3813241df0624199568f14ddf`; not reported as a current vulnerability.
 - Harness canonical token sweeps: development-only code, not production cleanup.
 - False revoke results: may mean already revoked or absent; not automatically evidence of a live credential.
-- Snapshot legacy unknown creates and creation legacy adoption: existing indefinite debt and durable incarnation handling credited; no duplicate defect. (Both were retired later by decision D5, request 73eccbec.)
-- An unawaited setAlarm alone: insufficient to claim a crash bug without the Workers storage/output-gate contract. Plan 004's evidenced issue is absence of any wake before the first creation create.
+- Snapshot legacy unknown creates and founding legacy adoption: existing indefinite debt and durable incarnation handling credited; no duplicate defect. (Both were retired later by decision D5, request 73eccbec.)
+- An unawaited setAlarm alone: insufficient to claim a crash bug without the Workers storage/output-gate contract. Plan 004's evidenced issue is absence of any wake before the first founding create.
 - Provider TTLs, normal CAS/complete-forward behavior and expired credentials: do not change them or treat expiry as proof a push did not land.
 - Broad performance, dependencies, UI, general auth review and unrelated roadmap features were outside this focused audit. No direction features were ranked against correctness fixes.
 
@@ -1622,11 +1622,11 @@ All three plans are **DONE, pending review**. No plan's premise turned out to be
 
 ### What changed
 
-**Plan 001: complete token inventories.** `completeInventory` in `packages/git/src/artifacts.ts` accepts a listing only when its records account for its total and every record has a non-empty ID, a known scope and state, and a timestamp-string expiry. Otherwise it throws. The creation validator (`Workspaces.inventoryOf`) now uses it; its rules are unchanged, except that a redundant type check on the total was dropped (the strict count comparison already rejects a missing or non-number total). Workspace cleanup (`cleanForkNow`) and snapshot preparation (`SnapshotRepos.prepare`) also use it. An incomplete or malformed workspace listing leaves every task owed and on its backoff, so the workspace is never ready and gets no grant. An incomplete snapshot listing issues nothing, and the repository keeps its owed deletion. Each caller keeps its own active and expiry filter. The recorded lease token is still kept, and the creation token is still revoked, only on the proven fork. The binding's `listTokens()` takes no paging parameter, so the pagination STOP condition did not apply. Provider documentation was not consulted, because no live calls were allowed.
+**Plan 001: complete token inventories.** `completeInventory` in `packages/git/src/artifacts.ts` accepts a listing only when its records account for its total and every record has a non-empty ID, a known scope and state, and a timestamp-string expiry. Otherwise it throws. The founding validator (`Workspaces.inventoryOf`) now uses it; its rules are unchanged, except that a redundant type check on the total was dropped (the strict count comparison already rejects a missing or non-number total). Workspace cleanup (`cleanForkNow`) and snapshot preparation (`SnapshotRepos.prepare`) also use it. An incomplete or malformed workspace listing leaves every duty owed and on its backoff, so the workspace is never ready and gets no grant. An incomplete snapshot listing issues nothing, and the repository keeps its owed deletion. Each caller keeps its own active and expiry filter. The recorded lease token is still kept, and the creation token is still revoked, only on the proven fork. The binding's `listTokens()` takes no paging parameter, so the pagination STOP condition did not apply. Provider documentation was not consulted, because no live calls were allowed.
 
-**Plan 002: unknown fork effects through foreign occupancy.** When a repository that is not this canonical repo's fork holds a lane fork's name, `cleanForkNow` still settles answered and owed pending work: our fork is gone, and so are its tokens. It no longer settles a step that is still in flight. That step keeps its inventory on the existing capped backoff (`cleanFork`'s `finally` advances it), and it does not block a lease. The foreign repository is still only read for provenance (`get` and `info`).
+**Plan 002: unknown fork effects through foreign occupancy.** When a repository that is not this canonical repo's fork holds a lane fork's name, `cleanForkNow` still settles answered and owed duties: our fork is gone, and so are its tokens. It no longer settles a step that is still in flight. That step keeps its inventory on the existing capped backoff (`cleanFork`'s `finally` advances it), and it does not block a lease. The foreign repository is still only read for provenance (`get` and `info`).
 
-**Plan 004: creation wake before the first create.** `WorkspacesOptions.wake` is a new optional async callback. `createIncarnation` records the create step in one transaction, then awaits `wake(now)` and only then sends the create. If the wake rejects, nothing is sent and the step is closed as `not-sent`; debt recorded earlier is kept. `CoreOptions.wake` passes the callback through, and `Room.wake` persists the alarm. Wake-ups run one at a time, each reads the stored alarm and only ever moves it earlier, and the alarm cache is set only after storage accepts the alarm. `schedule()` now clears its cache when a store is rejected. The Room constructor schedules any creation debt it finds (`blockConcurrencyWhile` with `recover`), so recovery does not need a new found request.
+**Plan 004: founding wake before the first create.** `WorkspacesOptions.wake` is a new optional async callback. `createIncarnation` records the create step in one transaction, then awaits `wake(now)` and only then sends the create. If the wake rejects, nothing is sent and the step is closed as `not-sent`; debt recorded earlier is kept. `CoreOptions.wake` passes the callback through, and `Room.wake` persists the alarm. Wake-ups run one at a time, each reads the stored alarm and only ever moves it earlier, and the alarm cache is set only after storage accepts the alarm. `schedule()` now clears its cache when a store is rejected. The Room constructor schedules any founding debt it finds (`blockConcurrencyWhile` with `recover`), so recovery does not need a new found request.
 
 ### Tests and gates
 
@@ -1641,19 +1641,19 @@ Every new test below failed on the code before its fix, except two plan 002 cont
 | 002 | Definite refusal and an ordinary answered create | "plan 002: a fork creation refused unchanged …"; "an ordinary fork creation that answered, not yet swept …"; the existing provenance and readiness tests | Pass |
 | 004 | Actual Durable Object: alarm persisted before the first create; a stopped host's debt is serviced by a fresh object's alarm | `founding-gaps.test.ts`: "the alarm is in storage while the first create is outstanding …" (inspects storage while the create is held, aborts the object, applies the create late, then runs only `runDurableObjectAlarm`) | Pass |
 | 004 | Wake failure sends nothing; earliest alarm kept | "an alarm that cannot be stored …"; "an earlier alarm already in storage is kept …"; "wake-ups asked for at once …"; Node: "plan 004: a wake-up that cannot be stored …" and "the founding wake-up is stored after the create step is on record …" | Pass |
-| 004 | Older ledger, unfounded room, healthy creation, legacy adoption (since retired by decision D5), sealed isolation | "a fresh object schedules founding debt it finds …"; the existing founding-gaps and creation tests | Pass |
+| 004 | Older ledger, unfounded room, healthy founding, legacy adoption (since retired by decision D5), sealed isolation | "a fresh object schedules founding debt it finds …"; the existing founding-gaps and founding tests | Pass |
 | All | Root and package gates | `npm ci`; `npm run typecheck`; `npm test`; `npm run test:workers -w @generalbusiness/artroom-git` (8 tests); `npm run test:node -w @generalbusiness/artroom-room` (125, after the merge); `npm run test:workerd -w @generalbusiness/artroom-room` (387); `node --test packages/git/test/workspaces.test.ts packages/git/test/snapshots.test.ts` (106); `npm exec -w @generalbusiness/artroom-room -- wrangler deploy --dry-run` (bundles only) | All exit 0, run in that order at the final head of the branch (after main `a319360a` was merged in). Earlier runs were discarded, because another agent shared the scratch directory and a gate script may have been mixed |
 | All | Scope | `git diff --name-only bd520fb9..HEAD`: only the plans' drift-check paths and `plans/` | Pass |
 
-One note on the Durable Object test. In the workerd test pool, aborting an object does not complete while an RPC request to it is still in flight, or while its pending work resolves a promise created by the test. Either way the test hangs. So the test performs the Worker's creation steps itself (the registry binding and the seed), starts `room.core.found` inside the object, and polls a plain flag. The creation code path, the storage and the abort are all real.
+One note on the Durable Object test. In the workerd test pool, aborting an object does not complete while an RPC request to it is still in flight, or while its pending work resolves a promise created by the test. Either way the test hangs. So the test performs the Worker's founding steps itself (the registry binding and the seed), starts `room.core.found` inside the object, and polls a plain flag. The founding code path, the storage and the abort are all real.
 
 ### Mutation table
 
-Each mutant was applied alone to the merged code and the relevant suites were run (the Node Git tests; for plan 004 also the workerd creation tests); then the file was restored. Every mutant turned at least one test red.
+Each mutant was applied alone to the merged code and the relevant suites were run (the Node Git tests; for plan 004 also the workerd founding tests); then the file was restored. Every mutant turned at least one test red.
 
 | ID | Mutation | Red tests |
 |---|---|---|
-| M1 | 001: drop the total-versus-count check | 9 (empty-page and no-total cases for both callers, both restart controls, the post-mint test, creation a35b4b61) |
+| M1 | 001: drop the total-versus-count check | 9 (empty-page and no-total cases for both callers, both restart controls, the post-mint test, founding a35b4b61) |
 | M2 | 001: drop the per-record check | 14 |
 | M3a, M3b | 001: drop the ID type check, or the non-empty ID check | 2, 2 |
 | M4 | 001: drop the scope check | 2 |
@@ -1662,10 +1662,10 @@ Each mutant was applied alone to the merged code and the relevant suites were ru
 | M7 | 001: drop the records-list check | 1 (after the "no list of records" case was added; it first survived) |
 | M8 | 001: workspace sweep reads `.tokens` unvalidated | 10 |
 | M9 | 001: snapshot preparation reads `.tokens` unvalidated | 10 |
-| M10 | 001: creation inventory reads `.tokens` unvalidated | 4 (existing a35b4b61 tests) |
-| N1 | 002: settle every task under a foreign occupant (the old behaviour) | 2 |
-| N2 | 002: settle only answered pending work | 1 (existing owed-debt test) |
-| N3 | 002: settle only owed pending work | 2 |
+| M10 | 001: founding inventory reads `.tokens` unvalidated | 4 (existing a35b4b61 tests) |
+| N1 | 002: settle every duty under a foreign occupant (the old behaviour) | 2 |
+| N2 | 002: settle only answered duties | 1 (existing owed-debt test) |
+| N3 | 002: settle only owed duties | 2 |
 | N4 | 002: remove `cleanFork`'s backoff `finally` | 4 |
 | P1 | 004: no wake before the create | 4 (2 Node, 2 workerd) |
 | P2 | 004: send the create after a failed wake | 2 |
@@ -1683,7 +1683,7 @@ The first version of the validator had a type check on the total that no test co
 ### Not changed here (for separate requests)
 
 - The Room's snapshot `wake` (`core.ts`, `snapshotRepos`) still calls `committed()`, which issues `setAlarm` without awaiting it. So `SnapshotRepos.prepare` can send a create before the alarm is confirmed in storage. Plan 004 asked for this to be reported, not fixed.
-- Constructor recovery covers creation debt only. A created room still relies on its stored alarm, as before.
+- Constructor recovery covers founding debt only. A founded room still relies on its stored alarm, as before.
 - `packages/room/src/jobs.ts` validates its canonical inventory with its own rule, which does not check scope. Future consumers should use `completeInventory`.
 - The development harness in `packages/git/src/worker.ts` (now `packages/git/measure/harness/worker.ts`, decision D5) reads listings unvalidated. It is out of scope, as the audit noted.
 
@@ -1694,7 +1694,7 @@ Gitseq request `c9cd4cd859e9f715a743a674845e1c7e0cc4b994`, branch `request/cc-fo
 | Item | Change | Tests (each failed before the change) | Mutants (each turned the tests red) |
 |---|---|---|---|
 | 1. The snapshot wake-up is stored before a snapshot create | `core.ts`: `SnapshotRepos` wakes through the Room's persisted alarm (`CoreOptions.wake`), not `committed()`. `repos.ts`: if the wake-up cannot be stored, `prepare` sends nothing, closes the step as `not-sent` and drops its row | `snapshot-repos.test.ts`: "the alarm is in storage while the snapshot create is outstanding …" (with no alarm stored beforehand, the test holds the create, checks storage, aborts the object, applies the create late, and a fresh object's alarm deletes the repository); "a snapshot wake-up that cannot be stored …". `snapshots.test.ts` (Node): "follow-up c9cd4cd8: a wake-up that cannot be stored sends no create …" | Q1: the wake-up is `committed()` again (2 red). Q2: the failed wake-up leaves the step in flight (2). Q3: the create is sent after a failed wake-up (2) |
-| 2. A fresh Room object schedules every debt it owns | `room.ts`: `recover()` stores an alarm for `nextAlarm()` in a created room (snapshot, workspace and job-token cleanup, and the rest of the alarm's work), and for `foundingDue()` before creation | Durable Object restart controls, each with no alarm stored before the restart: "a snapshot repository's owed deletion …" (`snapshot-repos.test.ts`); "a released workspace whose token revocation and inventory are owed …" (`followup-c9cd4cd8.test.ts`); "(2) with no alarm stored, a fresh object stores one, and its alarm observes the unknown mint without settling it" (`job-token-mint.test.ts`). Each also runs the stored alarm and checks the debt is serviced; the unknown mint stays open | Q4: founding-only recovery, as before (3 red). Q5: founded-only recovery (1, the plan 004 creation control) |
+| 2. A fresh Room object schedules every debt it owns | `room.ts`: `recover()` stores an alarm for `nextAlarm()` in a founded room (snapshot, workspace and job-token cleanup, and the rest of the alarm's work), and for `foundingDue()` before founding | Durable Object restart controls, each with no alarm stored before the restart: "a snapshot repository's owed deletion …" (`snapshot-repos.test.ts`); "a released workspace whose token revocation and inventory are owed …" (`followup-c9cd4cd8.test.ts`); "(2) with no alarm stored, a fresh object stores one, and its alarm observes the unknown mint without settling it" (`job-token-mint.test.ts`). Each also runs the stored alarm and checks the debt is serviced; the unknown mint stays open | Q4: founding-only recovery, as before (3 red). Q5: founded-only recovery (1, the plan 004 founding control) |
 | 3. Job inventories use `completeInventory` | `jobs.ts` uses the shared rule, now exported from the Git package's `index.ts`; the note text is unchanged | `job-token-mint.test.ts`: "(3) an inventory with a record of an unknown scope …" and "… a record whose expiry is not a timestamp string …". The old rule counted such a record as a live token | Q6: the old inline rule (2 red). Q7: no validation (3) |
 
 Gates at the exact head of the branch: see the request's report. Not changed here: the development harness listings in `packages/git/src/worker.ts` (now `measure/harness/worker.ts`), which the audit put out of scope.
@@ -1824,7 +1824,7 @@ Review `f060871bfd1610447865b3069b3e48efd6f6c349` of head `611edea7` found the r
 |---|---|
 | `landing.test.ts`: "review f060871b: while a cleanup pass waits on an answer, the owed revocations are due again when its current attempt times out…" | Two overdue records. `nextDue()` is the attempt's start plus 30 s, and moves when the second attempt starts. An accepted operation still makes it "now". A restarted room owes the record at once. |
 | `landing.test.ts`: "review f060871b: a revocation answered whose completion cannot commit counts as a failure with backoff…" | A `BEFORE DELETE` trigger fails completion. Both records take the 2 s backoff, `tokenRevoked` rolls back, and the batch continues. With an `UPDATE` trigger too, both are still tried and keep their due times. After recovery, both complete, with one receipt each. |
-| `landing-do.test.ts`: "review f060871b: a failure recording the cleanup duty rolls the landing back…" | Adapted from the checker's SQL fixture, across real Durable Object restarts. A failed task insert rolls the landing back. A failed completion keeps the debt on its 2 s backoff with `tokenRevoked` false. After recovery, the next attempt completes, with one receipt. |
+| `landing-do.test.ts`: "review f060871b: a failure recording the cleanup duty rolls the landing back…" | Adapted from the checker's SQL fixture, across real Durable Object restarts. A failed duty insert rolls the landing back. A failed completion keeps the debt on its 2 s backoff with `tokenRevoked` false. After recovery, the next attempt completes, with one receipt. |
 | `packages/room/test/workerd/review-f060871b.test.ts` | Adapted from the checker's alarm fixture: the production Room with real `Room.alarm` runs. While a revocation is pending: five alarms, one call, no stored alarm under 1 s, and `nextDue` between 1 s and 30 s ahead. After completion: no debt and no landing wake. On a 200 ms timeout: backoff 2 s, the next due time is the record's, and an earlier alarm sends nothing. |
 
 The earlier Durable Object test's last phase now runs the alarm itself, and checks that any wake left is bounded and finds nothing owed. The checker's two original fixtures also pass unchanged against this head.
@@ -2094,7 +2094,7 @@ Git package, `packages/git/test/landing.test.ts` ("mint lane B …", 10 tests, w
 | (1) | R-MINT-4, R-MINT-7 | Node: a host stops at `token-answered`; the token is the ledger's alone (`held`, on no attempt, in no row); a restart 10 s later makes it `owed`, due 1 s ahead; the ledger revokes it by its ID once; the publication lands forward with attempt 2, one receipt, no live token, no record, no row. Workers: the same across a real abort, through the alarm alone |
 | (2) | R-MINT-2, R-MINT-5 | Applied, then `INTERNAL_ERROR`: one `unknown` record, the ledger's retry is a new record whose token is pushed, the same outcome, slot and receipts, and the applied token never revoked, past its lifetime and an observation. A lost answer: one create (the engine does not retry), one `unknown` record, the attempt's detail is safe metadata only, and the next attempt lands |
 | (3) | R-MINT-3, R-MINT-4 | A trigger fails `pushToken`'s save: no ID on the attempt, no row, the ledger still owns the token (its release failed, so `owed`), and its pass revokes it by its ID; the publication lands later with a new token. The release is off the publication queue: `publish` ends while it is unanswered |
-| (4) | R-MINT-4, R-MINT-7 | The row: written by `pushToken` with the reported expiry, the ledger's record gone in the same transaction; deleted by the held operation's revocation; kept while revocations fail, after the operation ends and past the token's expiry; deleted by plan 003's cleanup pass. A trigger on the row's insert rolls `pushToken` back (and the ledger's release revokes the token); one on its delete rolls `tokenRevoked` back, and the task stays until it commits |
+| (4) | R-MINT-4, R-MINT-7 | The row: written by `pushToken` with the reported expiry, the ledger's record gone in the same transaction; deleted by the held operation's revocation; kept while revocations fail, after the operation ends and past the token's expiry; deleted by plan 003's cleanup pass. A trigger on the row's insert rolls `pushToken` back (and the ledger's release revokes the token); one on its delete rolls `tokenRevoked` back, and the duty stays until it commits |
 | (5) | R-MINT-7 | A stored room with an active operation's unrevoked token and an ended operation's owed token gains both rows at its first start, and not again |
 | (6) | R-MINT-5, R-MINT-7 | An observation over a listing of exactly those two tokens counts 0 unaccounted; the SQL spy shows two point lookups in `artroom_land_token` and no statement on `artroom_land_op` |
 | (7) | | All earlier landing, plan 003 and review f060871b tests pass unchanged (only `FakeTokens` gained the new interface's fields) |
@@ -2178,7 +2178,7 @@ Lane C's sites keep their own mints: the publisher client's `withToken` (integra
 
 ## Request d29c09fa: safe error metadata at durable sinks
 
-Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. Revised for review `f80d6692` (changes requested: legacy rows) and the checker's creation control on `18d69cda`: see [Review f80d6692](#review-f80d6692). The head for review is the commit that carries this section.
+Status: DONE, pending checker review. Gitseq request `d29c09fa`, branch `request/land-errors`, cut from main `574568b2`. Revised for review `f80d6692` (changes requested: legacy rows) and the checker's founding control on `18d69cda`: see [Review f80d6692](#review-f80d6692). The head for review is the commit that carries this section.
 
 **The rule** (review `0ab6dac3`, lane A's standard). A durable or projected error field keeps lane A's `errorNote(stage, error)` and nothing more: a fixed stage phrase, the error's name if it is in a fixed list, an Artifacts code if `artifacts.ts` classifies it, and an integer numeric code or HTTP status. It never keeps the provider's message, even redacted: no token format in the contract lets a pattern find every credential. Operator logs are different. The Room's `diagnose` (`src/diag.ts`, request `d268d249`) logs the error's name and its redacted, bounded message; that is unchanged.
 
@@ -2240,7 +2240,7 @@ Each test makes the provider throw (or answer) with a message echoing an `art_v1
 | `packages/git/test/workspaces.test.ts` (3 new) | provisioning that keeps failing (the view, `artroom_ws`, the steps), a refused step (`answered`), failed cleanup (`defer`) | every row, `view`, `duties`, the returned view |
 | `packages/git/test/snapshots.test.ts` (2 new) | a failed create, then its check; failed retirement (revoke and delete) | every row, `duties` |
 | `packages/room/test/workerd/safe-errors-d29c09fa.test.ts` (new, 5) | the production Room: integration through `ContainerPublisher` then readiness; an answered push with main not read back, then an unanswered push; a publication failing with a credential as its code, with no code, and with a known Artifacts code | every row of every table, the `log`, `attention`, `lanes` and `op` reads, `PublicationStatus`, the operator diagnoses, the caller's error |
-| Review `f80d6692` and the checker's creation control (Node 7 more in the three files above; Room 4 more, and 2 in `founding-gaps.test.ts`) | stored rows with old text, reopened; terminal rows; batches; see [Review f80d6692](#review-f80d6692) | every row, the projections before the upgrade, and after it |
+| Review `f80d6692` and the checker's founding control (Node 7 more in the three files above; Room 4 more, and 2 in `founding-gaps.test.ts`) | stored rows with old text, reopened; terminal rows; batches; see [Review f80d6692](#review-f80d6692) | every row, the projections before the upgrade, and after it |
 | `packages/room/test/workerd/request-d268d249.test.ts` (1 changed) | the lost mint, the unreadable inventory, the failed revocation of job tokens | `job_tokens`, every row of every table, `jobTokenDuties()` |
 
 ### Mutation table
@@ -2281,7 +2281,7 @@ Report `f80d6692` on `f81a102d` (changes requested) found one P2. New writes wer
 
 **At read.** `PublicationStatus.lastError`, `WorkspaceOp.error.message` (the workspace view, and so the `op` read) and `jobTokenDuties().status` show only what the validator passes. So nothing stored before the rule is shown, from the moment the object opens, whether or not the upgrade has reached that row. Attention and admin items, and the landing views, show no error field.
 
-**At rest.** Room migration 2 starts a one-time upgrade. In its transaction, in O(1), it stores a cursor (`meta.error_scrub`) if any table that could hold an old error has rows, and makes a `publication_error` that is not a known code `transport`. Each alarm then runs one batch (`RoomCore.scrubErrors`, the `errors` step; `nextAlarm` is due at once while the cursor is stored). A batch reads at most `SCRUB_BATCH` (500) rows of one table after the cursor, by its key. It rewrites only the unsafe values, in one transaction with the new cursor. The last batch deletes the cursor. After that the step reads one meta row and writes nothing, and a run over upgraded rows changes nothing. The tables, in order: `artroom_land_op` (every record, terminal ones too: `lastError` and each push's `detail` in the JSON body), `artroom_ws` (`error`, revoked rows too), `artroom_ws_duty` and `artroom_snap_duty` (`last_error`, done rows too), and `job_tokens` (`last_error`). Nothing else changes: ownership, token IDs, expiry and deadlines, `next_ms` and backoff, attempts, unknown and known effects (`mint:` rows stay unknown mints), `held`, pending cleanup and their state. Signed history (entries, records, acts) is never touched. A host without an alarm (tests, the Git harness) can run every batch at once with `scrubLegacyErrors(sql)`.
+**At rest.** Room migration 2 starts a one-time upgrade. In its transaction, in O(1), it stores a cursor (`meta.error_scrub`) if any table that could hold an old error has rows, and makes a `publication_error` that is not a known code `transport`. Each alarm then runs one batch (`RoomCore.scrubErrors`, the `errors` step; `nextAlarm` is due at once while the cursor is stored). A batch reads at most `SCRUB_BATCH` (500) rows of one table after the cursor, by its key. It rewrites only the unsafe values, in one transaction with the new cursor. The last batch deletes the cursor. After that the step reads one meta row and writes nothing, and a run over upgraded rows changes nothing. The tables, in order: `artroom_land_op` (every record, terminal ones too: `lastError` and each push's `detail` in the JSON body), `artroom_ws` (`error`, revoked rows too), `artroom_ws_duty` and `artroom_snap_duty` (`last_error`, done rows too), and `job_tokens` (`last_error`). Nothing else changes: ownership, token IDs, expiry and deadlines, `next_ms` and backoff, attempts, unknown and known effects (`mint:` rows stay unknown mints), `held`, cleanup duties and their state. Signed history (entries, records, acts) is never touched. A host without an alarm (tests, the Git harness) can run every batch at once with `scrubLegacyErrors(sql)`.
 
 | Control | What it shows |
 |---|---|
@@ -2324,28 +2324,28 @@ Report `f80d6692` on `f81a102d` (changes requested) found one P2. New writes wer
 
 24 mutants, all red, each applied alone by `/private/tmp/claude-501/landerr/mutants/run2.py` at `e5a2efb3` (logs beside it). S15 and S16 were green there. The commit after it adds the write count and the safe observation, and both are red at `a1176a89`.
 
-#### The creation path (checker's control on `18d69cda`)
+#### The founding path (checker's control on `18d69cda`)
 
-The checker's control showed a cursor that was never drained. A public creation failed its revocation, and its alarm then settled all the remote debt without sealing the genesis. A version-1 room with a done workspace step holding old text was then reopened. Migration 2 stored the cursor, but an unfounded room's `recover` and `schedule` used only `foundingDue` (null by then), and its alarm ran only `settleFounding`.
+The checker's control showed a cursor that was never drained. A public founding failed its revocation, and its alarm then settled all the remote debt without sealing the genesis. A version-1 room with a done workspace step holding old text was then reopened. Migration 2 stored the cursor, but an unfounded room's `recover` and `schedule` used only `foundingDue` (null by then), and its alarm ran only `settleFounding`.
 
-**Change.** On the creation path, `recover` and `schedule` now use `RoomCore.unfoundedDue()`: the earlier of the creation debt and the upgrade, which is due at once while its cursor is stored (`scrubDue`). The alarm's work there is `workUnfounded()`: the upgrade's next batch, then the creation cleanup. A failure of one does not stop the other. A created room already had the upgrade in `nextAlarm` and in `runAll` (the `errors` step). That step is not a loop kind, so it also runs while the canonical repository is gone, and when other steps fail. There is no other alarm path: a room's alarm runs either the created composition or the creation one, and the registry stores no error fields.
+**Change.** On the founding path, `recover` and `schedule` now use `RoomCore.unfoundedDue()`: the earlier of the founding debt and the upgrade, which is due at once while its cursor is stored (`scrubDue`). The alarm's work there is `workUnfounded()`: the upgrade's next batch, then the founding cleanup. A failure of one does not stop the other. A founded room already had the upgrade in `nextAlarm` and in `runAll` (the `errors` step). That step is not a loop kind, so it also runs while the canonical repository is gone, and when other steps fail. There is no other alarm path: a room's alarm runs either the founded composition or the founding one, and the registry stores no error fields.
 
 | Control | What it shows |
 |---|---|
-| `founding-gaps.test.ts`: the checker's control | As the checker ran it, with its file also run as it was (`/private/tmp/claude-501/landerr/checker-founding-control.log`, passed). After the creation debt is settled, a reopened version-1 room with old text in a done workspace step stores an alarm, and alarms alone drain the cursor and rewrite the text. The room stays unfounded |
-| `founding-gaps.test.ts`: creation debt still owed | The same with every workspace step holding old text while the revocation is still owed: the same alarms drain the upgrade and settle the creation debt |
-| `safe-errors-d29c09fa.test.ts`: a created room; the canonical repository gone | Old text in a done workspace step, a done snapshot step and a job token, reopened at version 1: recovery stores an alarm, and alarms alone drain the cursor and rewrite all three, also while `canonical_gone` is set |
+| `founding-gaps.test.ts`: the checker's control | As the checker ran it, with its file also run as it was (`/private/tmp/claude-501/landerr/checker-founding-control.log`, passed). After the founding debt is settled, a reopened version-1 room with old text in a done workspace step stores an alarm, and alarms alone drain the cursor and rewrite the text. The room stays unfounded |
+| `founding-gaps.test.ts`: founding debt still owed | The same with every workspace step holding old text while the revocation is still owed: the same alarms drain the upgrade and settle the founding debt |
+| `safe-errors-d29c09fa.test.ts`: a founded room; the canonical repository gone | Old text in a done workspace step, a done snapshot step and a job token, reopened at version 1: recovery stores an alarm, and alarms alone drain the cursor and rewrite all three, also while `canonical_gone` is set |
 
 | Mutant | Mutation | Red tests |
 |---|---|---|
-| F1 | an unfounded alarm running only `settleFounding` (the reviewed code) | both creation controls |
-| F2 | an unfounded `schedule` using only `foundingDue` | both creation controls |
+| F1 | an unfounded alarm running only `settleFounding` (the reviewed code) | both founding controls |
+| F2 | an unfounded `schedule` using only `foundingDue` | both founding controls |
 | F3 | an unfounded `recover` using only `foundingDue` | the checker's control |
-| F4 | `unfoundedDue` leaving out the upgrade | both creation controls |
-| F5 | `workUnfounded` not running the batch | both creation controls |
-| F6 | `scrubDue` always null | both creation controls; the Room reopen control |
+| F4 | `unfoundedDue` leaving out the upgrade | both founding controls |
+| F5 | `workUnfounded` not running the batch | both founding controls |
+| F6 | `scrubDue` always null | both founding controls; the Room reopen control |
 | F7 | `nextAlarm` leaving out the upgrade | the Room reopen control |
-| F8 | the `errors` step doing nothing | a created room; canonical repository gone |
+| F8 | the `errors` step doing nothing | a founded room; canonical repository gone |
 
 8 mutants, all red, each applied alone by `/private/tmp/claude-501/landerr/mutants/run3.py` at `db6247c8`.
 
@@ -2452,7 +2452,7 @@ Report `31ad41d5` on `e03a9c95` resolved both P2s of review `993dce7a` (60 mutat
 
 - **Landed migration 2 kept, due indexes as 3** (choice 11; the merge above).
 - **Both stored versions, with an in-progress scrub and a restart.** The "upgrade" control runs from version 1 (the scrub starts, its own step drains it, the indexes are installed) and from version 2 (indexes only; the scrub does not rerun). A new control starts a room at version 2 with the scrub's cursor stopped mid-table in `job_tokens` and legacy rows after it: migration 3 adds the indexes and leaves the cursor; production alarms alone resume the scrub from the cursor (the rows after it are made safe, the row before it is not revisited), finish it and remove the cursor; ownership and deadlines are kept; a restart changes nothing. Both indexes are used: each due query is one indexed search, no sort.
-- **Cleanup still finishes through production alarms, before and after creation.** `d29c09fa`'s created control ("in a founded room the upgrade drains …", with and without the repository) and its two unfounded controls (`founding-gaps.test.ts`, "the error upgrade drains in an unfounded room …") pass on the combined head, and now also check that the chain reached version 3 with both indexes; the unfounded ones check that `unfoundedDue()` is the earlier of the creation debt and the scrub's work (the scrub's, due at once).
+- **Cleanup still finishes through production alarms, before and after founding.** `d29c09fa`'s founded control ("in a founded room the upgrade drains …", with and without the repository) and its two unfounded controls (`founding-gaps.test.ts`, "the error upgrade drains in an unfounded room …") pass on the combined head, and now also check that the chain reached version 3 with both indexes; the unfounded ones check that `unfoundedDue()` is the earlier of the founding debt and the scrub's work (the scrub's, due at once).
 - **No landed sink or guard dropped.** Every line `d29c09fa` added to the files both lanes touch was checked against the combined head. Kept as landed: in `mints.ts`, `knownArtifactsCode` and the stage list; in `client.ts`, integrate's `errorNote("integration failed", e)`; in `core.ts`, `publicationCode` (known codes only), the `errors` step, `scrubErrors`, `scrubDue`, `unfoundedDue` and the scrub in `nextAlarm`; in `store.ts`, migration 2, `PUBLICATION_CODES`, `safeJobStatus`, `ROOM_SCRUB_TABLES` with `job_tokens`; in `index.ts`, the safe-error exports; in `jobs.ts`, `jobTokenDuties()`'s `safeJobStatus` read guard and the failed revocation's `errorNote("revocation failed", e)` (in `settleToken`'s bounded form). Gone by design: `jobs.ts`'s three `mint:` sinks (the lost mint's `answer lost: …`, `watchMint`'s inventory note, and its import of `completeInventory`), because the mint ledger replaced those records; the ledger's own sinks are `errorNote` throughout (lane A).
 
 ### Mutation table
@@ -2512,7 +2512,7 @@ Each mutant was applied alone by a script (`/private/tmp/claude-501/mintC/mutant
 | S7 | S | namespaces treated as erased | (6) the fixture; the namespace probe; the allowed-path count |
 | S8 | S | enum members treated as erased | (6) the fixture; the allowed-path count |
 | S9 | S | parameter properties treated as erased | (6) the fixture; the allowed-path count |
-| M1 | M | the due indexes' migration (3) removed | upgrade (from 1 and from 2); mid-scrub at 2; `d29c09fa`'s created (2) and unfounded (2) upgrade controls and its reopen control (each now checks version 3) |
+| M1 | M | the due indexes' migration (3) removed | upgrade (from 1 and from 2); mid-scrub at 2; `d29c09fa`'s founded (2) and unfounded (2) upgrade controls and its reopen control (each now checks version 3) |
 | M2 | M | the upgrade guard broken: the due indexes only in the base step, which a stored room never reruns | as M1 |
 | M4 | M | the composed chain broken: the due indexes folded into step 2 (as numbered before the merge), which a version-2 room never reruns | upgrade (from 2); mid-scrub at 2; and, as the version ends at 2, the controls M1 names |
 | M3 | M | the job token index without its tie-break (a sort for the order) | upgrade (the plan); mid-scrub at 2 (the plan) |
@@ -2800,12 +2800,12 @@ A lane fork has no durable store of its own. It is an Artifacts repository, and 
 - **The answer** is classified once, whenever it arrives. Usable: a token ID and text, read scope, and a readable expiry no later than the answer's arrival plus the lifetime asked plus `MINT_CLOCK_ALLOWANCE_MS` (5 s; R-MINT-3's clock-skew contract, request `df6ff8d3`), for a caller still waiting; the record becomes `held`. A token ID otherwise: `owed`, due at once, with its reported expiry or none. A refusal that changed nothing (`refusedUnchanged`): the record is deleted. Anything else, including a transport failure, `INTERNAL_ERROR`, an answer without an ID and the 30 s wait running out: `unknown`. A late answer is applied to its own record only, by its row ID and expected state, and never reaches a caller. If an answer with a token ID cannot be recorded, the ID is written durably as owed, with at most 3 bounded writes (`MINT_ID_WRITE_ATTEMPTS`), before the token is revoked at once by that ID; an answered revocation ends the record, a failed one leaves it owed with its ID. Only if storage refuses every write does the record keep its earlier state (R-MINT-3 as amended; C2).
 - **Retries.** The hidden retry is gone. Only `retriable()` errors (`INTERNAL_ERROR`, `UPSTREAM_UNAVAILABLE`) are retried, with the canonical ledger's limits (5 attempts, from 0.5 s), and each attempt is a new record, sent only after the earlier record holds its outcome (`unknown`). A transport failure or a lost answer is not retried.
 - **Release.** `withToken` revokes the token by its ID however the pin ends, waiting at most 30 s. An answer deletes the record. A failure, a timeout or a completion that does not commit makes it `owed`, due in 1 s; a late answer to that revocation changes nothing.
-- **Takeover.** The constructor (so each object start, in a created room at `recover()`, which reaches it through `nextAlarm()`) turns every `sent` record into `unknown` and every `held` record into `owed`, due at once, in one indexed update.
+- **Takeover.** The constructor (so each object start, in a founded room at `recover()`, which reaches it through `nextAlarm()`) turns every `sent` record into `unknown` and every `held` record into `owed`, due at once, in one indexed update.
 - **The alarm.** `reconcile()` keeps or clears the takeover time, starts a revocation pass (not awaited), and observes at most one fork (awaited, bounded). A pass takes at most 20 owed records due now, earliest due first, then by row ID (index `artroom_fork_mint_state`); one runs at a time; while it waits on an answer, owed records are not eligible before that attempt's timeout. A pass that finds expired records settles only those, with no lookup and no call, and ends. Otherwise each fork in the batch is looked up once, bounded and with provenance; each record's readable expiry is checked again immediately before its revocation; results are written in one transaction. Backoff: 1 s doubling to 5 min, never past a readable expiry. A record with no readable expiry is never settled by time.
 - **Watching unknown creates.** Each fork with unknown records has one watch row: its count of unknown records and its observation. An alarm observes at most one fork, the one due earliest (index `artroom_fork_mint_watch_due`): one bounded lookup and listing, `completeInventory`, at most 1,000 records, and a count of live tokens that nobody attributes by ID. A token counts as attributed if a ledger record names it (index `artroom_fork_mint_token`), or if the fork's owner holds it: the lane's lease token (`artroom_ws.token_id`) or a token revocation the workspace owes (`artroom_ws_duty.token_id`). Both are point lookups on two new indexes. Each observation makes one write, to that fork's watch row. The next is due after a wait doubling from 1 min to 6 h; a new unknown record never brings it sooner than 1 min after the last; a fork whose unknown records were all settled by their own late answers is not observed. No record is written, settled or revoked by an observation.
 - **`nextDue()`** is the earliest of the owed records' due time, the earliest fork observation, and the takeover time while a record is `sent` or `held`. A time already passed counts as now plus 1 s; a still-future time counts as itself.
-- **The fork's sweep** (R-WS-3; plans 001 and 002) asks about each token immediately before its revocation, after every earlier await. It keeps the lease's recorded token and a token the ledger holds for a pin in progress. While any fork token create on that fork is `sent` or `unknown`, it revokes only tokens whose IDs a record names (the ledger's records, or the workspace's owed token pending work) and leaves every other active token; no time ends this, only the record's own answer (C1, C3).
-- **The Room.** `ArtifactsAdapter` passes a delegate to `workspaces.forkTokens` to `Pinning` (the workspaces are built once the room is created). The alarm runs the ledger as its own step and loop kind, `forkTokens`: self-timed like `mints`, so a failure of the step takes that kind's backoff, which ends only when the step runs. `nextAlarm()` includes `forkTokens.nextDue()`, after that backoff. The kind is not in `NEEDS_REPOSITORY`: forks are separate repositories, so the ledger runs and is scheduled while the canonical repository is gone, as workspace cleanup is.
+- **The fork's sweep** (R-WS-3; plans 001 and 002) asks about each token immediately before its revocation, after every earlier await. It keeps the lease's recorded token and a token the ledger holds for a pin in progress. While any fork token create on that fork is `sent` or `unknown`, it revokes only tokens whose IDs a record names (the ledger's records, or the workspace's owed token duties) and leaves every other active token; no time ends this, only the record's own answer (C1, C3).
+- **The Room.** `ArtifactsAdapter` passes a delegate to `workspaces.forkTokens` to `Pinning` (the workspaces are built once the room is founded). The alarm runs the ledger as its own step and loop kind, `forkTokens`: self-timed like `mints`, so a failure of the step takes that kind's backoff, which ends only when the step runs. `nextAlarm()` includes `forkTokens.nextDue()`, after that backoff. The kind is not in `NEEDS_REPOSITORY`: forks are separate repositories, so the ledger runs and is scheduled while the canonical repository is gone, as workspace cleanup is.
 - **Safe metadata.** Every stored error is `errorNote(stage, e)`, using the existing stages.
 - **The source scan** allows `workspace/fork-tokens.ts` one reach of `createToken`, as `mints.ts`, `workspaces.ts` and `snapshot/repos.ts` have; `publisher/client.ts` now reaches it nowhere, and a reach put back there fails the scan.
 
@@ -2858,20 +2858,20 @@ Node: `packages/git/test/fork-tokens.test.ts`, 34 tests (F1 to F28), against a f
 | The sweep asks again before each revocation (C3) | F26 |
 | The clock allowance on the lifetime bound (C4) | F28 (67 ms, 5,000 ms accepted; 5,001 ms owed), R8 (both halves of `pinObjects` 67 ms ahead, propose admitted) |
 | Safe metadata at the sinks | F9, R2 |
-| Pending work pageable, without token text (R-MINT-5) | F14 |
+| Duties pageable, without token text (R-MINT-5) | F14 |
 
 ### The merge with main 58a2f0a0
 
 Main `58a2f0a0` (request `8bd623cc`, row-write measurements, after the orphan retirement record `d3f7d3a8`) changed `nextAlarm()` in `packages/room/src/core.ts`: one bounded existence check for pins on the default path, and one delayed-pin due read, passed into `loopPendingKinds`, when `PIN_DELAY_MS` is set. The merge was textually clean (merge `31ec8a77`; `git diff --check origin/main` is clean). In the merged `nextAlarm()`, the fork token ledger is its own term of the same earliest-first minimum, beside the delayed pin, the mint ledger, the error upgrade, the job-token pass and the check jobs.
 
-The composed scheduler is tested in `packages/room/test/workerd/pin-delay.test.ts`, "set, composed with mint lane F (request 02836f9a) …", beside main's lane C composition test. With each ledger's due time set directly: the fork token ledger wins when it is earliest; each of the other five wins when earlier than it; its own `forkTokens` backoff holds it, and only it (the pins', mint ledger's and job-token pass's backoffs do not); and the repository-gone fence (`canonical_gone`) holds the pin, the mint ledger and the job-token pass but not the fork token ledger, whose own backoff still holds it while the repository is gone. So two things hold the fork token ledger's candidate back: its own backoff after a failure of its step, and a room not yet created (`nextAlarm()` reads no workspaces then; before creation the Room schedules `unfoundedDue()` instead). Mutants K1 to K5 were run again against both Room files, with K6 and K7 added (below).
+The composed scheduler is tested in `packages/room/test/workerd/pin-delay.test.ts`, "set, composed with mint lane F (request 02836f9a) …", beside main's lane C composition test. With each ledger's due time set directly: the fork token ledger wins when it is earliest; each of the other five wins when earlier than it; its own `forkTokens` backoff holds it, and only it (the pins', mint ledger's and job-token pass's backoffs do not); and the repository-gone fence (`canonical_gone`) holds the pin, the mint ledger and the job-token pass but not the fork token ledger, whose own backoff still holds it while the repository is gone. So two things hold the fork token ledger's candidate back: its own backoff after a failure of its step, and a room not yet founded (`nextAlarm()` reads no workspaces then; before founding the Room schedules `unfoundedDue()` instead). Mutants K1 to K5 were run again against both Room files, with K6 and K7 added (below).
 
 ### Review findings C1 to C4 on 3d1223a1
 
 The checker's preliminary findings on `3d1223a1`, with its controls in `checker-fork-controls.test.ts`. All three controls failed on `3d1223a1` as reported, and pass on the fixed code (run against `9209c8c8`; C1's and C3's interleavings are now F24 and F26, below). Each fix has committed tests and named mutants.
 
-- **C1. The fork's sweep revoked a lost-answer token.** A pin's create whose answer is lost leaves an `unknown` record with no ID; `Workspaces.revoke` then swept the fork and revoked that token, which no record attributes. The guidance was corrected twice (planner assert `66f8b350` and its two corrections; the latest supersedes a request-time fence). A create takes only a scope and a lifetime, an inventory cannot identify it by timing, and nothing bounds when it applies (R-MINT-6), so no window, label or elapsed time can settle the question. The rule now: while any fork token create on a fork is `sent` or `unknown`, the sweep revokes only tokens whose IDs a record names (the fork ledger's records, or the workspace's owed token pending work, such as an ended lease's token) and leaves every other active token, for as long as the record stays unsettled. The record settles only by its own create's answer (a late answer, as before) or a documented provider fence; never by time or inventory. **R-WS-3's cleanup of unrecorded tokens is suspended on such a fork, not inferred around.** R-WS-3's purpose, that an ended lease's access ends, still holds: the lease's own token is recorded by ID (`artroom_ws.token_id`, then an owed token task) and is revoked through the pause. What the pause leaves are tokens no record names: their exposure is bounded only by each token's own lifetime, from when Artifacts applied it (R-MINT-6). When the record is settled, the fork's next sweep (the next lease end or provisioning) revokes the unrecorded tokens still active. F24: the pause, no time-based resume two hours later, the late answer, and the resumed sweep. Mutants N1 (no pause), N1t (a time-based resume), N7 (the pause revokes nothing, not even named tokens).
-- **C2. A known ID was lost when its write failed.** One write failure recording `held`, then a failed revocation at once, left the record `sent` and so `unknown` after a restart, with the token live. Now the ID is written durably as owed, with at most 3 bounded writes (`MINT_ID_WRITE_ATTEMPTS`), before any revocation; then the revocation at once; a failure leaves the record owed with its ID for the alarm. R-MINT-3 in `docs/protocol.md` is amended, extending request `df6ff8d3`'s landed text: once an ID is received it is written durably before any revocation is attempted, a failed write is retried with the ID in hand, the retries are bounded, and if storage refuses every one the Room cannot guarantee that the task survives and the record's earlier state governs; the earlier failed-write clause now applies only before an ID is known. The canonical `MintLedger` follows the same rule (choice 6). F21 now asserts the ID is kept; F23 (the write retried), F25 (the checker's control), F27 (a host stop while the revocation is out); canonical `mints.test.ts` (6) restated and one added. Mutants N4, N5 (fork), M1, M2 (canonical), L27.
+- **C1. The fork's sweep revoked a lost-answer token.** A pin's create whose answer is lost leaves an `unknown` record with no ID; `Workspaces.revoke` then swept the fork and revoked that token, which no record attributes. The guidance was corrected twice (planner assert `66f8b350` and its two corrections; the latest supersedes a request-time fence). A create takes only a scope and a lifetime, an inventory cannot identify it by timing, and nothing bounds when it applies (R-MINT-6), so no window, label or elapsed time can settle the question. The rule now: while any fork token create on a fork is `sent` or `unknown`, the sweep revokes only tokens whose IDs a record names (the fork ledger's records, or the workspace's owed token duties, such as an ended lease's token) and leaves every other active token, for as long as the record stays unsettled. The record settles only by its own create's answer (a late answer, as before) or a documented provider fence; never by time or inventory. **R-WS-3's cleanup of unrecorded tokens is suspended on such a fork, not inferred around.** R-WS-3's purpose, that an ended lease's access ends, still holds: the lease's own token is recorded by ID (`artroom_ws.token_id`, then an owed token duty) and is revoked through the pause. What the pause leaves are tokens no record names: their exposure is bounded only by each token's own lifetime, from when Artifacts applied it (R-MINT-6). When the record is settled, the fork's next sweep (the next lease end or provisioning) revokes the unrecorded tokens still active. F24: the pause, no time-based resume two hours later, the late answer, and the resumed sweep. Mutants N1 (no pause), N1t (a time-based resume), N7 (the pause revokes nothing, not even named tokens).
+- **C2. A known ID was lost when its write failed.** One write failure recording `held`, then a failed revocation at once, left the record `sent` and so `unknown` after a restart, with the token live. Now the ID is written durably as owed, with at most 3 bounded writes (`MINT_ID_WRITE_ATTEMPTS`), before any revocation; then the revocation at once; a failure leaves the record owed with its ID for the alarm. R-MINT-3 in `docs/protocol.md` is amended, extending request `df6ff8d3`'s landed text: once an ID is received it is written durably before any revocation is attempted, a failed write is retried with the ID in hand, the retries are bounded, and if storage refuses every one the Room cannot guarantee that the duty survives and the record's earlier state governs; the earlier failed-write clause now applies only before an ID is known. The canonical `MintLedger` follows the same rule (choice 6). F21 now asserts the ID is kept; F23 (the write retried), F25 (the checker's control), F27 (a host stop while the revocation is out); canonical `mints.test.ts` (6) restated and one added. Mutants N4, N5 (fork), M1, M2 (canonical), L27.
 - **C3. The sweep revoked a pin's token that became held while it waited.** The sweep took its keep set once, at the listing. It now asks about each token immediately before its revocation, after every earlier await. With C1's pause, the checker's own control no longer reaches its interleaving (the pause leaves its unrecorded write token), so F26 reproduces it with a token the ledger names: the sweep waits on revoking that token, the pin's answer arrives, and the pin's token, now held, is kept. Mutant N2 (the decisions taken once at the listing) survives alone, by causality: an unrecorded token that could become held belongs to a create that was already open at the listing, so the pause already left it; with the pause removed too (N12), F24 and F26 are red. The recheck is kept as the standing rule (cancellation checked after every await, before every send), not as the only guard.
 - **C4. The fork check repeated the exact upper bound.** Artifacts stamps expiries up to 67 ms ahead of the Room's clock (request `df6ff8d3`), so the fork half of `pinObjects` refused a valid token. `ForkTokens.classify` now allows `MINT_CLOCK_ALLOWANCE_MS` on the lifetime bound, as R-MINT-3 says; a fork token has no absolute deadline, so there is no `notAfter` to keep. The canonical ledger's allowance and its deadline protection are request `df6ff8d3`'s, merged here. F28 (67 ms and 5,000 ms accepted, 5,001 ms owed and never returned), R8 (a real Room: both halves 67 ms ahead, the propose admitted with its head pinned, neither ledger left with a record). Mutants CK1 (fork allowance dropped), CK2 (canonical allowance dropped), CK3 (allowance applied to the canonical deadline). Request `df6ff8d3`'s own Room control for an expiry a minute past the bound (`live-propose-df6ff8d3.test.ts`) assumed the canonical half was refused; with this lane the fork's read token is minted first, with the same check, so it is that token which is refused and owed in the fork ledger, and the canonical create is never sent. The control is reconciled to that, keeping its meaning (commit `5d9926cf`).
 

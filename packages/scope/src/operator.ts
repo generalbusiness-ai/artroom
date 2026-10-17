@@ -13,7 +13,7 @@
  * - **It holds no credential and no private text.** A row is a kind from a
  *   fixed list and references of fixed forms: a position and a hash of this
  *   scope's history, an operation's ID with an attempt's number, and a
- *   send's outbox ID. It has no member that takes free text, and `found`
+ *   send's outbox ID. It has no member that takes free text, and `record`
  *   refuses a row of any other form.
  * - **Bounded.** It keeps the latest `rows` rows and drops the oldest.
  *
@@ -21,7 +21,7 @@
  * finding writes one, and always here. `incidentsOf` reads a sealed entry
  * and says what incident it holds, and `follow` writes those rows as the
  * history grows, from a mark that it keeps beside the record. A finding
- * that writes no entry is told to `found` by the component that made it.
+ * that writes no entry is told to `record` by the component that made it.
  *
  * | Kind | Found by | Entry |
  * |---|---|---|

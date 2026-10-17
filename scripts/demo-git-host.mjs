@@ -14,7 +14,7 @@
  *
  * Generated role labels do not identify a human or prove their approval. This
  * CLI submits nothing. Future POST helpers require an explicit HTTPS base URL;
- * found also requires the actual register receipt/ref and expected revision.
+ * The creation helper also requires the actual register receipt/ref and expected revision.
  * They implement no read bootstrap, directory journey or first publication.
  */
 import { randomBytes, randomUUID } from "node:crypto";

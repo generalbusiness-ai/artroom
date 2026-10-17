@@ -198,7 +198,7 @@ A scope answers a submitted intent in one of four ways (`Answer`):
 | `mismatch` | The same actor and key are on an entry with another intent. | Inspect the recorded intent and original request before another mutation. |
 
 A **receipt** (`Receipt`) holds the fact of the entry, the effects it
-derived, and a outbox ID for each message it sent.
+derived, and an outbox ID for each message it sent.
 
 The idempotency key belongs to the first intent that took effect under it, for the life of the scope. Exact replay can return the earlier receipt without judging the act again. A timed drain can run first and return
 unavailable before that receipt. Keep the original signed envelope and inspect

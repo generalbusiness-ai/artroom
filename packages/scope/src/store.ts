@@ -6,7 +6,7 @@
  * A store is derive's `StateView` and `StateWriter`, so derive's
  * `applyEntry` is the only code that changes folded state. Beside that it
  * keeps what the fold does not: the entries, the row of each send, and the
- * retained inputs. It decides nothing. `Sealed`, `Duty` and `Dispatched`
+ * retained inputs. It decides nothing. `Sealed`, `OutboxItem` and `Dispatched`
  * are the contract's, and are exported here again.
  */
 

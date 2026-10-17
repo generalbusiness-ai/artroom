@@ -184,7 +184,7 @@ not reach it, and it is the value the signature covers.
   matches. Another incarnation is `wrong-incarnation`; another scope, kind
   or position is `reference-mismatch`; another hash is `hash-mismatch`. In
   each case the receipt is not of this history.
-- `followOutbox(duty)` reads the outbox status of one send, by a outbox ID
+- `followOutbox(outboxId)` reads the outbox status of one send, by an outbox ID
   from a receipt's `sends`: whether it is held, its attempts, its
   acknowledgment, and for a request its result or diagnosis.
 

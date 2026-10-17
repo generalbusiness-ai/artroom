@@ -81,7 +81,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   const installed = await run(rita, "install", SERVICE, "--host", "git.example", "--namespace", "artroom");
   expect(installed.code, installed.lines.join("\n")).toBe(0);
   const R = node((await rita.store.config())!.register!.scope);
-  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@3.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one founder key\.$/)]);
+  expect(installed.lines).toEqual([`Installed: register ${R.name}, under platform:register@3.`, expect.stringMatching(/^The operator key key_\S+ is kept in the config directory, readable only by you\. It is the one creator key\.$/)]);
   // A new register is created on the newest version, and the room that it creates on the newest version of each definition.
   expect((await R.summary()).value).toMatchObject({ status: "active", definition: "platform:register@3" });
   // Before the claim the operator key holds no session, and reads the register by signed reads of the log: its genesis is all there

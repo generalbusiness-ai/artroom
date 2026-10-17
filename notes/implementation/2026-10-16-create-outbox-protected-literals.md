@@ -146,6 +146,49 @@ listed so the boundary is reviewable.
 | [packages/scope/src/host-wiring.ts:32](../../packages/scope/src/host-wiring.ts#L32) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
 | [packages/scope/src/reads.ts:171](../../packages/scope/src/reads.ts#L171) | `founding` | 1 | Entry wire version 2; keep Entry-v1 readers |
 | [packages/scope/src/register-host.ts:103](../../packages/scope/src/register-host.ts#L103) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
+| [scripts/demo-captures.ts:70](../../scripts/demo-captures.ts#L70) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:251](../../scripts/demo-captures.ts#L251) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:263](../../scripts/demo-captures.ts#L263) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:266](../../scripts/demo-captures.ts#L266) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
+| [scripts/demo-captures.ts:294](../../scripts/demo-captures.ts#L294) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:316](../../scripts/demo-captures.ts#L316) | `founder` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:356](../../scripts/demo-captures.ts#L356) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
+| [scripts/demo-captures.ts:366](../../scripts/demo-captures.ts#L366) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:418](../../scripts/demo-captures.ts#L418) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-captures.ts:419](../../scripts/demo-captures.ts#L419) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:33](../../scripts/demo-git-host.mjs#L33) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:99](../../scripts/demo-git-host.mjs#L99) | `founderHandle` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:114](../../scripts/demo-git-host.mjs#L114) | `founderHandle` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:124](../../scripts/demo-git-host.mjs#L124) | `founderHandle` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:126](../../scripts/demo-git-host.mjs#L126) | `founderHandle` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:130](../../scripts/demo-git-host.mjs#L130) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:130](../../scripts/demo-git-host.mjs#L130) | `founders` | 1 | register@12 |
+| [scripts/demo-git-host.mjs:138](../../scripts/demo-git-host.mjs#L138) | `founderHandle` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:165](../../scripts/demo-git-host.mjs#L165) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
+| [scripts/demo-git-host.mjs:165](../../scripts/demo-git-host.mjs#L165) | `founder` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:165](../../scripts/demo-git-host.mjs#L165) | `founderHandle` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-git-host.mjs:185](../../scripts/demo-git-host.mjs#L185) | `found` | 1 | register@12, directory@11, membership@7 and destination@7 for the carried native fields |
+| [scripts/demo-git-host.mjs:213](../../scripts/demo-git-host.mjs#L213) | `founderHandle` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-run.ts:71](../../scripts/demo-run.ts#L71) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-run.ts:153](../../scripts/demo-run.ts#L153) | `founder` | 2 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-run.ts:155](../../scripts/demo-run.ts#L155) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo-run.ts:156](../../scripts/demo-run.ts#L156) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:21](../../scripts/demo/rehearse.ts#L21) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:22](../../scripts/demo/rehearse.ts#L22) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:158](../../scripts/demo/rehearse.ts#L158) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:167](../../scripts/demo/rehearse.ts#L167) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:172](../../scripts/demo/rehearse.ts#L172) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:173](../../scripts/demo/rehearse.ts#L173) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:177](../../scripts/demo/rehearse.ts#L177) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:181](../../scripts/demo/rehearse.ts#L181) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:186](../../scripts/demo/rehearse.ts#L186) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:191](../../scripts/demo/rehearse.ts#L191) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:196](../../scripts/demo/rehearse.ts#L196) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:206](../../scripts/demo/rehearse.ts#L206) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:236](../../scripts/demo/rehearse.ts#L236) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:259](../../scripts/demo/rehearse.ts#L259) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:337](../../scripts/demo/rehearse.ts#L337) | `founder` | 1 | Local demo custody schema 2 for role/handle keys; matching native versions for signed fields |
+| [scripts/demo/rehearse.ts:459](../../scripts/demo/rehearse.ts#L459) | `founding` | 1 | CLI custody schema 2; this is retained config.plan |
 
 ## Digest-addressed initial Git content
 
@@ -169,6 +212,20 @@ Jam record.ts retains six ordinary lookup identifiers in its exact
 historical deployed-source.json closure, together with its old bundle.
 Planner clarification of the unrelated-lookup condition is still pending;
 no exception approval or new Jam source/asset review is claimed.
+
+| Location | Meaning |
+|---|---|
+| apps/jam/src/record.ts:133,135,138 | segmentAtTime initializes, updates and returns the last segment starting at or before the queried time |
+| apps/jam/src/record.ts:142,144,147 | segmentAtBar initializes, updates and returns the last segment at or before the queried bar |
+| apps/jam/deploy/assets/app.js:217,219,222 | retained bundle copies of segmentAtTime |
+| apps/jam/deploy/assets/app.js:225,227,230 | retained bundle copies of segmentAtBar |
+
+The unchanged source is 9,603 bytes, SHA-256
+4de1fbca151f4cecadaddf54a2381415cf87eaa2c0dbc0196370b4746e46c0d1.
+The unchanged bundle is 48,745 bytes, SHA-256
+8637e95407834c75c47dbd0052471261674824b5e9e3dfb9cfbf2da941dd45e2.
+These hashes identify the historical deployment closure; they do not turn
+ordinary lookup identifiers into pinned definition literals.
 
 Historical Markdown, old request IDs, signed fixture nonces, chosen handles
 and the inactive protocol specification keep their historical spellings.
