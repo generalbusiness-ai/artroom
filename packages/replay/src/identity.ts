@@ -34,7 +34,9 @@ class EvidenceCollection {
   readonly pending = new Map<string, Promise<IdentityFrame | null>>();
   #calls = 0;
   #bytes = 0;
-  constructor(readonly code: ReceiverIdentityCode, readonly source: CheckedIdentitySource) {}
+  readonly code: ReceiverIdentityCode;
+  readonly source: CheckedIdentitySource;
+  constructor(code: ReceiverIdentityCode, source: CheckedIdentitySource) { this.code = code; this.source = source; }
   #keep(copy: IdentityFrame | null): IdentityFrame | null {
     if (!copy || !isEntryOf(copy.entry, copy.fact)) return null;
     const key = canonicalize(copy.fact), position = canonicalize([copy.fact.at, copy.fact.seq]), cached = this.frames.get(key);
@@ -69,7 +71,8 @@ class EvidenceCollection {
 
 class EvidenceView {
   readonly #needed = new Map<string, IdentityFrame>();
-  constructor(readonly collection: EvidenceCollection) {}
+  readonly collection: EvidenceCollection;
+  constructor(collection: EvidenceCollection) { this.collection = collection; }
   get code() { return this.collection.code; }
   get frames(): readonly IdentityFrame[] { return [...this.#needed.values()]; }
   #take(frame: IdentityFrame | null): IdentityFrame | null {

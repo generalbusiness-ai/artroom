@@ -1175,3 +1175,73 @@ pass; an initial command with the wrong relative executable path ran no
 tests and remains logged. These checks are not rendered browser proof.
 The first frozen gate and a current-head memory specimen still follow this
 checkpoint, with exact evidence before Source review.
+
+
+## First frozen gate: retained failure and focused repairs
+
+The first frozen implementation is
+2d00ee97e00440185f5a07526603bdb956fbd803, tree
+8be4cacadfb971c2fe0f1a5415f6ecbe0f19421a. Its original gate,
+session 26058, closed with exit 1. The original log is
+/tmp/artroom-directory-2d00ee97e-first-gate.log; its gate directory is
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.lcOQS03NjH.
+Install, whitespace and typecheck passed. The test step took 431.6 seconds
+elapsed and 521.6 CPU seconds; Vitest reported 1,530 pass, nine fail and
+three skip across 302 files. The explicit Node and Counting steps were not
+reached. This is a failed gate, with no sole-load diagnosis or waiver.
+
+The nine failures were two file-publication owner-version expectations,
+the replay CLI launch, the Counting generated-module check, destination
+host owner-version selection, the missing-inbox-code delivery path,
+GitHub founding, the join-metrics snapshot and the Site clock deadline
+assertion. The original failures remain in the log above.
+
+Repairs and their focused evidence:
+
+- File publication now includes the actual new destination version 6 in
+  its positive cases and rejects unsupported future version 7. Both older
+  versions remain. The package focus passes seven cases in
+  /tmp/artroom-directory-gate-repair-file-versions-focus.log. Native
+  destination owner selection likewise admits exact version 6, retains
+  existing versions and rejects 7; its focused case passes.
+- Node's strip-only CLI could not load TypeScript parameter properties in
+  two new replay evidence classes. Explicit readonly fields and ordinary
+  constructor assignments preserve behavior and work in that entrypoint.
+  The first repair still exposed the second constructor and is retained
+  in gate-repair-replay-first-focus.log: 58 pass and one fail. After both
+  repairs, all six CLI cases pass in
+  /tmp/artroom-directory-gate-repair-replay-cli-second-focus.log.
+- The owned Counting build regenerated counting.js and counting-assets.ts.
+  The owned Page build was also repeated after the repairs, producing the
+  same 703,344-byte page.js. Both asset checks pass in
+  /tmp/artroom-directory-gate-repair-assets-focus.log. Build logs are
+  gate-repair-counting-owned-build.log and
+  gate-repair-page-final-owned-build.log under the same /tmp prefix.
+- An existing receiver without runnable definition code now takes the
+  legacy source-verification path before the existing code-unavailable
+  result. New receiver evidence collection starts only when the receiving
+  definition is present. The missing-inbox-code native case passes. This
+  changes no authority rule or definition lookup result.
+- The Site clock witness compares the offer deadline against the SDK's
+  actual whole-second normalization of the sampled clock. The exact
+  five-minute boundary, accepted offer and released old-continuation
+  checks remain. Its native focused case passes.
+- The join metrics collector finishes after its invocation's actual
+  background work. Its HTTP answer can arrive first. The test now joins
+  the fixture's finite registry of original scheduled callbacks before
+  reading the sink, with no sleep, clock advance, new act or read retry.
+  It still requires exactly all five rows and both exact counter arrays.
+  Both join cases pass in
+  /tmp/artroom-directory-gate-repair-join-metrics-second-focus.log.
+
+The first native repair invocation covered destination-host, founding,
+GitHub-founding, limits and Site-clock-lifetime: 15 pass and only the join
+snapshot failed. That result is retained in
+/tmp/artroom-directory-gate-repair-native-first-focus.log. The GitHub
+founding case passes in this focused invocation; the original gate's
+first-head failure has no separately established cause. Only the next
+full gate can establish the current combined sequence result.
+
+All these are local checks. The next frozen implementation still needs
+its single gate, current-head memory specimen and exact Source review.
+No landing, push or provider operation is inferred from this checkpoint.

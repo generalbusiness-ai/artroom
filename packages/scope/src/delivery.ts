@@ -139,8 +139,8 @@ export class Deliveries {
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
     const creates = message.class === "request" && message.type === "create" && !isScopeRef(delivered.to);
     if (creates && !isSeed(delivered.to)) return UNVERIFIED;
-    let reader = !known && message.class !== "control" && receiving ? await this.#scope.receiverReads() : null;
-    if (!known && message.class !== "control" && receiving && !reader) return retry("dependency-unavailable");
+    let reader = !known && message.class !== "control" && receiving?.definition ? await this.#scope.receiverReads() : null;
+    if (!known && message.class !== "control" && receiving?.definition && !reader) return retry("dependency-unavailable");
     // An empty new receiver collects raw bytes before interpreting a name.
     // A locator selects this read strategy only; bootstrap below must prove
     // the actual native parent create before any label reaches a judge.

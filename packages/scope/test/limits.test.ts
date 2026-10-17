@@ -115,6 +115,10 @@ describe("serving limits of a join (authority note, section 3.6; `limits.ts`)", 
       // The limited address is still limited for a join, and an admin's invitation from it is admitted: only a join is counted or bounded.
       const again = await scope.intent(rita, "invite-member", { fields: { handle: "@vera", role: "member", inviteHash: textDigest(`${SECRET}2`), inviteEnds: soon(3600) } });
       expect([await post(scope, await forged(), "198.51.100.7"), await post(scope, again, "198.51.100.7")]).toEqual([[503, "rate-limited"], [200, "accepted"]]);
+      // The collector finishes after the invocation's actual background work,
+      // including the admitted join's inbox creation. Join those callbacks
+      // before reading the sink; the HTTP answer need not wait for telemetry.
+      await (scope.stub as unknown as { awaitScheduledCallbacks(): Promise<unknown> }).awaitScheduledCallbacks();
       const joins = metrics.filter(p => p.blobs[0] === "join");
       expect(joins.map(p => [p.blobs[4], p.blobs[5]])).toEqual([["refused", "none"], ["refused", "none"], ["unavailable", "rate-limited"], ["served", "none"], ["unavailable", "rate-limited"]]);
       expect(joins.filter(p => p.blobs[5] === "rate-limited").map(p => p.doubles)).toEqual([[1, 0, 1, 0, 0, 0], [1, 0, 1, 0, 0, 0]]);
