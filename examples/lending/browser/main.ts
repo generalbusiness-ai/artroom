@@ -21,8 +21,8 @@ const root = document.querySelector<HTMLElement>("#lending")!;
 let epoch = 0, reading = 0;
 let memory: Remembered | null = null, gateway: LendingGateway | null = null, state: LendingState = { status: "loading" };
 let kept: Pending | null = null, keptJoin: Seat | null = null, notice: Notice = null, busy = false, timer: number | undefined;
-/** Controls whose typed text a redraw must drop: a donation that took effect empties its form. */
-const dropped = new Set<string>();
+/** Clear a consumed value only while that control still holds the submitted draft. */
+const dropped = new Map<string, string>();
 /** Keep a staff member's draft while a permission refresh temporarily hides its control. */
 const reasonDrafts = new Map<string, string>();
 let drawnEpoch = epoch;
@@ -83,8 +83,10 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
   if (at !== epoch) return;
   tell(kind, outcome);
   if (outcome.status === "recorded") {
-    const consumed = kind === "donate" ? ["donate-name", "donate-description"] : kind === "cancel" ? [`reason-${input.thing}`] : [];
-    for (const key of consumed) dropped.add(key);
+    const consumed: [string, string | undefined][] = kind === "donate"
+      ? [["donate-name", input.name], ["donate-description", input.description]]
+      : kind === "cancel" ? [[`reason-${input.thing}`, input.reason]] : [];
+    for (const [key, value] of consumed) if (value !== undefined) dropped.set(key, value);
   }
   await look();
 });
@@ -252,7 +254,10 @@ function draw(): void {
     drawnEpoch = epoch;
   }
   for (const [key, value] of typed) if (key.startsWith("reason-")) reasonDrafts.set(key, value);
-  for (const key of dropped) { typed.delete(key); reasonDrafts.delete(key); }
+  for (const [key, consumed] of dropped) {
+    if (typed.get(key) === consumed) typed.delete(key);
+    if (reasonDrafts.get(key) === consumed) reasonDrafts.delete(key);
+  }
   for (const [key, value] of reasonDrafts) if (!typed.has(key)) typed.set(key, value);
   dropped.clear();
   const nodes = memory?.seat && memory.identity ? drawLibrary(memory.seat) : drawJoin();

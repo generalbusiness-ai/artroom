@@ -304,3 +304,45 @@ required; no approval is inferred from this gate. Hugh has directly
 approved repository pushes. Reviewed landing may proceed after exact-head
 approval. Planner may deploy to Cloudflare as needed; no provider or
 deployment action is part of this delivery.
+
+## Review correction: edits during a pending reply
+
+Complete five-scope review `0ad4e770` requested one correction at
+`50dd61e7`. Donation controls remain editable while the signed request
+waits for its reply. A recorded reply for draft A unconditionally cleared
+both current fields, including newer draft B. Cancellation reasons had
+the same problem. The other four scopes had no additional substantive
+finding, but none was approved for landing.
+
+The renderer now remembers each submitted field value, and clears a
+consumed field only when its current value still equals that submitted
+value. A newer name, description or cancellation reason survives; an
+unchanged consumed field still clears. Refused, unknown and unrelated
+acts keep the previous behavior. The retained reason map uses the same
+comparison when a permission refresh temporarily hides a staff control.
+No signed request, pending record, gateway, membership or custody code
+changes for this repair.
+
+The extended actual-renderer witness submits A, holds its scripted reply,
+types B into the new rendered controls, and then releases recorded A.
+It also changes only one donation field and tests a newer cancellation
+reason. Original run 65699 closed with exit 1 (`ec9da7`): six assertion
+failures, three at each viewport, and the earlier 16 checks passed.
+Repaired run 30476 closed with exit 0 (`e8b3df`): all 22 checks passed
+at 1280×900 and 390×844. URL/title, meaningful content, missing framework
+overlays and console health were checked. Both deferred-donation
+screenshots were inspected; the newer text remains visible without
+horizontal clipping. Screenshots show a scrolled form, not the full page.
+Browser plugin was unavailable; the retained pinned Playwright 1.63.0 and
+local Chrome were used, with no dependency installation.
+
+The real renderer, model, shelf and CSS are exercised. Gateway,
+membership, remembered storage and publication remain four explicit
+scripted ports. This is no Native authority, custody, IndexedDB or provider
+proof. Browser TypeScript passed separately (`3b3420`), and the owned
+Lending producer regenerated matching disk and Worker assets (`fce2c3`).
+The earlier gate at `39572e24` remains a passing historical run, but does
+not cover this changed runtime. One new gate is due at the repaired
+composition freeze, followed by complete exact-head re-review. Private
+fixture, report and screenshot paths confer no external read or execution
+rights; a fresh finite public projection will carry the review evidence.
