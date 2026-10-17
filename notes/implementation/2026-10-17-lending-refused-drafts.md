@@ -160,3 +160,27 @@ The local integration now includes repair `83eb65d9c`. The earlier gate
 `24299` remains evidence of its original composition only. A new frozen
 integration gate is required for this changed dependency; no P3 Source
 filing or landing can precede archive's independent approval and landing.
+
+### Replacement integration gate
+
+Original gate `27928` ran once at clean commit
+`d0a4449313db0bb174c1ec780e73c1a0851872c3`, tree
+`f693053c4e2c40c057337bb8612d36640cd739a5`, and exited zero. The owner
+terminal is `863b1f`. The dependency view already matched the unchanged
+lock, so installation was skipped. Whitespace took 0.0 seconds elapsed
+and 0.0 CPU; types 7.2 and 26.4; tests 439.1 and 552.3. All 1,563 Vitest
+tests passed, with three skips; sixteen Node and fifty-five Counting
+tests passed. The wrapper log is
+`/tmp/artroom-p3-integration-d0a44493-gate.log`; step logs are under
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.77Mz0xZC3i`.
+
+This was macOS 27.0.1 on arm64 with eighteen logical CPUs. Before the
+gate, load averages were 1.37, 1.67 and 1.62; the verified-lock stamp
+matched. These observations establish no load cause. After completion,
+archive's gate-result note from `6d1a1973d` was composed and these two P3
+notes record the integration result. Only those three notes may differ
+from the passing freeze; all other 1,451 mode/type/blob leaves must match.
+Archive's exact review `17dad8da` and finite grant `6e2b59c7` remain
+separate. P3 Source filing still waits for its reviewed landing and exact
+Main correspondence. No approval or external-file access follows from
+this gate record.
