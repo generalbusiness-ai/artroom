@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aae4b1e4b24e40c625191f7ad124447ea215f937","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-16-create-outbox-protected-literals.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:aaeb8c0ee268971887cb981ea8c0652ae754f35a","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-capability.test.ts."}
