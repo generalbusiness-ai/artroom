@@ -3,11 +3,15 @@
 Source child `e9943975`, promise `536af54f`, implements the approved
 Draft 4 under NOW request `e0292346`. It adopts technical reconciliation
 `d1543f97` and the subsequent bounded-proof and foreign-fixture advice.
-Implementation and its focused witnesses are prepared for the frozen gate.
-No Source review, gate, landing, default activation, provider action or
-Cloudflare change is claimed at this checkpoint. Earlier sections retain
-their original checkpoint status; the latest evidence below supersedes
-only those progress statements, not the retained failures or limitations.
+The implementation is prepared for exact Source review over Main 4f7b07ee.
+Its original gate at frozen 2bcc1a4d closed 0: 1,540 Vitest pass, three
+skip, 16 Node and 55 Counting. The final successor adds only this evidence
+update and the two already approved Main design notes. All other blobs
+and modes match the tested tree. Earlier sections retain their original
+checkpoint status; the terminal evidence below supersedes those progress
+statements while preserving every failed gate and stated limitation.
+No Source approval, landing, default activation, provider action or
+Cloudflare change is claimed.
 
 ## Current implementation boundary
 
@@ -1314,3 +1318,48 @@ peak/worst-case heap, maximum-frame input coverage, leak/zero-residue or
 hosted capacity evidence. No heap setting changed. Attempt5 and final1
 files remain intact. This specimen stays tied to its exact repair freeze;
 the subsequent GitHub changes are three test-only paths and this note.
+
+
+## Passing frozen gate and current Main composition
+
+The original gate at 2bcc1a4d56a24709ba587209be7a845eb4ecaa9a,
+tree 19962892a0dd6328536d0c26295217acef74083f, session 13739,
+closed with exit 0. Vitest reports 1,540 pass and three skip. The explicit
+Node checks report 16 pass; the downstream Counting checks report 55
+pass. Whitespace passes. Typecheck took 7.1 seconds elapsed and 26.5 CPU
+seconds; the full test step took 431.3 seconds elapsed and 524.0 CPU
+seconds. These are the original gate's measured phases, not sums of
+separately repeated suites. The exact gate log is
+/tmp/artroom-directory-2bcc1a4d5-first-gate.log; retained gate files are
+under /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.0UiaiuG6RU.
+
+The local machine is arm64 Mac17,7, 18 logical CPUs and 68,719,476,736
+bytes of memory. The dependency view was verified against the same
+package-lock.json, so installation was skipped. This is a warm local
+working session after focused checks and owned asset builds, with no
+forced cold cache or controlled idle-load claim. One observed load sample
+during this gate was 2.26, 2.26, 2.06. No package, lockfile, heap setting,
+provider binding or deployed version was changed for this gate.
+
+Both original failed freezes remain failed: 2d00ee97 session 26058 and
+7ccc45025 session 4123. The passing gate belongs only to 2bcc1a4d and its
+proved documentation-only successor. Focused passes are not substituted
+for a combined gate, and the subsecond upstream-response diagnosis is
+limited to the two reproduced GitHub failures.
+
+While that gate ran, Main advanced from aeebc18c to
+4f7b07ee3a3f728f84967adbc464702a4bf1c11d. Its sole two additions are
+the approved evidence-rules and declared-landing-policy design notes.
+Merge da0bdc140d8ae2a2dcab8cfe5c28a1406b2ac85e incorporates those
+exact Main files. Neither design is activated by this Source. The final
+commit updates only this implementation report. Full tree comparison
+against the passing freeze checks that only these three Markdown paths
+differ; every other blob, mode and path is unchanged. No second gate is
+run for this notes-only composition, under docs/testing.md.
+
+Source review includes all 82 paths changed against the current Main.
+The five unlanded native-room-naming artifact bases at b779cf01 remain
+protected for their own Source; this Directory delivery does not retire
+them. No source-review approval, Main landing or push is claimed here.
+Git push authorization remains separate from the continuing Cloudflare
+hold. No Cloudflare or other provider operation has run for Directory.
