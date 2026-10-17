@@ -1,0 +1,141 @@
+{
+  "purpose": "Visual references for design-only a9a3585c / b410d2f0. Static HTML and PNG browser renders remain to be built and reviewed.",
+  "tool": "Built-in image_gen; no CLI/API credential path used.",
+  "initial": [
+    {
+      "name": "needs-you-desktop",
+      "prompt": "Use case: ui-mockup. Create one high-fidelity COMPLETE desktop MCP App screen, a restrained workroom UI called dap, embedded in an AI chat host. This is a design reference, not a marketing page. Canvas landscape about1536x1024, straight-on crisp browser-quality interface only, no device frame, no browser chrome, no host logos or chat messages. Use supplied image ONLY as the existing dap wordmark reference, faithfully at72px width in header. Palette exact: bone #F3F1EA canvas, white #FFFFFF occasional controls, forest #123F2B actions/links, ink #16180F text, muted #6B6A5F, lines #D8D5CB; garnet #7A1F2E only refusals. Rounded humanist sans like Open Runde, headings32px/600, body16px/24, metadata13px monospaced. Sharp zero-radius surfaces, square buttons with a subtle45degree cut bottom-right, no shadows/gradients. 8px spacing scale, generous40px gutters, centered content max1100px. Header: actual small dap logo atleft, 'Task list' room name beside it; right explicit actor 'Ari \u00b7 person'. Thin divider; simple textual two-item nav 'Needs you' active green underline and 'Work'. Main heading 'Needs you'. Catch-up band contains '7 new entries since your last review', 'Through entry248', outlined 'Mark reviewed' action, helper 'Reading an item leaves its work open.' Main content is an OPEN LIST of exactly3 generously spaced horizontal rows, separated by thin rules, not cards or a cardgrid. Each row shows a bold title, actor role/controller, three compact labelled explanations 'What needs you', 'Why you', 'What settles it', and one clear right-aligned link-button. Row1 title 'Keep completed tasks in history?'; actor square agent mark with text 'Storage agent \u00b7 agent' and 'Controlled by Ari'; what 'A product decision is waiting.'; why 'You were asked to approve text v2.'; settles 'Review the alternatives and record your choice.'; action 'Read decision'. Row2 title 'Clear completed \u00b7 version2'; actor 'Interface agent \u00b7 agent' and 'Controlled by Ari'; what 'A change is ready for review.'; why 'Your review is requested.'; settles 'Review this version before merging.'; action 'Review change'. Row3 title 'Publication outcome unknown'; actor circular person mark with 'Ari \u00b7 person'; what 'The merge reply did not arrive.'; why 'You sent the original request.'; settles 'Check that request\u2019s outcome.'; action 'Check outcome'. Footer '3 items shown \u00b7 1 scope checked'. Make people and agents visually distinct with words and simple circle/person versus square/agent geometric markers, never color alone; no avatars/photos. There are no approve/merge controls on this screen. Preserve exact workflow, no new product areas, fake analytics, decorative pills, hero eyebrows, illustrations, dashboardsidebar, cardgrid, or extra inventedcopy. Clear, airy, legible, senior product-design execution. Every text/control must be practicable as code-native HTML/CSS later; do not make any interface a rasterasset in implementation. This is the first reference of a coordinated five-family desktop/mobile light/dark set; lock this visual system."
+    },
+    {
+      "name": "work-desktop",
+      "prompt": "Use case: ui-mockup. Generate one COMPLETE high-fidelity desktop MCP App screen for dap in an AI-chat iframe, landscape1536x1024, straight-on interface only, no browser/device/host chrome. Image1 is the exact accepted visual-system reference (Needs you); Image2 is the existing dap wordmark. Keep the same header with72px-equivalent logo, room 'Task list', right actor 'Ari \u00b7 person', textual nav 'Needs you' and 'Work'. Reuse the reference's proportions, typography, spacing, sharp square surfaces and cut bottom-right button corner. Palette LOCK: flat bone#F3F1EA, ink#16180F, forest#123F2B, line#D8D5CB, muted#6B6A5F, white controls, garnet#7A1F2E only refusals/removals. No gradients, paper texture, shadows, glossy effects or decorative graphics. Open Runde-style rounded sans and13px-equivalent mono metadata/code, generous margins, restrained low-density editorial workroom. People use circle marker+explicit 'person'; agents square marker+explicit 'agent' AND 'Controlled by Ari'; checker distinct outlined square+explicit 'checker'. No real avatars. No cards unless a content form needs one clear frame; use open lists, separators, well-aligned columns. Absolutely no hero eyebrows, bento grids, dashboard sidebars, extra product areas or invented analytics. All UI must be implementable as native HTML/CSS text/controls. These are synthetic future design examples, not a claim that any host feature is already built. SCREEN: Work, nav Work active. Main heading 'Work', task title 'Clear completed'. One sentence: 'Add a button that clears completed tasks from the active list.' First open region heading 'Current conditions', metadata 'Terms v3 \u00b7 entry241', three short items: 'Keep completed tasks in history.' 'Hide them from the active list.' 'Keep earlier tasks recoverable.' Thin-rule separate 'Agent work' region is a2-row table with columns Agent / Assignment / Terms / State / Next. Row1 Interface agent \u00b7 agent, Controlled by Ari; 'Button and empty list'; 'v3 \u00b7 accepted'; 'Working'; link 'View change'. Row2 Storage agent \u00b7 agent, Controlled by Ari; 'Preserve task history'; 'v3 \u00b7 accepted'; 'Waiting for a decision'; link 'Read decision'. Under the second row a plain explanation 'Blocked by: Keep completed tasks in history?' Show a compact lower 'Recent record' with3 sparse chronological entries: 'Ari \u00b7 person offered terms v3', 'Interface agent \u00b7 agent accepted terms v3 \u00b7 Controlled by Ari', 'Storage agent \u00b7 agent asked a question \u00b7 Controlled by Ari'. Bottom secondary outlined action 'Offer work' and small text 'Each offer names one agent and the current terms.' No approve or merge action here. Show all regions fully and legibly."
+    },
+    {
+      "name": "decision-desktop",
+      "prompt": "Use case: ui-mockup. Generate one COMPLETE high-fidelity desktop MCP App screen for dap in an AI-chat iframe, landscape1536x1024, straight-on interface only, no browser/device/host chrome. Image1 is the exact accepted visual-system reference (Needs you); Image2 is the existing dap wordmark. Keep the same header with72px-equivalent logo, room 'Task list', right actor 'Ari \u00b7 person', textual nav 'Needs you' and 'Work'. Reuse the reference's proportions, typography, spacing, sharp square surfaces and cut bottom-right button corner. Palette LOCK: flat bone#F3F1EA, ink#16180F, forest#123F2B, line#D8D5CB, muted#6B6A5F, white controls, garnet#7A1F2E only refusals/removals. No gradients, paper texture, shadows, glossy effects or decorative graphics. Open Runde-style rounded sans and13px-equivalent mono metadata/code, generous margins, restrained low-density editorial workroom. People use circle marker+explicit 'person'; agents square marker+explicit 'agent' AND 'Controlled by Ari'; checker distinct outlined square+explicit 'checker'. No real avatars. No cards unless a content form needs one clear frame; use open lists, separators, well-aligned columns. Absolutely no hero eyebrows, bento grids, dashboard sidebars, extra product areas or invented analytics. All UI must be implementable as native HTML/CSS text/controls. These are synthetic future design examples, not a claim that any host feature is already built. SCREEN: Decision detail. Nav Needs you active, breadcrumb 'Needs you / Decision'. Main heading 'Keep completed tasks in history?' Metadata row 'Text v2 \u00b7 entry245', asker 'Storage agent \u00b7 agent', 'Controlled by Ari'. A plain sentence 'Your approval was requested for this exact text.' Scope/context line 'Clear completed \u00b7 terms v3'. Body: question 'Should clearing keep completed tasks in history, or delete them permanently?' Two balanced OPEN columns separated by one vertical rule, not giant cards: 'Keep history' \u2014 'Remove tasks from the active list. Earlier work stays recoverable.' and 'Delete permanently' \u2014 'Remove tasks and their history. Accidental clearing cannot be undone.' Below: 'Storage agent recommends keeping history.' Then 'Requested approver' row 'Ari \u00b7 person' with status 'Waiting for your approval of v2'. Below a visible textarea labelled 'Comment' showing 'Keep earlier tasks recoverable after clearing.' Bottom main green action 'Approve text v2', outlined 'Request changes', and a disabled pale action 'Record decision' with helper 'Record the decision after the requested approvals are complete.' Small meaningful distinction 'Approving the text does not change the work\u2019s conditions.' No claim that agent recommendation is a decision. Keep all text/controls readable."
+    },
+    {
+      "name": "change-desktop",
+      "prompt": "Use case: ui-mockup. Generate one COMPLETE high-fidelity desktop MCP App screen for dap in an AI-chat iframe, landscape1536x1024, straight-on interface only, no browser/device/host chrome. Image1 is the exact accepted visual-system reference (Needs you); Image2 is the existing dap wordmark. Keep the same header with72px-equivalent logo, room 'Task list', right actor 'Ari \u00b7 person', textual nav 'Needs you' and 'Work'. Reuse the reference's proportions, typography, spacing, sharp square surfaces and cut bottom-right button corner. Palette LOCK: flat bone#F3F1EA, ink#16180F, forest#123F2B, line#D8D5CB, muted#6B6A5F, white controls, garnet#7A1F2E only refusals/removals. No gradients, paper texture, shadows, glossy effects or decorative graphics. Open Runde-style rounded sans and13px-equivalent mono metadata/code, generous margins, restrained low-density editorial workroom. People use circle marker+explicit 'person'; agents square marker+explicit 'agent' AND 'Controlled by Ari'; checker distinct outlined square+explicit 'checker'. No real avatars. No cards unless a content form needs one clear frame; use open lists, separators, well-aligned columns. Absolutely no hero eyebrows, bento grids, dashboard sidebars, extra product areas or invented analytics. All UI must be implementable as native HTML/CSS text/controls. These are synthetic future design examples, not a claim that any host feature is already built. SCREEN: Change review. Needs you active; breadcrumb 'Work / Clear completed / Change12'. Heading 'Clear completed', adjacent subdued 'Version2'. Proposer 'Interface agent \u00b7 agent' and 'Controlled by Ari'. An immutable-subject strip in monospace shows 'Base8475e1b' 'Source569c9ae' 'Integration6ef5643'; small link 'Full commits'. Body split wide left2/3 and narrow right1/3 with a simple divider. Left: 'Changes' row 'src/tasks.ts' with link 'Read diff', secondary 'Compare with version1'. Then 'Agreed conditions': 'Keep completed tasks in history.' 'Hide them from the active list.' Link 'Decision: keep history \u00b7 text v2'. Then readable comment region label 'Comment on version2', textarea value 'History is preserved. Please keep the empty-list message clear.' Right: 'Checks' with 'Repository checker \u00b7 checker' and 'Passed for integration6ef5643' (no invented counts), then 'Requested review' row 'Ari \u00b7 person' / 'Waiting'. Explicit small rule 'Ari controls the proposing agent. Repository rules allow controller review.' Bottom green 'Approve version2', outlined 'Request changes', and DISABLED 'Merge version2' with helper 'Approval of this version is still needed.' Do not show publication confirmed before merge result; no fake progress gauges. Entire screen legible."
+    },
+    {
+      "name": "file-diff-desktop",
+      "prompt": "Use case: ui-mockup. Generate one COMPLETE high-fidelity desktop MCP App screen for dap in an AI-chat iframe, landscape1536x1024, straight-on interface only, no browser/device/host chrome. Image1 is the exact accepted visual-system reference (Needs you); Image2 is the existing dap wordmark. Keep the same header with72px-equivalent logo, room 'Task list', right actor 'Ari \u00b7 person', textual nav 'Needs you' and 'Work'. Reuse the reference's proportions, typography, spacing, sharp square surfaces and cut bottom-right button corner. Palette LOCK: flat bone#F3F1EA, ink#16180F, forest#123F2B, line#D8D5CB, muted#6B6A5F, white controls, garnet#7A1F2E only refusals/removals. No gradients, paper texture, shadows, glossy effects or decorative graphics. Open Runde-style rounded sans and13px-equivalent mono metadata/code, generous margins, restrained low-density editorial workroom. People use circle marker+explicit 'person'; agents square marker+explicit 'agent' AND 'Controlled by Ari'; checker distinct outlined square+explicit 'checker'. No real avatars. No cards unless a content form needs one clear frame; use open lists, separators, well-aligned columns. Absolutely no hero eyebrows, bento grids, dashboard sidebars, extra product areas or invented analytics. All UI must be implementable as native HTML/CSS text/controls. These are synthetic future design examples, not a claim that any host feature is already built. SCREEN: immutable file/diff reader. Needs you active; breadcrumb 'Change12 / Version2'. Main heading 'src/tasks.ts'. Three restrained text tabs 'File' 'Diff' ACTIVE 'Interdiff'. Subject strip: 'Base8475e1b \u2192 Integration6ef5643', 'Version2', link 'Full commits'. Caption '1 of2 files \u00b7 all lines of this file'. Main wide flat code pane with square corners, thin borders, roomy15px-equivalent Sometype Mono. A small header 'src/tasks.ts'. Context lines include 'export function clearCompleted(tasks) {' then a minus prefixed line '  return tasks.filter(task => !task.completed);' in muted garnet removal strip, plus prefixed lines '  return tasks.map(task => task.completed' and '    ? { ...task, archived: true }' and '    : task);' in pale-green addition strips, ending '}'. Include separate old/new line numbers gutters, + and\u2212 signs so meaning is not color alone. Under code, quiet exact endpoint labels 'Before:8475e1b' 'After:6ef5643'. Footer outlined 'Back to change', secondary text 'Review and approval stay bound to version2.' No approve or merge action in this reader, no random tree sidebar, no editor toolbar. The pane is read-only with selectable code. Show complete desktop anatomy and generous negative space without filler."
+    }
+  ],
+  "corrections": [
+    {
+      "name": "work-desktop",
+      "prompt": "Edit this desktop dap Work concept. Preserve the exact full layout, brand, typography, spacing, component geometry and all actor/controller labels. Correct the chronological state ONLY, because the history decision is still pending: Current conditions are 'Terms v1 \u00b7 entry220'. Replace its3condition texts with 'Add Clear completed to the task list.' 'Hide completed tasks from the active list.' 'Do not change unfinished tasks.' Both agent Terms values must read 'v1 \u00b7 accepted'. Storage agent still waits for the history decision, Interface agent still Working. In Recent record remove the invented dates entirely and use entry220 / entry221 / entry245 as simple monospace record labels; offer/accept texts must say terms v1. Do not show keep-history as an adopted condition yet. All other content same. Flat bone#F3F1EA/forest#123F2B/ink#16180F, no texture/shadows/gradients."
+    },
+    {
+      "name": "decision-desktop",
+      "prompt": "Edit this dap Decision concept preserving exact layout, typography, palette, all header/actor/controller/version/approval/comment regions and buttons. Three surgical semantic corrections: metadata context must say 'Clear completed \u00b7 terms v1' because conditions have not adopted the decision yet; remove both radio circles entirely, since this is immutable proposal text to read, not an editable answer selector; label the two text columns 'Proposed: Keep history' and 'Alternative: Delete permanently'. Keep their existing consequence copy unchanged. Change question sentence to 'Proposal: keep completed tasks in history when they are cleared.' with its immutable textv2/entry245 binding unchanged. Approve textv2 still approves this exact proposal; Record decision remains disabled before requested approvals; keep helper that approval does not change work conditions. No extra invented copy. Flat bone background exact#F3F1EA, no texture or gradient. All UI remains code-native implementable."
+    },
+    {
+      "name": "change-desktop",
+      "prompt": "Edit this dap Change concept preserving the complete exact visual structure/content. Correct only chronology/spacing metadata: breadcrumb says 'Work / Clear completed / Change 12'; after the 'Agreed conditions' heading add small monospace 'Terms v2 \u00b7 entry250'. The decision link remains textv2; conditionsv2 are adopted only after that separate decision and condition-revision acts. All hashes/base/source/integration, controls and explicit current-version person-review rule remain same. Version 2 wording should have normal word spaces. Do not add timestamps or extra data. Flat bone#F3F1EA, no texture/shadow/gradient. Preserve sharp cut buttons and original brand."
+    },
+    {
+      "name": "file-diff-desktop",
+      "prompt": "Correct this immutable dap DIFF reference. Keep full layout, brand, typography and code content. CRITICAL: 'Diff' is the ACTIVE green-underlined tab, and 'Interdiff' is unselected gray. This screenshot compares a base with an integration, not two versions. Add normal spaces: breadcrumb 'Change 12 / Version 2', strip 'Base 8475e1b \u2192 Integration 6ef5643' and 'Version 2'. Correct the two line-number gutters exactly: context export-function line old12/new12; removed return-filter line old13/newblank; added return-map line oldblank/new13; added question-mark archive line oldblank/new14; added colon-task line oldblank/new15; closing brace old14/new16. Keep minus/removal red and plus/addition green; only actual added/removed lines colored. Everything else unchanged including 'Full commits', exact endpoint labels, caption '1 of 2 files \u00b7 all lines of this file', 'Back to change'. No extra controls. Flat bone#F3F1EA canvas, no texture/gradients/shadow. Clear readable native-HTML design."
+    }
+  ],
+  "finalConceptPass": [
+    {
+      "name": "needs-you-desktop",
+      "prompt": "Edit this dap Needs you desktop concept, preserving layout, palette, typography, role/controller markers,3open rows, all3reason columns and allactions. Correct only these fixture labels: catch-up metadata becomes '3 scopes checked', replacing 'Through entry248' (there is no global room entry counter). Footer becomes '3 items shown \u00b7 3 scopes checked'. Row2 title becomes 'Improve empty-list message \u00b7 version 2'. Row3 title becomes 'Keyboard focus fix \u00b7 outcome unknown'. Row1 unchanged, Keep completed tasks in history? These are3different independent work items aggregated in one room. Use normal spaces in version labels. Keep all existing row explanation/action text unchanged. No extra product areas or icons, no fake dates. Flat bone#F3F1EA and existing forestbrand, no texture or gradient."
+    },
+    {
+      "name": "work-desktop",
+      "prompt": "Make only3text corrections in this otherwise accepted dap Work design; preserve every other pixel/layout/palette/detail. Storage agent assignment is 'Storage and history', replacing premature 'Preserve task history' because the history decision is still pending. In Recent record the Ari offer row is entry221, the Interface accept row is entry222, and the Storage row is entry245 'updated question text', replacing 'asked a question'. Current conditions remain Terms v1 entry220, all agent commitments v1 accepted. Preserve blocked status/readdecision and all actor/controller labels. Flat bone/forest/ink, no added decoration."
+    },
+    {
+      "name": "needs-you-mobile-dark",
+      "prompt": "Create a NEW coordinated NARROW MOBILE first-viewport concept of this dap Needs you UI, width390CSSpx portrait about780x1688 output (no phone/device frame). Image1 provides accepted desktop system; Image2 supplies exact white dap wordmark. Dark LOCK bg#121410,text#ECEAE2,lines#2C2F27,muted#A3A295,greenlink#5FA880, forestgreen primarybuttons withwhite text. Flat colors, sharp corners/cutbuttons, no textures/glow/gradients/shadows. Body16CSSpx, headings30, metadata13, touchcontrols44min. Headerwhite daplogo72equivalent, room Task list and Ari \u00b7 person; nextline nav Needs you active andWork. H1 Needs you. Catchup STACKED rather than squashed: '7 new entries since your last review', '3 scopes checked', outlined Mark reviewed button, helper Reading an item leaves its work open. Main open vertical list first item Keep completed tasks in history?; square agentmarker Storage agent \u00b7 agent, Controlled by Ari;3label/value blocks vertically: What needs you / A product decision is waiting. Why you / You were asked to approve text v2. What settles it / Review the alternatives and record your choice. Fullwidth Read decision button. Below a thinrule show start of next item 'Improve empty-list message \u00b7 version 2' naturally belowfold, with actual remaining content scrollable, not tiny compressed3column rows. Other aggregate item is Keyboard focus fix \u00b7 outcome unknown. Only firstviewport is requested; no invented bottom tabs, hamburger, hostcontrols, extra cardwrappers or approve/merge actions. Keep same mature typographic style and identity as desktop, realphonelegibility."
+    },
+    {
+      "name": "change-unknown-mobile-light",
+      "prompt": "Create coordinated portrait MOBILE dap Change UNKNOWN-OUTCOME state,390CSSpx wide, no phoneframe/browser/host. Preserve desktopreferencebrand/header/typography family but stack singlecolumn, bone#F3F1EA/ink#16180F/forest#123F2B, square cutbuttons and44CSSpx targets. Headerdaplogo,Task list,Ari \u00b7 person; nav Needs you/Work. Breadcrumb 'Change 9 / Version 1'. H1 'Keyboard focus fix'. Actorcircle 'Ari \u00b7 person'. Neutral outlined status panel, NOT red success/failure: heading 'Publication outcome unknown'; text 'Your merge was sent, but its reply did not arrive.' 'The original request is kept.' A compact read-only subject region 'Version 1' 'Integration 6ef5643' and metadata 'Original request \u00b7 kept'. Only primary action 'Check original request'. Under it precise helper 'This checks the saved request. It does not start another merge.' Secondary link 'Back to Needs you'. NO Merge, Retry merge, Approve or signing action anywhere. Below a thinrule a quiet 'What happens next' paragraph: 'A confirmed result shows the published commit. If it is still unknown, this view stays open.' Text wrapped naturally, generous spacing, no cardsgrid/illustration/statuscolorsinvented. This is a separate earlierworkitem, not the Clear completed change12. Staticfuturedesign only. Full first viewport, all critical recovery controlsvisible."
+    },
+    {
+      "name": "interdiff-mobile-light",
+      "prompt": "Create a complete coordinated NARROW MOBILE dap INTERDIFF reader concept390CSSpx wide portrait about780x1688output, no deviceframe/browser. Same dapheader, Task list, Ari \u00b7 person, Needs you/Work, bone#F3F1EA ink#16180F forest#123F2B zero-radius line#D8D5CB and cutbuttons. Breadcrumb 'Change 12 / Version 2'. H1 'src/tasks.ts'. Tabs File / Diff / Interdiff with ONLY Interdiff greenactiveunderline. Stack immutable endpoints into readable2rows: 'Version 1 \u00b7 62a6ace' then 'Version 2 \u00b7 6ef5643'. Small line 'Same base \u00b7 8475e1b' and link 'Full commits'. Caption 'Changes since version 1'. Read-only monospacecode pane with code WRAPPING insideviewport, no pageoverflow; show old/newlinegutter plus\u2212/+signs: context export function clearCompleted(tasks){; red removal return tasks.filter(task => !task.completed); green additions return tasks.map(task => task.completed / ? {...task, archived:true} / :task); closingbrace. Correct conceptualold/newgutter old12/new12 context, old13/newblank removal, blankold/new13-15 additions, old14/new16 brace. Font14CSSpx minimum, comfortablelineheight. Beneath code: 'Both versions are pinned. This is not a comparison with the current branch.' Fullwidthoutlined Back to change action44px. No approve/merge/editorcontrols, no sidebar or extraUI. This interdiff compares2integrationtrees on unchangedbase, not base\u2192integration; never label it Diff. Flatcolors no gradients/textures/shadows. Phonelegibility over squeezinglongcodeontoone line."
+    }
+  ],
+  "constraints": "Use repository-native dap SVG masters and font assets in HTML. Generated text mistakes are explicitly corrected by the design note. Concepts are not browser renders or evidence of real operations. No images are used as the interactive UI.",
+  "selectedFiles": [
+    {
+      "path": "change-desktop.png",
+      "bytes": 1315569,
+      "sha256": "20c45212f868afaa08b3d7e044c838c355eb7cc1429f73d99f9be9cb2828efc8",
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "path": "change-unknown-mobile-light.png",
+      "bytes": 1294494,
+      "sha256": "d65f0e9e4707a95a98a6f2f2146dcee8d42732f42aeec3a5fd954f38f5b499c0",
+      "dimensions": [
+        950,
+        1655
+      ]
+    },
+    {
+      "path": "decision-desktop.png",
+      "bytes": 1347478,
+      "sha256": "23a2e7f0ff52dbfa9346d7f0040f9dba6cadfed3f672af2dd2e0a4ec1312d1e8",
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "path": "file-diff-desktop.png",
+      "bytes": 1218551,
+      "sha256": "c2e060eef81215ef2675d6ca9a7a1c20e847c4253b899fef59976a9da6e36116",
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "path": "interdiff-mobile-light.png",
+      "bytes": 1335244,
+      "sha256": "2b21f5e79959179b4a5329b3ea1dc73c51f5bca664f70cbb7e960b956a91d6f3",
+      "dimensions": [
+        977,
+        1610
+      ]
+    },
+    {
+      "path": "needs-you-desktop.png",
+      "bytes": 1338291,
+      "sha256": "3786b6d41aa80a3e029276e0a97b9a8bba37ae069bbfdd143498560365291506",
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "path": "needs-you-mobile-dark.png",
+      "bytes": 1357513,
+      "sha256": "513514140aff9389f9562a825e6803ed1ff933c3a27498546b3161361636421e",
+      "dimensions": [
+        977,
+        1610
+      ]
+    },
+    {
+      "path": "work-desktop.png",
+      "bytes": 1512174,
+      "sha256": "333f2aa4481cb4d8d39a7bf92454aa9786b1898e5348f0dc3e887288bff95f87",
+      "dimensions": [
+        1536,
+        1024
+      ]
+    }
+  ]
+}

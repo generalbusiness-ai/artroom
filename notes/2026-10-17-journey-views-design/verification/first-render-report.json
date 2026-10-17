@@ -1,0 +1,5120 @@
+{
+  "kind": "static-design-browser-proof",
+  "started": "2026-10-17T16:40:48.154Z",
+  "base": "http://127.0.0.1:63452/notes/2026-10-17-journey-views-design/",
+  "tools": {
+    "playwrightModule": "/Users/hughpyle/.npm/_npx/e41f203b7505f1fb/node_modules/playwright-core/index.mjs",
+    "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "browserVersion": "155.0.8059.80"
+  },
+  "limits": "Fictional static navigation, rendered in isolated headless Chrome. No real room, service, signing, custody, provider, MCP bridge or host conformance.",
+  "inputs": {
+    "build.py": "87067f90261b4875e4242fd3d79aa32f531f5baa45d093901d4074f1c45fec70",
+    "mockups.css": "ee628bce37e04c70bc45b726d93ea8c1126cf04d3b413ee666d9c78119995add",
+    "mockups.json": "8e4ad9459e6fcdce720466b56fd59f989a56e576f673cbd2628ce38276db6349",
+    "render.mjs": "c79356659fe53e1c8c13f9c7af4ce114ab92eee711cda24224bf9c944449c7e1",
+    "needs-you-light.html": "e58b565ea3ad1a640b44fb29d61595364783d64ae0d36de555f605add8d15fdc",
+    "needs-reviewed-light.html": "42e6eb1933252f3f6e65acaf72accd39c029ffd38347dd2e1f675187040ccc0f",
+    "needs-partial-light.html": "d9abc8a0cc4d0e3199c46795ba9ff5b3d07bb2f453b99fad4b98c52078d37e11",
+    "needs-empty-light.html": "5eb244e5da992cd41bd6a407aa62d0a062045228b491ce9227737e967f2d310e",
+    "needs-loading-light.html": "a1c54425ea348bfe08ee6f91e588b96824bf2bd007010b7fa6cfda1e6c93843e",
+    "needs-unavailable-light.html": "f1d9c8bdb05ce9c5e68d993751fe2722a5f0aa9e909d80ea587d8915be1d9ca6",
+    "work-ready-light.html": "5bddff3ee26411e073d9253796e36863a36baedf04f25945a3c92a50eb5d1fc9",
+    "work-offered-interface-light.html": "2c54d3b5f260735044ddbc17817661c6ecca1a73a6eac6bccd383d36ba1f8572",
+    "work-offered-storage-light.html": "2a4155ca6e779d7866b2405c51925a9dc192bc8a6cae20b522497bcf420ac512",
+    "work-offered-light.html": "5be32692e783ed4ffc76b952f169018b28b645d2882d56d02e450382cbbb6818",
+    "work-active-light.html": "630299f972b330735635cf469151382ebab9fecee29e1e876551b327bcddf326",
+    "work-terms-changed-light.html": "b69750ea304d3d804f11096e70107618c3aa981920e419defbc885205176ccab",
+    "work-reoffered-interface-light.html": "c4bf1084b523a4c5d5647257457ddee49587a56720b3b9ae0ab4ba2e108d872c",
+    "work-reoffered-storage-light.html": "065815546617974309020c63ed1227b18c6132e327b78129638bd9784553899f",
+    "work-reoffered-light.html": "95d7d48e555d1c6a5ac61e3af42ae031f5bf260c9364369e2bf88afd0b251c16",
+    "work-resumed-light.html": "95352cae0bcca988cf7cc0cfac84910c0386c3ec0f86a078a6b2e62627288070",
+    "work-stalled-light.html": "0913c4df8f6a23d31b1ce86bb651caee2dbe971587ace24df5c27d955182a82f",
+    "work-delivered-light.html": "88ed3b92c30f39b7fda6baf6a306af735b2539e5ca85318b56d36f826ce53198",
+    "decision-requested-light.html": "6e2baec4de6d686c74fb2a2a5b6006c2d8c42b06a50c34e0bdaf5decbfe1d49c",
+    "decision-changes-light.html": "cbea293d67e3274a359d665c471d145aa9faa0acd63ac2d0db43c177226539ab",
+    "decision-approved-light.html": "b1abcb76580ad61fd3cdfed389ba5fc01d9447f8de4cbeeb09f04bbd72e2f97b",
+    "decision-decided-light.html": "66d0c7bd16e645514127b42698ec217c9da37c1270ad4f00a732c64738a08ed9",
+    "decision-refused-light.html": "417c44a29e4f5ac79d26756fc41477e33f4ec91d520f08911dc493ed2921f746",
+    "decision-unrequested-light.html": "7c720746666d379c91795977c579e5c52016130c35ba97953a54336a1d7a3d09",
+    "decision-stale-light.html": "e6c0aba5a64b2bfae5f16456ebd6996a491e4846d0f20978b76e6dd4b0de3c8a",
+    "change-review-light.html": "43fdec7d0ebb7e817b3d75cb66842d2f5dab86662c99ac285034d8d400e1008d",
+    "change-changes-light.html": "3de5684c5d70ebee079925265fcafe3e45a54b09b763d3be41517c6a642393ed",
+    "change-secondary-light.html": "92fc4d41b619f3c2d1b3b5780937a6f6bb0c2480ab46b41837d9b2263052cb7c",
+    "change-secondary-approved-light.html": "f6bfd65c7692cdb96f0e7303d50cbc07fc4bf0569569221697e0f0ba21b95467",
+    "change-secondary-published-light.html": "b1f2a967575ed52973d0275af893a9cd9f7a4472fb4d52165bf07cd86ea3c31f",
+    "change-approved-light.html": "b3ceef0af0f5d3d15f4429f4e415395b0083d4d09ecb55d030adba741e3fd421",
+    "change-stale-light.html": "b6b37d938914dae80be00bccc475242d612d06ae5297816e12c86bac2e1d49c5",
+    "change-no-checks-light.html": "b113588eabb4f652657ceafb1369f20b2fdbff3aeb3fbbacb1e1a6a8ff5cfec7",
+    "change-check-failed-light.html": "6c03013a73081c1d8d997d489d366b895fce9f17bff087984ad62cd05c11dcf9",
+    "change-unknown-light.html": "07652c1ed2eb1cf44e072346745605f55807aa045f4d7e49e10f3384e751e546",
+    "change-recovery-unavailable-light.html": "16424367f3f7df1948a6af7ccd1acb902309b404558c56afb930ac5190316eeb",
+    "change-published-light.html": "24c1b1e799bddb78890e628e4a842bbe1f6bde58f4fbb33b63623d44bf69bb3e",
+    "change-keyboard-published-light.html": "7dcfd2a72994a04bcba13a4f2530fbd0e4a7726091f485bdded0a592d0891a62",
+    "file-file-light.html": "53861d5089ca08b3715c53ea42e20a26131cf6b3fd9829d537e769a25558fbea",
+    "file-diff-light.html": "2bd345a805b8fb66617294195a387f4a547115f39abc0eaaa499f0ecd0a271d3",
+    "file-interdiff-light.html": "6d049c9e13960a5454d68e814114777f165cea51ed2823bfe279393d1cf4df37",
+    "file-truncated-light.html": "c401dcd7b625dfc7c522afbb81e96e12d55de7100c3255f888eb0ed9808f2e94",
+    "file-unavailable-light.html": "74116ee0ab7277b8fc337941eb6caaa40bf0e7cf2485454a9db0106deb6575aa",
+    "file-secondary-diff-light.html": "10b13f68e58ee843c352b5fe58588d31406d7a20b041aac93b1ad853d0253365",
+    "needs-you-dark.html": "30c39fae5bfd92c15027635c7c9333a0489f0a32dc4461412538014e12f4ca58",
+    "needs-reviewed-dark.html": "b0e438692d6796f4470a71ec47099a287a33d32a9898d21bad824e503dca6c71",
+    "needs-partial-dark.html": "c8b8841e059869b32ca44f7f2f9a82b9e2c3bf302f86644d56361bf76a768cb1",
+    "needs-empty-dark.html": "f74390bc1adb4d3e296f9d73c2f98f4b735d9529fd6e77a1998082dd1dc74b93",
+    "needs-loading-dark.html": "b046654fbe6f5716f61e2cd8f34b01c58667b684727e02bcffa67700b6f76939",
+    "needs-unavailable-dark.html": "55c5c492aed6c1a511b137409497f088665528cc89e4cb5607148917c32dfbc0",
+    "work-ready-dark.html": "6fde96fc7a9b135ca4c63b3be3a1874a24be6ed2e437d8be5bc08efa4517f565",
+    "work-offered-interface-dark.html": "912bdd04295bea294bf06f470034e044495f09875325be86a824572439751e9c",
+    "work-offered-storage-dark.html": "0ce4129b92231cac3a2e7766089f983a9fbd9872365f65a51577ca13bfa36a13",
+    "work-offered-dark.html": "bc3b1386d3385203b1ac6cb6f0b4ab4820fe1c444f2dbce373936cd7a5bfdcf8",
+    "work-active-dark.html": "040402237eac283bae7fde3ae17d5f5ff5ddaf91e561197c097ca55f44656ea9",
+    "work-terms-changed-dark.html": "4da133fe9aebbaf245cdf02fbf693613f317f55b0f23e703a2c38ccf214bcc5d",
+    "work-reoffered-interface-dark.html": "87c8411680c08086184c015ffe783d790d94431c5485d5390b89bc890f0857d4",
+    "work-reoffered-storage-dark.html": "8df58a53a65b73a09cca984e40a1a13f91e464784c402bcb146dbad3174082fb",
+    "work-reoffered-dark.html": "e3a440bb243db5dc635567e22e37303b2fc9a13abc72d357b56b60a4a946c42c",
+    "work-resumed-dark.html": "23fc53edeaff602ffe393661b2efb5b049e11439f0da9b43195f41b16df0961e",
+    "work-stalled-dark.html": "645aa1d0f09c9af7c73bd0e4f61c7505ec6cbad8429e3ec9d2eddf7c85bfee90",
+    "work-delivered-dark.html": "be6aa4ebedb9d530d65d93c093d7094a6d2ef7807829e0bfb993508f164af0dc",
+    "decision-requested-dark.html": "9aa7d53696313a9cbd98ca830ae8aa3cc16f522eef92e61ebd8998c03be2df75",
+    "decision-changes-dark.html": "e7f0a9c50c4176dd1dba4687b995c9d1732330ee9e2a22016b0ce011c25267c0",
+    "decision-approved-dark.html": "cd8b1e1531fc3857db0e789b90763e312c46ac54c43f75ebaed44a799de5e408",
+    "decision-decided-dark.html": "adf2d11e25f8592dadecb3ac759b80d7dbd3480ab2795c14882e3b1ba96e1574",
+    "decision-refused-dark.html": "320879b572e485c8db2925c8a36a84b52650865a0909adc00bb71821414fe316",
+    "decision-unrequested-dark.html": "2bb35d970d87d6e0e512c2bd0dad82f994b3451d76a5e439c495a300c8d25ffa",
+    "decision-stale-dark.html": "dba72875d3701c0a32902605ef2a1f5674e94b9ccbe9fd2e77a81130d45250ac",
+    "change-review-dark.html": "19b054a2cc97e67f2c5da2e275e02487cfdfd6896cea3c8a42c96d4ecef28b27",
+    "change-changes-dark.html": "0aedb917720b309c8276114f2ccbe22b324f34792f32f86662007415a64ec00d",
+    "change-secondary-dark.html": "61c85328fbda646bf31677b764d6f574946a00396cea7c809b5ea20ae5b3ca78",
+    "change-secondary-approved-dark.html": "13cf18ff300210b08a6eb70937675a0203e054ea3c61206b1096849682bbc513",
+    "change-secondary-published-dark.html": "035f8fa67c04953ef0c61b997a4bb3adc4d7e56d34ffdcc6efc8c274acd47eaa",
+    "change-approved-dark.html": "e700f06db656c8f7d003b1fc5b98fc976f9ec219b70c692548e574f044b6de64",
+    "change-stale-dark.html": "22ee5913a228a6c372fba9809e62c973c017a773d970d4eeb8dbdd518523c82d",
+    "change-no-checks-dark.html": "1e5bba94a68b7b2bb1f956658ddb61a32eeea139ac61314f551fb27d9d1ab1b7",
+    "change-check-failed-dark.html": "0cc83e71d6a0a47d5c0d7cf89c691e36fb31994beb27524647094d84078f2f19",
+    "change-unknown-dark.html": "2636b65bde6c001443791cd480cfb13e259c883ed98046aad2d7eebd408998fe",
+    "change-recovery-unavailable-dark.html": "0d512e426bb46fc5842e4fed25d16be348c3ddc72dd925006238d7fcaa0d7c96",
+    "change-published-dark.html": "b976a151d2d8f97744c76a6cf5ac4b45ad1824366268616db8ef70537e1a95e6",
+    "change-keyboard-published-dark.html": "08afd387cd28c62534ced71aa3718afd0699d49b702a1c33c908791d7fece89c",
+    "file-file-dark.html": "c9b472667dbfc0dfb6084f1517f04c5c759ffdf51d0b5abc8e83524d141b3090",
+    "file-diff-dark.html": "b05954098ebd3b5f4cd18d9d906c52ac36e84875b6205cf7c023fb99acc35d06",
+    "file-interdiff-dark.html": "3c026321a68b682328f1440830bb16d0af50bfee26837d25a2ef3d9ed20aa3de",
+    "file-truncated-dark.html": "14fee1aafc42e786ff4aa41b55979c9e177909748c62cdb4a6b09cafa80bd443",
+    "file-unavailable-dark.html": "60c46b55a4408bccf2a58e6fc2c71a3b8da4a30387da49af332822133b4b104d",
+    "file-secondary-diff-dark.html": "316f86d90df093999cd6af615b8918922f43c138a57192436745cd8aedd67b95",
+    "index-light.html": "1bbe55133cca2338250e05b87ae2d94f04e2bbde09ade4db9850aa0a2ea2f44f",
+    "index-dark.html": "3471357b634075b73a6a26e53bca5156e207b6cf22b0bbf6e4984fccb1aebcfb"
+  },
+  "checks": [
+    {
+      "name": "All local link and image targets exist",
+      "status": "passed"
+    },
+    {
+      "name": "needs-you-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-reviewed-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-partial-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-empty-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-loading-light-1536",
+      "status": "failed"
+    },
+    {
+      "name": "needs-unavailable-light-1536",
+      "status": "failed"
+    },
+    {
+      "name": "work-ready-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-interface-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-storage-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-active-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-terms-changed-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-interface-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-storage-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-resumed-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-stalled-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-delivered-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-requested-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-changes-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-approved-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-decided-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-refused-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-unrequested-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-stale-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-review-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-changes-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-approved-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-published-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-approved-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-stale-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-no-checks-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-check-failed-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-unknown-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-recovery-unavailable-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-published-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-keyboard-published-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-file-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-diff-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-interdiff-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-truncated-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-unavailable-light-1536",
+      "status": "failed"
+    },
+    {
+      "name": "file-secondary-diff-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-you-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-reviewed-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-partial-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-empty-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-loading-dark-1536",
+      "status": "failed"
+    },
+    {
+      "name": "needs-unavailable-dark-1536",
+      "status": "failed"
+    },
+    {
+      "name": "work-ready-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-interface-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-storage-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-active-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-terms-changed-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-interface-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-storage-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-resumed-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-stalled-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "work-delivered-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-requested-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-changes-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-approved-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-decided-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-refused-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-unrequested-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "decision-stale-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-review-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-changes-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-approved-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-published-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-approved-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-stale-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-no-checks-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-check-failed-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-unknown-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-recovery-unavailable-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-published-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "change-keyboard-published-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-file-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-diff-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-interdiff-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-truncated-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "file-unavailable-dark-1536",
+      "status": "failed"
+    },
+    {
+      "name": "file-secondary-diff-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "index-light-1536",
+      "status": "passed"
+    },
+    {
+      "name": "index-dark-1536",
+      "status": "passed"
+    },
+    {
+      "name": "needs-you-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-reviewed-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-partial-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-empty-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-loading-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "needs-unavailable-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "work-ready-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-interface-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-storage-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-active-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-terms-changed-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-interface-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-storage-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-resumed-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-stalled-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-delivered-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-requested-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-changes-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-approved-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-decided-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-refused-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-unrequested-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-stale-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-review-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-changes-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-approved-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-published-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "change-approved-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-stale-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-no-checks-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-check-failed-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-unknown-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-recovery-unavailable-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-published-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "change-keyboard-published-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "file-file-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-diff-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-interdiff-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-truncated-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-unavailable-light-390",
+      "status": "failed"
+    },
+    {
+      "name": "file-secondary-diff-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-you-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-reviewed-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-partial-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-empty-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "needs-loading-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "needs-unavailable-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "work-ready-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-interface-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-storage-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-offered-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-active-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-terms-changed-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-interface-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-storage-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-reoffered-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-resumed-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-stalled-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "work-delivered-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-requested-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-changes-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-approved-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-decided-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-refused-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-unrequested-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "decision-stale-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-review-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-changes-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-approved-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-secondary-published-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "change-approved-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-stale-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-no-checks-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-check-failed-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-unknown-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-recovery-unavailable-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "change-published-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "change-keyboard-published-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "file-file-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-diff-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-interdiff-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-truncated-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "file-unavailable-dark-390",
+      "status": "failed"
+    },
+    {
+      "name": "file-secondary-diff-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "index-light-390",
+      "status": "passed"
+    },
+    {
+      "name": "index-dark-390",
+      "status": "passed"
+    },
+    {
+      "name": "Native viewport comparisons and all primary actions",
+      "status": "passed"
+    },
+    {
+      "name": "320 px reflow and 200 percent browser-zoom-equivalent layout",
+      "status": "passed"
+    },
+    {
+      "name": "Keyboard focus, target sizes, full commits and reader tabs",
+      "status": "failed"
+    },
+    {
+      "name": "Sandboxed fixed-height iframe scrolls without host SDK",
+      "status": "passed"
+    },
+    {
+      "name": "Handoff agents (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Return and catch up (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Review, changes and pinned readers (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Requested person approval and separate revision (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Confirmed publication retains each change (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Refusals, stalls and original-request recovery (light)",
+      "status": "passed"
+    },
+    {
+      "name": "Handoff agents (dark)",
+      "status": "passed"
+    },
+    {
+      "name": "Return and catch up (dark)",
+      "status": "passed"
+    },
+    {
+      "name": "Review, changes and pinned readers (dark)",
+      "status": "passed"
+    },
+    {
+      "name": "Requested person approval and separate revision (dark)",
+      "status": "passed"
+    },
+    {
+      "name": "Confirmed publication retains each change (dark)",
+      "status": "passed"
+    },
+    {
+      "name": "Refusals, stalls and original-request recovery (dark)",
+      "status": "passed"
+    }
+  ],
+  "renders": [
+    {
+      "file": "needs-you-light-1536.png",
+      "bytes": 137684,
+      "sha256": "170e2b2629bcbd2ecb184b7607866317f05a9744039f30f37a057e7967c5ce69",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · current · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-reviewed-light-1536.png",
+      "bytes": 138138,
+      "sha256": "ebafba99fa7847f433f7940a954c17c50af28b9ae974308e014aa0b798f750d4",
+      "fullPage": true,
+      "key": "needs-reviewed",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · reviewed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-partial-light-1536.png",
+      "bytes": 164960,
+      "sha256": "85266a18ca7b38e8a5afd071dec323328ba09c63b0143dbfff20fbde02c1a00a",
+      "fullPage": true,
+      "key": "needs-partial",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1196,
+        "title": "dap design · Needs you · partial · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-empty-light-1536.png",
+      "bytes": 48608,
+      "sha256": "299a1a2c4a69cab381cd6e38118fa73e533ef5948f79686b9ca2bf16787e867a",
+      "fullPage": true,
+      "key": "needs-empty",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · empty · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-ready-light-1536.png",
+      "bytes": 108261,
+      "sha256": "a81dfd4cf548bb93a63615957b2ae90384bb52b2f0e2dd46438e2bf090eeed1e",
+      "fullPage": true,
+      "key": "work-ready",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · ready · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-interface-light-1536.png",
+      "bytes": 116032,
+      "sha256": "8d5a3975af0c0679873d0ac3fba3c8813dbac4e0e22ac335defde6c416aefd5f",
+      "fullPage": true,
+      "key": "work-offered-interface",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered-interface · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-storage-light-1536.png",
+      "bytes": 116235,
+      "sha256": "5e437e2015786397987844ed2f3a0a3af658117b10fe4381bdbec4d98cc82341",
+      "fullPage": true,
+      "key": "work-offered-storage",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered-storage · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-light-1536.png",
+      "bytes": 122678,
+      "sha256": "c5164af09534e2777519e3050ddca1ddec158d8c50094019db8caaa66e0fedda",
+      "fullPage": true,
+      "key": "work-offered",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-active-light-1536.png",
+      "bytes": 126009,
+      "sha256": "f3af2a4f0234a2d80598bd3072310c325021efe0f2052be516ff6319a844b55e",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1071,
+        "title": "dap design · Work · active · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-terms-changed-light-1536.png",
+      "bytes": 145183,
+      "sha256": "6048c2c93613d105874ba1076712f882d98e6841fe57a64938763ff853a5be37",
+      "fullPage": true,
+      "key": "work-terms-changed",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1252,
+        "title": "dap design · Work · terms-changed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-interface-light-1536.png",
+      "bytes": 135807,
+      "sha256": "26c82fea0f8a23d8bd99d6267b73343e5b6bb90d03cb0758edf3103056bb4c6e",
+      "fullPage": true,
+      "key": "work-reoffered-interface",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1141,
+        "title": "dap design · Work · reoffered-interface · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-storage-light-1536.png",
+      "bytes": 135890,
+      "sha256": "f5cc922e7f2b8e8ca5a4236a4d5f8c4a64f2bfd9e3e88a2ee1b7bed9620f0937",
+      "fullPage": true,
+      "key": "work-reoffered-storage",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1141,
+        "title": "dap design · Work · reoffered-storage · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-light-1536.png",
+      "bytes": 150069,
+      "sha256": "cbedf17671e13e4d0b8c3f65bd111c01cb03afe82b0b3950f0f39e08696bfa2f",
+      "fullPage": true,
+      "key": "work-reoffered",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1203,
+        "title": "dap design · Work · reoffered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-resumed-light-1536.png",
+      "bytes": 124374,
+      "sha256": "1ed97a646346472cd98e80eb068155e0778ba6affa45f13073d5a89e53c8aa44",
+      "fullPage": true,
+      "key": "work-resumed",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Work · resumed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-stalled-light-1536.png",
+      "bytes": 148314,
+      "sha256": "1252a945763d4a9056aaaa35fbb6ff2fe15ac8b29d0b89bcbf9a1834f234d64c",
+      "fullPage": true,
+      "key": "work-stalled",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1244,
+        "title": "dap design · Work · stalled · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-delivered-light-1536.png",
+      "bytes": 127698,
+      "sha256": "9aacb8a8274004e39641fa418d66a84983c77cad5d9efd618a9448e507b05b75",
+      "fullPage": true,
+      "key": "work-delivered",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Work · delivered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-requested-light-1536.png",
+      "bytes": 143891,
+      "sha256": "b6c1bbb0d02b9a8e628a6a32c81d0319b6e607f0eb8b3eb52784da120fb9d8bc",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1076,
+        "title": "dap design · Decision · requested · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-changes-light-1536.png",
+      "bytes": 138223,
+      "sha256": "b20c90381353d07db759916856b51e920bb03f7a91e34c9e407325acd830aea5",
+      "fullPage": true,
+      "key": "decision-changes",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · changes · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-approved-light-1536.png",
+      "bytes": 138531,
+      "sha256": "9453b43a947ce360be9a1457d45486c94083d6f0e9a75f580bbfbe412d65d250",
+      "fullPage": true,
+      "key": "decision-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1076,
+        "title": "dap design · Decision · approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-decided-light-1536.png",
+      "bytes": 132401,
+      "sha256": "e347b1ba8449975774483fd34f4af23a4f94d2d9d858a66d8141373cac6053ad",
+      "fullPage": true,
+      "key": "decision-decided",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Decision · decided · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-refused-light-1536.png",
+      "bytes": 150557,
+      "sha256": "cb7ebea06fdf71e5f5c9d48996cd9db1574fe3e257a4e28c625fcad922dfc249",
+      "fullPage": true,
+      "key": "decision-refused",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · refused · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-unrequested-light-1536.png",
+      "bytes": 147563,
+      "sha256": "0377ec6180b5ddb660a31750691af2ca0bc871589784f650db8b2d3eed394bab",
+      "fullPage": true,
+      "key": "decision-unrequested",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · unrequested · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-stale-light-1536.png",
+      "bytes": 81447,
+      "sha256": "b6ab7bdf66b9f977261f09ba63f6d2fb81f892f1574ac5b48d958e9b6ede6775",
+      "fullPage": true,
+      "key": "decision-stale",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Decision · stale · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-review-light-1536.png",
+      "bytes": 148564,
+      "sha256": "bd55cb889f8fec56fef013404c017a3117dd2ddc8301823f655c3f05b3bc3662",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1130,
+        "title": "dap design · Change · review · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-changes-light-1536.png",
+      "bytes": 84309,
+      "sha256": "2281e24f2a8fbf800db161afda4c173249a9ce0ed857e018b9bd841b4851f844",
+      "fullPage": true,
+      "key": "change-changes",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · changes · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-light-1536.png",
+      "bytes": 110351,
+      "sha256": "3f7ca01d62c22911e3dbbd4cfce4505e99d21fe5336c40bfaec54bcae9748e9d",
+      "fullPage": true,
+      "key": "change-secondary",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1116,
+        "title": "dap design · Change · secondary · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-approved-light-1536.png",
+      "bytes": 107312,
+      "sha256": "c578246fd48a3046e727d0fa9cac65c43aac11d76cf18ca4f8bb05885cfaaf4d",
+      "fullPage": true,
+      "key": "change-secondary-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1116,
+        "title": "dap design · Change · secondary-approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-published-light-1536.png",
+      "bytes": 83273,
+      "sha256": "40812adb95f74ec764c635f992de075e3a6e4b2c92aaa89b3a3f9dc38f497daa",
+      "fullPage": true,
+      "key": "change-secondary-published",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · secondary-published · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-approved-light-1536.png",
+      "bytes": 145428,
+      "sha256": "d75527214940bed605063d9e33e25a4a684d50bf14b881db2cc2c8e84afc0edf",
+      "fullPage": true,
+      "key": "change-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-stale-light-1536.png",
+      "bytes": 83638,
+      "sha256": "74874c0797f373099151cb36b3e33a69ccbf860f329da2a22440c99481a22395",
+      "fullPage": true,
+      "key": "change-stale",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · stale · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-no-checks-light-1536.png",
+      "bytes": 145922,
+      "sha256": "61a7a0fe447cec007a5dec6b3b0c57d8ad512c6a0b73177337be8787b0ccf281",
+      "fullPage": true,
+      "key": "change-no-checks",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · no-checks · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-check-failed-light-1536.png",
+      "bytes": 146540,
+      "sha256": "2c60451a7eef7021b4f8730950b26b030ecfca377204e1af33c0fb23201daa3a",
+      "fullPage": true,
+      "key": "change-check-failed",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · check-failed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-unknown-light-1536.png",
+      "bytes": 94655,
+      "sha256": "7a50ca2d54e4dfef8bf3fe20c98208dedfcf96f141699e8e7f33cd8fa0060a05",
+      "fullPage": true,
+      "key": "change-unknown",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · unknown · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-recovery-unavailable-light-1536.png",
+      "bytes": 98615,
+      "sha256": "7d5209965799651b84e7ed29c6372fb66ba64f5da6555ca16ab4356d2d8498a0",
+      "fullPage": true,
+      "key": "change-recovery-unavailable",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · recovery-unavailable · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-published-light-1536.png",
+      "bytes": 87032,
+      "sha256": "d3c5784edfa658e17c13d2eba61cd27adf5509eec0548e1834b39357dc2cb66e",
+      "fullPage": true,
+      "key": "change-published",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · published · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-keyboard-published-light-1536.png",
+      "bytes": 65145,
+      "sha256": "a2bf9bdf468c0a6cb9e1ad2af72505c2bbfdca1967126a0df84d715810240954",
+      "fullPage": true,
+      "key": "change-keyboard-published",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · keyboard-published · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-file-light-1536.png",
+      "bytes": 73977,
+      "sha256": "9adb5e9dafa4967babdf62110830514c0ea780e7210b8c9ded6c5e560eccb97d",
+      "fullPage": true,
+      "key": "file-file",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · File and diff · file · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-diff-light-1536.png",
+      "bytes": 86240,
+      "sha256": "e9edcbdc3d379ea09b5140762f39cef83050a42b40612c68d6bcfea487f5c3f3",
+      "fullPage": true,
+      "key": "file-diff",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1025,
+        "title": "dap design · File and diff · diff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-interdiff-light-1536.png",
+      "bytes": 88152,
+      "sha256": "acfb1107ecf432c99e33869dc657133fa3a773eae832cacff33cb59d20ab228d",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1025,
+        "title": "dap design · File and diff · interdiff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-truncated-light-1536.png",
+      "bytes": 90344,
+      "sha256": "6a5cae415a3644661766857457b32fa0eac4c3527568d26e975cb4491ef09748",
+      "fullPage": true,
+      "key": "file-truncated",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1063,
+        "title": "dap design · File and diff · truncated · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-secondary-diff-light-1536.png",
+      "bytes": 55897,
+      "sha256": "3299379ef92cb193ce7b7791cd908bea8aa3745e8864aa7b842195fb6edb2771",
+      "fullPage": true,
+      "key": "file-secondary-diff",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · File and diff · secondary-diff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-you-dark-1536.png",
+      "bytes": 137163,
+      "sha256": "7b8bf9fceb4e0e412ae39a9e0858e6edc13333577b8be7bc73800cbc3e609a1b",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · current · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-reviewed-dark-1536.png",
+      "bytes": 137771,
+      "sha256": "df042e9f00c6076e34d6d46b7eaa8f08d75c76e8f0be89bef252247e4fd95d9e",
+      "fullPage": true,
+      "key": "needs-reviewed",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · reviewed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-partial-dark-1536.png",
+      "bytes": 164501,
+      "sha256": "62024d03f9750f431389ed402c8db26225937d8e0c237b8271ad0bad5b970443",
+      "fullPage": true,
+      "key": "needs-partial",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1196,
+        "title": "dap design · Needs you · partial · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-empty-dark-1536.png",
+      "bytes": 48192,
+      "sha256": "d0f504f8f443fa9db7b706a07ec6ed02006d5b5c2eb39e83fece917e8935708a",
+      "fullPage": true,
+      "key": "needs-empty",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Needs you · empty · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-ready-dark-1536.png",
+      "bytes": 108936,
+      "sha256": "6c171916c60566f14f44bc2b1b3337429e4d5ad8d9b0308cf640daef2207fadc",
+      "fullPage": true,
+      "key": "work-ready",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · ready · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-interface-dark-1536.png",
+      "bytes": 116623,
+      "sha256": "c8aa7167c7ff17d571c65efa1998bd93e95d0c12302d717addc3cdc72832426b",
+      "fullPage": true,
+      "key": "work-offered-interface",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered-interface · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-storage-dark-1536.png",
+      "bytes": 116649,
+      "sha256": "fb3383843217a35a3ee89f3f0d7de17a9cf2db0935e6ad773ab92ebca3c447fb",
+      "fullPage": true,
+      "key": "work-offered-storage",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered-storage · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-dark-1536.png",
+      "bytes": 123018,
+      "sha256": "3521e7e8f8c27bea63340a6894bf2a749d42ad5e4779800827300ee072ed22ec",
+      "fullPage": true,
+      "key": "work-offered",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Work · offered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-active-dark-1536.png",
+      "bytes": 126303,
+      "sha256": "b354825e9606763111b4f40b75a1ae5ee8d382ccce0c8472527f5d65e9a4d89a",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1071,
+        "title": "dap design · Work · active · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-terms-changed-dark-1536.png",
+      "bytes": 145902,
+      "sha256": "18d60c3f8f1143e5d102d350d3c087354d32ca4996dfa030d9cdd666e7e30d0f",
+      "fullPage": true,
+      "key": "work-terms-changed",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1252,
+        "title": "dap design · Work · terms-changed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-interface-dark-1536.png",
+      "bytes": 136564,
+      "sha256": "5c6f58a2941385102ab5ea03c5e5faf8d860002e7ba1e738a901e2570fc146a2",
+      "fullPage": true,
+      "key": "work-reoffered-interface",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1141,
+        "title": "dap design · Work · reoffered-interface · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-storage-dark-1536.png",
+      "bytes": 136456,
+      "sha256": "49fbd5bb76d2853c9bf8658767750e6b30b46da28230cd389fb70a68149efefd",
+      "fullPage": true,
+      "key": "work-reoffered-storage",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1141,
+        "title": "dap design · Work · reoffered-storage · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-dark-1536.png",
+      "bytes": 150926,
+      "sha256": "db74b8f5c75810c8f1089d53c22667f09827fe4ac06481db782b30e618d4ca1a",
+      "fullPage": true,
+      "key": "work-reoffered",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1203,
+        "title": "dap design · Work · reoffered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-resumed-dark-1536.png",
+      "bytes": 125069,
+      "sha256": "7a16e736f8df4789c483712bcfe75654eb885ff1a6fbf066d1a301a81ba927e2",
+      "fullPage": true,
+      "key": "work-resumed",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Work · resumed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-stalled-dark-1536.png",
+      "bytes": 148712,
+      "sha256": "a44722a5447aa93dcaa70883317610c72fcd0a02c81c51ef83e3f36338af8932",
+      "fullPage": true,
+      "key": "work-stalled",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1244,
+        "title": "dap design · Work · stalled · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-delivered-dark-1536.png",
+      "bytes": 128154,
+      "sha256": "511ba5510214a1a358529ff8aa167ef674e9c547dfae470b99dfb075a7eeb7e5",
+      "fullPage": true,
+      "key": "work-delivered",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Work · delivered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-requested-dark-1536.png",
+      "bytes": 143971,
+      "sha256": "046164381d8364a60c0b82a6662eb7c1ece00c08369ae101ce423b2ebc8c2862",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1076,
+        "title": "dap design · Decision · requested · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-changes-dark-1536.png",
+      "bytes": 137695,
+      "sha256": "b022ee645f4b98648fa6644ab07c8970e4e84a5118cffaeb9df97a97c15852ac",
+      "fullPage": true,
+      "key": "decision-changes",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · changes · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-approved-dark-1536.png",
+      "bytes": 137959,
+      "sha256": "5a8ea00de0f57262a06defaa37439374ca720a2ace150b833bf9f1406b9c0f17",
+      "fullPage": true,
+      "key": "decision-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1076,
+        "title": "dap design · Decision · approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-decided-dark-1536.png",
+      "bytes": 132024,
+      "sha256": "763877b410d36c346976898a65edd98daf04d969c051e6827a5040c500d67135",
+      "fullPage": true,
+      "key": "decision-decided",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Decision · decided · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-refused-dark-1536.png",
+      "bytes": 150120,
+      "sha256": "a93622f0ad8903515a4e3ec1bc6db7200ccd5c6e00bc3f5bed71dbddb2bf7793",
+      "fullPage": true,
+      "key": "decision-refused",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · refused · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-unrequested-dark-1536.png",
+      "bytes": 147074,
+      "sha256": "fa4de215bb00dfb1fcbba39f2c788ebc635d359b9c7c8d9c3632ebcead9039ea",
+      "fullPage": true,
+      "key": "decision-unrequested",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1174,
+        "title": "dap design · Decision · unrequested · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-stale-dark-1536.png",
+      "bytes": 81187,
+      "sha256": "5cd1e061fd830c87d4af083c6dcb9bc74936a62904d576aa3fd97fe36165ba2a",
+      "fullPage": true,
+      "key": "decision-stale",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Decision · stale · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-review-dark-1536.png",
+      "bytes": 148942,
+      "sha256": "cb04a432b9c700901f8f45db92e3cc15225e5a3c76f4c92cda4c16c4b6eff6d0",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1130,
+        "title": "dap design · Change · review · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-changes-dark-1536.png",
+      "bytes": 84111,
+      "sha256": "752593c471e4330ea65e066b3d8f5a030fda108b75e236868a34be73ad0c9448",
+      "fullPage": true,
+      "key": "change-changes",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · changes · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-dark-1536.png",
+      "bytes": 110310,
+      "sha256": "44a259dce748659b8da3a400d0bd2031684eb0b9625d4ba8b314b74ffa38ee5a",
+      "fullPage": true,
+      "key": "change-secondary",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1116,
+        "title": "dap design · Change · secondary · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-approved-dark-1536.png",
+      "bytes": 107169,
+      "sha256": "df4e81c4571597c6768fb12dda2039505891ad1fa5f9c446057eedecd9bb8a10",
+      "fullPage": true,
+      "key": "change-secondary-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1116,
+        "title": "dap design · Change · secondary-approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-published-dark-1536.png",
+      "bytes": 83165,
+      "sha256": "07aa064937d093552aae1c715b378ed19f3e0215e5ab4caadc4633fdf9b93bf8",
+      "fullPage": true,
+      "key": "change-secondary-published",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · secondary-published · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-approved-dark-1536.png",
+      "bytes": 146029,
+      "sha256": "1c156c1a959611a26a8c14ce1b52fea52fc3863939871484913ce6c23187e935",
+      "fullPage": true,
+      "key": "change-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-stale-dark-1536.png",
+      "bytes": 83627,
+      "sha256": "456e3d4b23dbc561e6b94df9b2a6bf6be02570179df0a15733360d4ae3c7b9ed",
+      "fullPage": true,
+      "key": "change-stale",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · stale · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-no-checks-dark-1536.png",
+      "bytes": 146379,
+      "sha256": "0827e04b8b6554b36d53c91260d0e20f00fad89c27adfd3fb8eec40a74ae315c",
+      "fullPage": true,
+      "key": "change-no-checks",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · no-checks · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-check-failed-dark-1536.png",
+      "bytes": 147179,
+      "sha256": "ec580cebfa8131ef2448d269063de348ced2ede3ebe02d678b4c326e58a71d3d",
+      "fullPage": true,
+      "key": "change-check-failed",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1047,
+        "title": "dap design · Change · check-failed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-unknown-dark-1536.png",
+      "bytes": 94366,
+      "sha256": "33128e58ce78d4cc8fb8652d5ffb4fa30ff063ea1634b1003bc3d8be0a1c11a4",
+      "fullPage": true,
+      "key": "change-unknown",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · unknown · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-recovery-unavailable-dark-1536.png",
+      "bytes": 98426,
+      "sha256": "a205b22bc60066140eacaa47721d959a8aa692bac3141ae3e8870e3b6a423b91",
+      "fullPage": true,
+      "key": "change-recovery-unavailable",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · recovery-unavailable · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-published-dark-1536.png",
+      "bytes": 86637,
+      "sha256": "a8ce681e1af9db9f333acc7d0bf2b253c7c0474ec6ae3c0967e04039c6eeddd0",
+      "fullPage": true,
+      "key": "change-published",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · published · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-keyboard-published-dark-1536.png",
+      "bytes": 64764,
+      "sha256": "a9155838f5fb971d572203b94403d9b7de1427892cf94e41cced4db76eab82ae",
+      "fullPage": true,
+      "key": "change-keyboard-published",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · Change · keyboard-published · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-file-dark-1536.png",
+      "bytes": 74593,
+      "sha256": "41b58377743ac6c73d8a87ce254e8bd58cf6dd10b3510562ff454ff3426f89b4",
+      "fullPage": true,
+      "key": "file-file",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · File and diff · file · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-diff-dark-1536.png",
+      "bytes": 86588,
+      "sha256": "078d29e28518384cd7b66c982e80a29d3a12178ef80b7356ac387ca860cdf76e",
+      "fullPage": true,
+      "key": "file-diff",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1025,
+        "title": "dap design · File and diff · diff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-interdiff-dark-1536.png",
+      "bytes": 88483,
+      "sha256": "a4b02e2af509bc151f51b5e5e0d0441afbc4d4b945d87bcc46e32d5db2bce815",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1025,
+        "title": "dap design · File and diff · interdiff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-truncated-dark-1536.png",
+      "bytes": 90469,
+      "sha256": "4d9549a2b7895ae82ca7891ec479a74cd1af8bb440ac94c73ca8514b23f54fc6",
+      "fullPage": true,
+      "key": "file-truncated",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1063,
+        "title": "dap design · File and diff · truncated · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-secondary-diff-dark-1536.png",
+      "bytes": 55865,
+      "sha256": "510188b0a681e0704d2ea768bcbbe0ed277c47c0640f8760b3da19ff8d0ce5e9",
+      "fullPage": true,
+      "key": "file-secondary-diff",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 1024,
+        "title": "dap design · File and diff · secondary-diff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "index-light-1536.png",
+      "bytes": 309436,
+      "sha256": "5dd315b45003c6b01dc63712d0c394de1466056e470f0ad8a2149e16e4b96ec4",
+      "fullPage": true,
+      "key": "index",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 3694,
+        "title": "dap design · Catalogue · all states · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "index-dark-1536.png",
+      "bytes": 309529,
+      "sha256": "f91a54199f90bc8b0f02e6d46d4d1fb55d79d23cfb271ed2366daa17777e83f0",
+      "fullPage": true,
+      "key": "index",
+      "theme": "dark",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "metrics": {
+        "width": 1536,
+        "scrollWidth": 1536,
+        "height": 3694,
+        "title": "dap design · Catalogue · all states · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-you-light-390.png",
+      "bytes": 110413,
+      "sha256": "414883e9b3fd38fdb6ca64c605362b06b08f5581fc2c669a04e249a5640a4ff6",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1832,
+        "title": "dap design · Needs you · current · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-reviewed-light-390.png",
+      "bytes": 111763,
+      "sha256": "0996f444ca5c0e36e52026b33e074c206162ea42a0d2b9dd4fc0ae027a1b6806",
+      "fullPage": true,
+      "key": "needs-reviewed",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1787,
+        "title": "dap design · Needs you · reviewed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-partial-light-390.png",
+      "bytes": 132110,
+      "sha256": "f41c8d362c05f2ab618a36631cb4e747a1eafdf69cef05af734fa4ee1b80b04e",
+      "fullPage": true,
+      "key": "needs-partial",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2156,
+        "title": "dap design · Needs you · partial · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-empty-light-390.png",
+      "bytes": 32118,
+      "sha256": "c2d142cbce0ab59b4140cec291c845a1816cb50f5c2ec99ccf7b022347416ade",
+      "fullPage": true,
+      "key": "needs-empty",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "title": "dap design · Needs you · empty · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-ready-light-390.png",
+      "bytes": 87190,
+      "sha256": "9d5820fc8199d5e981bb47068125a40b28b85b757595c5233f800086c614bf69",
+      "fullPage": true,
+      "key": "work-ready",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1621,
+        "title": "dap design · Work · ready · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-interface-light-390.png",
+      "bytes": 93715,
+      "sha256": "ee347aeb0800203f3e43fd75e7a2ab85059f6d47e5bcf020143450415dfe313c",
+      "fullPage": true,
+      "key": "work-offered-interface",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1705,
+        "title": "dap design · Work · offered-interface · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-storage-light-390.png",
+      "bytes": 94020,
+      "sha256": "9d85284cb404fe0f33232fcd553cf8d1a9aa18398571a31e91d140208888e9dd",
+      "fullPage": true,
+      "key": "work-offered-storage",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1705,
+        "title": "dap design · Work · offered-storage · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-light-390.png",
+      "bytes": 100023,
+      "sha256": "0e731dcef1e61ab334ddeda51b168d9f4c3d5e869a36c0f89493834efbf83841",
+      "fullPage": true,
+      "key": "work-offered",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1788,
+        "title": "dap design · Work · offered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-active-light-390.png",
+      "bytes": 102017,
+      "sha256": "2bace01ada8b9e9bf6b2b1dbee2483e3f9eb86dda2927e99f88b023886837b3e",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1858,
+        "title": "dap design · Work · active · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-terms-changed-light-390.png",
+      "bytes": 112881,
+      "sha256": "fac1f0e2e850a31d03aaeec9662e7333794a15d3bdda7a839a964204c86a3f3c",
+      "fullPage": true,
+      "key": "work-terms-changed",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2007,
+        "title": "dap design · Work · terms-changed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-interface-light-390.png",
+      "bytes": 105868,
+      "sha256": "65ad7b2bd8eabb0024516433469e5c306c4229c401b78b174378af871c9c9838",
+      "fullPage": true,
+      "key": "work-reoffered-interface",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1872,
+        "title": "dap design · Work · reoffered-interface · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-storage-light-390.png",
+      "bytes": 105928,
+      "sha256": "5508f6b99f700d553d5ce276f7f0440945d6c9f3413ab6da51cf00daa468dc6c",
+      "fullPage": true,
+      "key": "work-reoffered-storage",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1872,
+        "title": "dap design · Work · reoffered-storage · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-light-390.png",
+      "bytes": 117430,
+      "sha256": "7127bde7d0b213caa40daba73255656c634e43f1cb0f85c64aea5b0675a66ed5",
+      "fullPage": true,
+      "key": "work-reoffered",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1994,
+        "title": "dap design · Work · reoffered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-resumed-light-390.png",
+      "bytes": 99446,
+      "sha256": "371c3f35f9997418816657e57957c0c2d19149e36f5780767dfd1157b72c5db4",
+      "fullPage": true,
+      "key": "work-resumed",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1839,
+        "title": "dap design · Work · resumed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-stalled-light-390.png",
+      "bytes": 120943,
+      "sha256": "9b322006a7ed050eea3593c9919c726c75956c5f86917b1952d937a86c317718",
+      "fullPage": true,
+      "key": "work-stalled",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2116,
+        "title": "dap design · Work · stalled · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-delivered-light-390.png",
+      "bytes": 102995,
+      "sha256": "41501d356c19e1e1ffe049d83126b8595042ce8aedc2b15fe6a238dbefb4d7ff",
+      "fullPage": true,
+      "key": "work-delivered",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1839,
+        "title": "dap design · Work · delivered · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-requested-light-390.png",
+      "bytes": 109853,
+      "sha256": "1dff5fd3085a1a2609e45fd776578b8885994c177adfc371d0d1decbf5ec13e1",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1569,
+        "title": "dap design · Decision · requested · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-changes-light-390.png",
+      "bytes": 105999,
+      "sha256": "b6d24e6ba5a814c9605f0a56a819042e1396b97d2545aacc6b907630e055eb36",
+      "fullPage": true,
+      "key": "decision-changes",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1505,
+        "title": "dap design · Decision · changes · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-approved-light-390.png",
+      "bytes": 106185,
+      "sha256": "91e3e4e8ad77517402ca82a48c034bdc74afdfc46bd44890cdfd40395e32b4f5",
+      "fullPage": true,
+      "key": "decision-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1445,
+        "title": "dap design · Decision · approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-decided-light-390.png",
+      "bytes": 102863,
+      "sha256": "5745833b68cae1717e0334605418250db01cf345001e209258fba0432d218a25",
+      "fullPage": true,
+      "key": "decision-decided",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1383,
+        "title": "dap design · Decision · decided · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-refused-light-390.png",
+      "bytes": 116662,
+      "sha256": "a58f2a8e99bf2ab6f78e8a385c106e388bc12ff3c9d8697d9d88109b5ddc5c2f",
+      "fullPage": true,
+      "key": "decision-refused",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1617,
+        "title": "dap design · Decision · refused · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-unrequested-light-390.png",
+      "bytes": 115077,
+      "sha256": "cd6a0b0ae92f54f15591803d25d9b122aec3739c2dcd33e468c8c9bd76ee4fc4",
+      "fullPage": true,
+      "key": "decision-unrequested",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1617,
+        "title": "dap design · Decision · unrequested · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-stale-light-390.png",
+      "bytes": 58352,
+      "sha256": "165d7bcb5246fab8483ebcbaf1890ec207fb1222a6f071da90051c9072722a5e",
+      "fullPage": true,
+      "key": "decision-stale",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 855,
+        "title": "dap design · Decision · stale · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-review-light-390.png",
+      "bytes": 107155,
+      "sha256": "c19f940969078c60780c54a0bc1062870b6441579ad540bd7a0ac04f3bcb4c36",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1683,
+        "title": "dap design · Change · review · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-changes-light-390.png",
+      "bytes": 60351,
+      "sha256": "1b9354cf9fdcaa29ff0e2c0c1fc129f250a2e62412ea2a78524c45afd32df26d",
+      "fullPage": true,
+      "key": "change-changes",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1059,
+        "title": "dap design · Change · changes · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-light-390.png",
+      "bytes": 76458,
+      "sha256": "ab306d47d2755b5eb8ec4211c035dfe3aee406e78d87cea742fa7eaf4a734656",
+      "fullPage": true,
+      "key": "change-secondary",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1253,
+        "title": "dap design · Change · secondary · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-approved-light-390.png",
+      "bytes": 73730,
+      "sha256": "ebff5190f53d554e833cbc908555c696cefa69d743e26aaf86fa4d5d880ce9b9",
+      "fullPage": true,
+      "key": "change-secondary-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1191,
+        "title": "dap design · Change · secondary-approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-approved-light-390.png",
+      "bytes": 105250,
+      "sha256": "840057258aaf276e9ea1696b6c7bb4bff1a4415c5807a30828304464e9648397",
+      "fullPage": true,
+      "key": "change-approved",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · approved · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-stale-light-390.png",
+      "bytes": 61503,
+      "sha256": "a2a86a96cbbc678f89a263fbd30d6b67d8cb8bd6cb38877ee2f2dc6450eb6730",
+      "fullPage": true,
+      "key": "change-stale",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1023,
+        "title": "dap design · Change · stale · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-no-checks-light-390.png",
+      "bytes": 104863,
+      "sha256": "3a6c05800342990d7aff3a7fa897112da50040f14f8e023300dec17288a29a4d",
+      "fullPage": true,
+      "key": "change-no-checks",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · no-checks · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-check-failed-light-390.png",
+      "bytes": 105209,
+      "sha256": "651017f38dae7238c65022e380f62fd35339e0610c899a9af4c39447be7a18f7",
+      "fullPage": true,
+      "key": "change-check-failed",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · check-failed · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-unknown-light-390.png",
+      "bytes": 63318,
+      "sha256": "fd71bf6eebf3df667e9cc2e3eb22a5cbf61805d1a923e027c96ead9cd8e0d6bd",
+      "fullPage": true,
+      "key": "change-unknown",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 987,
+        "title": "dap design · Change · unknown · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-recovery-unavailable-light-390.png",
+      "bytes": 68301,
+      "sha256": "aa7a8b125508935544fa21dc930f1710d5927f8d3a15b841246c1acf10d009fd",
+      "fullPage": true,
+      "key": "change-recovery-unavailable",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1037,
+        "title": "dap design · Change · recovery-unavailable · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-file-light-390.png",
+      "bytes": 49316,
+      "sha256": "82d43bca3f6e46d7d8b94917019a5c2aa7faeacac1c20180636c103e84793432",
+      "fullPage": true,
+      "key": "file-file",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1000,
+        "title": "dap design · File and diff · file · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-diff-light-390.png",
+      "bytes": 59246,
+      "sha256": "89509c5a7a8375734d3b39b26f6669a9943571ed4166f6e7ebe1642a03aec87b",
+      "fullPage": true,
+      "key": "file-diff",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1107,
+        "title": "dap design · File and diff · diff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-interdiff-light-390.png",
+      "bytes": 59912,
+      "sha256": "4b4b590a4fc1676cb6d6f47aaa48a5dbc17f839105dc7505a5f86166c676e600",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1128,
+        "title": "dap design · File and diff · interdiff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-truncated-light-390.png",
+      "bytes": 62726,
+      "sha256": "acbc4646302645f82f098566cd3dce11ac793316f07c09d1e8cf02292ba047a2",
+      "fullPage": true,
+      "key": "file-truncated",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1172,
+        "title": "dap design · File and diff · truncated · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-secondary-diff-light-390.png",
+      "bytes": 34829,
+      "sha256": "08975bc79f53c55e39b78fdbd1ff94aa523b0bf18d457c93b662296f28614f0a",
+      "fullPage": true,
+      "key": "file-secondary-diff",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "title": "dap design · File and diff · secondary-diff · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-you-dark-390.png",
+      "bytes": 110208,
+      "sha256": "5d1b92a4eaac4060158f177003a3bd0a4680f300ffd4004d4ce44296849cda31",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1832,
+        "title": "dap design · Needs you · current · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-reviewed-dark-390.png",
+      "bytes": 111643,
+      "sha256": "fcecb837c7c0adc94f8a1d3ec2c2b16024cd85d00d4e9cb89943197ffcaae046",
+      "fullPage": true,
+      "key": "needs-reviewed",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1787,
+        "title": "dap design · Needs you · reviewed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-partial-dark-390.png",
+      "bytes": 132020,
+      "sha256": "35641b5f291b1930dcf65744f9540c976885661d9f6e6df653d153c112b28438",
+      "fullPage": true,
+      "key": "needs-partial",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2156,
+        "title": "dap design · Needs you · partial · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-empty-dark-390.png",
+      "bytes": 32052,
+      "sha256": "d0605ac95c0034cee5dbb7eff25cdaccb5c23f0352349f80e921d47241d961f6",
+      "fullPage": true,
+      "key": "needs-empty",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "title": "dap design · Needs you · empty · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-ready-dark-390.png",
+      "bytes": 86982,
+      "sha256": "bad8c14e7359dc44c907ea0adff98c47a5a9746e9ffb24b25985225518f47c2c",
+      "fullPage": true,
+      "key": "work-ready",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1621,
+        "title": "dap design · Work · ready · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-interface-dark-390.png",
+      "bytes": 93587,
+      "sha256": "75f5b703bb64412c5323f53103762e61c6a66ed12de13a157c09a0099611d734",
+      "fullPage": true,
+      "key": "work-offered-interface",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1705,
+        "title": "dap design · Work · offered-interface · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-storage-dark-390.png",
+      "bytes": 93888,
+      "sha256": "2b2e0f761f890abdbd8d85afe9a663937d94aacdc70cb1459d99e503044bff1c",
+      "fullPage": true,
+      "key": "work-offered-storage",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1705,
+        "title": "dap design · Work · offered-storage · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-offered-dark-390.png",
+      "bytes": 100179,
+      "sha256": "fb388cab095fd2a102ae7802a3470eb785244fc0484213e61e80a3295cf2facb",
+      "fullPage": true,
+      "key": "work-offered",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1788,
+        "title": "dap design · Work · offered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-active-dark-390.png",
+      "bytes": 101880,
+      "sha256": "2f93cb5764eed94a2171348150132b251b5c87ee845eda25e00eea04a81b7991",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1858,
+        "title": "dap design · Work · active · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-terms-changed-dark-390.png",
+      "bytes": 112941,
+      "sha256": "9ac0ded0c027b7479664f1de63f3654f773cab9ffa66328dc5ea73564590ae43",
+      "fullPage": true,
+      "key": "work-terms-changed",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2007,
+        "title": "dap design · Work · terms-changed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-interface-dark-390.png",
+      "bytes": 105921,
+      "sha256": "97e3a517860d25c3e4324a447e104e45dc4fa42fca789ca359358ed537ea9535",
+      "fullPage": true,
+      "key": "work-reoffered-interface",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1872,
+        "title": "dap design · Work · reoffered-interface · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-storage-dark-390.png",
+      "bytes": 105969,
+      "sha256": "4f185954c393f6ee4a8891b9438c0f600b7b024de2aa1ea0135acdc737cf6bc8",
+      "fullPage": true,
+      "key": "work-reoffered-storage",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1872,
+        "title": "dap design · Work · reoffered-storage · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-reoffered-dark-390.png",
+      "bytes": 117663,
+      "sha256": "7c5bd8445d4a8804a4897b3436181aaeab09094e3d9e8dc193f4e1ccb7765df0",
+      "fullPage": true,
+      "key": "work-reoffered",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1994,
+        "title": "dap design · Work · reoffered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-resumed-dark-390.png",
+      "bytes": 99392,
+      "sha256": "b05da3c5fb43e5c0a233ba7e66e9d7788cc02e053414ed67520697d7f95891e4",
+      "fullPage": true,
+      "key": "work-resumed",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1839,
+        "title": "dap design · Work · resumed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-stalled-dark-390.png",
+      "bytes": 120696,
+      "sha256": "4908a2eb45c7303685c386dbed8cbc6f57edf8d9ceac47cd3aa6ad911b12a0f7",
+      "fullPage": true,
+      "key": "work-stalled",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 2116,
+        "title": "dap design · Work · stalled · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "work-delivered-dark-390.png",
+      "bytes": 102817,
+      "sha256": "0b4c7f1bc2243e73c1db8b50b4699d9835a3fffd8ebbdff31482274a3d69e0a4",
+      "fullPage": true,
+      "key": "work-delivered",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1839,
+        "title": "dap design · Work · delivered · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-requested-dark-390.png",
+      "bytes": 109735,
+      "sha256": "7b3e94ed89d3d91f648ff97a4f9ef3301cda99484811935691ef38fde2256dca",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1569,
+        "title": "dap design · Decision · requested · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-changes-dark-390.png",
+      "bytes": 105237,
+      "sha256": "6dbc30a8f780aa551e154c99f83c0ce29e3fbd4f65dcb0c08c13acb6af98a251",
+      "fullPage": true,
+      "key": "decision-changes",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1505,
+        "title": "dap design · Decision · changes · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-approved-dark-390.png",
+      "bytes": 106219,
+      "sha256": "d5b42e1c13d379704b853cdfc7f266e96fb44f82c21a0d34a02ccbe5c33c2c25",
+      "fullPage": true,
+      "key": "decision-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1445,
+        "title": "dap design · Decision · approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-decided-dark-390.png",
+      "bytes": 102970,
+      "sha256": "25d016a1afa66c9cc92e2b61b2361add194e4dc5cd9fd4b6bd9b49148d0759c2",
+      "fullPage": true,
+      "key": "decision-decided",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1383,
+        "title": "dap design · Decision · decided · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-refused-dark-390.png",
+      "bytes": 116105,
+      "sha256": "c3ffe5e1a2e189ead0f00b95983f26f17cd163b584afdfc58fa233db88560c53",
+      "fullPage": true,
+      "key": "decision-refused",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1617,
+        "title": "dap design · Decision · refused · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-unrequested-dark-390.png",
+      "bytes": 114422,
+      "sha256": "c6f0aa8ca70ced84192e3bab96a2a7155a5aa562cd5b9327593ae5d30986175f",
+      "fullPage": true,
+      "key": "decision-unrequested",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1617,
+        "title": "dap design · Decision · unrequested · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "decision-stale-dark-390.png",
+      "bytes": 58005,
+      "sha256": "a3762659664c15d0030827056ee563ce0d5ce046a6f960e2a9002254e22488b6",
+      "fullPage": true,
+      "key": "decision-stale",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 855,
+        "title": "dap design · Decision · stale · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-review-dark-390.png",
+      "bytes": 107298,
+      "sha256": "e57fc0fa43f34dca9064d8096c8683024957fe892b6f11f28a4b2e230a422b7a",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1683,
+        "title": "dap design · Change · review · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-changes-dark-390.png",
+      "bytes": 60346,
+      "sha256": "808dc3de79f215ce7f76e1b89381ef6a9ab0072411c3f41a1f87c5705257b1d6",
+      "fullPage": true,
+      "key": "change-changes",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1059,
+        "title": "dap design · Change · changes · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-dark-390.png",
+      "bytes": 76468,
+      "sha256": "3c0b85a5859735e3f1348ef0020345a28c1253ffcbb29b3324687a3feed3aef4",
+      "fullPage": true,
+      "key": "change-secondary",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1253,
+        "title": "dap design · Change · secondary · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-secondary-approved-dark-390.png",
+      "bytes": 73697,
+      "sha256": "a4a3e23ba436dfb2e351c5b373b6471bf42daac8af7300d4c48be2bb54bf1881",
+      "fullPage": true,
+      "key": "change-secondary-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1191,
+        "title": "dap design · Change · secondary-approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-approved-dark-390.png",
+      "bytes": 105523,
+      "sha256": "ec246bd37b64770cddfe5bc12a359bc12adeee905c86672ce1ccc298a13f2eb0",
+      "fullPage": true,
+      "key": "change-approved",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · approved · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-stale-dark-390.png",
+      "bytes": 61575,
+      "sha256": "53e7596c123b0d5f8eb32d36ca473f96d33a39f763c4813d4d006ed06b5d7f40",
+      "fullPage": true,
+      "key": "change-stale",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1023,
+        "title": "dap design · Change · stale · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-no-checks-dark-390.png",
+      "bytes": 105474,
+      "sha256": "52bba19ecd2d1c2e9d4fcdb733150969c2499212a8f26811bf97bb8b579faa9b",
+      "fullPage": true,
+      "key": "change-no-checks",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · no-checks · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-check-failed-dark-390.png",
+      "bytes": 105810,
+      "sha256": "2c0d855d5c7461e52dbc3d43b5c9a15a6d36a08394f69068cf4c1dc1129b8d81",
+      "fullPage": true,
+      "key": "change-check-failed",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1579,
+        "title": "dap design · Change · check-failed · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-unknown-dark-390.png",
+      "bytes": 63615,
+      "sha256": "ed7e7393b15205f70e7a9582e7871d62a34d75bb4964185b02fe55329934f099",
+      "fullPage": true,
+      "key": "change-unknown",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 987,
+        "title": "dap design · Change · unknown · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "change-recovery-unavailable-dark-390.png",
+      "bytes": 68518,
+      "sha256": "4894554eb16eaebe90e2477dac775a90a7ce7242bbd39437281a6fb0d948493d",
+      "fullPage": true,
+      "key": "change-recovery-unavailable",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1037,
+        "title": "dap design · Change · recovery-unavailable · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-file-dark-390.png",
+      "bytes": 48727,
+      "sha256": "a2c3d3033e7d78494846123c336a841fc225af2345d80b608b01ab33c6d69ab2",
+      "fullPage": true,
+      "key": "file-file",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1000,
+        "title": "dap design · File and diff · file · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-diff-dark-390.png",
+      "bytes": 59606,
+      "sha256": "4c9f23e16b11847fac3daf8ff0b4c27714c6231f42854e1bb99121c8e4d61e0b",
+      "fullPage": true,
+      "key": "file-diff",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1107,
+        "title": "dap design · File and diff · diff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-interdiff-dark-390.png",
+      "bytes": 60431,
+      "sha256": "598cae454dc1f67e145457506f17b3851d2ba86e931ce2d0c918e9360abbf27f",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1128,
+        "title": "dap design · File and diff · interdiff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-truncated-dark-390.png",
+      "bytes": 62856,
+      "sha256": "88d26b67a0df2b84cc3cc02e803b7dffba76faf6548108320fceddefcd139611",
+      "fullPage": true,
+      "key": "file-truncated",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 1172,
+        "title": "dap design · File and diff · truncated · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "file-secondary-diff-dark-390.png",
+      "bytes": 34902,
+      "sha256": "8fdfeb43bd2c4b2946e925e3f652130ed92c5e0cad2196a1d5d101acfb0808d1",
+      "fullPage": true,
+      "key": "file-secondary-diff",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "title": "dap design · File and diff · secondary-diff · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "index-light-390.png",
+      "bytes": 224409,
+      "sha256": "e240f3216e91963fef127b44ef1d327fcc6e732837a1ff0478d0247ea5e26ab8",
+      "fullPage": true,
+      "key": "index",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 3463,
+        "title": "dap design · Catalogue · all states · light",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "index-dark-390.png",
+      "bytes": 223541,
+      "sha256": "541e7171c329e5db5ed9adf1461e0d5c793204361b3b46568a992f19f3bcbc62",
+      "fullPage": true,
+      "key": "index",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 3463,
+        "title": "dap design · Catalogue · all states · dark",
+        "scripts": 0,
+        "forms": 0,
+        "fonts": true,
+        "images": true,
+        "externalLinks": [],
+        "csp": "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src 'none'"
+      }
+    },
+    {
+      "file": "needs-you-light-1536-viewport.png",
+      "bytes": 137684,
+      "sha256": "170e2b2629bcbd2ecb184b7607866317f05a9744039f30f37a057e7967c5ce69",
+      "fullPage": false,
+      "key": "needs-you",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "file": "work-active-light-1536-viewport.png",
+      "bytes": 125422,
+      "sha256": "da8327753c02baad409bb4c8eebb5cdf8e02cc3dcdfaec746174237f1a0cd41e",
+      "fullPage": false,
+      "key": "work-active",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "file": "decision-requested-light-1536-viewport.png",
+      "bytes": 143166,
+      "sha256": "86c90896eb99a1fc179984791c7715bea74642d0b34cf9d4266a28ac14cafb33",
+      "fullPage": false,
+      "key": "decision-requested",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "file": "change-review-light-1536-viewport.png",
+      "bytes": 140782,
+      "sha256": "39d03d5b9e52927b5cd6084b8c885c9ca6de1f1da7a7274fcef5c118ebd3f383",
+      "fullPage": false,
+      "key": "change-review",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "file": "file-diff-light-1536-viewport.png",
+      "bytes": 86231,
+      "sha256": "386eb3cbdfc8cccfa9568cf2887cc968f5c184226e7add8375f8a5003047013a",
+      "fullPage": false,
+      "key": "file-diff",
+      "theme": "light",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      }
+    },
+    {
+      "file": "needs-you-dark-390-viewport.png",
+      "bytes": 52589,
+      "sha256": "c531cb746c05a80fb10f0d7509626c170571470690816989a7ffa2e900528b77",
+      "fullPage": false,
+      "key": "needs-you",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "change-unknown-light-390-viewport.png",
+      "bytes": 55201,
+      "sha256": "106c5af69136bf2047bf48155a08e412fac98fb1adb767366dfa7787d61e0808",
+      "fullPage": false,
+      "key": "change-unknown",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "file-interdiff-light-390-viewport.png",
+      "bytes": 47480,
+      "sha256": "bf89c8dd8a002965ca642b6fc877630bf626cc2fba380cafe300e27d8e24d2e2",
+      "fullPage": false,
+      "key": "file-interdiff",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "needs-you-320.png",
+      "bytes": 108886,
+      "sha256": "b2575cb4b3535f566771190856b5bf6ef85fe16d459c860e6bb9fed7c25fcea4",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "deviceScaleFactor": 1,
+      "note": "Narrow reflow"
+    },
+    {
+      "file": "work-active-320.png",
+      "bytes": 101276,
+      "sha256": "6366b0f956e1b4251a66025b2fdc7eb820dec2fadae8ed2e4a8c5bb101ef13ca",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "deviceScaleFactor": 1,
+      "note": "Narrow reflow"
+    },
+    {
+      "file": "decision-requested-320.png",
+      "bytes": 109122,
+      "sha256": "68a32dc2d853f47d31ee6d0c1b3aafd3f84122193cdaa20354989cbd615fc218",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "deviceScaleFactor": 1,
+      "note": "Narrow reflow"
+    },
+    {
+      "file": "change-review-320.png",
+      "bytes": 106418,
+      "sha256": "22bf3128ff6daca5beb31308448c7c85b7bdbf18d0e81d4bae30bea6e5fe6e89",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "deviceScaleFactor": 1,
+      "note": "Narrow reflow"
+    },
+    {
+      "file": "file-interdiff-320.png",
+      "bytes": 59251,
+      "sha256": "2f6f0ed773dd8a2a036cff35a16673e4c4b793a1e4a388290549b9789c54d5c8",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "deviceScaleFactor": 1,
+      "note": "Narrow reflow"
+    },
+    {
+      "file": "needs-you-zoom200-equivalent.png",
+      "bytes": 255508,
+      "sha256": "791b77741b970f35745d9febe09bf0e40235f585e8aea59b06d9dc87efeea9fe",
+      "fullPage": true,
+      "key": "needs-you",
+      "theme": "light",
+      "viewport": {
+        "width": 640,
+        "height": 450
+      },
+      "deviceScaleFactor": 2,
+      "note": "1280 × 900 physical pixels represented by 640 × 450 CSS pixels at scale 2; layout equivalent, not a real host zoom setting"
+    },
+    {
+      "file": "work-active-zoom200-equivalent.png",
+      "bytes": 244523,
+      "sha256": "b6a029d3b6523886a1d7022f66da40b2a33107b0ca037007e7dd099ccf5b7cc0",
+      "fullPage": true,
+      "key": "work-active",
+      "theme": "light",
+      "viewport": {
+        "width": 640,
+        "height": 450
+      },
+      "deviceScaleFactor": 2,
+      "note": "1280 × 900 physical pixels represented by 640 × 450 CSS pixels at scale 2; layout equivalent, not a real host zoom setting"
+    },
+    {
+      "file": "decision-requested-zoom200-equivalent.png",
+      "bytes": 239949,
+      "sha256": "54528bd082bdd5f113243ed560bee7f1a18d7765f84965b2b376cca0dabf0333",
+      "fullPage": true,
+      "key": "decision-requested",
+      "theme": "light",
+      "viewport": {
+        "width": 640,
+        "height": 450
+      },
+      "deviceScaleFactor": 2,
+      "note": "1280 × 900 physical pixels represented by 640 × 450 CSS pixels at scale 2; layout equivalent, not a real host zoom setting"
+    },
+    {
+      "file": "change-review-zoom200-equivalent.png",
+      "bytes": 242084,
+      "sha256": "c5cf80ebd8d5883892e9ee151212c13b26a21c06e874a300ddf99ddfb296d2b3",
+      "fullPage": true,
+      "key": "change-review",
+      "theme": "light",
+      "viewport": {
+        "width": 640,
+        "height": 450
+      },
+      "deviceScaleFactor": 2,
+      "note": "1280 × 900 physical pixels represented by 640 × 450 CSS pixels at scale 2; layout equivalent, not a real host zoom setting"
+    },
+    {
+      "file": "file-interdiff-zoom200-equivalent.png",
+      "bytes": 141219,
+      "sha256": "c739084c326e4d0ea821b3d1b9e139a8e1e48afa14032ceec9c9581fbe57c8a1",
+      "fullPage": true,
+      "key": "file-interdiff",
+      "theme": "light",
+      "viewport": {
+        "width": 640,
+        "height": 450
+      },
+      "deviceScaleFactor": 2,
+      "note": "1280 × 900 physical pixels represented by 640 × 450 CSS pixels at scale 2; layout equivalent, not a real host zoom setting"
+    },
+    {
+      "file": "sandbox-iframe-dark.png",
+      "bytes": 40601,
+      "sha256": "bd48e9726cb8d5d0bbdfbd3dc8205e307023cf1a77d20b50564d12803cb069a2",
+      "fullPage": false,
+      "iframe": {
+        "width": 390,
+        "scroll": 390,
+        "height": 1683,
+        "scripts": 0
+      },
+      "viewport": {
+        "width": 430,
+        "height": 680
+      },
+      "limits": "Layout only. No MCP handshake, bridge or host integration."
+    }
+  ],
+  "failures": [
+    {
+      "name": "needs-loading-light-1536",
+      "error": "AssertionError [ERR_ASSERTION]: needs-loading-light-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-unavailable-light-1536",
+      "error": "AssertionError [ERR_ASSERTION]: needs-unavailable-light-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "file-unavailable-light-1536",
+      "error": "AssertionError [ERR_ASSERTION]: file-unavailable-light-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-loading-dark-1536",
+      "error": "AssertionError [ERR_ASSERTION]: needs-loading-dark-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-unavailable-dark-1536",
+      "error": "AssertionError [ERR_ASSERTION]: needs-unavailable-dark-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "file-unavailable-dark-1536",
+      "error": "AssertionError [ERR_ASSERTION]: file-unavailable-dark-1536: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-loading-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: needs-loading-light-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-unavailable-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: needs-unavailable-light-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-secondary-published-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-secondary-published-light-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-published-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-published-light-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-keyboard-published-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-keyboard-published-light-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "file-unavailable-light-390",
+      "error": "AssertionError [ERR_ASSERTION]: file-unavailable-light-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-loading-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: needs-loading-dark-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "needs-unavailable-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: needs-unavailable-dark-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-secondary-published-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-secondary-published-dark-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-published-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-published-dark-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "change-keyboard-published-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: change-keyboard-published-dark-390: horizontal overflow 391/390\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:56)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "file-unavailable-dark-390",
+      "error": "AssertionError [ERR_ASSERTION]: file-unavailable-dark-390: fonts or images missing\n    at clean (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:33:197)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:86\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:50:4"
+    },
+    {
+      "name": "Keyboard focus, target sizes, full commits and reader tabs",
+      "error": "AssertionError [ERR_ASSERTION]: Small target File\n    at file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:74:105\n    at async check (file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:35:37)\n    at async file:///private/tmp/artroom-builder-journey-views-design-20261017/notes/2026-10-17-journey-views-design/render.mjs:68:2"
+    }
+  ],
+  "finished": "2026-10-17T16:41:24.719Z",
+  "status": "failed"
+}

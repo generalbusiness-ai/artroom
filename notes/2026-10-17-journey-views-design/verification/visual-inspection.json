@@ -1,0 +1,60 @@
+{
+  "method": "Current catch-up lists, reviewed state, pinned snapshot and checker diamond inspected with view_image. Work desktop concept reopened beside the current grouped entry list to compare the reused Recent record pattern. Unaffected viewport comparisons carried forward only by exact PNG hashes. See the fidelity ledger and planner P1/R1 corrections.",
+  "comparisons": [
+    {
+      "file": "work-active-light-1536-viewport.png",
+      "sha256": "05c96c901d0ffaee78fdec08c62fd80c9a75667985530861804b7e7e2fa42acc",
+      "inspection": "Byte-identical to the personally inspected fce231 viewport capture"
+    },
+    {
+      "file": "decision-requested-light-1536-viewport.png",
+      "sha256": "86c90896eb99a1fc179984791c7715bea74642d0b34cf9d4266a28ac14cafb33",
+      "inspection": "Byte-identical to the personally inspected fce231 viewport capture"
+    },
+    {
+      "file": "file-diff-light-1536-viewport.png",
+      "sha256": "981cddb2211c1e84c526e9e9aa74cf7aac2ce0a09293978cbe7dec8de9340edd",
+      "inspection": "Byte-identical to the personally inspected fce231 viewport capture"
+    },
+    {
+      "file": "change-unknown-light-390-viewport.png",
+      "sha256": "ce44b2e5c452dea7ceddf8c682baa67a60fd1d1f8c9a476543a276b701bbba5c",
+      "inspection": "Byte-identical to the personally inspected fce231 viewport capture"
+    },
+    {
+      "file": "file-interdiff-light-390-viewport.png",
+      "sha256": "b0f9f6c63d39252b4089a8ce2d9ac9a3bf5a1538e407e85c417cb30a68b5a0f4",
+      "inspection": "Byte-identical to the personally inspected fce231 viewport capture"
+    },
+    {
+      "file": "needs-you-light-1536-viewport.png",
+      "sha256": "106d2f27ef0bd212cb03de03b98140fc4076b1a69fec274b6214a16b50296041",
+      "inspection": "Current PNG personally inspected with view_image in the P1 review pass"
+    },
+    {
+      "file": "change-review-light-1536-viewport.png",
+      "sha256": "5cd8dc763a23e209259397bfa1d086e5a20bc7813955e3ea0edf142f8e052eac",
+      "inspection": "Current PNG personally inspected with view_image in the P1 review pass"
+    },
+    {
+      "file": "needs-you-light-1536-changes.png",
+      "sha256": "9c107360f5d7b5a9049d5698c0c9610649699faad551c59c3060fac37c6be23b",
+      "inspection": "Current PNG personally inspected with view_image in the P1 review pass"
+    },
+    {
+      "file": "catchup-change18-18-light-390.png",
+      "sha256": "01625688b109378a4383ec7bb76105fbe17a0a90c5361ced619a398ced90b649",
+      "inspection": "Current PNG personally inspected with view_image in the P1 review pass"
+    },
+    {
+      "file": "needs-reviewed-light-390-changes.png",
+      "sha256": "74e298175ee6d078d185ff8ac8d178e73793ce04c238959a1d7a83caec42effd",
+      "inspection": "Current PNG personally inspected with view_image in the P1 review pass"
+    },
+    {
+      "file": "needs-partial-dark-390-changes.png",
+      "sha256": "6a3ed3daedb5eb05ec62c5e1bebafc86b8e3b5c035a3485783dd8a5dd56ef3a5",
+      "inspection": "Personally inspected previous P1 capture, byte-identical to current"
+    }
+  ]
+}
