@@ -124,6 +124,11 @@ An audit lets agents run their own tests while lying stays costly. A
   refused when published. A member's unit tests and the room's
   integration tests can disagree for honest reasons, so a mismatch between
   them is not evidence of a false result.
+- The audit's room check always runs fresh. `reuse` does not apply to it:
+  rules that set `reuse: true` on a check that an audit names are refused
+  when published, and the destination never counts an earlier result as
+  the audit's run. An audit compares the member's recorded result with a
+  new run, not with another recorded result.
 - `every` is a positive whole number with a fixed upper bound in the data
   shape. The first slice accepts only `every: 1`: every landing that the
   check applies to also runs the audit.
@@ -174,6 +179,8 @@ the new job's key. It never searches the room's history. The publication
 records the earlier job that it counted. The counted result remains that
 job's result. The record never shows it as a new run.
 
+Before it counts an earlier pass, the destination compares every admitted
+pass and fail under the same eligibility rule, not the passes alone.
 When two eligible results for one key disagree, the check depends on more
 than the tree. The destination then disables reuse for that key, and a
 request to reuse it is refused with `check-disagrees`. A fresh run is not
@@ -203,39 +210,63 @@ not hold anything.
 A `published` check may say `holds: true`. Then a failure blocks later
 landings in the same extent. The destination records the hold, because
 the destination's versioned definition and state are what admit
-publications. It records the hold in its own state before it admits any
-later publication in that extent. The hold names:
+publications. A hold has a key:
 
-- the check name, its job and its configuration digest;
-- the rules revision in force;
-- the published commit that failed; and
+- the check name, its source, its stage and its configuration digest;
+- the rules revision in force, which is the hold's generation; and
 - the extent.
 
-While a hold stands, the destination refuses each later landing in that
-extent with `extent-regressed`. The exchange that sets and clears holds
-has these rules:
+The hold also records the failed job and the published commit.
+
+**When a hold takes effect.** A `published` check that is still running
+does not block later landings. Recording a failure and setting its hold
+are one update of the destination's state. The destination orders that
+update with its admissions, so every admission that it decides after the
+update sees the hold, and none decided before it does. A hold has no
+effect on a publication that was already admitted. While a hold stands,
+the destination refuses each later landing in that extent with
+`extent-regressed`.
+
+**Order.** The destination judges notices by its own recorded publication
+sequence, and by the order in which it admitted jobs within one
+publication. It never orders by commit hash or job identifier, and never
+by the order in which notices arrive.
+
+**What clears a hold.** Only a pass clears a hold, and only a pass from a
+job that meets all of these:
+
+- the destination admitted the job under the current rules;
+- the job is bound to the hold's exact key; and
+- the job's publication is the hold's publication or a later one in the
+  destination's sequence.
+
+A pass under another check, source, configuration or rules generation
+never clears a hold, whatever its commit or job order. The rest of the
+exchange has these rules:
 
 - Each result is bound to its job, as `checked` is today. A duplicate
   notice changes nothing.
-- Notices are judged by the order of the commits they name, not by the
-  order in which they arrive. A pass clears a hold only when it is for the
-  same commit or a later one. A late pass for an earlier release does not
-  clear the hold for a later release that failed. For one commit, the
-  later job decides.
-- A failure for a commit earlier than one that the same check has already
-  passed is recorded, but it does not set a hold.
+- A failure for a publication earlier than one that the same key has
+  already passed is recorded, but it does not set a hold.
 - A timeout, an error, an unknown outcome or an unavailable observation is
   not a pass. It never clears a hold, and with `holds: true` it sets one,
   with its reason.
 - Closing the maintainers' intent, or any other intent, does not clear a
   hold.
-- An admin or maintainer can release a hold by a separate act at the
-  destination that names the hold and gives a reason. The record shows it
-  as an override, not as a pass, and it says nothing about current health.
+- If the rules or the check's configuration change while a hold stands,
+  the hold stays. A pass under the new generation does not clear it. An
+  admin or maintainer releases it by a transition act that names the old
+  hold and the new generation, or by an override.
+- An admin or maintainer can release a hold by an override act at the
+  destination that names the hold and gives a reason.
+
+The record shows a transition or an override as that act, never as a
+pass, and neither says anything about current health.
 
 These rules keep the forge design's four facts apart: the commit is the
-subject, the hold and the override are the authority, the check's result
-is the provider's outcome, and none of them states current health.
+subject, the hold and the acts that release it are the authority, the
+check's result is the provider's outcome, and none of them states current
+health.
 
 The lane fixes each check's deadline at 1,800 seconds. A `deadline` field
 in the rules would give each stage its own time budget. It belongs in the
@@ -276,7 +307,8 @@ sit.
 | `work` and `landing` stages | The same versions | Open |
 | `room` source in production, and audits at `every: 1` | A production adapter for the checker service | Open. Decision 4 puts it in the first slice. |
 | Audits with `every` above 1 | Independent randomness committed after the result, and an attempt identity that cancel and retry cannot change | Open. Not in the first slice. |
-| `published` stage and holds | Hold state and its release exchange in the destination's new version, and one more message from the destination to the lane | Partly met. Platform scopes already send to the lane. The hold state is new. |
+| `published` stage and holds | Hold state, its release exchange and the transition act in the destination's new version, and one more message from the destination to the lane | Partly met. Platform scopes already send to the lane. The hold state is new. |
+| Holding landings while a `published` check is still running | A mode of `holds` that blocks admissions until the check's result is recorded | Open. Not in the first slice. |
 | `outside` source | An operation form for a check run, its owner, and what the room trusts in its answer. Only `hold@1` and `git-read@1` exist. | Open |
 | Health checks after a deployment | The deployment contract of the [forge design](2026-10-15-unified-forge-design.md#48-execution-evidence-and-external-outcomes) | Open |
 | Showing why a check failed | A store for run logs. `details` is only a digest. | Open: [evidence capture](../docs/roadmap.md#evidence-capture-and-private-custody) |
@@ -312,7 +344,10 @@ The slice's witnesses would show these things:
 - An audited landing whose two results disagree is refused.
 - Rules whose audit names a check with another configuration are refused.
 - Rules with `every` other than 1 are refused in the first slice.
-- A cancelled and retried landing of the same tree still runs the audit.
+- A cancelled and retried landing of the same tree gets a fresh audit
+  run, even though an admitted pass from the cancelled reservation exists
+  for the same tree, configuration, source and stage.
+- Rules that set `reuse: true` on a check that an audit names are refused.
 - A reused passed result counts on an equal tree and is refused on a
   different one.
 - A passed result from a different source is not eligible for reuse.
@@ -321,7 +356,14 @@ The slice's witnesses would show these things:
 - `reuse: true` on a `published` check is refused.
 - A failed `published` check opens an intent, and with `holds: true`
   refuses the next landing in its extent.
-- A late pass for an earlier commit does not clear a hold for a later one.
+- A late pass for an earlier publication does not clear a hold for a
+  later one.
+- A pass under another configuration or rules generation, on the same or
+  a later commit, does not clear a hold.
+- A failure that races the next admission is recorded either before it,
+  and the admission is refused, or after it, and the publication is
+  admitted while the hold applies to the next one. It never takes effect
+  in part.
 - A duplicate or reordered failure notice does not lose a hold.
 - Closing the maintainers' intent, or another intent, does not clear a
   hold.
@@ -332,7 +374,7 @@ The slice's witnesses would show these things:
 The witnesses belong in the lane scenarios and the destination's judge
 tests, where the [testing guide](../docs/testing.md) places them.
 
-## Changes in draft 2
+## Changes in drafts 2 and 3
 
 Draft 2 answers the checker's review of draft 1.
 
@@ -361,3 +403,20 @@ Draft 2 answers the checker's review of draft 1.
   shows the open work, including where the room's service key mark is
   held. The `outside` basis is an owner-defined class of observation, and
   its trust contract stays open.
+
+Draft 3 answers the checker's review of draft 2.
+
+- **F1, hold recovery.** A hold has a key: check, source, stage,
+  configuration and rules generation, with the extent. Only a pass from a
+  job that the destination admitted under the current rules, bound to that
+  key, on the same or a later publication, clears it. A change of rules or
+  configuration needs a transition act or an override. Order is the
+  destination's own publication sequence. A running `published` check
+  does not block landings, a recorded failure blocks every admission
+  decided after it, and a hold never reaches back to an admitted
+  publication. New witnesses cover a pass under another generation and a
+  failure that races an admission.
+- **F2, audit and reuse.** An audit's room check always runs fresh, and
+  rules that let it be reused are refused. Reuse compares admitted passes
+  and fails alike. A new witness covers a retried landing with a pass from
+  the cancelled reservation.
