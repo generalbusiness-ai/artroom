@@ -106,7 +106,7 @@ when the hold ends. It is also the base for hosted agent teams working on a
 repository. *Done when* two agents each push to their own hold's fork, a
 token stops working when its hold ends, and the change publishes from the
 chosen fork. *Depends on* MVP S0's finding on hold staging. Live use needs
-a Worker deploy, so it waits for the freeze to lift (open question 3).
+a Worker deploy, so it waits for the freeze to lift (open question 2).
 
 **J5. The smallest attention loop.** The inbox holds attention items but
 "No send leaves it, no timed rule exists and no entry starts a task"
@@ -180,11 +180,15 @@ proposal to remove 36 acts by merging `-own`/`-any` pairs (line 64).
 ## 4. Critical path
 
 - **The MCP Apps views design comes before any view slice.** The 16
-  October sprint report lists it as owed
-  (`notes/reports/2026-10-16-sprint-report.md:108`). It now covers five
+  October sprint report listed it as owed by the planner
+  (`notes/reports/2026-10-16-sprint-report.md:108`); builder now owns it,
+  using web-application and mobile-application design practice, since the
+  person returns from a phone as well as the desktop. It covers five
   views: Needs you (with J5's three reasons), Work, Decision, Change, and
-  file, diff and interdiff (J2). MVP S2, S4 and S6, and J2 and J5, wait
-  for it.
+  file, diff and interdiff (J2). Each has a desktop and a narrow mobile
+  layout, in light and dark, with the major flows shown end to end, as a
+  design note with HTML mockups and rendered images reviewed by the
+  checker. MVP S2, S4 and S6, and J2 and J5, wait for it.
 - **J3 and J4 come before the steps of the journey that run real work.**
   Without J3, no check runs and the view says "no checks ran". Without J4,
   agents share the destination's one repository and the journey cannot
@@ -196,7 +200,6 @@ proposal to remove 36 acts by merging `-own`/`-any` pairs (line 64).
 1. Must the exit test's cloud agents be dap-hosted agent teams, or may
    they be agent sessions running elsewhere with their own agent keys
    (MVP section 1.1)?
-2. Who writes the MCP Apps views design, and where is it reviewed?
-3. If J4 cannot be deployed before the exit test, does the first run use
+2. If J4 cannot be deployed before the exit test, does the first run use
    the destination's one repository and record per-hold forks as a known
    gap?
