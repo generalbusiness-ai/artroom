@@ -66,9 +66,9 @@ export function observedFetch(original: Fetch): Fetch {
     try {
       const op = active();
       if (op) {
-        const route = new URL(url).pathname.split("/").at(-1), method = init?.method ?? "GET";
+        const parts = new URL(url).pathname.split("/"), route = parts.at(-1), method = init?.method ?? "GET";
         if (method === "GET" || (method === "POST" && route === "sessions")) {
-          mcpRead(["items", "history", "outbox", "log"].includes(route ?? ""));
+          mcpRead(parts.at(-2) === "items" || ["items", "query-items", "history", "outbox", "log"].includes(route ?? ""));
         }
       }
     } catch { const op = active(); if (op) lost(op); }
@@ -103,13 +103,16 @@ export class McpMetrics {
     try { op = this.#context(tool); } catch { return work(); }
     const start = this.#clock();
     return local.run(op, async () => {
-      let outcome: { end: string; reason: string; numbers: number[] } | null = { end: "error", reason: "exception", numbers: [0, 0, 0, 0] };
+      let outcome: { end: string; reason: string; numbers: number[] } | null = null;
       try {
         const value = await work();
         try { const got = describe(value); outcome = { end: got.end, reason: got.reason ?? "none", numbers: got.numbers }; } catch { lost(op); outcome = null; }
         return value;
       } catch (error) {
-        if (failure) { try { const got = failure(error); outcome = { end: got.end, reason: got.reason ?? "none", numbers: [0, 0, 0, 0] }; } catch { lost(op); outcome = null; } }
+        try {
+          const got = failure?.(error) ?? { end: "error", reason: "exception" };
+          outcome = { end: got.end, reason: got.reason ?? "none", numbers: kind === "tools-list" ? [0, 0, op.reads, 0] : [op.reads, op.pages, 0, 0] };
+        } catch { lost(op); outcome = null; }
         throw error;
       } finally {
         try { if (outcome) emit(op, kind, outcome.end, outcome.reason, [this.#clock() - start, ...outcome.numbers], true); } catch { lost(op); }

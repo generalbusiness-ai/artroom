@@ -10,7 +10,7 @@ import { secretSigner } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/dap-lanes";
 import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
-import { ERROR_BYTES, failed } from "../src/service.ts";
+import { ERROR_BYTES, failed, ListRestart } from "../src/service.ts";
 import { finding } from "../src/errors.ts";
 import { fileStore } from "../src/node.ts";
 import type { McpMetricOptions, McpMetricPoint } from "../src/metrics.ts";
@@ -78,6 +78,18 @@ async function listOf(service: McpService): Promise<{ tools: number; pages: numb
 }
 
 describe("what a call costs, end to end", () => {
+  test("an invalid tool-list cursor retains the inventory read attempts before restart", async () => {
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo], { metrics: { report: point => { metrics.push(point); } } });
+    await expect(s.service.page("invalid-fixture-cursor")).rejects.toBeInstanceOf(ListRestart);
+    const observed = metrics.filter(point => point.blobs[0] === "tools-list");
+    expect(observed).toHaveLength(1);
+    expect(observed[0]!.blobs.slice(4, 6)).toEqual(["refused", "restart"]);
+    const attempts = reads(s.stand.requests) + sessions(s.stand.requests);
+    expect(attempts).toBeGreaterThan(0);
+    expect(observed[0]!.doubles.slice(2)).toEqual([0, 0, attempts, 0]);
+    expect(metrics.at(-1)!.doubles.slice(1, 3)).toEqual([0, 0]);
+  });
   // Invariant: each tool's reads, warm and cold, are within section 8's table, and its whole result within its bound: a cold
   // call adds one session request, an expired session one more, a refused session one signed read per read, and a session the
   // scope refuses on a read one signed-read fallback for that read.
