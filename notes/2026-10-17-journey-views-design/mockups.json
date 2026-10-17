@@ -1,0 +1,727 @@
+{
+  "kind": "static-design-fixtures",
+  "noLiveActs": true,
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "commits": {
+    "Base": "8475e1beda99cd9b32d3617f1fb255664090fbe0",
+    "Version 1 source": "94e6b0427e0779b4cd686d3c46ec196cf105aacc",
+    "Version 2 source": "569c9aeed9e74b4d803f874cfbfbd90a9218c24d",
+    "Version 1 integration": "62a6aced9f5b9e2473d33960fb336721de14582f",
+    "Version 2 integration": "6ef56437b0cf81a1d95c2a00b7c539d1856e0fdf",
+    "Change 9 integration": "1faf54e188a46dd8edeb5ead4adb7f9fbee10fb4",
+    "Change 18 integration": "d664779063515feb27b0532f708970d1c4f68008",
+    "Change 18 source": "edc3a252bcf84cdd0fb28ea459bf6419106ea223"
+  },
+  "pages": [
+    {
+      "key": "needs-you",
+      "family": "Needs you",
+      "state": "current",
+      "theme": "light",
+      "path": "needs-you-light.html",
+      "sha256": "e58b565ea3ad1a640b44fb29d61595364783d64ae0d36de555f605add8d15fdc"
+    },
+    {
+      "key": "needs-reviewed",
+      "family": "Needs you",
+      "state": "reviewed",
+      "theme": "light",
+      "path": "needs-reviewed-light.html",
+      "sha256": "42e6eb1933252f3f6e65acaf72accd39c029ffd38347dd2e1f675187040ccc0f"
+    },
+    {
+      "key": "needs-partial",
+      "family": "Needs you",
+      "state": "partial",
+      "theme": "light",
+      "path": "needs-partial-light.html",
+      "sha256": "f79316b53383a2b400e3345e526a3c9535bfb6daf18b6fe7c30f74f044eb9089"
+    },
+    {
+      "key": "needs-empty",
+      "family": "Needs you",
+      "state": "empty",
+      "theme": "light",
+      "path": "needs-empty-light.html",
+      "sha256": "5eb244e5da992cd41bd6a407aa62d0a062045228b491ce9227737e967f2d310e"
+    },
+    {
+      "key": "needs-loading",
+      "family": "Needs you",
+      "state": "loading",
+      "theme": "light",
+      "path": "needs-loading-light.html",
+      "sha256": "a1c54425ea348bfe08ee6f91e588b96824bf2bd007010b7fa6cfda1e6c93843e"
+    },
+    {
+      "key": "needs-unavailable",
+      "family": "Needs you",
+      "state": "unavailable",
+      "theme": "light",
+      "path": "needs-unavailable-light.html",
+      "sha256": "f1d9c8bdb05ce9c5e68d993751fe2722a5f0aa9e909d80ea587d8915be1d9ca6"
+    },
+    {
+      "key": "work-ready",
+      "family": "Work",
+      "state": "ready",
+      "theme": "light",
+      "path": "work-ready-light.html",
+      "sha256": "5bddff3ee26411e073d9253796e36863a36baedf04f25945a3c92a50eb5d1fc9"
+    },
+    {
+      "key": "work-offered-interface",
+      "family": "Work",
+      "state": "offered-interface",
+      "theme": "light",
+      "path": "work-offered-interface-light.html",
+      "sha256": "2c54d3b5f260735044ddbc17817661c6ecca1a73a6eac6bccd383d36ba1f8572"
+    },
+    {
+      "key": "work-offered-storage",
+      "family": "Work",
+      "state": "offered-storage",
+      "theme": "light",
+      "path": "work-offered-storage-light.html",
+      "sha256": "2a4155ca6e779d7866b2405c51925a9dc192bc8a6cae20b522497bcf420ac512"
+    },
+    {
+      "key": "work-offered",
+      "family": "Work",
+      "state": "offered",
+      "theme": "light",
+      "path": "work-offered-light.html",
+      "sha256": "5be32692e783ed4ffc76b952f169018b28b645d2882d56d02e450382cbbb6818"
+    },
+    {
+      "key": "work-active",
+      "family": "Work",
+      "state": "active",
+      "theme": "light",
+      "path": "work-active-light.html",
+      "sha256": "630299f972b330735635cf469151382ebab9fecee29e1e876551b327bcddf326"
+    },
+    {
+      "key": "work-terms-changed",
+      "family": "Work",
+      "state": "terms-changed",
+      "theme": "light",
+      "path": "work-terms-changed-light.html",
+      "sha256": "b69750ea304d3d804f11096e70107618c3aa981920e419defbc885205176ccab"
+    },
+    {
+      "key": "work-reoffered-interface",
+      "family": "Work",
+      "state": "reoffered-interface",
+      "theme": "light",
+      "path": "work-reoffered-interface-light.html",
+      "sha256": "c4bf1084b523a4c5d5647257457ddee49587a56720b3b9ae0ab4ba2e108d872c"
+    },
+    {
+      "key": "work-reoffered-storage",
+      "family": "Work",
+      "state": "reoffered-storage",
+      "theme": "light",
+      "path": "work-reoffered-storage-light.html",
+      "sha256": "065815546617974309020c63ed1227b18c6132e327b78129638bd9784553899f"
+    },
+    {
+      "key": "work-reoffered",
+      "family": "Work",
+      "state": "reoffered",
+      "theme": "light",
+      "path": "work-reoffered-light.html",
+      "sha256": "95d7d48e555d1c6a5ac61e3af42ae031f5bf260c9364369e2bf88afd0b251c16"
+    },
+    {
+      "key": "work-resumed",
+      "family": "Work",
+      "state": "resumed",
+      "theme": "light",
+      "path": "work-resumed-light.html",
+      "sha256": "95352cae0bcca988cf7cc0cfac84910c0386c3ec0f86a078a6b2e62627288070"
+    },
+    {
+      "key": "work-stalled",
+      "family": "Work",
+      "state": "stalled",
+      "theme": "light",
+      "path": "work-stalled-light.html",
+      "sha256": "0913c4df8f6a23d31b1ce86bb651caee2dbe971587ace24df5c27d955182a82f"
+    },
+    {
+      "key": "work-delivered",
+      "family": "Work",
+      "state": "delivered",
+      "theme": "light",
+      "path": "work-delivered-light.html",
+      "sha256": "88ed3b92c30f39b7fda6baf6a306af735b2539e5ca85318b56d36f826ce53198"
+    },
+    {
+      "key": "decision-requested",
+      "family": "Decision",
+      "state": "requested",
+      "theme": "light",
+      "path": "decision-requested-light.html",
+      "sha256": "6e2baec4de6d686c74fb2a2a5b6006c2d8c42b06a50c34e0bdaf5decbfe1d49c"
+    },
+    {
+      "key": "decision-changes",
+      "family": "Decision",
+      "state": "changes",
+      "theme": "light",
+      "path": "decision-changes-light.html",
+      "sha256": "cbea293d67e3274a359d665c471d145aa9faa0acd63ac2d0db43c177226539ab"
+    },
+    {
+      "key": "decision-approved",
+      "family": "Decision",
+      "state": "approved",
+      "theme": "light",
+      "path": "decision-approved-light.html",
+      "sha256": "b1abcb76580ad61fd3cdfed389ba5fc01d9447f8de4cbeeb09f04bbd72e2f97b"
+    },
+    {
+      "key": "decision-decided",
+      "family": "Decision",
+      "state": "decided",
+      "theme": "light",
+      "path": "decision-decided-light.html",
+      "sha256": "66d0c7bd16e645514127b42698ec217c9da37c1270ad4f00a732c64738a08ed9"
+    },
+    {
+      "key": "decision-refused",
+      "family": "Decision",
+      "state": "refused",
+      "theme": "light",
+      "path": "decision-refused-light.html",
+      "sha256": "417c44a29e4f5ac79d26756fc41477e33f4ec91d520f08911dc493ed2921f746"
+    },
+    {
+      "key": "decision-unrequested",
+      "family": "Decision",
+      "state": "unrequested",
+      "theme": "light",
+      "path": "decision-unrequested-light.html",
+      "sha256": "7c720746666d379c91795977c579e5c52016130c35ba97953a54336a1d7a3d09"
+    },
+    {
+      "key": "decision-stale",
+      "family": "Decision",
+      "state": "stale",
+      "theme": "light",
+      "path": "decision-stale-light.html",
+      "sha256": "e6c0aba5a64b2bfae5f16456ebd6996a491e4846d0f20978b76e6dd4b0de3c8a"
+    },
+    {
+      "key": "change-review",
+      "family": "Change",
+      "state": "review",
+      "theme": "light",
+      "path": "change-review-light.html",
+      "sha256": "6dc12f0bab44b18ffa81f89afd080f2dba8c7b9c6a4502d85562b741a291af5c"
+    },
+    {
+      "key": "change-changes",
+      "family": "Change",
+      "state": "changes",
+      "theme": "light",
+      "path": "change-changes-light.html",
+      "sha256": "3de5684c5d70ebee079925265fcafe3e45a54b09b763d3be41517c6a642393ed"
+    },
+    {
+      "key": "change-secondary",
+      "family": "Change",
+      "state": "secondary",
+      "theme": "light",
+      "path": "change-secondary-light.html",
+      "sha256": "92fc4d41b619f3c2d1b3b5780937a6f6bb0c2480ab46b41837d9b2263052cb7c"
+    },
+    {
+      "key": "change-secondary-approved",
+      "family": "Change",
+      "state": "secondary-approved",
+      "theme": "light",
+      "path": "change-secondary-approved-light.html",
+      "sha256": "f6bfd65c7692cdb96f0e7303d50cbc07fc4bf0569569221697e0f0ba21b95467"
+    },
+    {
+      "key": "change-secondary-published",
+      "family": "Change",
+      "state": "secondary-published",
+      "theme": "light",
+      "path": "change-secondary-published-light.html",
+      "sha256": "b1f2a967575ed52973d0275af893a9cd9f7a4472fb4d52165bf07cd86ea3c31f"
+    },
+    {
+      "key": "change-approved",
+      "family": "Change",
+      "state": "approved",
+      "theme": "light",
+      "path": "change-approved-light.html",
+      "sha256": "15e8c56723679059d71a70a1c9bf8353a808a88cedcc75b482d9657f3a375197"
+    },
+    {
+      "key": "change-stale",
+      "family": "Change",
+      "state": "stale",
+      "theme": "light",
+      "path": "change-stale-light.html",
+      "sha256": "b6b37d938914dae80be00bccc475242d612d06ae5297816e12c86bac2e1d49c5"
+    },
+    {
+      "key": "change-no-checks",
+      "family": "Change",
+      "state": "no-checks",
+      "theme": "light",
+      "path": "change-no-checks-light.html",
+      "sha256": "8d25f42eb95216e8f0c0317ded690fcd75f870520c1a811f72c2b6678b8efd6f"
+    },
+    {
+      "key": "change-check-failed",
+      "family": "Change",
+      "state": "check-failed",
+      "theme": "light",
+      "path": "change-check-failed-light.html",
+      "sha256": "b4e058d093bdbec59d10261cc7be0aaa3f7629ba9fe6197656c46ad4eda28ce0"
+    },
+    {
+      "key": "change-unknown",
+      "family": "Change",
+      "state": "unknown",
+      "theme": "light",
+      "path": "change-unknown-light.html",
+      "sha256": "07652c1ed2eb1cf44e072346745605f55807aa045f4d7e49e10f3384e751e546"
+    },
+    {
+      "key": "change-recovery-unavailable",
+      "family": "Change",
+      "state": "recovery-unavailable",
+      "theme": "light",
+      "path": "change-recovery-unavailable-light.html",
+      "sha256": "16424367f3f7df1948a6af7ccd1acb902309b404558c56afb930ac5190316eeb"
+    },
+    {
+      "key": "change-published",
+      "family": "Change",
+      "state": "published",
+      "theme": "light",
+      "path": "change-published-light.html",
+      "sha256": "24c1b1e799bddb78890e628e4a842bbe1f6bde58f4fbb33b63623d44bf69bb3e"
+    },
+    {
+      "key": "change-keyboard-published",
+      "family": "Change",
+      "state": "keyboard-published",
+      "theme": "light",
+      "path": "change-keyboard-published-light.html",
+      "sha256": "7dcfd2a72994a04bcba13a4f2530fbd0e4a7726091f485bdded0a592d0891a62"
+    },
+    {
+      "key": "file-file",
+      "family": "File and diff",
+      "state": "file",
+      "theme": "light",
+      "path": "file-file-light.html",
+      "sha256": "76223db764177314613a4a6964472b1cb3a8065d8652e0d993ca153980c4a68b"
+    },
+    {
+      "key": "file-diff",
+      "family": "File and diff",
+      "state": "diff",
+      "theme": "light",
+      "path": "file-diff-light.html",
+      "sha256": "66d20dfa9c2f853e5227450b5b106d1f2181c9f290875595d95d3be893138247"
+    },
+    {
+      "key": "file-interdiff",
+      "family": "File and diff",
+      "state": "interdiff",
+      "theme": "light",
+      "path": "file-interdiff-light.html",
+      "sha256": "94f89449655b3e370537f473cae90465a83c35fff22a8f7e604add0f9ddd7b13"
+    },
+    {
+      "key": "file-truncated",
+      "family": "File and diff",
+      "state": "truncated",
+      "theme": "light",
+      "path": "file-truncated-light.html",
+      "sha256": "0386ec580e88215470ef8c2641822a7e4f021fb05161cc120c8169ec6ac6b356"
+    },
+    {
+      "key": "file-unavailable",
+      "family": "File and diff",
+      "state": "unavailable",
+      "theme": "light",
+      "path": "file-unavailable-light.html",
+      "sha256": "74116ee0ab7277b8fc337941eb6caaa40bf0e7cf2485454a9db0106deb6575aa"
+    },
+    {
+      "key": "file-secondary-diff",
+      "family": "File and diff",
+      "state": "secondary-diff",
+      "theme": "light",
+      "path": "file-secondary-diff-light.html",
+      "sha256": "cfa24b31520e7d01cacd723018ae4fed9e9f006f31e7d93f5116665b65a3b099"
+    },
+    {
+      "key": "needs-you",
+      "family": "Needs you",
+      "state": "current",
+      "theme": "dark",
+      "path": "needs-you-dark.html",
+      "sha256": "30c39fae5bfd92c15027635c7c9333a0489f0a32dc4461412538014e12f4ca58"
+    },
+    {
+      "key": "needs-reviewed",
+      "family": "Needs you",
+      "state": "reviewed",
+      "theme": "dark",
+      "path": "needs-reviewed-dark.html",
+      "sha256": "b0e438692d6796f4470a71ec47099a287a33d32a9898d21bad824e503dca6c71"
+    },
+    {
+      "key": "needs-partial",
+      "family": "Needs you",
+      "state": "partial",
+      "theme": "dark",
+      "path": "needs-partial-dark.html",
+      "sha256": "2dcda740dccc138875def0b1f703a3002cd4a941ff26790822d0df24b39120c2"
+    },
+    {
+      "key": "needs-empty",
+      "family": "Needs you",
+      "state": "empty",
+      "theme": "dark",
+      "path": "needs-empty-dark.html",
+      "sha256": "f74390bc1adb4d3e296f9d73c2f98f4b735d9529fd6e77a1998082dd1dc74b93"
+    },
+    {
+      "key": "needs-loading",
+      "family": "Needs you",
+      "state": "loading",
+      "theme": "dark",
+      "path": "needs-loading-dark.html",
+      "sha256": "b046654fbe6f5716f61e2cd8f34b01c58667b684727e02bcffa67700b6f76939"
+    },
+    {
+      "key": "needs-unavailable",
+      "family": "Needs you",
+      "state": "unavailable",
+      "theme": "dark",
+      "path": "needs-unavailable-dark.html",
+      "sha256": "55c5c492aed6c1a511b137409497f088665528cc89e4cb5607148917c32dfbc0"
+    },
+    {
+      "key": "work-ready",
+      "family": "Work",
+      "state": "ready",
+      "theme": "dark",
+      "path": "work-ready-dark.html",
+      "sha256": "6fde96fc7a9b135ca4c63b3be3a1874a24be6ed2e437d8be5bc08efa4517f565"
+    },
+    {
+      "key": "work-offered-interface",
+      "family": "Work",
+      "state": "offered-interface",
+      "theme": "dark",
+      "path": "work-offered-interface-dark.html",
+      "sha256": "912bdd04295bea294bf06f470034e044495f09875325be86a824572439751e9c"
+    },
+    {
+      "key": "work-offered-storage",
+      "family": "Work",
+      "state": "offered-storage",
+      "theme": "dark",
+      "path": "work-offered-storage-dark.html",
+      "sha256": "0ce4129b92231cac3a2e7766089f983a9fbd9872365f65a51577ca13bfa36a13"
+    },
+    {
+      "key": "work-offered",
+      "family": "Work",
+      "state": "offered",
+      "theme": "dark",
+      "path": "work-offered-dark.html",
+      "sha256": "bc3b1386d3385203b1ac6cb6f0b4ab4820fe1c444f2dbce373936cd7a5bfdcf8"
+    },
+    {
+      "key": "work-active",
+      "family": "Work",
+      "state": "active",
+      "theme": "dark",
+      "path": "work-active-dark.html",
+      "sha256": "040402237eac283bae7fde3ae17d5f5ff5ddaf91e561197c097ca55f44656ea9"
+    },
+    {
+      "key": "work-terms-changed",
+      "family": "Work",
+      "state": "terms-changed",
+      "theme": "dark",
+      "path": "work-terms-changed-dark.html",
+      "sha256": "4da133fe9aebbaf245cdf02fbf693613f317f55b0f23e703a2c38ccf214bcc5d"
+    },
+    {
+      "key": "work-reoffered-interface",
+      "family": "Work",
+      "state": "reoffered-interface",
+      "theme": "dark",
+      "path": "work-reoffered-interface-dark.html",
+      "sha256": "87c8411680c08086184c015ffe783d790d94431c5485d5390b89bc890f0857d4"
+    },
+    {
+      "key": "work-reoffered-storage",
+      "family": "Work",
+      "state": "reoffered-storage",
+      "theme": "dark",
+      "path": "work-reoffered-storage-dark.html",
+      "sha256": "8df58a53a65b73a09cca984e40a1a13f91e464784c402bcb146dbad3174082fb"
+    },
+    {
+      "key": "work-reoffered",
+      "family": "Work",
+      "state": "reoffered",
+      "theme": "dark",
+      "path": "work-reoffered-dark.html",
+      "sha256": "e3a440bb243db5dc635567e22e37303b2fc9a13abc72d357b56b60a4a946c42c"
+    },
+    {
+      "key": "work-resumed",
+      "family": "Work",
+      "state": "resumed",
+      "theme": "dark",
+      "path": "work-resumed-dark.html",
+      "sha256": "23fc53edeaff602ffe393661b2efb5b049e11439f0da9b43195f41b16df0961e"
+    },
+    {
+      "key": "work-stalled",
+      "family": "Work",
+      "state": "stalled",
+      "theme": "dark",
+      "path": "work-stalled-dark.html",
+      "sha256": "645aa1d0f09c9af7c73bd0e4f61c7505ec6cbad8429e3ec9d2eddf7c85bfee90"
+    },
+    {
+      "key": "work-delivered",
+      "family": "Work",
+      "state": "delivered",
+      "theme": "dark",
+      "path": "work-delivered-dark.html",
+      "sha256": "be6aa4ebedb9d530d65d93c093d7094a6d2ef7807829e0bfb993508f164af0dc"
+    },
+    {
+      "key": "decision-requested",
+      "family": "Decision",
+      "state": "requested",
+      "theme": "dark",
+      "path": "decision-requested-dark.html",
+      "sha256": "9aa7d53696313a9cbd98ca830ae8aa3cc16f522eef92e61ebd8998c03be2df75"
+    },
+    {
+      "key": "decision-changes",
+      "family": "Decision",
+      "state": "changes",
+      "theme": "dark",
+      "path": "decision-changes-dark.html",
+      "sha256": "e7f0a9c50c4176dd1dba4687b995c9d1732330ee9e2a22016b0ce011c25267c0"
+    },
+    {
+      "key": "decision-approved",
+      "family": "Decision",
+      "state": "approved",
+      "theme": "dark",
+      "path": "decision-approved-dark.html",
+      "sha256": "cd8b1e1531fc3857db0e789b90763e312c46ac54c43f75ebaed44a799de5e408"
+    },
+    {
+      "key": "decision-decided",
+      "family": "Decision",
+      "state": "decided",
+      "theme": "dark",
+      "path": "decision-decided-dark.html",
+      "sha256": "adf2d11e25f8592dadecb3ac759b80d7dbd3480ab2795c14882e3b1ba96e1574"
+    },
+    {
+      "key": "decision-refused",
+      "family": "Decision",
+      "state": "refused",
+      "theme": "dark",
+      "path": "decision-refused-dark.html",
+      "sha256": "320879b572e485c8db2925c8a36a84b52650865a0909adc00bb71821414fe316"
+    },
+    {
+      "key": "decision-unrequested",
+      "family": "Decision",
+      "state": "unrequested",
+      "theme": "dark",
+      "path": "decision-unrequested-dark.html",
+      "sha256": "2bb35d970d87d6e0e512c2bd0dad82f994b3451d76a5e439c495a300c8d25ffa"
+    },
+    {
+      "key": "decision-stale",
+      "family": "Decision",
+      "state": "stale",
+      "theme": "dark",
+      "path": "decision-stale-dark.html",
+      "sha256": "dba72875d3701c0a32902605ef2a1f5674e94b9ccbe9fd2e77a81130d45250ac"
+    },
+    {
+      "key": "change-review",
+      "family": "Change",
+      "state": "review",
+      "theme": "dark",
+      "path": "change-review-dark.html",
+      "sha256": "6aeb4f118c71d7b65ff1bda7b42972510deb3291007985747986fa545920effa"
+    },
+    {
+      "key": "change-changes",
+      "family": "Change",
+      "state": "changes",
+      "theme": "dark",
+      "path": "change-changes-dark.html",
+      "sha256": "0aedb917720b309c8276114f2ccbe22b324f34792f32f86662007415a64ec00d"
+    },
+    {
+      "key": "change-secondary",
+      "family": "Change",
+      "state": "secondary",
+      "theme": "dark",
+      "path": "change-secondary-dark.html",
+      "sha256": "61c85328fbda646bf31677b764d6f574946a00396cea7c809b5ea20ae5b3ca78"
+    },
+    {
+      "key": "change-secondary-approved",
+      "family": "Change",
+      "state": "secondary-approved",
+      "theme": "dark",
+      "path": "change-secondary-approved-dark.html",
+      "sha256": "13cf18ff300210b08a6eb70937675a0203e054ea3c61206b1096849682bbc513"
+    },
+    {
+      "key": "change-secondary-published",
+      "family": "Change",
+      "state": "secondary-published",
+      "theme": "dark",
+      "path": "change-secondary-published-dark.html",
+      "sha256": "035f8fa67c04953ef0c61b997a4bb3adc4d7e56d34ffdcc6efc8c274acd47eaa"
+    },
+    {
+      "key": "change-approved",
+      "family": "Change",
+      "state": "approved",
+      "theme": "dark",
+      "path": "change-approved-dark.html",
+      "sha256": "f29f8f650a006ae4140cfb51b06e7368a0a63b179f10136484f8fb29dd89249e"
+    },
+    {
+      "key": "change-stale",
+      "family": "Change",
+      "state": "stale",
+      "theme": "dark",
+      "path": "change-stale-dark.html",
+      "sha256": "22ee5913a228a6c372fba9809e62c973c017a773d970d4eeb8dbdd518523c82d"
+    },
+    {
+      "key": "change-no-checks",
+      "family": "Change",
+      "state": "no-checks",
+      "theme": "dark",
+      "path": "change-no-checks-dark.html",
+      "sha256": "0d5b2f6d98d05c6c57f6fe0f4b83e8829069f529cc66488a9ce8ad5a1377311a"
+    },
+    {
+      "key": "change-check-failed",
+      "family": "Change",
+      "state": "check-failed",
+      "theme": "dark",
+      "path": "change-check-failed-dark.html",
+      "sha256": "dc5d55237d2ceb40e38fbb6c23dec951d31d0a08321defaa5778c33dbd2fd809"
+    },
+    {
+      "key": "change-unknown",
+      "family": "Change",
+      "state": "unknown",
+      "theme": "dark",
+      "path": "change-unknown-dark.html",
+      "sha256": "2636b65bde6c001443791cd480cfb13e259c883ed98046aad2d7eebd408998fe"
+    },
+    {
+      "key": "change-recovery-unavailable",
+      "family": "Change",
+      "state": "recovery-unavailable",
+      "theme": "dark",
+      "path": "change-recovery-unavailable-dark.html",
+      "sha256": "0d512e426bb46fc5842e4fed25d16be348c3ddc72dd925006238d7fcaa0d7c96"
+    },
+    {
+      "key": "change-published",
+      "family": "Change",
+      "state": "published",
+      "theme": "dark",
+      "path": "change-published-dark.html",
+      "sha256": "b976a151d2d8f97744c76a6cf5ac4b45ad1824366268616db8ef70537e1a95e6"
+    },
+    {
+      "key": "change-keyboard-published",
+      "family": "Change",
+      "state": "keyboard-published",
+      "theme": "dark",
+      "path": "change-keyboard-published-dark.html",
+      "sha256": "08afd387cd28c62534ced71aa3718afd0699d49b702a1c33c908791d7fece89c"
+    },
+    {
+      "key": "file-file",
+      "family": "File and diff",
+      "state": "file",
+      "theme": "dark",
+      "path": "file-file-dark.html",
+      "sha256": "79afa93db67ec6c8a62957a14a3e460fed6e6358ecd52f91f053dadc05b2042c"
+    },
+    {
+      "key": "file-diff",
+      "family": "File and diff",
+      "state": "diff",
+      "theme": "dark",
+      "path": "file-diff-dark.html",
+      "sha256": "68cb7977369782e8cc4dfa6bc9339321cf1eee098afc3224c3a833b24294cbbd"
+    },
+    {
+      "key": "file-interdiff",
+      "family": "File and diff",
+      "state": "interdiff",
+      "theme": "dark",
+      "path": "file-interdiff-dark.html",
+      "sha256": "37169a7c667b9eec3f87d9b51917dd01bd9e3cfb7669d8b53b4dfffc9ea59ccb"
+    },
+    {
+      "key": "file-truncated",
+      "family": "File and diff",
+      "state": "truncated",
+      "theme": "dark",
+      "path": "file-truncated-dark.html",
+      "sha256": "21fcdb4e69bf535121f8653de83c81d12834992c220e3370983b1e99b16ce5c1"
+    },
+    {
+      "key": "file-unavailable",
+      "family": "File and diff",
+      "state": "unavailable",
+      "theme": "dark",
+      "path": "file-unavailable-dark.html",
+      "sha256": "60c46b55a4408bccf2a58e6fc2c71a3b8da4a30387da49af332822133b4b104d"
+    },
+    {
+      "key": "file-secondary-diff",
+      "family": "File and diff",
+      "state": "secondary-diff",
+      "theme": "dark",
+      "path": "file-secondary-diff-dark.html",
+      "sha256": "04d3166d56edf696ca7c10841b6c0190aae4173dfc2d31544e098e531d7768f8"
+    }
+  ],
+  "stateCount": 44,
+  "pageCount": 88,
+  "renderStatus": "Generation alone proves no browser result. See renders/render-index.json for separate evidence."
+}

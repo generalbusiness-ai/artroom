@@ -1,0 +1,45 @@
+{
+  "method": "Selected concept pairs inspected with view_image; final eight viewport PNGs are byte-identical to the inspected previous-final captures. Final partial and diff captures inspected again after the last run. See the design note fidelity ledger.",
+  "comparisons": [
+    {
+      "file": "needs-you-light-1536-viewport.png",
+      "sha256": "170e2b2629bcbd2ecb184b7607866317f05a9744039f30f37a057e7967c5ce69",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "work-active-light-1536-viewport.png",
+      "sha256": "83b3f96debd8cc7fe134c496d931341905df24466ec58fa38630a6cb61902a1d",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "decision-requested-light-1536-viewport.png",
+      "sha256": "86c90896eb99a1fc179984791c7715bea74642d0b34cf9d4266a28ac14cafb33",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "change-review-light-1536-viewport.png",
+      "sha256": "bf601b1f7117296caab70c357df87d745d838fafeca75c4821dc3cfcf9ee5234",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "file-diff-light-1536-viewport.png",
+      "sha256": "981cddb2211c1e84c526e9e9aa74cf7aac2ce0a09293978cbe7dec8de9340edd",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "needs-you-dark-390-viewport.png",
+      "sha256": "c531cb746c05a80fb10f0d7509626c170571470690816989a7ffa2e900528b77",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "change-unknown-light-390-viewport.png",
+      "sha256": "62f4e7874abe4894cc42130f2d28aca4e7583c60738e2d3d66bdd2105cfb5e79",
+      "identicalToInspectedPreviousFinal": true
+    },
+    {
+      "file": "file-interdiff-light-390-viewport.png",
+      "sha256": "7dee16f5c5dacbd76085013077f61379fce9339dcdb7ea1531a9e5b47f701f47",
+      "identicalToInspectedPreviousFinal": true
+    }
+  ]
+}

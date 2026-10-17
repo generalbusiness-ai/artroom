@@ -1,9 +1,10 @@
 # Journey views in the AI app
 
-Draft, 17 October 2026. Request `a9a3585c`, clarified by `9b70e9b6`.
+Design packet, 17 October 2026. Request `a9a3585c`, clarified by `9b70e9b6`.
 Source `b410d2f0`, promise `355b9a8b`, starts from Main `2637e6bb`.
-The design is not submitted for approval yet. HTML mockups, their browser
-renders, the complete checks, checker approval, and planner read remain due.
+The packet contains static HTML mockups, concepts and browser PNGs.
+Exact-head checker approval and planner read remain due. These examples
+implement no production view or live act.
 
 The person starts work, leaves, and returns to the same shared record.
 They can understand a decision, inspect an exact change, and confirm its
@@ -28,7 +29,8 @@ The main task is **Clear completed**. Its issue history has these steps:
 1. Entry 220 sets conditions v1: add Clear completed, hide completed tasks
    from the active list, and leave unfinished tasks unchanged.
 2. Separate offers and acceptances bind each agent to those conditions.
-   The interface offer is entry 221 and its acceptance is entry 222.
+   The two offers are entries 221 and 222. The interface acceptance is
+   entry 223, followed by the storage acceptance at entry 224.
 3. Storage agent asks whether clearing should keep history, then blocks
    its work. Interface work can continue independently.
 4. Entry 245 sets question text v2. It proposes keeping history and
@@ -73,6 +75,7 @@ Every displayed short hash has a full value under **Full commits**.
 | Version 2 integration | `6ef56437b0cf81a1d95c2a00b7c539d1856e0fdf` |
 | Change 9 integration | `1faf54e188a46dd8edeb5ead4adb7f9fbee10fb4` |
 | Change 18 version 2 integration | `d664779063515feb27b0532f708970d1c4f68008` |
+| Change 18 version 2 source | `edc3a252bcf84cdd0fb28ea459bf6419106ea223` |
 
 File shows a file at one exact commit. Diff compares the base with the
 selected integration. Interdiff compares the two integrations on their
@@ -128,8 +131,9 @@ with the design assets. The final mockups remain HTML and CSS.
 Generated references are visual specifications with these explicit text
 corrections. They are not evidence that the example operations occurred:
 
-- The Work offer is entry **221**, despite the generated image retaining
-  **220** after a targeted correction. Its acceptance is entry 222.
+- The first Work offer is entry **221**, despite the generated image retaining
+  **220** after a targeted correction. The second offer is entry 222 and
+  the interface acceptance is entry 223. An offer never counts as acceptance.
 - File, Diff, and Interdiff remain three visible reader choices. The narrow
   Interdiff image omitted Diff; the HTML must restore that required choice.
 - Wrapped code continues the same logical line. A continuation gets no
@@ -141,10 +145,9 @@ corrections. They are not evidence that the example operations occurred:
   Bitmap texture, slight shading, and generated logo variations are not
   production assets.
 
-The final browser comparison must check copy, layout, type, colours,
-actor markers, container rules, and narrow overflow. It must compare the
-accepted reference and the actual render with `view_image`, including
-native-size views where practical. No final fidelity claim is made yet.
+The browser comparison below records copy, layout, type, colours, actor
+markers, container rules and narrow overflow. It compares the selected
+concepts with the HTML, including the five native desktop dimensions.
 
 ## People, agents, and checkers
 
@@ -294,8 +297,8 @@ Reassignment remains an explicit authorised act with its own custody.
 
 These states apply to the shared kit. Work, Decision, Change, and reader
 examples also show their specific blocked, stale, refusal, recovery, and
-truncation variants. The final render index will enumerate every page,
-theme, width, and inspected state. It is still to be produced.
+truncation variants. The [render index](2026-10-17-journey-views-design/renders/render-index.json)
+enumerates the pages, themes, viewports and checked states.
 
 ## The iframe boundary
 
@@ -327,6 +330,117 @@ actual MCP host, signing, storage, or provider acceptance.
 Only the design note and its assets change. Runtime, tests, declarations,
 packages, locks, and deployments remain exact to the Source base.
 Document-only gate handling follows [the testing guide](../docs/testing.md).
-Nothing in this draft closes capacity `113a54bd`, open choices `4dccae54`,
-actual journey implementation, or any earlier operational or gate-stability
-obligation. Exact-head checker approval and planner read remain required.
+Capacity choices `4dccae54` were answered by planner report `63195bdd`
+and accepted by `cd5d2265`. The full capacity runtime task `113a54bd`,
+actual journey implementation and earlier operational or gate-stability
+obligations remain open. Exact-head checker approval and planner read
+remain required for this design.
+
+## Open and reproduce the examples
+
+Start with the [light catalogue](2026-10-17-journey-views-design/index-light.html)
+or [dark catalogue](2026-10-17-journey-views-design/index-dark.html). Each
+lists the 44 states across the five families. There are 88 state pages and
+two catalogues. Every button-shaped link navigates a fictional snapshot;
+none sends an act. Comments are read-only sample text. A later snapshot
+can include acts by other members; navigating to it does not impersonate
+them or simulate a live event stream.
+
+The files live below `notes/2026-10-17-journey-views-design/`:
+
+| Path | Purpose |
+| --- | --- |
+| `build.py` | Standard-library-only HTML generator and fixture identities |
+| `mockups.css` | Shared brand, responsive layout and focus styles |
+| `mockups.json` | State list, synthetic commit identities and HTML hashes |
+| `concepts/` | Eight selected Image Gen references and their prompt record |
+| `render.mjs` | Browser navigation, layout checks and PNG capture recipe |
+| `renders/` | Full-page and viewport PNGs, with a hash index |
+| `verification/` | Earlier run reports and the unchanged-source proof |
+
+Run `python3 notes/2026-10-17-journey-views-design/build.py` to regenerate
+HTML. Serve the checkout root on a loopback HTTP server so relative brand
+and font paths resolve. Run `render.mjs` with `DESIGN_BASE_URL` pointing to
+that directory, `PLAYWRIGHT_MODULE` pointing to an existing pinned
+Playwright module, and `CHROME_PATH` pointing to an existing Chrome
+executable. The recorded run used Playwright 1.63.0. No package was
+installed in the checkout. Use a fresh `DESIGN_RENDER_DIR`; the renderer
+refuses to overwrite an evidence directory.
+
+The Browser plugin was unavailable. The in-app browser attempt returned
+“Browser is not available: iab”, so the checks used the existing pinned
+Playwright with isolated headless Chrome and a fresh profile. All page
+requests were restricted to the loopback origin. There are no scripts,
+forms, external links or live network connections in the mockups. Their
+CSP denies connection and form actions. Images and fonts are local assets.
+
+## Browser and visual evidence
+
+The final run passed 197 checks and produced 200 PNGs, with no reported
+failures. The render index records input hashes, PNG hashes, browser
+version, checks and any failures. It covers every
+state and both catalogues at 1536 × 1024 and 390 × 844 CSS pixels. The
+additional checks cover five families at 320 pixels; a 640 × 450 viewport
+at scale 2, equivalent to 200 percent browser zoom on a 1280 × 900
+surface; visible keyboard focus; native Full commits expansion; all three
+reader tabs; and a 390 × 600 sandboxed iframe. The iframe scrolls to its
+actions without a host SDK. The zoom check is a layout equivalent, not a
+claim about a real host's zoom control. No full WCAG conformance is claimed.
+
+Each of the six walkthroughs runs in both themes. They check separate
+offers and agent acceptances; reading versus Mark reviewed; exact-version
+request changes; requested-person approval followed by a separate decision
+and conditions revision; publication with each change's own commit; and
+refusal, stall and original-request recovery. The three queue obligations
+remain after Mark reviewed. Missing or failed checks disable merge. The
+truncated reader really omits rows, and an unavailable reader shows no
+invented code. Logical line numbers remain fixed when code wraps.
+
+Earlier run reports are retained. The first full run failed on commit-ID
+wrapping, the narrow File target and a font probe that expected an unused
+font to have loaded. The fixes wrap full IDs, give each reader tab at
+least 44 pixels, and explicitly load the declared fonts for the probe.
+The next full run passed. Visual review then added old/new gutter labels,
+corrected partial catch-up to say two of three scopes read, and moved the
+last-known label into its item identity. Each later run retains its own
+report. A passing later run does not rewrite the earlier failures.
+
+### Fidelity ledger
+
+The selected concept and browser render were inspected with `view_image`
+in the same visual review. The five desktop comparisons use the concept's
+native 1536 × 1024 dimensions. The phone bitmaps are 977 × 1610 for Needs
+you and Interdiff, and 950 × 1655 for recovery. They specify no CSS viewport
+or device scale, so they do not define a unique native browser size. The
+phone comparison uses the actual 390 × 844 target and full-page captures;
+it does not claim pixel equality with those differently sized bitmaps.
+
+| Comparison | Concept and render evidence | Result or deliberate correction |
+| --- | --- | --- |
+| Needs you structure | `concepts/needs-you-desktop.png`; `renders/needs-you-light-1536-viewport.png` | Same header, catch-up band and three open rows with reason, responsibility and settling act. Titles and three action labels are retained. |
+| Work density and terms | `concepts/work-desktop.png`; `renders/work-active-light-1536-viewport.png` | Open sections, three conditions and aligned agent rows retained. Excess row/section spacing was reduced. Entries 221 and 223 correct the generated text. |
+| Decision hierarchy | `concepts/decision-desktop.png`; `renders/decision-requested-light-1536-viewport.png` | Proposal, alternatives, recommendation, requested person, comment and separate controls retained. The long title fits the desktop row. The read-only comment notice is an explicit prototype correction. |
+| Change review | `concepts/change-desktop.png`; `renders/change-review-light-1536-viewport.png` | Pinned commit band and two-column diff/conditions/review layout retained. A flex basis that added sidebar height was removed. Required checks and controller-review rules stay explicit. |
+| Reader and gutters | `concepts/file-diff-desktop.png`; `renders/file-diff-light-1536-viewport.png` | Full-width file surface, signed additions/removals and both line gutters retained. The caption now promises all changed lines of this file, rather than all file lines. File itself says lines 12–16. |
+| Mobile queue | `concepts/needs-you-mobile-dark.png`; `renders/needs-you-dark-390-viewport.png` | Stacked reasons and full-width actions retained. The compact one-row header follows the other mobile references, keeps the actor visible, and makes Read decision fit the first phone viewport. It wraps naturally at 320 pixels. |
+| Mobile recovery | `concepts/change-unknown-mobile-light.png`; `renders/change-unknown-light-390-viewport.png` | Unknown outcome, kept original request and one outcome-check action retained. Full commits is added so Change 9's corrected independent hash is inspectable. |
+| Mobile interdiff | `concepts/interdiff-mobile-light.png`; `renders/file-interdiff-light-390-viewport.png` | Both immutable versions and shared base remain visible. The missing Diff tab is restored. Wrapping keeps one logical gutter number; Back to change remains below the code. |
+| Type, palette and assets | All eight pairs above; `mockups.css`; existing `brand/` assets | Existing Open Runde, Teletype33 and Sometype Mono replace generated approximations. Exact flat bone/ink/forest tokens replace bitmap texture and gradients. Person circle, agent square, outlined checker and cut-corner controls are retained. The dark wordmark uses the existing transparent white SVG. |
+
+The above-the-fold copy comparison retains the reference's task names,
+proposal alternatives, actor kinds, controller labels and action names.
+The deliberate changes are the record/hash corrections listed earlier;
+normal spaces in record labels; the restored Diff tab; honest excerpt and
+truncation captions; plain monospaced code with change signs and
+backgrounds rather than generated syntax colours; explicit required-check wording; the read-only comment
+notice; and the independent recovery hash with Full commits. The compact
+phone header reorders the room name into the top row. A version label sits
+beside the title on desktop and below it on phone. No marketing copy or
+unrelated product feature was added.
+
+The code-native mockups were faithfully verified against the selected
+references and the documented corrections. No material visual mismatch
+remains in the inspected comparisons. This is builder verification;
+checker approval and the planner's read are separate requirements. Host
+theme updates, standard bridge messages, actual service authority, shared
+recovery custody and a real publication result remain implementation work.

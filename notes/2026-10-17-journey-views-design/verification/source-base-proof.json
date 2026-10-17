@@ -1,0 +1,8 @@
+{
+  "baseCommit": "2637e6bbeeee2385146032144feda031b9fd5635",
+  "baseTree": "c7e7188b445325024b091d0d9e21a8c4164885b5",
+  "baseLeafCount": 1467,
+  "changedBasePaths": [],
+  "baseManifestSha256": "d528cf87917b51a51d62afcddcd2ef7969fb259e42f3425cac9e4c3806a84ff2",
+  "method": "Every Main blob content and executable/symlink mode compared with the current isolated worktree; only new notes paths may be added. Final candidate tree is supplied by the Source artifact."
+}
