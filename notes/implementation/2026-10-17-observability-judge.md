@@ -226,14 +226,43 @@ operator run after deployment reopens. Its reader is a follow-up under
 `f57fc4da`, delivered with the first post-freeze deploy check. Calibration
 rules are unchanged. No provider query, introspection, token or schema
 change is authorized or executed by this local delivery.
-The complete third stage has not passed a gate or
-received Source review. One gate is due at its final changed implementation
-freeze. Archive review `17dad8da` keeps priority for Source filing and
+The local implementation has passed its one final gate, as recorded below;
+it has not received Source review or measured acceptance. Archive review
+`17dad8da` keeps priority for Source filing and
 landing. The five prepared P3 slices are preserved separately.
 
 No provider query, credential access, configuration change, deployment,
 publication, native answer change or claimed measured latency follows
 from this checkpoint. The Cloudflare hold remains in effect.
+
+## Final local gate
+
+The final implementation freeze is
+`7f6ee2bb030e5d96c73d39c0ba35100cd0309b22`, tree
+`4ded0ac38e29a6e7b19c5a75161ff2e0880fc8c7`. It has 21 changed paths
+and 1,445 tracked leaves against Main `55e1970a5`. All 123 contract,
+platform, client and lockfile leaves remain exact. The explicit unmeasured
+storage reason passed all nine focused Node cases in run `273906`.
+Deferred reader request `23b45732` retains the planner's first post-freeze
+delivery requirement.
+
+Original gate session 48171 closed with exit 0 (`8dc6b5`). Vitest passed
+1,544 cases and skipped three; the built-in Node checks passed 25 and the
+Counter browser checks passed 55. Installation took 2.2 seconds elapsed
+and 3.4 CPU seconds; typechecking took 7.4 and 26.3; tests took 432.8
+and 524.0. The owner measured 442.7 seconds elapsed for the gate and
+554.0 child CPU seconds. This was macOS 27.0.1, arm64, 18 logical CPUs,
+with pre-run load averages 1.823, 1.585 and 1.388. Installation used the
+existing lock and local dependency cache; it was not a skipped install.
+Lock SHA-256 is
+`a3dd5689f33c5181b5ff48553fbb3c45b44abf96720ba9935eed40853a3b09bc`.
+
+The gate ended at the same clean head and tree. Its original log is
+`/tmp/artroom-judge-7f6ee2bb-gate.log`, with step logs in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.1jkY13EYAM`.
+The owner terminal is `/tmp/artroom-judge-7f6ee2bb-gate-terminal.json`.
+These private evidence paths are references, not read grants. This
+delivery-note update changes no source or test; the gate is not repeated.
 
 ## Query references
 
