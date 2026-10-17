@@ -43,11 +43,23 @@ hosted acceptance or secret-erasure guarantee is claimed.
 This two-path slice starts at Main
 `55e1970a5f7a87a9aeeda92542b3e98ad0088a10`, tree
 `8125caf09510d3415dd13649e371e07ed289465d`. The document-only
-composition will be checked against the frozen, passing implementation
+composition was checked against the frozen, passing implementation
 `52c1a0fc1e44a604977a95698c8014cf0ab04b7d`, tree
 `409b91640dd326d867e2a329be5ffe99b3f72358`, and its final notes
 successor `a156b08f1c6169c3a943160440cac122231bdfab`, tree
 `3e6340bb0a05dfbfb05771a066a8cd52a274a2fb`.
+
+The original composition check at
+`2a52d2c5a3119f4c8bca73b937e1714f7a41941e`, tree
+`96b21e2925eb8ea54b978108ddc59d1e511186b4`, found exactly this
+guide and this new note changed after `a156b08f`: the other 1,457
+existing mode, type and blob leaves agree. Against the gate freeze,
+only the guide and five delivery notes differ; all 1,453 other leaves
+agree. All thirteen archive leaves match its current final source
+`6d1a1973dd5bb361dbe22d4c6b29c223be6c91e6`. The new Custody link
+resolves to the existing heading, and whitespace checks pass. This
+paragraph is a later note-only addition; final review must retain the
+same source correspondence.
 
 Original gate session `49806` exited zero: 1,567 Vitest cases passed,
 three existing cases skipped, 16 Node checks and 55 Counting browser
