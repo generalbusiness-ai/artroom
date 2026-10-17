@@ -860,3 +860,44 @@ The Room fixture now accepts an explicit Root-only bound and can retain
 the Root without automatically opening a partition. Default callers keep
 their previous behavior. No Source gate, approval or provider operation is
 claimed by this checkpoint.
+
+## Native full-partition seal and post-seal control
+
+Two native handoff cases use a Root bound of 3,012 and a first-partition
+bound of 64; siblings retain defaults. Actual issue edits produce real
+partition index traffic. One case fills the partition until written plus
+reserved is 64, then records seal and completes exactly one successor.
+The other seals at the quarter-entry threshold. Both confirm generation 2,
+base 100,001, the actual successor's active birth and its first issue's
+number 100,001. The first partition's control remains open with sealed and
+handedOff true and its exact Root and membership references.
+
+After evicting that partition, its attempted open reaches native authority
+and is refused partition-sealed. At the threshold, the existing issue's
+title update still indexes; a newly created concern obtains number 3.
+A second issue's authentic genesis result is held before seal. Its exact
+create duty has a genesis acknowledgment and no result. After sealing and
+restart, release records that duty applied at an entry after the seal,
+preserving its row, actual incarnation and number 2. No genesis result,
+membership answer or index message is fabricated. Git, clock and scheduler
+remain the fixture's labelled stand-ins.
+
+The first three fixture runs respectively exposed an unregistered successor
+dispatcher and an unregistered concern-parent dispatcher, then passed both
+cases. The added delayed-reply runs retain a local loopback EPERM, an
+incorrect assumption that a lane row starts creating (it starts listed),
+and an overbroad result hold that also caught the Root's seal reply.
+The narrowed, exact-duty version passes both cases in
+/tmp/artroom-directory-seal-handoff-late-eighth-focus.log, with lane types
+passing in /tmp/artroom-directory-seal-handoff-late-final-types.log.
+
+Removing only seal's standing marker makes the actual full case fail its
+seal acceptance assertion; the threshold case still passes. Its exact
+refusal code was not printed. A separate control makes recorded membership
+unavailable only after sealing: both cases now answer authority-unavailable
+at the opening assertion instead of reaching partition-sealed. This models
+the lost-authority effect of an unreadable control selector; it does not
+move the actual control into a new state. Both controls distinguish and
+restore their source. Logs are /tmp/artroom-directory-seal-standing-marker-control.log
+and /tmp/artroom-directory-post-seal-membership-control.log. No gate,
+Source approval or provider operation is claimed here.
