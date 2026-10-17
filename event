@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:98800e776e590b2683b73cca4f2294bf0647cd56","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/genesis-proof.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:989f0561ffa64ad331124291ba664219e777689d","text":"Merge retired a covered predecessor; the successor is at packages/git/test/fixtures/own-host/README.md."}
