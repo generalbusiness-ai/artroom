@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:14f54db1232ddd8a60fe2a02f51aa07730c992e1","text":"Merge retired a covered predecessor; the successor is at scripts/deploy-check.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:16ec02de4e4a364ffe53ae3338c9d5965d2d18bd","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-observability-judge.md."}
