@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82ee532b4df5cb05a9c7724aa42152b63c9f16c2","text":"Merge retired a covered predecessor; the successor is at docs/manual/record.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82fd3f78a0c05ac1a1219f2014bdd98f36d75750","text":"Merge retired a covered predecessor; the successor is at packages/platform/test/support-partition-origin.ts."}
