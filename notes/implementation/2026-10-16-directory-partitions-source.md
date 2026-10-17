@@ -3,15 +3,17 @@
 Source child `e9943975`, promise `536af54f`, implements the approved
 Draft 4 under NOW request `e0292346`. It adopts technical reconciliation
 `d1543f97` and the subsequent bounded-proof and foreign-fixture advice.
-The implementation is prepared for exact Source review over Main 4f7b07ee.
-Its original gate at frozen 2bcc1a4d closed 0: 1,540 Vitest pass, three
-skip, 16 Node and 55 Counting. The final successor adds only this evidence
-update and the two already approved Main design notes. All other blobs
-and modes match the tested tree. Earlier sections retain their original
-checkpoint status; the terminal evidence below supersedes those progress
-statements while preserving every failed gate and stated limitation.
-No Source approval, landing, default activation, provider action or
-Cloudflare change is claimed.
+The F1 Lending correction is prepared for exact successor Source review
+over Main 4f7b07ee, with all 84 actual changed paths. Its original gate
+at frozen 67ea36850 closed 0: 1,540 Vitest pass, three skip, 16 Node and
+55 Counting. The final successor changes only this evidence report; every
+other blob, mode and path matches that tested tree. The earlier 2bcc gate
+also passed, but did not establish Lending asset freshness; first review
+b8b351f1 correctly requested that correction at f45. Earlier sections
+retain their original checkpoint status; terminal evidence below
+supersedes progress statements while preserving every failed gate,
+review finding and limitation. No Source approval, landing, default
+activation, provider action or Cloudflare change is claimed.
 
 ## Current implementation boundary
 
@@ -1363,3 +1365,81 @@ protected for their own Source; this Directory delivery does not retire
 them. No source-review approval, Main landing or push is claimed here.
 Git push authorization remains separate from the continuing Cloudflare
 hold. No Cloudflare or other provider operation has run for Directory.
+
+
+## F1: regenerate the omitted Lending outputs
+
+Independent review b8b351f18bf7812fcad200f8ffe92abbc3f8c9b3
+requests changes at f45a5ce80/tree9d876b7d for one introduced generated
+asset mismatch. The Lending JavaScript and Worker module omitted the new
+platform-name parser alternative, although their Source and rebuilt Page
+and Counting already contained it. No other blocker was found in all 82
+reviewed paths. Requester ratification 96e92740 adopts F1. The passing
+2bcc gate and f45 notes-only correspondence remain accurate historical
+evidence; neither is approval or proof of Lending asset freshness.
+
+The repository-owned examples/lending/scripts/assets.mjs regenerates the
+outputs with existing esbuild 0.28.1 and no package installation. Exactly
+two tracked paths change. Lending JS is 117,572 bytes, SHA256
+f839a78ba12bf032b08e9174d03b8a4c1997941b3654e3f2c58527052574546f.
+The Worker module is 124,156 bytes, SHA256
+37b3f4cf862c25e448be1f8f2d53383e62e40f4e67bbbef180768f263c8ffe2f.
+These match the independent review's expected outputs. The sole JS
+replacement adds |directory-partition to the existing platform-name
+regex, exactly 20 bytes. The module embeds that change and its digest.
+No pinned declaration, parser source, HTML or CSS changes.
+
+An independent comparison against lendingFiles() and lendingAssets()
+reproduces all four owned outputs exactly: the three public files and the
+Worker module. HTML remains 472 bytes/SHA256
+73dd9fda69f9f539f50a6d64fe79255e4455cd708a169906f70e34a829a02c2d;
+CSS remains 2,377 bytes/SHA256
+cde330d2cd3718cd4e1ff269250f14230046fb31c656badbcc6617b2d1e619e9.
+The owned build log is /tmp/artroom-directory-lending-f1-owned-build.log.
+Ten existing browser-source Node checks across model, custody and
+publication pass in
+/tmp/artroom-directory-lending-f1-browser-source-focus.log. This is not
+rendered browser or hosted proof, and no whole suite was repeated for the
+focused check. The new frozen correction will receive its single full
+gate before exact review, binding all 84 paths under the same Source
+child and promise. Five unlanded naming artifact bases remain protected.
+The separate terminology branch is cleanly checkpointed at b38c578a1;
+none of its changes enters this Directory correction. No provider action.
+
+
+## Passing F1 gate and exact successor boundary
+
+The original single gate at
+67ea36850c5dafc56ad6e8d6e844880cf92f7db2, tree
+8b531062edd6e04c8ce3195c7ed0f1986224d4e6, session 85443,
+closed with exit 0. It reports 1,540 Vitest pass, three skip, 16 Node
+and 55 Counting. Whitespace passes. Typecheck took 7.1 seconds elapsed
+and 26.5 CPU seconds; the full test step took 446.9 seconds elapsed and
+537.6 CPU seconds. These are phases of this original gate, not a union
+of focused executions. Dependencies were verified against the same lock;
+installation was skipped. The machine remains arm64 Mac17,7, 18 logical
+CPUs, 68,719,476,736 bytes of memory. An observed load sample during this
+warm local run was 2.37, 1.76, 1.74; no controlled idle or cold-cache
+claim. Original log:
+/tmp/artroom-directory-67ea36850-first-gate.log. Retained gate files:
+/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.XQKQ54sJNn.
+
+The original log also retains one nonfatal native RPC-disposal diagnostic
+and the scripted-fault scenarios' native diagnostics. Exit 0 is not a
+claim of physical draining or absence of leaked resources; no cause is
+assigned to that disposal diagnostic here. The closed final2 inspector
+specimen remains specifically at 7ccc. Its raw32/provenance functions
+are unchanged; the later two generated Lending assets differ. No new-head
+heap measurement is claimed.
+
+Checker independently confirms that 67ea differs from reviewed f45 in
+only the two predicted Lending outputs and this report: all 1,433 other
+leaf modes, blobs and paths are unchanged. The final evidence-only
+successor then changes only this report from the passing 67ea tree,
+leaving all 1,435 other leaves unchanged. No repeated gate is run for that
+report-only successor, under docs/testing.md. Exact successor review must
+bind all 84 paths, primary first, and preserve both approved Main design
+notes. Previous failed freezes, the prior passing gate and the F1
+changes-requested verdict remain tied to their own exact heads. Five
+unlanded native-room-naming artifacts remain protected. No terminology
+change, provider operation or default activation is included.
