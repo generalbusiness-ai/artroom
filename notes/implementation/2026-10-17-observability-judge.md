@@ -157,12 +157,71 @@ also passed. Original logs remain in `/tmp/artroom-judge-stdio-focus.log`,
 `/tmp/artroom-judge-native-generic-permitted-focus.log`; the refused
 sandbox attempt remains `/tmp/artroom-judge-native-generic-focus.log`.
 
+## Preparation phases and operator inputs
+
+Preparation-step phases are now emitted after their successful record
+write, separately from the parent record. Custody double 6 distinguishes
+record (0) from preparation step (1). The native hosted recovery witness
+checks both a standalone step and steps of an unsubmitted act: a failed
+answer write emits no answered phase, retry retains the exact intent,
+and the native lane keeps one preparation entry. Original local session
+40502 closed zero (`6a83d9`): one selected case passed, eleven unselected.
+
+Automatic review initially rejected the single preparation-phase control
+as a mutation sweep. No command executed. The retry supplied the explicit
+distinction in `docs/testing.md`: one or two focused controls per invariant
+are required, while sweeps and whole suites per mutant are prohibited.
+That exact focused command was then approved. Original session 63641
+closed zero (`dfdc21`): baseline passed, moving the answered-phase hook
+before its write failed an assertion, and the source was restored to
+custody SHA-256
+`97c28dd9b5ce1656a170083285e13c5764a46ff873134457aaf5054f192a5528`.
+The original log is `/tmp/artroom-judge-preparation-phase-control.log`.
+No approval block remains for that completed control.
+
+The operator command now reads a completed deployment's version from
+retained Wrangler version-1 NDJSON output. It requires the project's
+4.147.0 pin and refuses uploads, failed commands and ambiguous output.
+An explicit calibration file names the observed window, version, weighted
+route count, p95, chosen bound and recording digest. These records assert
+provenance; the command does not certify an observation or follow the
+recording digest. It reports both input-file hashes. It has no token
+argument; the read token comes from the operator environment. `--help`
+works without an account query.
+
+Direct Node run `676686` passed nine cases, including the command with
+synthetic retained files and scripted fetch. After strict selector types
+and ended calibration-window validation, `a7705e` also passed nine. The
+actual help command `c9649b` exited zero without reading an account.
+These are synthetic command/protocol checks, not Wrangler output from
+a real deployment or measured demo calibration.
+
+The exact MCP map and operator inputs are documented in `docs/mcp.md`
+and `docs/operations.md`. Static comparison `bc13e1` confirms all eighteen
+fixed names and forty-one native reasons match their documented sets;
+new local links resolve. The map also documents server reasons, record
+and preparation phases, numeric ranges, completion/loss reservations,
+context and the deliberate exclusion of dynamic act names. Module run
+`58ee26` passed all four cases after rejecting non-string context metadata
+without leaking it or replacing the result. MCP and Scope typechecking
+`2f4c19` and `066236` passed.
+
+The four affected MCP Node files ran together once. Original session
+69789 closed zero (`b6e62c`): sixty-one cases passed and one existing case
+skipped, 7.95 seconds total. The log is
+`/tmp/artroom-judge-mcp-affected-tests.log`. This is affected-file
+verification, not the whole repository gate. Earlier passing and failed
+observations remain attributed to their own source checkpoints.
+
 ## Remaining third-stage work
 
-The command-line interface, deployment-report binding and observed
-calibration provenance, actual storage-row reporting, preparation-step
-phase events, the exact public map documentation and live acceptance
-remain outstanding. The complete third stage has not passed a gate or
+Observed demo calibration, actual storage-row reporting and live acceptance
+remain outstanding. Request `5ddf26c3` asks the planner to reconcile the
+rows-written source within the existing approved stage. The delivered
+metrics-v1 map contains no such total, and public platform documentation
+requires GraphQL introspection to identify exposed fields. No account
+introspection or new metric schema has been inferred or executed.
+The complete third stage has not passed a gate or
 received Source review. One gate is due at its final changed implementation
 freeze. Archive review `17dad8da` keeps priority for Source filing and
 landing. The five prepared P3 slices are preserved separately.

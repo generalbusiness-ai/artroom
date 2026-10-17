@@ -2,12 +2,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import type { MismatchReason, ReadRefusal, RefusalReason, SessionRefusal, UnavailableReason } from "@generalbusiness/dap-contract";
-import type { Phase } from "./custody.ts";
+import type { Phase, Step } from "./custody.ts";
 
 export const MCP_METRIC_SCHEMA = "mcp-metrics-v1";
 const MAX = 0x7fffffff;
 const TOOLS = new Set(["list", "room", "inspect", "create", "join", "prepare", "items", "steps", "step", "record", "sends", "text", "wait", "settle", "credential", "actions", "act", "enrol"]);
 const PHASES = new Set(["prepared", "sent", "unknown", "accepted", "refused", "mismatch", "settled"]);
+const STEP_PHASES = new Set(["prepared", "sent", "unknown", "answered"]);
 const NATIVE: Record<RefusalReason | UnavailableReason | MismatchReason | ReadRefusal | SessionRefusal, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true,
   "bad-intent": true, misaddressed: true, expired: true, "scope-refused": true, "unknown-act": true, "bad-field": true,
@@ -18,7 +19,7 @@ const NATIVE: Record<RefusalReason | UnavailableReason | MismatchReason | ReadRe
   "rate-limited": true, "idempotency-mismatch": true, "not-found": true, "wrong-incarnation": true, forbidden: true,
   "history-unavailable": true, "too-large": true, "sessions-unavailable": true, "bad-request": true, replayed: true,
 };
-const REASONS = new Set([...Object.keys(NATIVE), ...PHASES, "none", "exception", "shape", "stale-descriptor", "restart", "transport", "custody", "credential", "target", "unknown-tool", "read", "conflicting", "full", "locked", "unreadable", "terminal", "unkept"]);
+const REASONS = new Set([...Object.keys(NATIVE), ...PHASES, ...STEP_PHASES, "none", "exception", "shape", "stale-descriptor", "restart", "transport", "custody", "credential", "target", "unknown-tool", "read", "conflicting", "full", "locked", "unreadable", "terminal", "unkept"]);
 const ENDS = new Set(["ok", "refused", "error", "unavailable"]);
 const integer = (n: number): boolean => Number.isInteger(n) && !Object.is(n, -0) && n >= 0 && n <= MAX;
 const uuid = (s: string): boolean => /^(?:unknown|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.test(s);
@@ -47,6 +48,10 @@ function emit(op: Operation, kind: "tools-list" | "tool-call" | "custody", end: 
 export function custodyTransition(from: Phase | null, to: Phase): void {
   try { const op = active(); if (op && from !== to) { if (!PHASES.has(to)) lost(op); else emit(op, "custody", "ok", to, [0, 0, 0, 0, 0]); } } catch { /* observations never own a write */ }
 }
+/** Preparation phase is separate from its parent record; the flag distinguishes it. */
+export function custodyStepTransition(from: Step["phase"] | null, to: Step["phase"]): void {
+  try { const op = active(); if (op && from !== to) { if (!STEP_PHASES.has(to)) lost(op); else emit(op, "custody", "ok", to, [0, 0, 0, 0, 1]); } } catch { /* observations never own a write */ }
+}
 /** One attempted operational read; direct hosted authority reads use this too. */
 export function mcpRead(page = false): void {
   try {
@@ -63,7 +68,7 @@ export function observedFetch(original: Fetch): Fetch {
       if (op) {
         const route = new URL(url).pathname.split("/").at(-1), method = init?.method ?? "GET";
         if (method === "GET" || (method === "POST" && route === "sessions")) {
-          mcpRead(["items", "history", "outbox", "log", "retained"].includes(route ?? ""));
+          mcpRead(["items", "history", "outbox", "log"].includes(route ?? ""));
         }
       }
     } catch { const op = active(); if (op) lost(op); }
@@ -81,7 +86,8 @@ export class McpMetrics {
     let request = "none";
     try { request = this.#options.requestId?.() ?? Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, "0")).join(""); } catch { /* none */ }
     const deployment = this.#options.deployment ?? "local", version = this.#options.version ?? "unknown";
-    const valid = deployment.length > 0 && new TextEncoder().encode(deployment).length <= 128 && uuid(version) && /^(?:none|[0-9a-f]{16})$/.test(request);
+    const valid = typeof deployment === "string" && deployment.length > 0 && new TextEncoder().encode(deployment).length <= 128
+      && typeof version === "string" && uuid(version) && typeof request === "string" && /^(?:none|[0-9a-f]{16})$/.test(request);
     return { open: true, tool: valid && TOOLS.has(tool) ? tool : null, deployment: valid ? deployment : "unknown", version: valid ? version : "unknown", request: valid ? request : "none", reads: 0, pages: 0, mask: 0, lost: 0, points: [] };
   }
   #flush(op: Operation): void {

@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateDeployment } from "./deploy-check-evaluate.mjs";
-import { checkDeployment } from "./deploy-check.mjs";
+import { checkDeployment, deploymentCheckMain } from "./deploy-check.mjs";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // Synthetic metrics-v1 observations, not an observed demo or SQL API recording.
 const version = "11111111-1111-1111-1111-111111111111", deployment = "local-fixture", now = 2_000_000;
@@ -130,4 +133,29 @@ test("Judge client refuses failed, truncated or oversized observations without e
     : new Response(new ReadableStream({ pull(c) { pieces++; c.enqueue(new Uint8Array()); }, cancel() { stopped = true; } })) });
   assert.equal(fragmented.pass, false); assert.ok(fragmented.failures.includes("query"));
   assert.equal(stopped, true); assert.ok(pieces <= 65_538);
+});
+
+test("Judge CLI takes the completed version from retained output and requires calibration before I/O", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artroom-judge-cli-")), deployPath = join(dir, "deploy.ndjson"), calibrationPath = join(dir, "calibration.json");
+  // Synthetic shape of documented Wrangler output, not an executed deployment.
+  const session = { type: "wrangler-session", version: 1, wrangler_version: "4.147.0", command_line_args: ["deploy"] };
+  const deployed = { type: "deploy", version: 1, worker_name: "fixture", version_id: version };
+  const records = JSON.stringify(session) + "\n" + JSON.stringify(deployed) + "\n";
+  const calibration = { format: "dap-metric-calibration-1", deployment, version, from: new Date(now - 60_000).toISOString(), through: new Date(now).toISOString(), routeCount: 100, p95Ms: 10, boundMs: 10, recordingSha256: "a".repeat(64) };
+  const argv = ["--deploy-output", deployPath, "--calibration", calibrationPath, "--deployment", deployment, "--health", clientOptions.healthUrl];
+  const f = fixture(); let output = "", calls = 0;
+  const ports = { env: { CLOUDFLARE_ACCOUNT_ID: clientOptions.account, DAP_ANALYTICS_READ_TOKEN: clientOptions.token }, now: () => now,
+    write: s => { output += s; }, fetch: async url => { calls++; return Response.json(url === clientOptions.healthUrl ? f.health.body : apiRows(f.rows)); } };
+  try {
+    await writeFile(deployPath, records); await writeFile(calibrationPath, JSON.stringify(calibration));
+    assert.equal(await deploymentCheckMain(argv, ports), 0);
+    const result = JSON.parse(output); assert.equal(result.version, version); assert.equal(result.calibration.boundMs, 10);
+    assert.match(result.inputs.deploymentOutputSha256, /^[0-9a-f]{64}$/); assert.equal(calls, 2);
+    for (const invalid of [records.replace('"type":"deploy"', '"type":"version-upload"'), records + JSON.stringify(deployed) + "\n"]) {
+      output = ""; calls = 0; await writeFile(deployPath, invalid);
+      assert.equal(await deploymentCheckMain(argv, ports), 2); assert.equal(calls, 0); assert.deepEqual(JSON.parse(output).failures, ["input"]);
+    }
+    await writeFile(deployPath, records); await writeFile(calibrationPath, "{}"); output = ""; calls = 0;
+    assert.equal(await deploymentCheckMain(argv, ports), 2); assert.equal(calls, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

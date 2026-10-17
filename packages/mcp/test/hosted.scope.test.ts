@@ -183,7 +183,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };
 }
-const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; hostedTest.custodyBounds = null; hostedTest.failWrite = null; hostedTest.faultAt = null; hostedTest.failSession = false; room.done(); };
+const done = (room: Room) => { hostedTest.metrics = null; hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; hostedTest.custodyBounds = null; hostedTest.failWrite = null; hostedTest.faultAt = null; hostedTest.failSession = false; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
 const mcp = async (bearer: string, method: string, headers: Record<string, string>, body?: unknown): Promise<Response> => {
   const response = await routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
@@ -851,6 +851,9 @@ test("H6 through the endpoint: a write that fails while a result is written is r
 
 test("H6 through the endpoint: a preparation step whose answer the store could not keep is reported as such, with the step's identity and its own recovery; the step stays sent, the same step under the same key is sent again and kept, one preparation entry", async () => {
   const { room, rita } = await roomWithIssues();
+  const metrics: McpMetricPoint[] = [];
+  hostedTest.metrics = { report: point => { metrics.push(structuredClone(point)); } };
+  const stepPhases = () => metrics.filter(p => p.blobs[0] === "custody" && p.blobs[3] === "prepare" && p.doubles[5] === 1).map(p => p.blobs[5]);
   hostedTest.custodyBounds = { budget: 1024 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
   try {
     const bot = await hosted(room, rita, "@bot", "create-bot");
@@ -884,6 +887,7 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect(String(unkept["next"])).toMatch(/Do not use a new key or settle/);
     const kept = (await stub.custodyRecord("instance-bot"))!;
     expect([kept.phase, kept.steps], "the step is kept as sent, under a record that is still unresolved").toEqual(["sent", ["sent"]]);
+    expect(stepPhases()).toEqual(["sent"]);
     expect(await entriesBy(), "the lane admitted the step once").toBe(1);
     // The same step under the same key and arguments: the same signed step is sent again, the lane repeats its answer, the
     // answer is kept, the record settles and its capacity is released; the lane holds one preparation entry.
@@ -891,6 +895,7 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect((again["step"] as { phase: string; answer: { answer: string } }), JSON.stringify(again)).toMatchObject({ phase: "answered", answer: { answer: "accepted" } });
     const settled = (await stub.custodyRecord("instance-bot"))!;
     expect([settled.intent, settled.phase, settled.steps, settled.reserved], "the same intent, settled, nothing reserved").toEqual([kept.intent, "settled", ["answered"], 0]);
+    expect(stepPhases()).toEqual(["sent", "answered"]);
     expect(await entriesBy(), "one preparation entry").toBe(1);
     // Ordinary: an act prepared at a resource, the report staged at the lane, then its check step. The lane answers the check;
     // the store fails as that answer is written (the write of a prepared act's record, which the store's fault names `keep`);
@@ -906,11 +911,13 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect(String(checked["message"])).not.toMatch(/nothing was sent/);
     const unkeptCheck = (await stub.custodyRecord("report-bot"))!;
     expect([unkeptCheck.intent, unkeptCheck.phase, unkeptCheck.steps.sort()], "the act is not submitted; its check step is kept as sent beside the answered stage").toEqual([held.intent, "prepared", ["answered", "sent"]]);
+    expect(stepPhases()).toEqual(["sent", "answered", "sent", "answered", "sent"]);
     const checkedAgain = await result(await room.wait(() => modernCall(bot.bearer, "prepare", { ...report, step: "check" })));
     expect((checkedAgain["step"] as { phase: string }).phase, JSON.stringify(checkedAgain)).toBe("answered");
     expect((checkedAgain["act"] as { phase: string }).phase).toBe("prepared");
     const heldAgain = (await stub.custodyRecord("report-bot"))!;
     expect([heldAgain.intent, heldAgain.phase, heldAgain.steps.sort()], "the same act envelope, both steps answered").toEqual([held.intent, "prepared", ["answered", "answered"]]);
+    expect(stepPhases()).toEqual(["sent", "answered", "sent", "answered", "sent", "answered"]);
   } finally { done(room); }
 });
 

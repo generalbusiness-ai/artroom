@@ -59,7 +59,7 @@
 
 import type { Answer, Beside, DeclaredDefinition, Digest, KeyId, PlatformDefinition, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, intentDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { custodyTransition } from "./metrics.ts";
+import { custodyTransition, custodyStepTransition } from "./metrics.ts";
 
 export const UNRESOLVED_MOST = 256;
 export const OUTCOMES_INLINE = 64;
@@ -430,6 +430,7 @@ export class Custody {
       const before = fresh.phase;
       const intent = intentDigest(fresh.envelope.signed.intent);
       const sid = stepId({ intent, resource, capability, step });
+      const stepBefore = fresh.steps[sid]?.phase ?? null;
       const entry: Step = fresh.steps[sid] ?? { intent, resource, capability, step, phase: "prepared", answers: [] };
       // A standalone step with a decisive answer is terminal: its answer is returned again, and nothing is sent.
       if (fresh.standalone && entry.phase === "answered") {
@@ -442,6 +443,7 @@ export class Custody {
       fresh.steps[sid] = entry;
       if (fresh.standalone) fresh.phase = "sent";
       await this.#write(id, fresh, true, before);
+      custodyStepTransition(stepBefore, entry.phase);
       let answer: Answer | null = null;
       try { answer = await deliver(fresh.envelope.signed); } catch (error) { if (!(error instanceof Lost)) throw error; }
       entry.phase = answer === null || answer.answer === "unavailable" ? "unknown" : "answered";
@@ -456,6 +458,7 @@ export class Custody {
       try {
         fresh.updated = this.now();
         await this.#write(id, fresh, false, previous);
+        custodyStepTransition("sent", entry.phase);
       } catch (error) {
         if (error instanceof CustodyError && error.why.held === "too-large") throw error;
         throw new CustodyError({ held: "unkept", answer: answer === null ? "lost" : answer.answer, step: { resource: resource.scope, capability, step } });

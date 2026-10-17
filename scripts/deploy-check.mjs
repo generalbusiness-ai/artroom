@@ -1,5 +1,10 @@
 /** Read-only SQL/health client. Operational invocation and calibration are separate. */
 import { evaluateDeployment } from "./deploy-check-evaluate.mjs";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROWS = 50_000, QUERY_BYTES = 16 * 1024 * 1024, HEALTH_BYTES = 4096;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -9,6 +14,7 @@ const uint = value => {
   return n;
 };
 function validHealthUrl(value) {
+  if (typeof value !== "string") return false;
   try {
     const u = new URL(value);
     return u.protocol === "https:" && !u.username && !u.password && !u.search && !u.hash && u.pathname === "/health";
@@ -83,9 +89,9 @@ function points(answer) {
  */
 export async function checkDeployment(options, { fetch: fetcher = globalThis.fetch, now: clock = Date.now } = {}) {
   const { account, token, deployment, version, p95BoundMs, healthUrl } = options;
-  if (!/^[0-9a-f]{32}$/.test(account ?? "") || typeof token !== "string" || !token || token.length > 4096 || /[\r\n]/.test(token)
+  if (typeof account !== "string" || !/^[0-9a-f]{32}$/.test(account) || typeof token !== "string" || !token || token.length > 4096 || /[\r\n]/.test(token)
       || typeof deployment !== "string" || !deployment || new TextEncoder().encode(deployment).length > 128
-      || !UUID.test(version ?? "") || !Number.isSafeInteger(p95BoundMs) || p95BoundMs < 0 || !validHealthUrl(healthUrl)) {
+      || typeof version !== "string" || !UUID.test(version) || !Number.isSafeInteger(p95BoundMs) || p95BoundMs < 0 || !validHealthUrl(healthUrl)) {
     return { pass: false, failures: ["input"], message: "Invalid deployment check inputs or missing calibration." };
   }
   const now = Math.floor(clock() / 1000) * 1000;
@@ -99,4 +105,79 @@ export async function checkDeployment(options, { fetch: fetcher = globalThis.fet
   return evaluateDeployment({ deployment, version, now, p95BoundMs,
     rows: query.status === "fulfilled" ? query.value : null,
     health: health.status === "fulfilled" ? { status: 200, body: health.value } : null });
+}
+
+export function deploymentVersion(text) {
+  const rows = text.split(/\r?\n/).filter(s => s.trim()).map(s => JSON.parse(s));
+  if (rows.length > 128 || rows.some(row => !row || typeof row !== "object" || row.type === "command-failed")) throw new Error("deploy");
+  const sessions = rows.filter(row => row.type === "wrangler-session"), deployed = rows.filter(row => row.type === "deploy");
+  if (sessions.length !== 1 || deployed.length !== 1 || sessions[0].version !== 1 || sessions[0].wrangler_version !== "4.147.0"
+      || !Array.isArray(sessions[0].command_line_args) || sessions[0].command_line_args[0] !== "deploy" || deployed[0].version !== 1
+      || typeof deployed[0].worker_name !== "string" || !deployed[0].worker_name || typeof deployed[0].version_id !== "string" || !UUID.test(deployed[0].version_id)) throw new Error("deploy");
+  return deployed[0].version_id;
+}
+
+function calibrationOf(value, deployment, now) {
+  const keys = ["format", "deployment", "version", "from", "through", "routeCount", "p95Ms", "boundMs", "recordingSha256"];
+  if (!value || typeof value !== "object" || Object.keys(value).length !== keys.length || !keys.every(k => Object.hasOwn(value, k))
+      || value.format !== "dap-metric-calibration-1" || value.deployment !== deployment || typeof value.version !== "string" || !UUID.test(value.version)
+      || typeof value.recordingSha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.recordingSha256)) throw new Error("calibration");
+  const from = Date.parse(value.from), through = Date.parse(value.through);
+  if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(from) || from < 0 || !Number.isSafeInteger(through) || through <= from || through > now || through - from > 900_000
+      || new Date(from).toISOString() !== value.from || new Date(through).toISOString() !== value.through
+      || uint(value.routeCount) !== value.routeCount || value.routeCount < 100 || uint(value.p95Ms) !== value.p95Ms
+      || uint(value.boundMs) !== value.boundMs || value.boundMs < value.p95Ms) throw new Error("calibration");
+  return value;
+}
+
+async function inputFile(path) {
+  const limit = 256 * 1024, fd = await open(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+  try {
+    const info = await fd.stat();
+    if (!info.isFile() || info.size > limit) throw new Error("input");
+    const bytes = Buffer.alloc(limit + 1);
+    let at = 0;
+    while (at < bytes.length) {
+      const read = await fd.read(bytes, at, bytes.length - at, at);
+      if (!read.bytesRead) break;
+      at += read.bytesRead;
+    }
+    if (at > limit) throw new Error("input");
+    const data = bytes.subarray(0, at);
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(data), sha256: createHash("sha256").update(data).digest("hex") };
+  } finally { await fd.close(); }
+}
+
+/** CLI inputs assert observation provenance; review of the actual recording remains separate. */
+export async function deploymentCheckMain(argv, { env = process.env, fetch: fetcher = globalThis.fetch, now = Date.now, write = line => process.stdout.write(line) } = {}) {
+  if (argv.length === 1 && argv[0] === "--help") {
+    write("Usage: node scripts/deploy-check.mjs --deploy-output <fresh Wrangler NDJSON> --calibration <observed JSON> --deployment <name> --health <https://host/health>\nEnvironment: CLOUDFLARE_ACCOUNT_ID and DAP_ANALYTICS_READ_TOKEN (Account Analytics Read).\n");
+    return 0;
+  }
+  let args, deploymentOutput, calibrationInput, version, calibration;
+  try {
+    const allowed = new Set(["--deploy-output", "--calibration", "--deployment", "--health"]);
+    args = {};
+    for (let i = 0; i < argv.length; i += 2) {
+      const key = argv[i], value = argv[i + 1];
+      if (!allowed.has(key) || Object.hasOwn(args, key) || typeof value !== "string" || !value) throw new Error("input");
+      args[key] = value;
+    }
+    if (Object.keys(args).length !== allowed.size || !validHealthUrl(args["--health"])) throw new Error("input");
+    [deploymentOutput, calibrationInput] = await Promise.all([inputFile(args["--deploy-output"]), inputFile(args["--calibration"])]);
+    version = deploymentVersion(deploymentOutput.text);
+    calibration = calibrationOf(JSON.parse(calibrationInput.text), args["--deployment"], now());
+  } catch {
+    write(`${JSON.stringify({ pass: false, failures: ["input"], message: "A single completed deployment and a valid observed calibration are required." })}\n`);
+    return 2;
+  }
+  const result = await checkDeployment({ account: env.CLOUDFLARE_ACCOUNT_ID, token: env.DAP_ANALYTICS_READ_TOKEN,
+    deployment: args["--deployment"], version, p95BoundMs: calibration.boundMs, healthUrl: args["--health"] }, { fetch: fetcher, now });
+  write(`${JSON.stringify({ ...result, calibration, inputs: { deploymentOutputSha256: deploymentOutput.sha256, calibrationSha256: calibrationInput.sha256 } })}\n`);
+  return result.pass ? 0 : 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { process.exitCode = await deploymentCheckMain(process.argv.slice(2)); }
+  catch { console.error("Deployment check failed without a complete observation."); process.exitCode = 1; }
 }

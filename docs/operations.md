@@ -123,7 +123,87 @@ Loss bits are 1 for budget, 2 for invalid fields, 4 for group coarsening,
 `busy`, `clock-behind` or `unavailable`, an invalid end or a saturated
 counter. A terminal row cannot prove its own presence or detect the loss
 of both a route and its turn. These metrics alone cannot prove no busy
-turn occurred. The later deployment coverage check is a separate stage.
+turn occurred. The deployment coverage check below is a separate stage.
+
+## Check a deployment
+
+The Judge source reads Analytics Engine and public health. It requires a
+bound from an observed demo run. The [delivery note](../notes/implementation/2026-10-17-observability-judge.md)
+records the outstanding calibration and live API acceptance; synthetic
+test rows are not that observation.
+
+```sh
+node scripts/deploy-check.mjs \
+  --deploy-output /absolute/path/wrangler.ndjson \
+  --calibration /absolute/path/observed-calibration.json \
+  --deployment demo-deployment \
+  --health https://demo.example/health
+```
+
+Set `CLOUDFLARE_ACCOUNT_ID` and `DAP_ANALYTICS_READ_TOKEN` in the
+operator's environment. The token needs Account Analytics Read. Keep it
+out of repository files and command arguments. Only the SQL request gets
+it; health receives no analytics credential. The check makes reads only.
+Running it still needs the applicable operational scope.
+
+Use a fresh output file from the project's pinned Wrangler 4.147.0
+deployment. [Wrangler's structured output](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/)
+is NDJSON selected with `WRANGLER_OUTPUT_FILE_PATH`. The check requires
+one version-1 `wrangler-session` for `deploy` and one successful
+version-1 `deploy` record. It obtains the Worker version from that record's
+`version_id`. A version upload, ambiguous output or `command-failed`
+cannot substitute for a completed deployment. The health body's version
+and deployment must match those selected for the check.
+
+The calibration is a JSON object with exactly these fields:
+
+| Field | Meaning |
+|---|---|
+| `format` | `dap-metric-calibration-1` |
+| `deployment` | The same public deployment name |
+| `version` | The lowercase Worker UUID of the observed calibration run |
+| `from`, `through` | Canonical UTC ISO timestamps for its window, at most fifteen minutes; the window has ended |
+| `routeCount` | Observed weighted route events, at least 100 |
+| `p95Ms` | Observed whole-millisecond route p95 |
+| `boundMs` | Chosen whole-millisecond bound, at least that p95 |
+| `recordingSha256` | Lowercase SHA-256 of the retained observation |
+
+The baseline may be from an earlier version of the same deployment.
+The recording digest is the operator's declared reference: the script
+does not follow it or certify that the observation happened. Actual
+recording and review are part of delivery. Each input file is bounded at
+256 KiB. The result reports both input-file hashes and the calibration.
+
+The query selects the deployed version for a fixed fifteen-minute
+window. Event counts sum multiplicity times sample interval; counters
+sum their already-aggregated value times sample interval. Multiplicity
+is not applied to a counter again. Route p95 is the weighted nearest rank
+of unmerged route durations. Refused routes are reported beside errors;
+only route `error` ends count toward the one-percent error threshold.
+
+Fewer than 100 weighted routes, no turn, a newest event older than five
+minutes, error rate above one percent, p95 above the supplied bound,
+any busy turn, failed SQL or mismatched health all fail. Coverage is a
+separate gate: recorded loss is incomplete; sampling or unresolved turn
+places is unknown. With no sampling or loss, turn-marked HTTP routes
+must balance public turns at each of `create`, `acts` and `preparations`.
+Pre-turn routes are excluded. RPC, alarm, dispatch and mixed places cannot
+balance a missing HTTP turn. The result always declares undetectable
+paired loss, missing summaries and alarm/dispatch limits. A complete
+result describes observations, never proof that no busy turn occurred.
+
+The client bounds the SQL result at 50,000 rows and 16 MiB, health at
+4 KiB, each response at 65,536 pieces and each request at ten seconds.
+Overfull, truncated or malformed replies fail instead of judging a partial
+window. Redirects are errors. The query omits scope indexes, request IDs
+and trace IDs, and excludes the separate
+[MCP map](mcp.md#operational-metrics). Raw provider responses and tokens
+are not printed. Exit 0 means the observed check passed; 1 means it
+failed; 2 means its retained inputs were invalid.
+
+The reported `weightedRows` is the sum of sample intervals over metric
+points. It is not SQLite rows written. Actual storage-row reporting is
+still owed; `rowsWritten` remains unknown (`null`) and does not gate.
 
 ## Request correlation
 

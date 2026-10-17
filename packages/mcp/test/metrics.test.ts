@@ -34,6 +34,10 @@ describe("closed MCP operational observations", () => {
     expect(points.every(p => p.blobs[0] === "metric-dropped")).toBe(true);
     expect(points.map(p => p.doubles[2])).toEqual([301, 1]);
     expect(JSON.stringify(points)).not.toMatch(/PRIVATE|user:secret/);
+    const invalid: McpMetricPoint[] = [];
+    const badContext = new McpMetrics({ report: p => { invalid.push(p); }, version: ["11111111-1111-1111-1111-111111111111"] as unknown as string });
+    expect(await badContext.call("room", async () => 42, () => good)).toBe(42);
+    expect(invalid.map(p => [p.blobs[0], p.blobs[2]])).toEqual([["metric-dropped", "unknown"]]);
     const bounded = fixture();
     await bounded.metrics.call("room", async () => { for (let i = 0; i < 300; i++) custodyTransition(null, "prepared"); return true; }, () => good);
     expect(bounded.points).toHaveLength(250);

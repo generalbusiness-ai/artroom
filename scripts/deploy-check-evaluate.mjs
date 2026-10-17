@@ -44,7 +44,7 @@ export function evaluateDeployment({ deployment, version, now, p95BoundMs, rows,
       : `no busy observed, coverage unknown: ${result.coverageReasons.join("; ") || "unavailable observations"}`;
     return result;
   };
-  if (typeof deployment !== "string" || !deployment || new TextEncoder().encode(deployment).length > 128 || !UUID.test(version ?? "") || !integer(now)) {
+  if (typeof deployment !== "string" || !deployment || new TextEncoder().encode(deployment).length > 128 || typeof version !== "string" || !UUID.test(version) || !integer(now)) {
     fail("input"); return finish();
   }
   if (!integer(p95BoundMs)) fail("calibration");
