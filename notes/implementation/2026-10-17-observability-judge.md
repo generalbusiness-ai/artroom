@@ -288,7 +288,8 @@ The earlier standalone gate is historical, not combined validation.
 Source review must assess the repaired composition’s actual gate outcome
 and the bounded failures recorded below. The five P3 slices remain separate, with Judge before
 P3 in the latest review order. Calibration and real SQL/health acceptance
-remain owed, and Cloudflare deployment remains held.
+remain owed. Cloudflare deployment was still held at that checkpoint;
+the latest hosting policy is recorded below.
 
 ## Query references
 
@@ -429,3 +430,52 @@ creation witness was added. This changed implementation needs one gate
 at its new clean freeze, then fresh exact-head Source review. The
 rejected head, all original failures and both finite evidence grants
 remain preserved; no earlier approval or static advisory is transferred.
+
+## Receipt-repair gate and delivery
+
+The next implementation freeze is
+`3a3e03d03664786e7cfe06ed713936b6118e1849`, tree
+`1aa340c9686526727f64c1ea85d2df066da0f20f`. Original gate session
+91061 exited 1 (`c9c8c2`) at that same clean head and tree. It passed
+1,563 Vitest cases, failed five and skipped three. All metric witnesses
+passed. Each failure was an original 5,000 ms timeout: Git archive parent
+retry, Git compare-and-set push, Scope application establishment (the
+application case), Scope application publication, and Scope lending.
+Node and Counter checks were unrun inside the failed gate.
+
+The gate took 626.597 seconds elapsed and 754.833 child CPU seconds on
+macOS 27.0.1 arm64, with 18 logical CPUs and pre-run load averages
+10.319, 7.431 and 6.933. Installation was skipped against the verified
+unchanged lock stamp. Typechecking took 11.3 seconds elapsed and 33.9
+CPU seconds; tests took 615.0 and 720.5. Original private log:
+`/tmp/artroom-judge-receipt-3a3e03d0-gate.log`; terminal JSON is beside
+it. Step logs are in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.8yXI7Vdw9T`.
+These are references, not private-file grants.
+
+Exactly the five timed-out cases then passed once, without source,
+deadline, assertion or pool changes (original 36186, `21ff51`):
+archive parent retry 3,149.1 ms; compare-and-set push 2,142.5 ms;
+application establishment 1,193 ms; application publication 2,355 ms;
+lending 3,543 ms. Twelve other cases in those files were unselected.
+The outer focused command took 12.93 seconds elapsed and 15.94 CPU
+seconds on the same machine and installed dependency view; a separate
+pre-focus load reading was not captured. The exact downstream Node and
+Counter bodies then passed 25 and 55 checks, respectively, in that same
+original process. These separate passes are not a passing combined gate
+and do not establish a timeout cause. Gate stability remains open.
+
+This delivery successor changes only this note. All other 1,457 frozen
+mode/type/blob/path leaves remain exact, including every implementation
+and test file. All thirteen archive leaves and all 123 protected leaves
+remain exact to Main698. Complete exact-head review must assess both
+7731e1b findings and the new bounded timeout residue. No prior Source
+approval or gate verdict is transferred. No whole suite is repeated for
+the note-only successor.
+
+Planner policy `ef76f5db` lifts the hosting freeze as of 17 October at
+09:50 Eastern, requiring approval of the exact deployed head and the
+available post-deploy check. Earlier hold statements describe their
+checkpoints. This local Source slice itself performs no deployment or
+provider query. Actual observed calibration, live SQL/health acceptance,
+storage reporting, and full observability acceptance remain owed.
