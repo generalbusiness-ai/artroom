@@ -2,12 +2,16 @@
 
 ## Current Source
 
-Source request `47ed3a0f`, promise `82a1a159`, renews
-the complete original scope on actual Main
-`532b1d0d00e05f32cb5e454a0e838b447bff0b12`, tree `c802c528`.
-That Main preserves the reviewed Judge and adds the reviewed journey plan.
-The older Source IDs, dependency waits and gate results below describe
-earlier preparation checkpoints. All original attempts remain recorded.
+Source request `dcdb634e`, promise `94389612`, preserves the complete
+original scope on actual Main
+`afcf416e8c077499abbe7efd16bbdbe329811445`, tree `4b45f8ca`.
+That Main includes the reviewed Judge, journey plan and capacity preparation.
+Complete review `0ad4e770` found one Lending draft-loss issue. This successor
+repairs that boundary and its owned generated assets; the other scopes keep
+their reviewed runtime and test bytes. One gate is due at the changed
+composition freeze, followed by complete exact-head re-review. Earlier
+Source IDs, dependency waits and gate results below are historical checkpoints.
+All original attempts and the complete five-scope conditions remain recorded.
 
 ## Earlier preparation
 
@@ -346,3 +350,22 @@ not cover this changed runtime. One new gate is due at the repaired
 composition freeze, followed by complete exact-head re-review. Private
 fixture, report and screenshot paths confer no external read or execution
 rights; a fresh finite public projection will carry the review evidence.
+
+
+## Repaired composition on actual Main
+
+Reviewed capacity preparation `d2af3569` landed as Main `afcf416e`,
+with tree `4b45f8ca`, under approval `04e50ac0` and normal receipt
+`a673d2c1`. It preserves the prior 1,459 Main leaves and adds only its
+preparation note. Landing session 5512 closed with exit 0 (`00b30a`);
+reviewed Main and Gitseq push 92784 closed with exit 0 (`3a0199`). Remote
+readback and exact approved-tree correspondence passed (`fdd6bb`).
+The P3 candidate incorporates this exact document before its new gate.
+Full capacity implementation and decision `4dccae54` remain open.
+
+F1 repair changes only Lending's renderer and its two owned generated
+outputs. All other P3 runtime/test leaves remain exact to the fully reviewed
+`50dd61e7` candidate. The earlier passing gate at `39572e24` covers the
+pre-repair composition; a new gate must cover this changed implementation.
+All earlier failed Judge gates and their cause-unknown qualifications remain.
+No approval, deployment or operational/root acceptance is inferred.
