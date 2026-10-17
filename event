@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d80a9afb0aa9b7a05caa117b6a0c37fcb16ad8a","text":"Merge retired a covered predecessor; the successor is at scripts/count-code-lines.py."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d917db7dbc99753332ca6d15b283a7f59deb45e","text":"Merge retired a covered predecessor; the successor is at packages/client/src/http.ts."}
