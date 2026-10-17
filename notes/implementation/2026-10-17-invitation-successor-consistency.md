@@ -210,7 +210,10 @@ retains its three failed gates and cause-unknown timeout qualifications;
 those are neither waived nor counted as a passing combined P3 gate. All
 five P3 scopes and their earlier evidence remain intact. No provider,
 deployment, publication or unreviewed branch push is performed. Further
-GitHub egress waits for the pending direct destination approval.
+At that checkpoint, GitHub egress waited for direct destination approval.
+Hugh has since approved repository pushes and planner deployments to
+Cloudflare as needed. Reviewed Main and Gitseq were pushed successfully;
+this P3 delivery performs no deployment.
 
 
 ## Passing final composition gate
@@ -242,6 +245,7 @@ P3 run does not rewrite them or satisfy operational/root acceptance.
 Fresh Source commissions preserve every original P3 condition and evidence.
 The earlier pre-plan commissions were normally retired after the new
 promises became effective. Complete independent exact-head review remains
-required; no approval is inferred from this gate. Direct GitHub destination
-approval is still pending, so no further push or automatic-push landing
-is performed. No provider or deployment action is part of this delivery.
+required; no approval is inferred from this gate. Hugh has directly
+approved repository pushes. Reviewed landing may proceed after exact-head
+approval. Planner may deploy to Cloudflare as needed; no provider or
+deployment action is part of this delivery.
