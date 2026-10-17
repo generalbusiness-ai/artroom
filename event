@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f75e40c01f243a5f626a2d8c69ae53f8e8f5cad8","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/verify-cleanup.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f7eeb1a69f826856ba992299b2b691fbea41c0d1","text":"Merge retired a covered predecessor; the successor is at packages/platform/test/versions.test.ts."}
