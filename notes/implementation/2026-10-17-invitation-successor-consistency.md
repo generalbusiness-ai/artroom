@@ -3,7 +3,7 @@
 Source child `cca0370f`, promise `4178faca`, delivers P3 request
 `315ae850` under `6b5b1b33`, against Main `55e1970a5`. This is independent
 local work during archive review. Archive remains first for landing;
-final composition, gate and independent Source review remain required.
+exact Main correspondence and independent Source review remain required.
 
 ## What changes
 
@@ -74,7 +74,30 @@ catalog bytes changed. Original records use these paths:
 - `/tmp/artroom-invitation-successor-owned-page-assets.log`
 
 These owner references grant no raw-file, helper or execution access.
-Final review receives a separately pinned finite metadata grant. No
-full gate, Source approval, landing, provider operation, deployment or
-publication is claimed by this checkpoint. Existing hosted outputs and
-the pending archive/Lending candidates remain unchanged.
+Final review receives a separately pinned finite metadata grant. Source
+approval and reviewed landing remain owed. Existing hosted outputs and
+the original archive/Lending candidates remain unchanged; no provider
+operation, deployment or publication ran.
+
+## Frozen integration gate
+
+Original gate `24299` ran once at clean commit
+`5375fb16bafa658be91b7dba316ae519a6b2a8c6`, tree
+`10c77db40030c9b7533b5722c5f3fbdd2a4c7bbf`, and exited zero. The exact
+composition retains all thirteen archive paths from `c811785ea`, eleven
+Lending paths from `1d2a6cfde` and six invitation paths from `8c98c1f73`,
+with their original modes and blobs. Its thirty changed paths against
+Main `55e1970a5` contain no additional source changes.
+
+Whitespace, types, 1,562 Vitest tests with three skips, sixteen Node tests
+and fifty-five Counting tests passed. The existing-lock install took
+2.2 seconds, types 7.4 seconds and tests 444.9 seconds. The original owner
+terminal is `b7fe0f`, exit 0. The wrapper log is
+`/tmp/artroom-p3-integration-5375-gate.log`; step logs are in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.DHl3BJJKqb`.
+
+This note and the Lending note add evidence only after that freeze.
+The shared gate does not replace archive's own gate or approve that
+dependency. P3 Source filing and landing still wait for archive's reviewed
+landing and exact correspondence with Main. Log references grant no
+raw-file, helper or execution access.

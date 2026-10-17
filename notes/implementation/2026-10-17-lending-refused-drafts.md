@@ -125,7 +125,30 @@ Original records are retained outside the checkout:
 - `/tmp/artroom-lending-p3-membership-fixtures-model-focus.log`
 
 These references grant no external-file or execution access. A later
-Source review will receive its own finite, exact evidence grant. No full
-gate or Source approval has occurred for this combined candidate. All four
-P3 outcomes still owe exact reviewed landing. All six hosted outputs remain untouched; no provider
-operation, deployment or publication ran.
+Source review will receive its own finite, exact evidence grant. All four
+P3 outcomes still owe exact reviewed landing. All six hosted outputs remain
+untouched; no provider operation, deployment or publication ran.
+
+## Frozen integration gate
+
+Original gate `24299` completed at clean commit
+`5375fb16bafa658be91b7dba316ae519a6b2a8c6`, tree
+`10c77db40030c9b7533b5722c5f3fbdd2a4c7bbf`, and exited zero. Its exact
+composition contains archive `c811785ea`, Lending `1d2a6cfde` and invitation
+`8c98c1f73`: all thirteen, eleven and six respective path leaves retain
+their original mode and blob. There are thirty changed paths against
+Main `55e1970a5`, with no additional source changes.
+
+The gate passed whitespace and type checks, 1,562 Vitest tests with three
+skips, sixteen Node tests and fifty-five Counting tests. The existing-lock
+install took 2.2 seconds, types 7.4 seconds and tests 444.9 seconds.
+The original owner terminal is `b7fe0f`, exit 0. Its wrapper log is
+`/tmp/artroom-p3-integration-5375-gate.log`; step logs are in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.DHl3BJJKqb`.
+
+This is the one frozen integration gate for both P3 slices. This note and
+the invitation note record its result without changing implementation
+bytes. It does not replace archive's original gate `79043`, approve an
+unreviewed dependency or permit P3 Source filing before archive's reviewed
+landing. Exact correspondence with landed Main and independent Source
+approval remain required. These paths grant no raw-log or execution access.
