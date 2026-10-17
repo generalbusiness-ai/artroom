@@ -15,7 +15,7 @@
  */
 
 import type { Answer, DeliveryRefusal, Created, MismatchReason, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/dap-contract";
-import { REFUSAL_REASONS, isItemQueryRead, among, isDuty, isHead, isItem, isListOf, isLogPage, isRead, isReceipt, isRecord, isRetainedInput, isSealed, isSummary } from "@generalbusiness/artroom-bytes";
+import { REFUSAL_REASONS, isItemQueryRead, among, isOutboxItem, isHead, isItem, isListOf, isLogPage, isRead, isReceipt, isRecord, isRetainedInput, isSealed, isSummary } from "@generalbusiness/artroom-bytes";
 
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
 /** Why an act is refused (`Answer`). A source check and a platform definition are a founding's to answer, and are not here. */
@@ -63,8 +63,8 @@ export const ANSWERS: { [K in keyof ScopeApi]: (reply: unknown) => reply is Awai
   queryItems: isItemQueryRead,
   history: isRead(isListOf(isSealed)),
   entry: isRead(isSealed),
-  outbox: isRead(isListOf(isDuty)),
-  duty: isRead(isDuty),
+  outbox: isRead(isListOf(isOutboxItem)),
+  duty: isRead(isOutboxItem),
   log: isRead(isLogPage),
   retained: isRead(isRetainedInput),
 };

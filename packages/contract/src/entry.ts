@@ -161,8 +161,8 @@ export type Effect =
 // Views of an entry, built after sealing. None is part of the entry's bytes (section 3, point 5).
 
 /** One send of one entry: `seq.n`. */
-export type DutyId = `${number}.${number}`;
+export type OutboxId = `${number}.${number}`;
 export interface Envelope { to: ScopeId; from: FactRef; n: number; message: Message }
 export interface Receipt { fact: FactRef; definition: Digest | PlatformDefinition;
                            intent: Digest | null; effects: readonly Effect[];
-                           sends: readonly DutyId[]; epoch: 0 }
+                           sends: readonly OutboxId[]; epoch: 0 }

@@ -10,10 +10,10 @@
  * are the contract's, and are exported here again.
  */
 
-import type { Digest, Dispatched, Duty, Entry, FactRef, Message, OperationId, RetainedInput, ScopeRef, Sealed, Seed, Timestamp } from "@generalbusiness/dap-contract";
+import type { Digest, Dispatched, OutboxItem, Entry, FactRef, Message, OperationId, RetainedInput, ScopeRef, Sealed, Seed, Timestamp } from "@generalbusiness/dap-contract";
 import type { Operation, RangeIndex, StateWriter } from "@generalbusiness/dap-derive";
 
-export type { Dispatched, Duty, Sealed };
+export type { Dispatched, OutboxItem, Sealed };
 
 /** An entry as stored: its canonical JSON, whose UTF-8 bytes are the entry's canonical bytes, and their number. */
 export interface Stored { seq: number; hash: Digest; bytes: string; size: number }
@@ -84,9 +84,9 @@ export interface Store extends StateWriter {
   /** The UTF-8 bytes of one retained input, or null, without reading it. */
   retainedSize(kind: Retained["kind"], digest: Digest, domain?: string): number | null;
   /** The row of one send, or null. */
-  duty(seq: number, n: number): Duty | null;
+  duty(seq: number, n: number): OutboxItem | null;
   /** At most `limit` sends after the one at `after`, in the order of `seq` and ordinal. */
-  duties(after: { seq: number; n: number } | null, limit: number): { duties: Duty[]; more: boolean };
+  duties(after: { seq: number; n: number } | null, limit: number): { duties: OutboxItem[]; more: boolean };
 
   // The dispatcher's bookkeeping (section 7.4). None of it is history, and no judgment reads it. Each call is one durable write.
 

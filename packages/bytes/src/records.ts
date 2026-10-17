@@ -31,13 +31,13 @@
  */
 
 import type {
-  Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, ObservationUse, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
+  Attempt, Dispatched, OutboxItem, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, ObservationUse, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
 } from "@generalbusiness/dap-contract";
 import { MAX_DEPTH, wellFormed } from "./canonical.ts";
 import { isIncarnation, isScopeId } from "./domains.ts";
 import { isDigest } from "./hash.ts";
-import { isDutyId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, isSignature, timeMs } from "./ids.ts";
+import { isOutboxId, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isScopeKind, isSignature, timeMs } from "./ids.ts";
 
 type Rec = Record<string, unknown>;
 type Check = (v: unknown) => boolean;
@@ -84,8 +84,8 @@ const ATTEMPTED: Record<Attempt["answer"], true> = { none: true, "wrong-incarnat
 const DISPATCHED: Record<Dispatched["answer"], true> = { ...ATTEMPTED, acknowledged: true };
 const CLASS: Record<Message["class"], true> = { request: true, result: true, control: true, advisory: true };
 const DECISION: Record<Extract<Input, { decision: unknown; type: "delivery" }>["decision"], true> = { applied: true, refused: true, superseded: true };
-const CLAUSE: Record<NonNullable<Duty["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
-const FINDING: Record<NonNullable<Duty["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
+const CLAUSE: Record<NonNullable<OutboxItem["result"]>["clause"], true> = { applied: true, refused: true, superseded: true, conflict: true };
+const FINDING: Record<NonNullable<OutboxItem["diagnosis"]>["finding"], true> = { undelivered: true, "delivery-unavailable": true };
 const RETAINED: Record<RetainedInput["kind"], true> = { definition: true, entry: true, rule: true, text: true, snapshot: true, value: true };
 /** Why a delivery was refused: a code the contract names and, where one exists, the name the failed guard declares. */
 const reason = record({ code: among(REFUSAL_REASONS) }, { name: text });
@@ -275,7 +275,7 @@ export const isEntry = (v: unknown): v is Entry => entry(v);
 
 // ---------------------------------------------------------------- views and reads (sections 4.1, 4.2 and 9.1)
 
-const receipt = record({ fact: factRef, definition: isDefinitionName, intent: orNull(isDigest), effects: listOf(effect), sends: listOf(isDutyId), epoch: is(0) });
+const receipt = record({ fact: factRef, definition: isDefinitionName, intent: orNull(isDigest), effects: listOf(effect), sends: listOf(isOutboxId), epoch: is(0) });
 export const isReceipt = (v: unknown): v is Receipt => receipt(v);
 const sealed = record({ entry, hash: isDigest });
 export const isSealed = (v: unknown): v is Sealed => sealed(v);
@@ -289,10 +289,10 @@ const summary = record({
 }, { reservationExpiry: (v) => record({ clock: is("available"), time: isTime, expired: listOf(isLocalId) })(v) || record({ clock: is("unavailable") })(v) });
 export const isSummary = (v: unknown): v is Summary => summary(v);
 const duty = record({
-  duty: isDutyId, to: (v) => scopeRef(v) || seed(v), class: among(CLASS), held: flag, attempts: listOf(record({ at: isTime, answer: among(DISPATCHED) })), acknowledged: orNull(factRef),
+  duty: isOutboxId, to: (v) => scopeRef(v) || seed(v), class: among(CLASS), held: flag, attempts: listOf(record({ at: isTime, answer: among(DISPATCHED) })), acknowledged: orNull(factRef),
   result: orNull(record({ seq: isLocalId, clause: among(CLAUSE) })), diagnosis: orNull(record({ seq: isLocalId, finding: among(FINDING) })),
 });
-export const isDuty = (v: unknown): v is Duty => duty(v);
+export const isOutboxItem = (v: unknown): v is OutboxItem => duty(v);
 /** A page of stored entries. Each entry's `bytes` is text a reader hashes and parses itself; it is not read here. */
 const logPage = record({ scope: scopeRef, definition: isDefinitionName, entries: listOf(record({ seq: isLocalId, hash: isDigest, bytes: text })) });
 export const isLogPage = (v: unknown): v is LogPage => logPage(v);

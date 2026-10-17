@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Duty, Entry, Read } from "@generalbusiness/dap-contract";
+import type { OutboxItem, Entry, Read } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Delivered } from "@generalbusiness/dap-derive";
 import { incidentsOf, type Incident, type Resent } from "../src/index.ts";
@@ -14,7 +14,7 @@ import { reader } from "./support.ts";
 
 interface Surface {
   incidents(reader: unknown, cursor?: string): Promise<Read<readonly Incident[]>>;
-  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: string): Promise<Read<readonly Duty[]>>;
+  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: string): Promise<Read<readonly OutboxItem[]>>;
   resend(duty: unknown): Promise<Resent>;
 }
 const surface = (node: Node) => node.object as unknown as Surface;

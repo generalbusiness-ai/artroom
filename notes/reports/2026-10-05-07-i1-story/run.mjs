@@ -173,7 +173,7 @@ class Seat {
   async status() { const read = await this.handle.summary(); return read.ok ? `${read.value.status}, head ${read.at.seq}` : read.reason; }
   async item(id) { return (await this.summary()).value.items.find((i) => i.id === id); }
   async duty(id) {
-    const d = ok(await this.handle.followDuty(id)).value;
+    const d = ok(await this.handle.followOutbox(id)).value;
     const log = d.attempts.map((a) => a.answer).join(", ") || "none";
     const result = d.result ? `result ${d.result.clause} at ${this.name}.${d.result.seq}` : d.class === "request" ? "no result yet" : "no result is due";
     return `${this.name} duty ${id}: ${d.class}${d.held ? ", held" : ""}; attempts: ${log}; ${d.acknowledged ? `acknowledged with ${fact(d.acknowledged)}` : "not acknowledged"}; ${result}`;

@@ -12,7 +12,7 @@ import type { Answer, DeclaredDefinition, Entry, Grant, Intent, Read, Receipt, S
 import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
-import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
+import type { Delivery, OutboxItem, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
 import type { NetScope } from "./worker.ts";
@@ -64,7 +64,7 @@ export class Node {
     return read.value;
   }
   async entries(): Promise<Entry[]> { return (await this.sealed()).map((s) => s.entry); }
-  async duties(): Promise<readonly Duty[]> {
+  async duties(): Promise<readonly OutboxItem[]> {
     const read = await this.stub.outbox(reader);
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;

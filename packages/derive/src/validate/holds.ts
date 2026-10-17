@@ -85,7 +85,7 @@ export interface Reserving {
 const CLAUSES = ["applied", "refused", "superseded", "undelivered", "conflict"] as const;
 
 /** Reads the members, makes the checks, and computes the amounts. Undefined: the value is no platform data, or it has no kind and no `holds`. */
-export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyAmounts" | "markers">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
+export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendingWorkAmounts" | "markers">, outcomeValues: Readonly<Record<string, readonly import("../ledger.ts").EvidenceValueDomain[]>> = {}): Reserving | undefined {
   if (!d.platform) return undefined;
   const { bad, rec, int, list, bounds } = d;
   const kindsWritten = isObject(top["outcomes"]) ? top["outcomes"] : {};
@@ -263,8 +263,8 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
   // row in pending: its state duty and each marker duty are counted together by the shared calculator, beside its deadline.
   const markedAmounts = capacity.markers ? markerReservations(capacity.markers) : null;
   const inState = (type: string, state: string): Amount => sum(
-    own(own(capacity.dutyAmounts.deadlines, type), state) ?? NOTHING,
-    own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.dutyAmounts.pending, type), state) ?? NOTHING),
+    own(own(capacity.pendingWorkAmounts.deadlines, type), state) ?? NOTHING,
+    own(capacity.markers, type) ? markedAmounts!.awaits(type, state, []) : (own(own(capacity.pendingWorkAmounts.pending, type), state) ?? NOTHING),
   );
   const everyState = [...d.types.values()].flatMap((type) => [...type.states.keys()].map((state) => inState(type.name, state)));
   const c: Counting = {
@@ -272,7 +272,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
     initial: (type) => { const of = d.types.get(type); return of ? inState(type, of.initial) : NOTHING; },
     change: largest(...everyState),
     entry: bounds.entryBytes,
-    written: capacity.dutyAmounts.clause,
+    written: capacity.pendingWorkAmounts.clause,
   };
 
   // Checks 4 and 5, for each kind that no item holds, and so for each such kind below another (edge 3).
@@ -336,7 +336,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "dutyA
     const path = binding.path.slice(0, -".bound".length);
     const handler = Object.entries(handlersWritten).find(([name]) => at("receives", name) === path)?.[1];
     if (!isObject(handler)) continue;
-    const written = own(capacity.dutyAmounts.decisions, path) ?? NOTHING;
+    const written = own(capacity.pendingWorkAmounts.decisions, path) ?? NOTHING;
     // The derived-effect ceiling stands in for the records a handler can
     // change, as entryBytes stands in for the whole static entry size.
     let amount: Amount | null = sum({ ...NOTHING, entries: 1, records: bounds.derivedEffects, bytes: 2 * bounds.entryBytes }, written);

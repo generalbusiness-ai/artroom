@@ -12,10 +12,10 @@
 import type { ItemQueryRead } from "./item-query.ts";
 import type { Answer, DeliveryRefusal, RefusalReason, UnavailableReason } from "./result.ts";
 import type { DeclaredDefinition } from "./definition.ts";
-import type { DutyId, Receipt } from "./entry.ts";
+import type { OutboxId, Receipt } from "./entry.ts";
 import type { FactRef, Grant, Digest, PlatformDefinition } from "./scope.ts";
 import type { SignedIntent } from "./intent.ts";
-import type { Cursor, Duty, Item, LogPage, Read, RetainedInput, Sealed, Settlement, Summary } from "./read.ts";
+import type { Cursor, OutboxItem, Item, LogPage, Read, RetainedInput, Sealed, Settlement, Summary } from "./read.ts";
 
 /**
  * How a founding is answered (section 7.1). `accepted`: the genesis entry is
@@ -76,9 +76,9 @@ export interface ScopeApi {
   queryItems(scope: string, reader: unknown, encoded: string): Promise<ItemQueryRead>;
   history(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Sealed[]>>;
   entry(scope: string, reader: unknown, seq: number): Promise<Read<Sealed>>;
-  outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Duty[]>>;
+  outbox(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly OutboxItem[]>>;
   /** The outbox status of one send. */
-  duty(scope: string, reader: unknown, duty: DutyId): Promise<Read<Duty>>;
+  duty(scope: string, reader: unknown, duty: OutboxId): Promise<Read<OutboxItem>>;
   /** A page of the history as stored: each entry's canonical bytes. */
   log(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<LogPage>>;
   /** One retained input, by kind and digest; a value also names its byte domain. */

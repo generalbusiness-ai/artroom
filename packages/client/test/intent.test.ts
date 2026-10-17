@@ -114,7 +114,7 @@ test("each operation of the handle returns a reply only when it has every member
       refusal("guard-failed"), refusal({ code: "tired" }), refusal({ name: "not-this-ask" }),
       genesis({}), genesis({ kind: "" }), genesis({ kind: null })]],
     ["outbox", (t) => handle(t).outbox("c"), [read([duty], { next: "c2" })], [...each(duty).map((v) => read([v])), read(duty)]],
-    ["followDuty", (t) => handle(t).followDuty("1.0"),
+    ["followOutbox", (t) => handle(t).followOutbox("1.0"),
       [read(duty), read({ ...duty, acknowledged: fact, result: { seq: 2, clause: "applied" }, diagnosis: { seq: 3, finding: "undelivered" } }), refused],
       [...each(duty).map((v) => read(v)), read({ ...duty, class: "letter" }), read({ ...duty, result: { seq: 2 } }), read({ ...duty, diagnosis: { seq: 3, finding: "lost" } }), read({ ...duty, attempts: [{ at: entry.time }] })]],
   ];

@@ -5,7 +5,7 @@
  * compiling. The digests and names are made up.
  */
 
-import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, DutyId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, ObservationUse, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
+import type { AdoptedReceiveType, Answer, DeclaredDefinition, DeliveryCause, Digest, OutboxId, Entry, Envelope, FactRef, Grant, Intent, MemberRef, ObservationUse, Read, Receipt, Report, ScopeRef, Seed } from "../src/index.ts";
 import { DOMAINS, PROPOSED_BOUNDS, type Bounds, type DomainTag } from "../src/index.ts";
 
 const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
@@ -67,7 +67,7 @@ const i1: Entry = {
 };
 
 // The views, built after sealing.
-const duty: DutyId = "17.0";
+const duty: OutboxId = "17.0";
 const envelope: Envelope = { to: "sc_issue", from: d17Fact, n: 0, message: d17.sends[0]!.message };
 const receipt: Receipt = { fact: d17Fact, definition: "platform:directory@1", intent: d("a"), effects: d17.effects, sends: [duty], epoch: 0 };
 const accepted: Answer = { answer: "accepted", receipt };

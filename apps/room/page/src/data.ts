@@ -34,7 +34,7 @@ import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, OutboxId } from "@generalbusiness/dap-contract";
 import { LATE, b64url, byteOrder, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, activeDirectory, collectItemQuery, partitionIndexes, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
@@ -958,10 +958,10 @@ export async function issueCreation(room: Room, result: Acted, current: () => bo
     const child = row?.refs["scope"];
     if (!row || row.state !== "listed") return unavailable;
     const pending = async (provisional: boolean): Promise<IssueCreation> => {
-      const dutyId: DutyId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      const dutyId: OutboxId = `${receipt.fact.seq}.${creates[0]!.n}`;
       if (!receipt.sends.includes(dutyId)) return unavailable;
       if (!current()) return unavailable;
-      const read = await handle.followDuty(dutyId);
+      const read = await handle.followOutbox(dutyId);
       if (!current()) return unavailable;
       if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
       const duty = read.value;

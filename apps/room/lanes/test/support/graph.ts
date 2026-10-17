@@ -24,7 +24,7 @@ import { env } from "cloudflare:workers";
 import { SELF, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
+import type { Answer, Bounds, DeclaredDefinition, Digest, OutboxItem, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, intentDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, create, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
 import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/dap-derive";
@@ -254,7 +254,7 @@ export class Node<D extends DeclaredDefinition> {
   }
   /** One item as it is now: a copy, so that a scenario can compare it with the item later. */
   async item(id: number): Promise<Item> { return structuredClone((await this.state()).item(id)!); }
-  async duties(): Promise<readonly Duty[]> {
+  async duties(): Promise<readonly OutboxItem[]> {
     const read = await this.handle.scope.outbox();
     if (!read.ok) throw new Error(`no outbox of ${this.name}: ${read.reason}`);
     return read.value;

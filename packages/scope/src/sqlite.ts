@@ -17,7 +17,7 @@ import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Held, Incarnat
 import { canonicalize, isDigest, isScopeRef, parseStrict } from "@generalbusiness/artroom-bytes";
 import { isObject, MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
-import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import type { Dispatched, OutboxItem, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
 import { ARCHIVE_PIN_KEY, archivePinBytes } from "./archive-pin.ts";
 import { LocalSigners, SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 
@@ -438,13 +438,13 @@ export class SqliteStore implements Store {
       : this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM retained_input WHERE kind = ? AND digest = ?", kind, digest);
     return row && (row["size"] as number);
   }
-  duty(seq: number, n: number): Duty | null {
+  duty(seq: number, n: number): OutboxItem | null {
     const row = this.#one(`SELECT ${DUTY} FROM outbox WHERE seq = ? AND n = ?`, seq, n);
-    return row && dutyOf(row);
+    return row && outboxItemOf(row);
   }
-  duties(after: { seq: number; n: number } | null, limit: number): { duties: Duty[]; more: boolean } {
+  duties(after: { seq: number; n: number } | null, limit: number): { duties: OutboxItem[]; more: boolean } {
     const rows = this.#all(`SELECT ${DUTY} FROM outbox WHERE (seq, n) > (?, ?) ORDER BY seq, n LIMIT ?`, after?.seq ?? -1, after?.n ?? -1, limit + 1);
-    return { duties: rows.slice(0, limit).map(dutyOf), more: rows.length > limit };
+    return { duties: rows.slice(0, limit).map(outboxItemOf), more: rows.length > limit };
   }
 
   // ---------------------------------------------------------------- the dispatcher's bookkeeping
@@ -519,9 +519,9 @@ function sendingOf(row: Row): Sending {
 /** The columns of an outbox row that a read of its duty returns. */
 const DUTY = "seq, n, target, class, held, attempts, ack, result, diagnosis";
 
-function dutyOf(row: Row): Duty {
+function outboxItemOf(row: Row): OutboxItem {
   return {
-    duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as Duty["class"], held: row["held"] === 1,
+    duty: `${row["seq"] as number}.${row["n"] as number}`, to: json(row["target"]), class: row["class"] as OutboxItem["class"], held: row["held"] === 1,
     attempts: json(row["attempts"]), acknowledged: orNull(row["ack"]), result: orNull(row["result"]), diagnosis: orNull(row["diagnosis"]),
   };
 }

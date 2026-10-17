@@ -34,8 +34,8 @@
  * `hold@1` that is not built (I3 deltas, entry ES12).
  */
 
-import type { Digest, DutyId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize, isDigest, isDutyId, isOperationId } from "@generalbusiness/artroom-bytes";
+import type { Digest, OutboxId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
+import { canonicalize, isDigest, isOutboxId, isOperationId } from "@generalbusiness/artroom-bytes";
 import { isObject, timeMs } from "@generalbusiness/dap-derive";
 import type { Clock, Transport } from "./ports.ts";
 import type { Sql } from "./sqlite.ts";
@@ -52,7 +52,7 @@ const KINDS: ReadonlySet<string> = new Set<IncidentKind>([
 ]);
 
 /** A reference to a fact in conflict. Each is a position or an ID of this scope, and none is text that a member or an outside system wrote. */
-export type IncidentRef = { entry: number; hash?: Digest } | { operation: OperationId; attempt: number } | { duty: DutyId };
+export type IncidentRef = { entry: number; hash?: Digest } | { operation: OperationId; attempt: number } | { duty: OutboxId };
 
 /** One row of the operator's record. `n` numbers the rows of this scope's record, from 1. */
 export interface Incident { n: number; time: Timestamp; scope: ScopeRef | null; kind: IncidentKind; refs: readonly IncidentRef[] }
@@ -64,7 +64,7 @@ function isRef(v: unknown): v is IncidentRef {
   if (keys === "entry") return position(v["entry"]);
   if (keys === "entry,hash") return position(v["entry"]) && isDigest(v["hash"]);
   if (keys === "attempt,operation") return position(v["attempt"]) && isOperationId(v["operation"]);
-  return keys === "duty" && isDutyId(v["duty"]);
+  return keys === "duty" && isOutboxId(v["duty"]);
 }
 
 /** The most rows one scope's record keeps. Configuration: no text states a number (I3 deltas, entry ES12). */
@@ -177,7 +177,7 @@ export type Resent = { sent: true; answer: Dispatched["answer"] | "source-unveri
 export async function sendAgain(
   store: Pick<Store, "duty" | "stored" | "scope" | "attempted" | "acknowledge">, transport: Transport | null, clock: Clock, record: OperatorRecord, duty: unknown, seconds: number,
 ): Promise<Resent> {
-  const at = isDutyId(duty) ? (duty.split(".").map(Number) as [number, number]) : null;
+  const at = isOutboxId(duty) ? (duty.split(".").map(Number) as [number, number]) : null;
   const row = at ? store.duty(at[0], at[1]) : null;
   const kept = at ? store.stored(at[0]) : null;
   const scope = store.scope();

@@ -3,7 +3,7 @@ import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
 import { join as pathJoin } from "node:path";
 import { tmpdir } from "node:os";
 import { fileStore } from "../src/files.ts";
-import type { Receipt, SignedIntent, Summary, Entry, DutyId, Item } from "@generalbusiness/dap-contract";
+import type { Receipt, SignedIntent, Summary, Entry, OutboxId, Item } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/dap-platform";
@@ -47,7 +47,7 @@ test.each([MEMBERSHIP, "platform:membership@6"] as const)("retained native agent
         expect(judged.result, "the package's actual membership rules admit the scripted native input").toBe("write");
         if (judged.result !== "write") throw Error("Model admission refused");
         const entry = m.entries.at(-1)!.entry, fact = m.fact(entry.seq);
-        const accepted: Receipt = { intent: digest, fact, definition: named, effects: entry.effects, sends: entry.sends.map((send): DutyId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
+        const accepted: Receipt = { intent: digest, fact, definition: named, effects: entry.effects, sends: entry.sends.map((send): OutboxId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
         receipts.set(digest, accepted); receipt = accepted;
       }
       if (signed.intent.kind === lose) { lose = null; throw Error("SCRIPTED lost accepted reply"); }

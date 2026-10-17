@@ -92,9 +92,9 @@ export function markerReservations(types: Markers, base: (type: string, form: Ma
     return sum(base(name, form), largest(form.chainAmount, ...left.map((state) => sum(own(t.heldAmounts, state) ?? NOTHING, awaits(name, state, done)))));
   };
   /** One duty of an item in a state: the largest over its alternatives there, and over the states that a timed rule leads to (point DI19). `slot` null: the state duty. */
-  const dutyOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): Amount => {
+  const workOf = (name: string, t: MarkedType, slot: string | null, state: string, done: readonly string[]): Amount => {
     const here = t.forms.filter((form) => form.slot === slot && form.in.includes(state)).map((form) => formOf(name, t, form, slot === null ? done : [...done, slot]));
-    const there = t.moves.filter((move) => move.from.includes(state)).map((move) => dutyOf(name, t, slot, move.to, done));
+    const there = t.moves.filter((move) => move.from.includes(state)).map((move) => workOf(name, t, slot, move.to, done));
     return largest(...here, ...there);
   };
   /**
@@ -111,7 +111,7 @@ export function markerReservations(types: Markers, base: (type: string, form: Ma
     if (found !== undefined) return found;
     if (open.has(key)) { cyclic(name, state); return NOTHING; }
     open.add(key);
-    const total = sum(dutyOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => dutyOf(name, t, mark, state, set)));
+    const total = sum(workOf(name, t, null, state, set), ...t.marks.filter((mark) => !set.includes(mark)).map((mark) => workOf(name, t, mark, state, set)));
     open.delete(key);
     known.set(key, total);
     return total;

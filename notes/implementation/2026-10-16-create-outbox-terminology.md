@@ -152,3 +152,42 @@ lookups, autolinks and Git search results. The literal/version inventory
 and other authorized work continue independently. Global genesis input
 founding belongs to Entry-v1 bytes, so its future wire version is also
 being distinguished from definition-local field revisions.
+
+## Approved Directory composition and provenance renewal
+
+Directory candidate a2d18fe3 is approved by c7f86f94 and landed as Main
+9a1238b7 with effective receipt 731911ea. This branch now includes that
+merge, including its exact Lending generated assets and final report.
+The original terminology request depended on the now-retired f45 report;
+request 1b6d2579 and promise e692fa54 renew this unfinished slice on the
+stable landing receipt. Request 1a7c88af is superseded toward that
+successor. Earlier checkpoints and failed compiler attempts remain above.
+
+## Outbox and pending-work symbol checkpoint
+
+The read-model types and validators now use OutboxItem, OutboxId,
+isOutboxItem and isOutboxId. The SDK follow operation is followOutbox.
+The definition validator's internal reservation terms use PendingWork and
+PendingWorkAmounts because they include item and marker work as well as
+sends. CleanupWork names the destination's internal cleanup projection.
+The lexical pass changes 211 tokens across 40 files. No alias is added.
+Public field and transport-method renames, retained operational-record
+normalization and remaining prose are still unfinished.
+
+Direct source inspection confirms these outbox types describe unsigned
+reads and runtime bookkeeping, rather than a field in the sealed Entry
+or NativeInput grammar. Receipt.sends still contains the same seq.n ID
+strings. The private request_index SQL column named duty and previously
+retained operator reference JSON need explicit compatibility treatment
+when their public projections change. No signed-read kind is added;
+outbox still uses its existing protected-read policy.
+
+Root types pass in
+/tmp/artroom-create-outbox-outbox-symbols-first-types.log. Existing focused
+checks pass: twelve settle/marker cases in
+/tmp/artroom-create-outbox-pending-work-focus.log and nine byte-domain
+cases in /tmp/artroom-create-outbox-outbox-domains-focus.log. The native
+demo-route and client invocation passes three cases across two Scope
+files in /tmp/artroom-create-outbox-demo-route-outbox-focus.log. Its
+additional client/CLI paths were outside that selected project and are
+not claimed as executed. No full terminology gate has run.

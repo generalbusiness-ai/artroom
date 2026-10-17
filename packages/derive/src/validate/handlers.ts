@@ -8,7 +8,7 @@ import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { alsoMark, bound, type Selecting } from "./binding.ts";
-import { mark, marked, naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";
+import { mark, marked, naming, onSubject, subject, type ClauseSet, type Ctx, type Defining, type PendingWork, type Type } from "./context.ts";
 import { settlesByMark } from "./markers.ts";
 import { effects, setsSlot } from "./effects.ts";
 import { declaredFields, fieldType } from "./fields.ts";
@@ -138,7 +138,7 @@ function entrySends(d: Defining, path: string, declared: number, told: number, p
  * name and the kind of scope that owns it. Null: it declares none, or what
  * it declares is refused.
  */
-function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name: string; kind: string } | null, top: Rec): Duties["settles"] {
+function settling(d: Defining, v: unknown, path: string, ctx: Ctx, copy: { name: string; kind: string } | null, top: Rec): PendingWork["settles"] {
   const { bad, form, rec, names, list } = d;
   const f = form(v, path, ["of", "copy"], ["in", "sets"]);
   if (!f) return null;
@@ -213,11 +213,11 @@ export function acts(d: Defining, v: unknown, timed: Readonly<Record<string, unk
     // Section 16.1, "The subjects that an entry observes": the rows of an act, in platform data. A source reads what a guard of the
     // act may read, and no name of `also` that a mark binds.
     if ("observes" in o) observes(d, o["observes"], at(path, "observes"), { where: "act", ctx, selected: new Set([...named.marked, ...named.through]) });
-    const duties: Duties = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null, top) : null, opens: step === "open" ? on?.name ?? null : null, mayCreateCopy: false, sets: [], requests: [] };
-    duties.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
+    const pendingWork: PendingWork = { path, settles: "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, null, top) : null, opens: step === "open" ? on?.name ?? null : null, mayCreateCopy: false, sets: [], requests: [] };
+    pendingWork.sets = setsOf(d, step === "open" ? on : null, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // A child's genesis sends the platform's one result beside what its act declares.
-    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
-    d.duties.push(duties);
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, pendingWork.requests), attention(d, o["attention"], at(path, "attention"), ctx), name === top["genesis"] ? 1 : 0);
+    d.pendingWork.push(pendingWork);
     if (step === "open" && on) {
       const set = new Set(Array.isArray(o["effects"]) ? o["effects"].map(setsSlot) : []);
       // Section 6.3: an opening sets every required slot. Section 6.1: a required slot may be set by an effect mark of the row, so
@@ -276,11 +276,11 @@ export function receives(d: Defining, v: unknown, top: Rec): void {
     const settles = "settles" in o ? settling(d, o["settles"], at(path, "settles"), ctx, copy, top) : null;
     // A singleton primary item may already exist, so its opening counts at the static maximum of one. A settlement of this
     // handler's own copy requires an existing key; a relate handler that settles an item can still receive a first key.
-    const duties: Duties = { path, settles, opens: on?.name ?? null, mayCreateCopy: cls === "relate" && !(settles && "copy" in settles), sets: [], requests: [] };
-    duties.sets = setsOf(d, on, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
+    const pendingWork: PendingWork = { path, settles, opens: on?.name ?? null, mayCreateCopy: cls === "relate" && !(settles && "copy" in settles), sets: [], requests: [] };
+    pendingWork.sets = setsOf(d, on, () => effects(d, o["effects"], at(path, "effects"), ctx, false));
     // The entry that decides a request sends the platform's one result.
-    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, duties.requests), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);
-    d.duties.push(duties);
+    entrySends(d, path, sends(d, o["sends"], at(path, "sends"), ctx, top, pendingWork.requests), attention(d, o["attention"], at(path, "attention"), ctx), cls === "advisory" ? 0 : 1);
+    d.pendingWork.push(pendingWork);
     // Section 6.4: an advisory has no result, so its handler ends the exchange: it sends nothing and tells nobody.
     if (cls === "advisory") for (const k of ["sends", "attention"]) if (Array.isArray(o[k]) && o[k].length > 0) bad("advisory-sends", at(path, k), "a handler of class advisory declares none");
     if (!on) continue;

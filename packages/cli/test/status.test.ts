@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import type { Duty, Read, Summary } from "@generalbusiness/dap-contract";
+import type { OutboxItem, Read, Summary } from "@generalbusiness/dap-contract";
 import type { OperationalApi, Transport } from "@generalbusiness/artroom-client";
 import { newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
 import { statusReport, STATUS_PAGES } from "../src/status-report.ts";
 const at = { scope: `sc_${"a".repeat(52)}` as const, kind: "membership" as const, inc: newIncarnation(new Uint8Array(16).fill(1)) };
 const head = { seq: 9, hash: textDigest("head") }, time = "2099-01-01T00:00:00Z";
 const summary: Read<Summary> = { ok: true, at: head, complete: true, value: { scope: at, definition: "platform:membership@2", status: "active", time, items: [], counts: [["member", "active", 2]] } };
-const duty: Duty = { duty: "7.0", to: at, class: "request", held: false, attempts: [], acknowledged: null, result: null, diagnosis: null };
+const duty: OutboxItem = { duty: "7.0", to: at, class: "request", held: false, attempts: [], acknowledged: null, result: null, diagnosis: null };
 const page = <T>(value: readonly T[]): Read<readonly T[]> => ({ ok: true, at: head, complete: true, value });
 function fixture() {
   let requests = 0;

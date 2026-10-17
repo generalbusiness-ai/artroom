@@ -24,7 +24,7 @@ import type { Delivered, Item } from "@generalbusiness/dap-derive";
 import { d, keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
 import { officeDefinitionFor } from "@generalbusiness/dap-platform/testing";
-import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
+import type { Delivery, OutboxItem, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
@@ -38,7 +38,7 @@ interface Surface {
   summary(reader: unknown): Promise<Read<Summary>>;
   history(reader: unknown, cursor?: string): Promise<Read<readonly Sealed[]>>;
   entry(reader: unknown, seq: number): Promise<Read<Sealed>>;
-  outbox(reader: unknown): Promise<Read<readonly Duty[]>>;
+  outbox(reader: unknown): Promise<Read<readonly OutboxItem[]>>;
   retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>>;
   deliver(envelope: Delivered): Promise<Delivery>;
   dispatch(): Promise<number>;
@@ -131,7 +131,7 @@ export interface Repository { O: Platform; M: Platform; ritasInbox: Platform; un
 /** Metadata of this fixture's retained creation protocol, never message bodies. */
 export async function inboxConfirmation(repository: Repository) {
   const membership = await repository.M.at(), parent = await repository.M.sealed();
-  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; duty: string; class: Duty["class"]; next: number; alarm: number | null; attempts: Duty["attempts"] }[] = [];
+  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; duty: string; class: OutboxItem["class"]; next: number; alarm: number | null; attempts: OutboxItem["attempts"] }[] = [];
   const inboxes = await Promise.all([repository.ritasInbox, repository.unasInbox].map(async inbox => {
     const sealed = await inbox.sealed(), first = sealed[0];
     if (!first || first.entry.input.type !== "genesis") throw new Error("Inbox creation has no retained genesis");

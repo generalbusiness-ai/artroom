@@ -28,24 +28,24 @@
  * nothing here changes because a request is old.
  */
 
-import { DOMAINS, ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/dap-contract";
-import type { Cursor, Digest, DutyId, Entry, FieldValue, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/dap-contract";
-import { isDigest, isDutyId, isOperationId, isSeed, positionOf, retainedReadArgument, timeMs } from "@generalbusiness/artroom-bytes";
+import { DOMAINS, ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_ITEMS, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/dap-contract";
+import type { Cursor, Digest, OutboxId, Entry, FieldValue, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/dap-contract";
+import { isDigest, isOutboxId, isOperationId, isSeed, positionOf, retainedReadArgument, timeMs } from "@generalbusiness/artroom-bytes";
 import { bound, byteOrder, creationFields, evidenceValues, inputTexts, namedBy, own, placesOf, retainsOf, same, type Item, type Owners, type ScopeState, type ValidDefinition } from "@generalbusiness/dap-derive";
 import type { Pinned } from "./core.ts";
 import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
 import type { RequestIndex, RequestPage, RequestQuery } from "./request-index.ts";
 import { checkSignedRead, leads, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
-import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
+import type { OutboxItem, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
 /** The kinds of retained input that the read route serves by digest. `value` is read by domain as well. */
 export const READABLE: readonly RetainedInput["kind"][] = ["definition", "entry", "rule", "text", "snapshot", "value"];
 
 /** The bound of each read. The defaults are the contract's table, and for a retained input the history page's byte bound. */
-export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxDuties: number; retainedBytes: number }
+export interface ReadBounds { retainedItems: number; historyEntries: number; historyBytes: number; entryBytes: number; outboxItems: number; retainedBytes: number }
 export const READ_BOUNDS: ReadBounds = {
-  retainedItems: RETAINED_ITEMS_PAGE, historyEntries: HISTORY_PAGE_ENTRIES, historyBytes: HISTORY_PAGE_BYTES, entryBytes: ENTRY_READ_BYTES, outboxDuties: OUTBOX_PAGE_DUTIES,
+  retainedItems: RETAINED_ITEMS_PAGE, historyEntries: HISTORY_PAGE_ENTRIES, historyBytes: HISTORY_PAGE_BYTES, entryBytes: ENTRY_READ_BYTES, outboxItems: OUTBOX_PAGE_ITEMS,
   retainedBytes: RETAINED_INPUT_BYTES,
 };
 
@@ -57,7 +57,7 @@ const position = (cursor: Cursor | undefined, first: number | null): number | nu
 
 /** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
 /** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
-const dutyOf = (duty: unknown): [seq: number, n: number] | null => (isDutyId(duty) ? (duty.split(".").map(Number) as [number, number]) : null);
+const outboxItemOf = (duty: unknown): [seq: number, n: number] | null => (isOutboxId(duty) ? (duty.split(".").map(Number) as [number, number]) : null);
 
 /** The entry that opened an operation and its ordinal there, from its ID, or null. The form is the bytes package's to judge. */
 const operationOf = (id: unknown): [seq: number, k: number] | null => (isOperationId(id) ? (id.split(":").map(Number) as [number, number]) : null);
@@ -315,20 +315,20 @@ export class Reads {
   }
 
   /** A page of the outbox: each send in the order of its entry and ordinal. The cursor is the last duty of the page before. */
-  outbox(reader: unknown, cursor?: Cursor): Read<readonly Duty[]> {
+  outbox(reader: unknown, cursor?: Cursor): Read<readonly OutboxItem[]> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = cursor === undefined ? null : dutyOf(cursor);
+    const at = cursor === undefined ? null : outboxItemOf(cursor);
     if (cursor !== undefined && !at) return no("not-found");
-    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxDuties);
+    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
     return { ok: true, at: open.scope.head, value: page.duties, complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
   }
 
   /** The outbox row of one send, by its duty ID. */
-  duty(reader: unknown, duty: DutyId): Read<Duty> {
+  duty(reader: unknown, duty: OutboxId): Read<OutboxItem> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
-    const at = dutyOf(duty);
+    const at = outboxItemOf(duty);
     const row = at ? this.#store.duty(at[0], at[1]) : null;
     return row ? { ok: true, at: open.scope.head, value: row, complete: true } : no("not-found");
   }
@@ -346,7 +346,7 @@ export class Reads {
     if (!("scope" in read)) return read;
     const at = cursor === undefined ? null : operationOf(cursor);
     if (cursor !== undefined && !at) return no("not-found");
-    const page = this.#store.operations(at ? { seq: at[0], k: at[1] } : null, this.#bounds.outboxDuties, open === true);
+    const page = this.#store.operations(at ? { seq: at[0], k: at[1] } : null, this.#bounds.outboxItems, open === true);
     return { ok: true, at: read.scope.head, value: page.operations, complete: !page.more, ...(page.more ? { next: page.operations.at(-1)!.operation.id } : {}) };
   }
 
@@ -370,7 +370,7 @@ export class Reads {
     if (!("scope" in open)) return open;
     const after = position(cursor, null);
     if (after === undefined) return no("not-found");
-    const page = this.#record?.page(after, this.#bounds.outboxDuties) ?? { incidents: [], more: false };
+    const page = this.#record?.page(after, this.#bounds.outboxItems) ?? { incidents: [], more: false };
     return { ok: true, at: open.scope.head, value: page.incidents, complete: !page.more, ...(page.more ? { next: String(page.incidents.at(-1)!.n) } : {}) };
   }
 
@@ -394,12 +394,12 @@ export class Reads {
    * that are in the list, which may be none. `next` is the last send that
    * was passed over, and `complete` says that the outbox ended.
    */
-  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly Duty[]> {
+  waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Read<readonly OutboxItem[]> {
     const open = this.#open(reader, "waiting");
     if (!("scope" in open)) return open;
-    const at = cursor === undefined ? null : dutyOf(cursor);
+    const at = cursor === undefined ? null : outboxItemOf(cursor);
     if ((list !== "diagnosed" && list !== "unanswered") || (cursor !== undefined && !at)) return no("not-found");
-    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxDuties);
+    const page = this.#store.duties(at ? { seq: at[0], n: at[1] } : null, this.#bounds.outboxItems);
     return { ok: true, at: open.scope.head, value: page.duties.filter((duty) => waitingIn(duty) === list), complete: !page.more, ...(page.more ? { next: page.duties.at(-1)!.duty } : {}) };
   }
 }

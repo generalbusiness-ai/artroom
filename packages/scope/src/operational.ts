@@ -1,6 +1,6 @@
 /** Invocation-local instrumentation. No native envelope or record carries it. */
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { DutyId } from "@generalbusiness/dap-contract";
+import type { OutboxId } from "@generalbusiness/dap-contract";
 import { correlated, correlation, isRequestId, isTraceId } from "./correlation.ts";
 import { admittedRequestUrl } from "./item-query-wire.ts";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
@@ -16,7 +16,7 @@ interface Invocation {
   metrics: Metrics;
   users: number;
   recordEntry?: (seq: number) => boolean;
-  recordDuty?: (duty: DutyId) => boolean;
+  recordDuty?: (duty: OutboxId) => boolean;
 }
 export interface Operational {
   identity: OperationalIdentity;
@@ -69,7 +69,7 @@ export function entryCorrelation(seq: number): void {
   if (context.entryFailures) context.entryFailures.count++;
   else context.invocation.metrics.sidecar(true, true);
 }
-export function dutyCorrelation(duty: DutyId): void {
+export function dutyCorrelation(duty: OutboxId): void {
   const context = operational();
   if (!context?.invocation.recordDuty) return;
   try { if (context.invocation.recordDuty(duty)) return; } catch { /* below */ }

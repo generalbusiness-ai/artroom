@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type DeclaredDefinition, type DutyId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type OutboxId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, factRefOf, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { changeDemo3 } from "../src/index.ts";
 import { validateDefinition } from "@generalbusiness/dap-derive";
@@ -98,7 +98,7 @@ async function fixture(category: Category, declared: DeclaredDefinition = change
     if (kind === "merge") prior.push({ ...entry, seq: seq + 1, prev: entryHash(entry), input: { type: "delivery", from: { at: G, seq: 1, hash: textDigest("scripted reservation") }, n: 0, message: { class: "result", of: { from: factRefOf(entry), n: 0 }, outcome: "applied" }, clause: "applied" }, effects: [{ effect: "state", item: seq, state: "committed" }], sends: [] });
     const fact = factRefOf(entry);
     accepted.push({ kind, ...(typeof signed.intent.fields["path"] === "string" ? { path: signed.intent.fields["path"] } : {}), fact, signed });
-    const receipt: Receipt = { fact, definition: summaries.get(target.scope)!.definition, intent: intentDigest(signed.intent), effects: entry.effects, sends: entry.sends.map(s => `${seq}.${s.n}` as DutyId), epoch: 0 };
+    const receipt: Receipt = { fact, definition: summaries.get(target.scope)!.definition, intent: intentDigest(signed.intent), effects: entry.effects, sends: entry.sends.map(s => `${seq}.${s.n}` as OutboxId), epoch: 0 };
     return Response.json({ answer: "accepted", receipt });
   };
   const context: Context = { store, fetch, now: () => Date.parse(TIME), tries: 1, pause: async () => { if (category === "local-pause") throw new Error(PRIVATE); }, read: async () => utf8(CONTENT), git: { run: async () => 0, files: async () => ({ ok: true, tip: BASE, files: [{ path: "one.md", bytes: utf8(CONTENT) }, { path: "docs/two.md", bytes: utf8("# Second source\n") }] }) } };

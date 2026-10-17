@@ -1,6 +1,6 @@
 /** Seven-day operational correlation, outside every sealed history. */
-import type { DutyId, Timestamp } from "@generalbusiness/dap-contract";
-import { isDutyId } from "@generalbusiness/artroom-bytes";
+import type { OutboxId, Timestamp } from "@generalbusiness/dap-contract";
+import { isOutboxId } from "@generalbusiness/artroom-bytes";
 import { timeOf } from "@generalbusiness/dap-derive";
 import { isRequestId, isTraceId } from "./correlation.ts";
 import type { Sql } from "./sqlite.ts";
@@ -16,7 +16,7 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS request_index (
 CREATE INDEX IF NOT EXISTS request_index_time ON request_index(time, n);
 CREATE INDEX IF NOT EXISTS request_index_request ON request_index(request, time DESC, n DESC);
 CREATE INDEX IF NOT EXISTS request_index_trace ON request_index(trace, time DESC, n DESC);`;
-export interface RequestRow { n: number; request: string; trace: string | null; time: Timestamp; seq: number | null; duty: DutyId | null }
+export interface RequestRow { n: number; request: string; trace: string | null; time: Timestamp; seq: number | null; duty: OutboxId | null }
 export interface RequestQuery { by: "request" | "trace"; id: string; before: { time: number; n: number } | null }
 export interface RequestPage { rows: readonly RequestRow[]; window: { oldest: Timestamp; newest: Timestamp } | null; complete: boolean; next?: string }
 /** Closed query admission is independent of SQL and of session authority. */
@@ -39,9 +39,9 @@ export class RequestIndex {
     try { this.#sql.exec(SCHEMA).toArray(); this.#ready = true; } catch { /* no native fact depends on this table */ }
   }
   /** Called only after the native entry/outbox write. Never throws. */
-  record(request: unknown, trace: unknown, now: number, seq: number | null, duty: DutyId | null): boolean {
+  record(request: unknown, trace: unknown, now: number, seq: number | null, duty: OutboxId | null): boolean {
     if (!isRequestId(request) || !(trace === null || isTraceId(trace)) || !position(now)
-      || !(seq === null || position(seq)) || !(duty === null || isDutyId(duty)) || seq === null && duty === null) return false;
+      || !(seq === null || position(seq)) || !(duty === null || isOutboxId(duty)) || seq === null && duty === null) return false;
     try {
       if (!this.#ready) this.#initialize();
       if (!this.#ready) return false;
@@ -69,7 +69,7 @@ export class RequestIndex {
       const complete = rows.length <= REQUEST_PAGE;
       const value = rows.slice(0, REQUEST_PAGE).map((row): RequestRow => {
         if (!position(row["n"]) || !isRequestId(row["request"]) || !(row["trace"] === null || isTraceId(row["trace"])) || !position(row["time"])
-          || !(row["seq"] === null || position(row["seq"])) || !(row["duty"] === null || isDutyId(row["duty"]))) throw Error("Unavailable correlation row");
+          || !(row["seq"] === null || position(row["seq"])) || !(row["duty"] === null || isOutboxId(row["duty"]))) throw Error("Unavailable correlation row");
         return { n: row["n"], request: row["request"], trace: row["trace"], time: timeOf(row["time"]), seq: row["seq"], duty: row["duty"] };
       });
       if (!(oldest === null && newest === null) && !(position(oldest) && position(newest))) return null;

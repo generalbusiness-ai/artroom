@@ -12,7 +12,7 @@
 import type { ScopeKind } from "@generalbusiness/dap-contract";
 import { NOTHING, largest, requestEntries, sum, times, type Amount } from "../held.ts";
 import type { Markers } from "../markers.ts";
-import type { ClauseSet, Defining, Duties } from "./context.ts";
+import type { ClauseSet, Defining, PendingWork } from "./context.ts";
 import { markerCapacity } from "./markers.ts";
 import type { TimedGraph, TimedMove } from "./timed.ts";
 
@@ -25,7 +25,7 @@ export interface PendingCopy { name: string; kind: ScopeKind; states: readonly s
  * terms and retained inputs remain owed under cc570904. The numeric
  * fields of Capacity are entry projections of these amounts, not a second calculation or five-dimensional admission.
  */
-export interface DutyAmounts {
+export interface PendingWorkAmounts {
   deadlines: Readonly<Record<string, Readonly<Record<string, Amount>>>>;
   pending: Readonly<Record<string, Readonly<Record<string, Amount>>>>;
   pendingCopies: readonly (Omit<PendingCopy, "entries"> & { amount: Amount })[];
@@ -34,7 +34,7 @@ export interface DutyAmounts {
 }
 
 export interface Capacity {
-  dutyAmounts: DutyAmounts;
+  pendingWorkAmounts: PendingWorkAmounts;
   deadlines: Record<string, Record<string, number>>;
   pending: Record<string, Record<string, number>>;
   pendingCopies: PendingCopy[];
@@ -50,32 +50,32 @@ export interface Capacity {
  * first. Each rule's chain was computed once, with the cycle check. A cycle
  * of settling forms is refused here, as `reserve-unbounded`.
  */
-export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clauseSets" | "types">, graph: TimedGraph, moves: readonly TimedMove[]): Capacity {
+export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "pendingWork" | "clauseSets" | "types">, graph: TimedGraph, moves: readonly TimedMove[]): Capacity {
   const entry: Amount = { ...NOTHING, entries: 1, bytes: d.bounds.entryBytes };
   // One settling form's own entry and declared openings. Changes to existing subjects and to the copy being settled create
   // no new item/key. Initial-state duties remain in starts, so the opening unit is included once, beside those duties.
-  const entryFor = (form: Duties): Amount => sum(entry, { ...NOTHING, items: form.opens === null ? 0 : 1, records: form.mayCreateCopy ? 1 : 0 });
+  const entryFor = (form: PendingWork): Amount => sum(entry, { ...NOTHING, items: form.opens === null ? 0 : 1, records: form.mayCreateCopy ? 1 : 0 });
   const deadline = (entries: number): Amount => times(entries, entry);
   /** A deadline's known amount in that state, with each timed entry at the entry-size stand-in. */
   const held = (type: string, state: string): Amount => deadline(graph.fromState.get(type)?.get(state) ?? 0);
   // Built from entries, so each type and each state is an own name of its record, whatever it is called (`own`, in values.ts).
   const deadlineAmounts = Object.fromEntries([...graph.fromState].map(([type, states]) => [type, Object.fromEntries([...states].map(([state, entries]) => [state, deadline(entries)]))]));
-  const entriesOfStates = (amounts: DutyAmounts["pending"]): Record<string, Record<string, number>> => Object.fromEntries(Object.entries(amounts).map(([type, states]) => [type, Object.fromEntries(Object.entries(states).map(([state, amount]) => [state, amount.entries]))]));
+  const entriesOfStates = (amounts: PendingWorkAmounts["pending"]): Record<string, Record<string, number>> => Object.fromEntries(Object.entries(amounts).map(([type, states]) => [type, Object.fromEntries(Object.entries(states).map(([state, amount]) => [state, amount.entries]))]));
   const deadlines = entriesOfStates(deadlineAmounts);
 
   const key = (type: string, state: string) => JSON.stringify([type, state]);
   /** The forms that settle an item of that type in that state, by type and state. */
-  const settlers = new Map<string, Duties[]>();
-  const unbounded = new Set<Duties>();
+  const settlers = new Map<string, PendingWork[]>();
+  const unbounded = new Set<PendingWork>();
   // Revision 22, "A marker duty": an item of a type that some form settles by a mark reserves by its state and by the marks that
   // are `true`. Every form that settles an item of such a type, by a mark or by state, is counted there, and not below.
   const markers = markerCapacity(d, { graph, moves, entry: entryFor, deadline, starts: (set) => starts(set), requests: (form) => requestsOf(form) }, unbounded);
-  for (const form of d.duties) {
+  for (const form of d.pendingWork) {
     if (form.settles && "subject" in form.settles && !markers.marked(form.settles.type)) for (const state of new Set(form.settles.states)) settlers.set(key(form.settles.type, state), [...(settlers.get(key(form.settles.type, state)) ?? []), form]);
   }
   const done = new Map<string, Amount>();
   const open = new Set<string>();
-  const forms: Duties[] = [];
+  const forms: PendingWork[] = [];
 
   /**
    * Row 3: what an item of that type in that state reserves for its
@@ -128,8 +128,8 @@ export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clau
    */
   // Each request here is future work of a settling form: its pending-request unit is Reserved, not Used. Its result may newly
   // retain its foreign source entry. The largest clause closure is propagated in every dimension already known here.
-  const requestsOf = (form: Duties): Amount => sum(...form.requests.map((request) => times(request.most, sum(requestEntries(d.bounds.entryBytes), largest(...request.clauses.map((c) => starts(c)))))));
-  const amountOf = (form: Duties): Amount => {
+  const requestsOf = (form: PendingWork): Amount => sum(...form.requests.map((request) => times(request.most, sum(requestEntries(d.bounds.entryBytes), largest(...request.clauses.map((c) => starts(c)))))));
+  const amountOf = (form: PendingWork): Amount => {
     const settled = form.settles && "subject" in form.settles ? form.settles : undefined;
     forms.push(form);
     const amount = sum(entryFor(form), starts(form.sets, settled), requestsOf(form));
@@ -141,7 +141,7 @@ export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clau
   const waiting = new Map<string, Map<string, Amount>>();
   const wait = (type: string, state: string) => waiting.set(type, (waiting.get(type) ?? new Map<string, Amount>()).set(state, awaits(type, state)));
   markers.check();
-  for (const form of d.duties) {
+  for (const form of d.pendingWork) {
     if (!form.settles || !("subject" in form.settles) || markers.marked(form.settles.type)) continue;
     const { type, states } = form.settles;
     for (const state of states) wait(type, state);
@@ -151,14 +151,14 @@ export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "duties" | "clau
   const pendingAmounts = Object.fromEntries([...waiting].map(([type, states]) => [type, Object.fromEntries(states)]));
   const pending = entriesOfStates(pendingAmounts);
   // Row 4: a copy in a listed state reserves what the handler that settles it reserves.
-  const copyAmounts = d.duties.flatMap((form): DutyAmounts["pendingCopies"][number][] => (form.settles && "copy" in form.settles ? [{ name: form.settles.name, kind: form.settles.kind as ScopeKind, states: form.settles.copy, amount: amountOf(form) }] : []));
+  const copyAmounts = d.pendingWork.flatMap((form): PendingWorkAmounts["pendingCopies"][number][] => (form.settles && "copy" in form.settles ? [{ name: form.settles.name, kind: form.settles.kind as ScopeKind, states: form.settles.copy, amount: amountOf(form) }] : []));
   const pendingCopies = copyAmounts.map(({ amount, ...copy }) => ({ ...copy, entries: amount.entries }));
   // A request reserves, beside its two entries, the most that one of its clauses can start. The runtime holds the largest over
   // every request form of the definition, which is never less (section 17.2, "More, and never less").
   const clause = largest(...d.clauseSets.map((c) => starts(c)));
   for (const form of unbounded) d.bad("reserve-unbounded", form.path, "the forms that settle lead back to the state this one settles, so no reservation covers what its settlement can start");
   const marked = unbounded.size === 0 ? markers.data() : null;
-  const decisions = Object.fromEntries(d.duties.filter((form) => form.path.startsWith("receives.")).map((form) => [form.path, starts(form.sets)]));
+  const decisions = Object.fromEntries(d.pendingWork.filter((form) => form.path.startsWith("receives.")).map((form) => [form.path, starts(form.sets)]));
   const decisionEntries = Object.fromEntries(Object.entries(decisions).map(([path, amount]) => [path, amount.entries]));
-  return { dutyAmounts: { deadlines: deadlineAmounts, pending: pendingAmounts, pendingCopies: copyAmounts, clause, decisions }, deadlines, pending, pendingCopies, clauseEntries: clause.entries, decisionEntries, ...(marked ? { markers: marked } : {}) };
+  return { pendingWorkAmounts: { deadlines: deadlineAmounts, pending: pendingAmounts, pendingCopies: copyAmounts, clause, decisions }, deadlines, pending, pendingCopies, clauseEntries: clause.entries, decisionEntries, ...(marked ? { markers: marked } : {}) };
 }

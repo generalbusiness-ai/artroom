@@ -2252,12 +2252,12 @@ function cleanupMintUnknown(given: RuleGiven, publication: Item): boolean {
   }
   return false;
 }
-type CleanupDuties = { refReason?: string; tokenReason?: string; tokenAttempts: number; refRemoved: boolean };
-const cleanupDuties = (publication: Item): CleanupDuties => publication.values["cleanupReason"] as unknown as CleanupDuties;
+type CleanupWork = { refReason?: string; tokenReason?: string; tokenAttempts: number; refRemoved: boolean };
+const cleanupWork = (publication: Item): CleanupWork => publication.values["cleanupReason"] as unknown as CleanupWork;
 /** Independent obligations share one bounded record; the deletion budget
  * remains cumulative across all operations and late answers. */
 function cleanupStatus(publication: Item, changed: { ref?: string | null; token?: string | null; deletes?: number; tokenAttempts?: number; removed?: boolean }, tokensClosed = false): RuleEffect[] {
-  const previous = cleanupDuties(publication);
+  const previous = cleanupWork(publication);
   const ref = changed.ref === undefined ? previous.refReason : changed.ref;
   const token = changed.token === undefined ? previous.tokenReason : changed.token;
   const removed = changed.removed ?? previous.refRemoved;
@@ -2378,7 +2378,7 @@ export const destinationRules3: Rules = (() => {
     const publication = targetOf(given.state, given.own, operation);
     if (!publication || given.input.type !== "outcome") return NOTHING;
     const body = given.input.evidence.body as { send?: unknown; seen?: unknown; tree?: unknown };
-    if (publication.state === "cleanup-owed" && cleanupDuties(publication).refReason === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
+    if (publication.state === "cleanup-owed" && cleanupWork(publication).refReason === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
       const used = cleanupAttempt(given, publication, operation);
       if (used >= 3) return NOTHING;
       return { effects: cleanupStatus(publication, { ref: "reservation-ref", deletes: used, removed: false }), opens: [opening(given, "reservation-delete", 3 - used, publication.id), opening(given, "mint", 1, publication.id)], update: null };
@@ -2427,12 +2427,12 @@ export const destinationRules3: Rules = (() => {
       const effects: RuleEffect[] = exhausted ? cleanupStatus(target, { token: unknown ? "reservation-token-unknown" : "reservation-token", tokenAttempts: given.input.attempt })
         : earlierFailure ? cleanupStatus(target, { token: earlierFailure, tokenAttempts: 3 })
         : cleanupMintUnknown(given, target) ? cleanupStatus(target, { token: "reservation-token-unknown", tokenAttempts: 1 })
-        : closed && (cleanupDuties(target).refRemoved || cleanupDuties(target).tokenReason) ? cleanupStatus(target, { token: null }, true) : [];
+        : closed && (cleanupWork(target).refRemoved || cleanupWork(target).tokenReason) ? cleanupStatus(target, { token: null }, true) : [];
       return { effects, sends: [], opens: [] };
     } } },
     "reservation-delete": { place: "outcome", rules: {
       selects: false, read: false, most: { effects: 12, requests: 0, operations: 2 },
-      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && cleanupDuties(target).refRemoved !== true && cleanupAttempt(given, target, operation) < 3 && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
+      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && cleanupWork(target).refRemoved !== true && cleanupAttempt(given, target, operation) < 3 && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
       ready: (state, write, attempt) => (mintOf(state, write, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => isObject(evidence.body) && SENDS[result]!.includes(evidence.body["send"] as string) && isSeen(evidence.body["seen"]), unknown: () => ({ send: "unknown", seen: "failed" }),
       derives: (given, operation) => {
@@ -2445,8 +2445,8 @@ export const destinationRules3: Rules = (() => {
         const attempt = cleanupAttempt(given, target, operation);
         const heldUnknownStage = given.input.result === "confirmed" && !stageKnown;
         const exhausted = !removed && given.input.attempt === operation.most;
-        const next = cleanupDuties(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
-        const ref = cleanupDuties(target).refRemoved && !removed ? undefined : exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
+        const next = cleanupWork(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
+        const ref = cleanupWork(target).refRemoved && !removed ? undefined : exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
         const unknownMint = cleanupMintUnknown(given, target);
         const effects: RuleEffect[] = [...token.effects, ...cleanupStatus(target, { ...(ref === undefined ? {} : { ref }), deletes: attempt + (next ? 1 : 0), ...(removed ? { removed: true } : ref ? { removed: false } : {}), ...(unknownMint ? { token: "reservation-token-unknown", tokenAttempts: 1 } : {}) })];
         return { effects, opens: [...token.opens, ...(next ? [opening(given, "mint", 1, target.id)] : [])], sends: [] };

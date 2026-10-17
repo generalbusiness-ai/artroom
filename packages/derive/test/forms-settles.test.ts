@@ -255,7 +255,7 @@ describe("the form `{ of, sets, in }` at the validator", () => {
     ownCopy.receives["record-a"]!.opens = "result";
     const checkedCopy = validateDefinition(parseStrictBytes(canonicalBytes(ownCopy)), PROPOSED_BOUNDS, PROFILES, { platform: true });
     expect(checkedCopy.ok).toBe(true);
-    if (checkedCopy.ok) expect(checkedCopy.definition.dutyAmounts.pendingCopies.map(({ amount }) => [amount.entries, amount.items, amount.records])).toEqual([[1, 1, 0]]);
+    if (checkedCopy.ok) expect(checkedCopy.definition.pendingWorkAmounts.pendingCopies.map(({ amount }) => [amount.entries, amount.items, amount.records])).toEqual([[1, 1, 0]]);
   });
 
   test("18.51 cases 2 and 3, and the grammar: the mark is a required truth value with the default false that is not fixed, `in` lists no final state, and no written effect sets the mark but to true", () => {

@@ -10,7 +10,7 @@
 import { isObject, own } from "../values.ts";
 import { NOTHING, sum, type Amount } from "../held.ts";
 import { markerReservations, type MarkedType, type MarkerForm, type Markers } from "../markers.ts";
-import type { ClauseSet, Defining, Duties, Type } from "./context.ts";
+import type { ClauseSet, Defining, PendingWork, Type } from "./context.ts";
 import { at, type Rec } from "./shape.ts";
 import type { TimedGraph, TimedMove } from "./timed.ts";
 
@@ -37,9 +37,9 @@ export function settlesByMark(d: Defining, r: Rec, s: Type, states: readonly str
 }
 
 /** For each item type, the slots that a `settles` of the third form names: its marks. */
-export function marksOf(duties: readonly Duties[]): Map<string, Set<string>> {
+export function marksOf(pendingWork: readonly PendingWork[]): Map<string, Set<string>> {
   const marks = new Map<string, Set<string>>();
-  for (const { settles } of duties) {
+  for (const { settles } of pendingWork) {
     if (settles && "subject" in settles && settles.slot !== undefined) marks.set(settles.type, (marks.get(settles.type) ?? new Set<string>()).add(settles.slot));
   }
   return marks;
@@ -53,7 +53,7 @@ export function marksOf(duties: readonly Duties[]): Map<string, Set<string>> {
  * the commit.
  */
 export function setOnce(d: Defining): void {
-  const marks = marksOf(d.duties);
+  const marks = marksOf(d.pendingWork);
   for (const set of d.valueSets) if (!set.constant && marks.get(set.type)?.has(set.slot)) d.bad("shape", set.path, `${set.slot} of ${set.type} is a mark that a form settles by: a written effect sets it only to the constant true`);
 }
 
@@ -61,10 +61,10 @@ export function setOnce(d: Defining): void {
 export interface Counting {
   graph: TimedGraph;
   moves: readonly TimedMove[];
-  entry(form: Duties): Amount;
+  entry(form: PendingWork): Amount;
   deadline(entries: number): Amount;
   starts(set: ClauseSet): Amount;
-  requests(form: Duties): Amount;
+  requests(form: PendingWork): Amount;
 }
 
 /**
@@ -76,12 +76,12 @@ export interface Counting {
  * the data does not name reads (rule 11). `data` gives the value that the
  * runtime keeps, once the closures are known to be finite.
  */
-export function markerCapacity(d: Pick<Defining, "duties" | "types">, count: Counting, unbounded: Set<Duties>) {
-  const marks = marksOf(d.duties);
-  const origin = new Map<MarkerForm, Duties>();
+export function markerCapacity(d: Pick<Defining, "pendingWork" | "types">, count: Counting, unbounded: Set<PendingWork>) {
+  const marks = marksOf(d.pendingWork);
+  const origin = new Map<MarkerForm, PendingWork>();
   const types = new Map<string, MarkedType>();
   for (const [name, slots] of marks) {
-    const forms = d.duties.flatMap((form): MarkerForm[] => {
+    const forms = d.pendingWork.flatMap((form): MarkerForm[] => {
       const settled = form.settles && "subject" in form.settles && form.settles.type === name ? form.settles : null;
       if (!settled) return [];
       const own = form.sets.filter((e) => e.subject === settled.subject);

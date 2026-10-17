@@ -15,7 +15,7 @@
  */
 
 import type {
-  Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Created, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
+  Answer, Beside, Cursor, DeclaredDefinition, Digest, OutboxItem, OutboxId, Entry, Created, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
   SignedIntent, Summary, ItemQuery, ItemQueryRead,
 } from "@generalbusiness/dap-contract";
 import { definitionDigest, entryHash, encodeItemQueryParameter, readItemQueryParameter, itemQueryReadFor, within, LATE, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
@@ -81,7 +81,7 @@ export class ScopeHandle {
   }
   history(cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return this.#transport.history(this.scope, this.#reader, cursor); }
   entry(seq: number): Promise<Read<Sealed>> { return this.#transport.entry(this.scope, this.#reader, seq); }
-  outbox(cursor?: Cursor): Promise<Read<readonly Duty[]>> { return this.#transport.outbox(this.scope, this.#reader, cursor); }
+  outbox(cursor?: Cursor): Promise<Read<readonly OutboxItem[]>> { return this.#transport.outbox(this.scope, this.#reader, cursor); }
 
   /**
    * The scope's published definition: the declaration the scope retains
@@ -142,7 +142,7 @@ export class ScopeHandle {
   }
 
   /** Follow a duty: the outbox status of one send, by the duty ID a receipt lists. */
-  followDuty(duty: DutyId): Promise<Read<Duty>> { return this.#transport.duty(this.scope, this.#reader, duty); }
+  followOutbox(duty: OutboxId): Promise<Read<OutboxItem>> { return this.#transport.duty(this.scope, this.#reader, duty); }
 }
 
 /**
