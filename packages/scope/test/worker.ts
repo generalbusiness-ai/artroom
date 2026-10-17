@@ -38,7 +38,7 @@ import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts"
 import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
 import scopeWorker, { DeployedScope, McpAgent, McpRegistry, ScopeService, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
-import type { HostedAgent } from "@generalbusiness/dap-mcp";
+import type { AgentPorts, HostedAgent } from "@generalbusiness/dap-mcp";
 import { outsideOf, owners, wired } from "./outside.ts";
 import type { MetricEnvironment } from "../src/operational.ts";
 
@@ -197,6 +197,8 @@ export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promi
  * the fixture's operations as a deployment's alarms would.
  */
 export const hostedTest: {
+  /** Closed MCP reporter port; no provider or Analytics Engine request. */
+  metrics: AgentPorts["metrics"] | null;
   now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null;
   /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */
   lose: string | null;
@@ -212,7 +214,7 @@ export const hostedTest: {
   failSession: boolean;
   /** While set, every configuration read of an agent, and with it every listing and snapshot, waits on this promise. */
   configHold: Promise<void> | null;
-} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false, configHold: null };
+} = { metrics: null, now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false, configHold: null };
 /** The scripted reset: thrown at a fence, once. */
 export class ScriptedReset extends Error { constructor(fence: string) { super(`scripted reset at ${fence}`); } }
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
@@ -239,6 +241,7 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   protected override ports() {
     const scopes = this.env.PLATFORM;
     return {
+      ...(hostedTest.metrics ? { metrics: hostedTest.metrics } : {}),
       ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}),
       ...(hostedTest.custodyBounds ? { custodyBounds: { ...hostedTest.custodyBounds, fail: (point: "keep" | "dispatch" | "result" | "segment") => { if (hostedTest.failWrite === point) { hostedTest.failWrite = null; throw new Error("SQLITE_FULL: scripted"); } } } } : {}),
       fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } },

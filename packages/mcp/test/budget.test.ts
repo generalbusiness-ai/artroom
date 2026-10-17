@@ -13,6 +13,7 @@ import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, ty
 import { ERROR_BYTES, failed } from "../src/service.ts";
 import { finding } from "../src/errors.ts";
 import { fileStore } from "../src/node.ts";
+import type { McpMetricOptions, McpMetricPoint } from "../src/metrics.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
 /**
@@ -27,7 +28,7 @@ const secret = () => crypto.getRandomValues(new Uint8Array(32));
 interface Served { stand: StandIn; service: McpService; config: McpConfig; clock: { now: number }; key: Uint8Array }
 
 /** A room on the stand-in: the six platform scopes and the given lanes, for a caller of `role` with that role's first actions. */
-function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore } = {}): Served {
+function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore; metrics?: McpMetricOptions } = {}): Served {
   const key = secret();
   const signer = secretSigner(key);
   const stand = new StandIn(signer.key, role, FIRST_ACTIONS_OF["platform:membership@2"]![role]!);
@@ -40,6 +41,7 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
   const clock = { now: START };
   const service = new McpService({ service: SERVICE, fetch: stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
     ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
+    ...(options.metrics ? { metrics: options.metrics } : {}),
     config: { read: async () => structuredClone(config), addRoot: async (root) => { config.roots = [...(config.roots ?? []), root]; } } });
   return { stand, service, config, clock, key };
 }
@@ -81,7 +83,8 @@ describe("what a call costs, end to end", () => {
   // scope refuses on a read one signed-read fallback for that read.
   test("reads per tool, warm and cold, with expired, refused and forbidden sessions", async ({ annotate }) => {
     // --generic=add lists every tool, so one room measures them all.
-    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add" });
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add", metrics: { report: point => { metrics.push(point); } } });
     await s.service.page();
     const M = s.config.repository!.membership.scope;
     const comment = await s.service.call("issue.comment", { target: 1, fields: { body: "First." }, idempotencyKey: "c-0" });
@@ -122,8 +125,16 @@ describe("what a call costs, end to end", () => {
       const name = label.split(" ")[0]!;
       // Cold: the session forgotten, as a process starting would hold none.
       s.service.reads.forget(M);
+      const metricStart = metrics.length;
       const cold = await counted(s, () => s.service.call(name, args()));
       const warm = await counted(s, () => s.service.call(name, args()));
+      // Dynamic act tool names are outside the closed metric name map. The
+      // generic tools retain exact measured attempts, including sessions.
+      if (!name.includes(".")) {
+        const calls = metrics.slice(metricStart).filter(p => p.blobs[0] === "tool-call");
+        expect(calls.map(p => p.doubles[2]), label).toEqual([reads(cold.requests) + sessions(cold.requests), reads(warm.requests) + sessions(warm.requests)]);
+        expect(calls.map(p => p.doubles[4]), label).toEqual([cold.bytes, warm.bytes]);
+      }
       expect([cold.result.isError, warm.result.isError], `${label}: ${JSON.stringify(warm.result.structuredContent)}`).toEqual([false, false]);
       expect(sessions(cold.requests), label).toBe(1);
       expect(sessions(warm.requests), label).toBe(0);

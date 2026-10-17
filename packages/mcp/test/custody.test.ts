@@ -8,6 +8,7 @@ import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-byt
 import { signedIntent } from "@generalbusiness/artroom-client";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, memoryStore, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
 import { blockedBy, fileStore, releaseLock, takeLock } from "../src/node.ts";
+import { McpMetrics, type McpMetricPoint } from "../src/metrics.ts";
 import { T0, accepted, build, identity, lane, notAfter, receiptOf, refused, resource, signer } from "./support/custody.ts";
 
 // The scope's answers here are scripted: `deliver` and `settle` are STAND-INs for a scope's submit and settlement. What a real
@@ -52,14 +53,25 @@ describe("custody keeps the exact envelope under the caller's key", () => {
   // intent's notAfter has passed; nothing is signed again.
   test("a lost reply, then settle finds the receipt, also after notAfter", async () => {
     const { custody, clock } = setup();
+    const points: McpMetricPoint[] = [], metrics = new McpMetrics({ report: p => { points.push(p); } });
     const sent: SignedIntent[] = [];
-    const lost = await custody.send(identity("k1"), meaningOf("m"), build("k1"), async (e) => { sent.push(e.signed); throw new Lost(); }, { notAfter });
+    const lost = await metrics.call("act", () => custody.send(identity("k1"), meaningOf("m"), build("k1"), async (e) => { sent.push(e.signed); throw new Lost(); }, { notAfter }), () => ({ end: "unavailable", bytes: 0 }));
     expect("lost" in lost && lost.record.phase).toBe("unknown");
     clock.advance(20 * 60_000);
-    const settled = await custody.settle(identity("k1"), async (e) => receiptOf(e.signed, 3));
+    // A real file-store write is held back once. An observed settlement
+    // answer alone cannot emit a persisted accepted transition.
+    const write = custody.store.write;
+    custody.store.write = async (id, record, options) => { if (record.phase === "accepted") throw new Error("scripted storage failure"); return write(id, record, options); };
+    try {
+      await expect(metrics.call("settle", () => custody.settle(identity("k1"), async e => receiptOf(e.signed, 3)), () => ({ end: "ok", bytes: 0 }))).rejects.toMatchObject({ why: { held: "unreadable" } });
+    } finally { custody.store.write = write; }
+    expect((await custody.store.read(identityId(identity("k1"))))?.phase).toBe("unknown");
+    expect(points.filter(p => p.blobs[0] === "custody").map(p => p.blobs[5])).toEqual(["prepared", "sent", "unknown"]);
+    const settled = await metrics.call("settle", () => custody.settle(identity("k1"), async (e) => receiptOf(e.signed, 3)), () => ({ end: "ok", bytes: 0 }));
     expect([settled!.record.phase, settled!.receipt?.fact.seq]).toEqual(["accepted", 3]);
     expect(settled!.record.envelope.signed).toEqual(sent[0]);
     expect(sent[0]!.intent.idempotencyKey).toBe("k1");
+    expect(points.filter(p => p.blobs[0] === "custody").map(p => p.blobs[5])).toEqual(["prepared", "sent", "unknown", "accepted"]);
   });
 
   // Invariant: an unavailable resend and a not-found settlement resolve nothing; the record stays unknown and is never evicted.

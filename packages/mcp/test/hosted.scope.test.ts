@@ -20,6 +20,7 @@ import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/in
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { created as createRoom } from "./support/story.ts";
+import { MCP_METRIC_SCHEMA, type McpMetricPoint } from "../src/metrics.ts";
 
 /** Production default dispatch, in this isolate. The actual native PLATFORM namespace is this fixture's Scope binding;
  * REGISTRIES and AGENTS keep their existing native subclasses, clocks, custody and control fences. */
@@ -80,6 +81,8 @@ const post = (path: string, authorization: string, body: string, method = "POST"
 
 test.each(["platform:register@3", "platform:register@10"] as const)("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinned client in both revisions acts as the agent (%s)", async registerDefinition => {
   const room = mcpRoom();
+  const metrics: McpMetricPoint[] = [];
+  hostedTest.metrics = { report: point => { metrics.push(structuredClone(point)); } };
   hostedTest.now = () => room.now();
   hostedTest.pause = (waiting) => room.pause(waiting);
   try {
@@ -133,6 +136,14 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
     // The agent's own entries name its key: rita reads the directory's history for the opened issues.
     const steps = (await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[];
     expect(steps.filter((e) => e.kind === "open-issue" && e.signer === answer.key).length, "two issues signed by the agent's key").toBe(2);
+    expect(metrics.some(p => p.blobs[0] === "tools-list")).toBe(true);
+    expect(metrics.some(p => p.blobs[0] === "tool-call" && p.blobs[3] === "wait" && p.doubles[2]! > 0)).toBe(true);
+    for (const phase of ["prepared", "sent", "accepted"]) expect(metrics.filter(p => p.blobs[0] === "custody" && p.blobs[3] === "enrol" && p.blobs[5] === phase)).toHaveLength(2);
+    expect(metrics.every(p => p.blobs[8] === MCP_METRIC_SCHEMA)).toBe(true);
+    const observation = JSON.stringify(metrics);
+    expect(observation).not.toContain(invitation.secret);
+    expect(observation).not.toContain(answer.bearer);
+    expect(observation).not.toContain(b64url(rita.secret));
     // The secret of the invitation appears in no hosted row but the retained envelope: the agent object's tables hold no copy.
     const registry = env.REGISTRIES.get(env.REGISTRIES.idFromName(M.scope)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]> };
     expect(await registry.agents()).toEqual(expect.arrayContaining([{ agent: answer.agent, handle: "@bot", key: answer.key, state: "enrolled" }]));
@@ -149,7 +160,7 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
       expect(history).not.toContain(invitation.secret);
       expect(history).not.toContain('"secret"');
     }
-  } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
+  } finally { hostedTest.metrics = null; hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
 
 /** A room created by rita with the issue definition active, and one agent created under `op`; the agent's answer. */

@@ -88,12 +88,80 @@ credential separation, successful evaluation, provider failure, truncated
 metadata, oversized health and a stream of empty pieces. They query no
 account and prove no real SQL execution, timeout latency or hosted health.
 
+## MCP instrumentation checkpoint
+
+`packages/mcp/src/metrics.ts` adds an invocation-local collector using the
+existing `AsyncLocalStorage` pattern. Calls own their actual read/session
+attempts and page requests. There is no shared before/after counter.
+The collector reserves a completion event and a terminal loss summary
+within 250 points, rejects unlisted names, reasons and invalid numbers,
+and never awaits a reporter. Throwing, rejecting or pending reporters do
+not replace returned values or exceptions. Formatter failure drops the
+observation; it does not fabricate a native error.
+
+The initial closed name map covers the generic tools, `list` and hosted
+`enrol`. Dynamic act tool names are outside that map and are dropped with
+tainted-loss accounting. No name is redacted into a supported name.
+Record phase observations occur only after successful custody writes,
+using the phase captured before mutation. Preparation steps' separate
+phase observations remain to be added.
+
+The CLI's `serve` path now emits `dap.metric` JSON on stderr. Hosted
+services and control enrolments use the optional reporter; the production
+Worker wires it only when the existing optional METRICS binding is
+present. Their point map has the explicit `mcp-metrics-v1` marker in blob
+9. The scope evaluator and query exclude that map. There is no new
+binding, configuration or provider action.
+
+Focused module run `d3564e` passed four cases; refined run `7d8f0c` also
+passed four after containing formatter failures and removing an
+ineffective retained-callback check. MCP source typechecking passed.
+The existing end-to-end budget and file-custody witnesses were
+strengthened: `65f644` passed six selected cases, 44 unselected. The
+budget witness compares actual recorded transport requests with the
+generic tools' emitted counts and bytes. The custody witness holds one
+settlement file write back and verifies that it emits no accepted phase
+until persistence succeeds. A focused control `a72a99` passed its
+baseline and failed an assertion when the phase hook moved before the
+write; source was restored to custody SHA-256
+`7637825af9f5da5d5e52584cc8f533355e94b341ca1ff24eb716040c3cb99027`.
+The log is `/tmp/artroom-judge-custody-phase-control.log`.
+
+The first native generic-story attempt `61ac9e` exited 1 before any case
+because the sandbox refused its loopback listener. The permitted local
+workerd attempt, original session 51528, closed zero (`987b48`): one
+selected case passed, one unselected, 4.55 seconds total. The full
+existing native generic story runs with a throwing reporter; exact room
+read outputs also agree across absent, normal, throwing, rejecting and
+pending reporters. Its existing Git and scheduler ports remain labelled
+stand-ins. This was not a provider or deployment run.
+
+Wiring the hosted callback first exposed a TypeScript callback type error
+(`9cb54a`); its point type was corrected. Scope typechecking then passed
+(`d9e9f2`), and the refined module/budget/custody selection `f1b3e1`
+passed six cases. The local stdio subprocess witness, original session
+33755, closed zero (`848c07`): one selected case passed, eleven
+unselected. Both pinned wire revisions and generic mode still work;
+metric lines are captured on stderr, client protocol errors stay empty,
+and the private device seed is absent. Its HTTP scope is a stand-in.
+
+Original hosted H1 session 63354 closed zero (`3e8877`): two selected
+native recipes passed, ten unselected, covering both legacy and
+invitation-key cohorts. Actual hosted objects, SQLite scopes, enrolment,
+both pinned clients and persisted phase counts are exercised. Captured
+metric points exclude the invitation seed, bearer and controller seed.
+The reporter is an explicit captured port; no Analytics Engine account
+write or live sink acceptance is proved. Scope typechecking `012b70`
+also passed. Original logs remain in `/tmp/artroom-judge-stdio-focus.log`,
+`/tmp/artroom-judge-hosted-h1-focus.log` and
+`/tmp/artroom-judge-native-generic-permitted-focus.log`; the refused
+sandbox attempt remains `/tmp/artroom-judge-native-generic-focus.log`.
+
 ## Remaining third-stage work
 
 The command-line interface, deployment-report binding and observed
-calibration provenance, actual storage-row reporting, MCP console and hosted events, concurrent
-operation-owned read/page counting, successful persisted custody-phase
-events, telemetry loss/privacy/equivalence witnesses and live acceptance
+calibration provenance, actual storage-row reporting, preparation-step
+phase events, the exact public map documentation and live acceptance
 remain outstanding. The complete third stage has not passed a gate or
 received Source review. One gate is due at its final changed implementation
 freeze. Archive review `17dad8da` keeps priority for Source filing and

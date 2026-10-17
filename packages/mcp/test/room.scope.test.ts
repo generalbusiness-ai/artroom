@@ -13,8 +13,19 @@ import { exercises, created, offers, step } from "./support/story.ts";
 async function story(mode: "default" | "generic", lines: string[] = []): Promise<{ told: Record<string, number>; requests: number }> {
   const room = mcpRoom();
   try {
-    const rita = room.agent("rita", { subscribe: true, mode });
+    const rita = room.agent("rita", { subscribe: true, mode, ...(mode === "generic" ? { metrics: { report: () => { throw new Error("scripted telemetry failure"); } } } : {}) });
     await created(room, rita, mode);
+    if (mode === "generic") {
+      // Actual native scopes, routes and sessions; the existing fixture's
+      // Git host and scheduler remain its labelled stand-ins. Telemetry
+      // reporters must preserve exact read results and the full story.
+      const expected = canonicalize(await rita.call("room"));
+      for (const report of [undefined, () => {}, () => { throw new Error("scripted telemetry failure"); },
+        () => Promise.reject(new Error("scripted telemetry failure")), () => new Promise(() => {})]) {
+        const shadow = room.agent("same-key-read", { mode, secret: rita.secret, config: rita.config, ...(report ? { metrics: { report } } : {}) });
+        expect(canonicalize(await shadow.call("room"))).toBe(expected);
+      }
+    }
     // List changes are counted step by step: since the end of the agent's previous step, with the watch fired twice at the end
     // (`tick`). An ordinary head advance with no change of the catalogue is told nothing; a genuine change is told once.
     const seen = new Map<Agent, number>();
