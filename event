@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dd0af6d24edfb964c4cc242e99536288cc4dc5ef","text":"Merge retired a covered predecessor; the successor is at examples/lending/browser/main.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:defaee03f538b1290cbae43cb796b8d711ef5d41","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-17-invitation-successor-consistency.md."}
