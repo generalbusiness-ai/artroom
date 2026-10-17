@@ -51,9 +51,8 @@ Commit headers use the adopted identity and message, a single header
 order and UTC offset. The encoder supports whole Unix seconds from zero
 through 253,402,300,799 inclusive, the last second of year 9999. Earlier
 native times and larger/noninteger values refuse rather than wrap or
-saturate. The eventual builder still must derive the seconds from the
-actual selected cutoff entry, including the adopted subsecond rule. This
-was the remaining work at checkpoint `0cf9f7a8`; the builder now derives
+saturate. Deriving the seconds from the actual selected cutoff entry was
+remaining work at checkpoint `0cf9f7a8`; the builder now derives
 that value by flooring the actual cutoff's UTC milliseconds.
 
 ## Focused evidence and failed attempts
@@ -98,8 +97,8 @@ Original logs use `/tmp/artroom-archive-layout-` with suffixes
 `first-object-test-types.log`, `first-object-focus.log`,
 `object-hash-control.log`, `object-hash-control-explicit-outcome.log`,
 `object-boundary-baseline-failure.log`, `object-types-after-stopped-output.log`
-and `object-hash-control-final.log`. No whole-suite gate has run for this
-Source. These are retained original attempts, not a union gate.
+and `object-hash-control-final.log`. No whole-suite gate had run at that
+checkpoint. These are retained original attempts, not a union gate.
 
 ## Complete internal layout
 
@@ -239,9 +238,41 @@ include `parent-content-control.log`, `buffer-ownership-original-failure.log`,
 `parent-closure-control.log`, `parent-closure-refusal-control.log`,
 `file-limit-terminal-original.log`, `terminal-limits-types.log` and
 `terminal-limits-focus.log`.
-These original focused runs are not a combined gate. One gate at the
-frozen implementation head and complete independent Source review remain
+These original focused runs are not a combined gate. The separate frozen
+gate is recorded below. Complete independent Source review remains
 required before landing.
+
+## Frozen gate and Source preparation
+
+The first complete gate ran at clean frozen head
+`a1829883d353d4676d34b39a857a0cd376064309`, tree
+`ea86f84d2f64245cc5f4efd50c9ac59b29853498`. Original owner session
+`79043` exited zero. Installation took 2.4 seconds elapsed and 3.4 CPU;
+whitespace 0.0 and 0.0; workspace typechecks 7.4 and 26.7; tests 427.9
+and 539.8. The result was 1,559 Vitest passes, three skips, 16 Node
+passes and 55 Counting passes. No suite was restarted or combined with
+an earlier run. Runtime fault messages in the step log did not make the
+completed gate fail.
+
+This was local macOS 27.0.1 on arm64 with 18 logical CPUs. The observed
+load averages before the gate were 1.30, 1.38 and 1.35. Existing dependencies
+were present but no verified-lock stamp existed, so the gate performed
+its normal existing-lock installation. The package lock hash stayed
+`a3dd5689f33c5181b5ff48553fbb3c45b44abf96720ba9935eed40853a3b09bc`.
+These are observations, not a claim that load alone caused any timing.
+
+The original gate log is `/tmp/artroom-archive-layout-a182-gate.log`.
+Its step logs are under
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.P1G8wYWM0a`.
+They remain owner evidence; an independent review receives only the
+explicitly granted finite metadata, not access to adjacent logs or helpers.
+All 1,439 original Main mode/blob leaves are exact at the frozen head;
+the change adds thirteen paths. This post-gate update changes this note
+only. All twelve implementation/test leaves remain exact to the passing
+freeze; the Source preparation checks that correspondence before filing.
+Read-only advisory `86a5e5d5` at earlier checkpoint `d6c86ac0` is distinct
+from independent Source review of the final candidate. No Source approval
+or landing is claimed by this gate record.
 
 ## Remaining archive outcomes
 
