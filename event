@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/deploy-check.test.mjs","body":{"commit":"02a9180357171ad2d15d3dd9e44b1fe8833f3492","path":"scripts/deploy-check.test.mjs"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:022e752acf93b64e025e87a6fff5083320a1bd3c","text":"Merge retired a covered predecessor; the successor is at docs/operations.md."}
