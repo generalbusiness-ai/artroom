@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-16-declared-landing-policy.md","body":{"commit":"4f7b07ee3a3f728f84967adbc464702a4bf1c11d","path":"notes/2026-10-16-declared-landing-policy.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c45278d89173518558f7940483ad189094878e52","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-declared-landing-policy.md."}
