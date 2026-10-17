@@ -1,12 +1,21 @@
 # Lending drafts, confirmed handles and recovery wording
 
-Current Source child `57878f81`, promise `8f268c82`, combines the four
+Current Source child `1665d183`, promise `60a826a4`, combines the four
 nonblocking P3 findings under `6bfce701` / `9253b465`. It starts from Main
 `55e1970a5`. The draft-only child `a6cd648c` / `a2db9f95` produced local
 checkpoint `a53744bc`; `c0218075` retires that narrower request toward
-this combined outcome before any Source artifact or full gate. Its
-implementation and original attempts continue here. Archive remains
-priority 1; final composition, gate, review and landing wait behind it.
+the combined outcome before any Source artifact or full gate. The
+combined request `57878f81` / `8f268c82` then produced checkpoint
+`0d1f382b8`; `8234904a` continues it under the current request, changing
+only the local-validation sequence. All original attempts remain.
+
+Archive remains priority 1 for review and landing. During that review,
+an exact local composition of archive `c811785ea`, this Lending slice
+and invitation slice `8c98c1f73` can receive one frozen integration gate.
+This is validation, not approval of an unreviewed dependency. Source
+filing and normal landing still wait for archive approval/landing and
+exact Main correspondence. A code change from review requires a fresh
+implementation freeze and check.
 
 The renderer previously cleared donation and cancellation inputs after
 both a recorded act and a refusal. It also cleared a cancellation reason
