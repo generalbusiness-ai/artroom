@@ -545,9 +545,9 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   const attempt = installAttemptOf(plan);
   if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
   if (plan.attempted === undefined && now >= timeMs(plan["founding"].intent.notAfter)!) {
-    const label = plan.definition === APPLICATION_COHORT.register ? "application" : plan.definition === FILE_PUBLICATION_COHORT.register ? "application-publication" : "Counting";
+    const label = plan.definition === APPLICATION_COHORT.register ? "application" : plan.definition === FILE_PUBLICATION_COHORT.register ? "application-publication" : plan.definition === INVITATION_KEY_COHORT.register ? "invitation-key" : "Counting";
     return failed(`Refused: plan-expired. The planned install could be created until ${plan["founding"].intent.notAfter}. ${strictCustody
-      ? `No request was sent by this run. Keep this original config directory unchanged. For a new ${label} plan, use a separate empty ARTROOM_HOME directory; configure the host with that new plan's register ID before installing.`
+      ? `No request was sent by this run. Keep this original config directory unchanged. For a new ${label} plan, set DAP_HOME to a separate empty directory. If ARTROOM_HOME is set, unset it or set it to that same new directory; different directories refuse before configuration is read. Configure the host with that new plan's register ID before installing.`
       : "Nothing was sent. Plan again, and set the new register ID."}`);
   }
   const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)

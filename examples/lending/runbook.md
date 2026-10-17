@@ -49,6 +49,16 @@ accepted, but the two variables must name the same directory when both are
 set. Do not expose invitation links, private keys, session headers, or
 pending envelopes in public evidence.
 
+The shell commands below also expand `$DAP_HOME`. If you currently set
+only `ARTROOM_HOME`, export its existing directory in the same shell:
+
+```sh
+export DAP_HOME="${ARTROOM_HOME:?Set ARTROOM_HOME to your existing config directory}"
+```
+
+This selects the same custody; it copies no files and creates no new key.
+If you already set both variables, keep them pointed at that same directory.
+
 ```sh
 node packages/cli/bin/dap.js install --plan "https://dap-library-publication-final-1014.inguz.workers.dev" --cohort application-publication --host artifacts --namespace "dap-library-publication-final-1014"
 ```
