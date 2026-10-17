@@ -20,7 +20,7 @@ function counterRecipe(mode: "default" | "generic"): { tools: string[]; count: n
   return { tools: [...cell.matchAll(/`([a-z][a-z0-9.-]*)`/g)].map((m) => m[1]!), count: Number([...cell.matchAll(/: (\d+)/g)].at(-1)![1]) };
 }
 
-/** A room of the application cohort, founded by rita, with the Counter's definition active and its actions in the admin role. */
+/** A room of the application cohort, created by rita, with the Counter's definition active and its actions in the admin role. */
 async function counterRoom(room: Room, options: { subscribe?: boolean } = {}): Promise<Agent> {
   const rita = room.agent("rita", options);
   // The explicit application cohort: register@5, whose claim creates directory@5, membership@4, rules@3 and destination@2.

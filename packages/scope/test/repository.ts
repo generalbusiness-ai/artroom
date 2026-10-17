@@ -3,13 +3,13 @@
  * office, a membership scope and the inbox of each member, each a Durable
  * Object with its own SQLite storage in the namespace `PLATFORM`, under the
  * production authority. It is partial preparation for the plan's fixture
- * `repository`, and it is labelled as that: it shows nothing of a founding.
+ * `repository`, and it is labelled as that: it shows nothing of a creation.
  *
  * | Part | Is |
  * |---|---|
  * | Membership and the inboxes | Real scopes under `platform:membership@1` and `platform:inbox@1`, written through the turn, the store and the dispatchers. |
  * | Authority | The production authority (`repositoryAuthority`): membership judges its own acts on its own head, and an inbox reads the membership scope that its genesis records, through the namespace. No test authority, and no scripted membership. |
- * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. A register's founding creates the real directory and its membership scope on real scopes in `creation-real.test.ts`. The tests of authority keep the office, which needs no register and no host. |
+ * | The office | A STAND-IN for the creator of a membership scope: a made-up directory, of the platform package's test support. A register's creation creates the real directory and its membership scope on real scopes in `creation-real.test.ts`. The tests of authority keep the office, which needs no register and no host. |
  * | A lane that sends a notice | SCRIPTED: an entry written by hand, read through `net.peers`. It shows the inbox's side of a notice, and nothing about a lane. |
  * | Readers | The test readers, a STAND-IN for read sessions, unless a test sets `platformNet.sessions`: then they are the real read sessions of `sessions.ts`, as `sessions.test.ts` does. |
  * | The clock | The scripted clock of the namespaces. No test waits on the wall clock. |
@@ -108,8 +108,8 @@ export async function settle(...nodes: readonly Platform[]): Promise<void> {
 }
 
 /**
- * An office that rita founds, a STAND-IN for the creator of a membership scope, and the membership scope that its founding creates.
- * Rita's key is the founding key, and sam's the recovery key. `hold`: the sends that transport does not deliver, until the test
+ * An office that rita creates, a STAND-IN for the creator of a membership scope, and the membership scope that its creation creates.
+ * Rita's key is the creation key, and sam's the recovery key. `hold`: the sends that transport does not deliver, until the test
  * clears `net.hold`.
  */
 export async function office(hold: ((envelope: Delivered) => boolean) | null = null, named: PlatformDefinition = MEMBERSHIP): Promise<{ O: Platform; M: Platform }> {
@@ -166,7 +166,7 @@ export async function inboxConfirmation(repository: Repository) {
   return { clock: timeMs(net.clock.now)!, inboxes, retries };
 }
 
-/** Complete only these inbox creation duties, with bounded real retry times. */
+/** Complete only these inbox creation pending work, with bounded real retry times. */
 export async function completeInboxConfirmation(repository: Repository): Promise<void> {
   const began = timeMs(net.clock.now)!;
   for (let round = 0; round < 4; round++) {
@@ -187,7 +187,7 @@ interface RepositoryOptions {
 
 /**
  * A membership scope with two members, each with one device key and an
- * inbox: rita, the founder and an admin, seated on the founding key; and
+ * inbox: rita, the creator and an admin, seated on the creation key; and
  * una, a member, who joined by an invitation of rita's. Each inbox is
  * created by the entry that made its member active, and confirmed.
  */

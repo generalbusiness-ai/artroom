@@ -66,12 +66,12 @@ async function story(lifetime: Lifetime): Promise<void> {
     }
     await dispatchFixture([...registers, ...waiting.filter((scope) => !registers.some((r) => r.name === scope)).map((scope) => node(scope as never))], lifetime.wait);
   };
-  // A selected-cohort install founds a register by its planned identity, which the command accepts only from a configured service
+  // A selected-cohort install creates a register by its planned identity, which the command accepts only from a configured service
   // it trusts: the test names the routed transport as that service.
   const person = (): Context => ({ store: memoryStore(), fetch, now, pause, trustedCreationService: { service: SERVICE, fetch } });
   const run = async (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
 
-  /** A room of one cohort, founded by its admin through the command: install with the cohort, wire the host stand-in, create. */
+  /** A room of one cohort, created by its admin through the command: install with the cohort, wire the host stand-in, create. */
   const create = async (admin: Context, cohort: "counting-commitments" | "application", namespace: string, name: string, handle: string) => {
     const installed = await run(admin, "install", SERVICE, "--host", "git.example", "--namespace", namespace, "--cohort", cohort);
     expect(installed.code, installed.lines.join("\n")).toBe(0);

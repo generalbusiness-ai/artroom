@@ -95,7 +95,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await s.alarm(), await surface(s).effect()]).toEqual([false, 0]);
     // A listing that shows the commit, offered as attempt 1's answer, is not that attempt's own answer.
     expect(await late(s, out, op, 1, { result: "confirmed", evidence: { basis: "read", body: { listed: ["c2"] } } })).toEqual({ recorded: "refused", detail: "only that attempt's own answer follows an unknown outcome" });
-    // None of these settled attempt 1: the operation is not settled, and it is in the list of the duties this scope holds.
+    // None of these settled attempt 1: the operation is not settled, and it is in the list of the pending work this scope holds.
     const held = await surface(s).operations(reader, undefined, true);
     expect([(await s.head()).seq, out.sent.length, held.ok && held.value.map((o) => [o.operation.id, o.state, outcomes(o)])]).toEqual([3, 2, [[op, "unknown", [["unknown at 2"], ["confirmed at 3"]]]]]);
 
@@ -137,7 +137,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     out.answer(op, 1, { result: "refused", evidence: { basis: "own-answer", body: { status: 409 } } });
     await s.restart();
     expect([await surface(s).effect(), out.attempts, (await s.head()).seq, await s.alarmAt()]).toEqual([1, [`${op}#1`], 2, timeMs(START)! + RETRY * 1000]);
-    // Attempt 2 gets no answer. The stated attempts are used: no attempt is opened, no wake-up is asked for, and the duty stays visible.
+    // Attempt 2 gets no answer. The stated attempts are used: no attempt is opened, no wake-up is asked for, and the task stays visible.
     out.answer(op, 2, null);
     s.c.clock.now = at(RETRY);
     expect(await s.alarm()).toBe(true);
@@ -321,7 +321,7 @@ describe("outside operations at a real scope (scope contract, section 4.3; autho
     expect([await late(s, out, older, 1, minted), await late(s, out, later, 1, own("c1")), (await s.head()).seq]).toEqual([{ recorded: "unavailable" }, { recorded: "unavailable" }, 14]);
     // The first pass offers the mint's answer. The turn is free, and the answer is still not written: its owner's fault. It goes behind the other.
     expect([await s.alarm(), (await s.head()).seq]).toEqual([true, 15]);
-    // The second pass, after the delay, writes the push's answer. The mint's is in hand: the driver asks for the next wake-up, and the operation is a duty with what it reserved.
+    // The second pass, after the delay, writes the push's answer. The mint's is in hand: the driver asks for the next wake-up, and the operation is a task with what it reserved.
     s.c.clock.now = at(HOLD + PROPOSED_BOUNDS.drainRetrySeconds);
     expect([await s.alarm(), (await s.sealed(16))[0]?.entry.input, (await seen(s, later)).state, await seen(s, older), await s.alarmAt()]).toMatchObject([
       true, { type: "outcome", operation: later, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { commit: "c1" } } }, "settled",

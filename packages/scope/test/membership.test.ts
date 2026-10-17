@@ -113,13 +113,13 @@ describe("authority on real scopes, under the production wiring (authority note,
     };
     try {
       // A runtime that lacks the rule `role-table`, whose mark stands in the genesis act. The office is a declared definition, and
-      // is founded. Its `create` reaches the object that the seed names, which has no definition that it can run whole: transport's
+      // is created. Its `create` reaches the object that the seed names, which has no definition that it can run whole: transport's
       // answer is `retry`, nothing is recorded, and the scope does not exist.
       platformNet.without = "role-table";
       const lacks = await office();
       expect(await created(lacks.O, lacks.M)).toEqual([false, [["request", null, ["retry"]]]]);
       // One rule missing, `handle-form`, whose mark stands in two acts and not in the genesis act. The genesis act could be derived,
-      // and the scope would then run under a part of its version. It is not founded either.
+      // and the scope would then run under a part of its version. It is not created either.
       platformNet.without = "handle-form";
       const { O, M } = await office();
       expect(await created(O, M)).toEqual([false, [["request", null, ["retry"]]]]);

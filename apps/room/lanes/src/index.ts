@@ -19,5 +19,5 @@ export { MANIFEST_DIGESTS } from "./digests3.ts";
 export { DEMO_DIGESTS, DIGESTS, LANE_FORMS } from "./digests.ts";
 export type { LaneDefinition } from "./shared.ts";
 
-/** Both declarations, as a founder supplies them in `definitions`, so that a directory which names their digests in a `create` retains their bytes. */
+/** Both declarations, as a creator supplies them in `definitions`, so that a directory which names their digests in a `create` retains their bytes. */
 export const definitions: readonly DeclaredDefinition[] = [issue, change];

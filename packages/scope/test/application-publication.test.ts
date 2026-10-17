@@ -117,7 +117,7 @@ test("a native application publishes once after missing proof, keeps later sourc
     await pause([R, D, M, Q, G, C]);
     // The test's per-name outside factory is selected at object start. The
     // Directory delivered G's genesis before this fixture installed its host
-    // factory. Restart with that factory and finish the native founding first.
+    // factory. Restart with that factory and finish the native creation first.
     await G.restart();
     await pause([R, D, M, Q, G, C]);
     expect((await G.item(0)).state).toBe("ready");

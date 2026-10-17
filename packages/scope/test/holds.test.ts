@@ -50,7 +50,7 @@ test("a reservation that an item holds, on real storage: the entry that opens th
       return { holder: store.holder(TICKET), holders: store.holders(), for: store.operationsFor(TICKET).map((operation) => [operation.id, operation.for]), none: store.operationsFor(0), outcomes: store.outstanding().outcomes, snapshot: store.all() };
     });
 
-    // The founding is 1 entry, and reserves the closing checkpoint. The ticket's entry is 1 more, and its 2 probes are 4 entries.
+    // The creation is 1 entry, and reserves the closing checkpoint. The ticket's entry is 1 more, and its 2 probes are 4 entries.
     // With a budget of 6 entries the taking entry does not fit, and nothing is written. With 7 it is admitted, with the whole.
     await budget(6);
     expect([said(await issue()), (await stored()).holders]).toEqual([["refused", "scope-full"], []]);

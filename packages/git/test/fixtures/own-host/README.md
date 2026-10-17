@@ -2,7 +2,7 @@
 
 Captured by the planner on 2026-10-07 at 11:36 Eastern from the live
 repository `artroom-demo/lm2piehzm5ujqyctjecrjthjwcg73u2v5ryz4gyqehvrlglyzrfa-1`
-(the founding commit 517e108 with an empty tree, and the receipt ref), with a
+(the creation commit 517e108 with an empty tree, and the receipt ref), with a
 read token in an `Authorization: Bearer` header. No token is in these files.
 
 - `info-refs.bin`: `GET /info/refs?service=git-upload-pack`, 200,

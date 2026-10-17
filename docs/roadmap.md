@@ -215,7 +215,7 @@ unknown until it is reconciled. A party in another organisation answers
 with its own signed act.
 
 **Today.** This model runs for one kind of operation: publication to a
-Git host, with its receipt and cleanup duties. A declared application
+Git host, with its receipt and pending cleanup. A declared application
 cannot declare its own operation. A fact from outside can enter only as a
 participant's signed report.
 
@@ -223,7 +223,7 @@ participant's signed report.
 tool executor's work (43); every counterparty in group 4.
 
 **The dap-spike's contribution.** Its obligations experiment declared a
-duty with a role, a performing act and a deadline. The controls for late,
+task with a role, a performing act and a deadline. The controls for late,
 missing and mismatched performance passed for Sale, and Club gave a
 counterexample
 ([obligations report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/T3-OBLIGATIONS-REPORT.md)).
@@ -311,7 +311,7 @@ what still sees everything the helper reads
 
 **What it is.** One record becomes two, or two become one, with a stated
 rule for what each side keeps. The party that writes a record hands that
-duty to another.
+task to another.
 
 **Today.** A scope creates child scopes. Nothing else changes a boundary.
 
@@ -357,7 +357,7 @@ break its own claims. Its results, in one table:
 | Can an agent write a model within a small repair budget? | No. Sale needed six repairs against a budget of two | [Visibility](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/REPORT.md) |
 | Does Club's original policy for admitting members hold? | No. The failure was kept | [Decision](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-16-club-admission-decision.md) |
 | Does a declaration layer remove the authoring errors? | Not this one. It stopped with a counterexample | [Stop report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/lang/REPORT.md) |
-| Can a duty be declared and checked? | Yes for Sale; Club gave a counterexample | [Obligations](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/T3-OBLIGATIONS-REPORT.md) |
+| Can a task be declared and checked? | Yes for Sale; Club gave a counterexample | [Obligations](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/T3-OBLIGATIONS-REPORT.md) |
 | Can it run as one process with no outside service? | Yes, in its fixture | [Ordering](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md) |
 | Can a newcomer understand a record from the screen? | Not measured | |
 
@@ -369,7 +369,7 @@ Where dap stands on each idea:
 | An exact retry returns the first receipt | Runs |
 | A result is read from an exact position of another record and is never read live | Runs, as delivery between scopes |
 | A shared constraint has one owner | The form of composition; no declared application shows it yet |
-| A duty with a deadline | Runs, as timed rules and pending duties |
+| A task with a deadline | Runs, as timed rules and pending work |
 | Different readers of one record | Not built |
 | A package attached to a running record | Not built |
 | Split, join and handover of the writer | Not built |

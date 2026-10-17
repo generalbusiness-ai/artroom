@@ -376,7 +376,7 @@ An owner's agent compares quote versions and marks unclear items.
   it accepts. Completion, inspection and payment close later.
   Unconfirmed supplies or unpriced work stay open.
 - **What the record keeps:** proposals, each acceptance or rejection, and
-  changed duties. Custody keeps accepted drawings, quotes and marked-up
+  changed pending work. Custody keeps accepted drawings, quotes and marked-up
   photos.
 
 Replacing a contractor ends one engagement. It does not erase what the
@@ -973,7 +973,7 @@ says when access is possible.
   and claims of work done. Custody keeps photos, messages and handover
   evidence.
 
-The workflow organises the exchange. It does not decide legal duties or
+The workflow organises the exchange. It does not decide legal pending work or
 the technical cause.
 
 ### 17 Planning an energy retrofit and its aftercare
@@ -1045,7 +1045,7 @@ agreements.
   condition can close while a utility change or an invoice is still
   open. The manager closing the account does not end a resident's
   dispute.
-- **What the record keeps:** dates, duties, access permissions and
+- **What the record keeps:** dates, pending work, access permissions and
   condition reports. Custody keeps forms, photos, meter readings and
   service confirmations.
 

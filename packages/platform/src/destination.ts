@@ -38,7 +38,7 @@ import { isOf, isStandingDestination, pinnedBy, pinnedOf } from "./versions.ts";
  * The versions of the destination that this package serves. An operation
  * that a destination opens states the scope's own version as its owner (the
  * contract's section 4.3). Version 2 adds the act `read-token`, with its
- * operation `mint-read`, and the founder's handle, which its founding
+ * operation `mint-read`, and the creator's handle, which its creation
  * commit names in a README (`destination2`, below).
  */
 export const DESTINATION_1 = "platform:destination@1" satisfies PlatformDefinition;
@@ -485,11 +485,11 @@ export const destination: PlatformData = {
  * - The act `read-token` (the planner's decision for I5), with the kind of
  *   operation `mint-read` that it opens and the rules of both
  *   (`WRITTEN_2`).
- * - The genesis takes the founder's handle, which the directory's creation
+ * - The genesis takes the creator's handle, which the directory's creation
  *   of version 2 sends, and keeps it in `branch.founderHandle`.
- * - The founding commit writes one file, `README.md`, in place of the empty
+ * - The creation commit writes one file, `README.md`, in place of the empty
  *   tree (`firstHeadCommit`): a heading with the repository's name and one
- *   sentence that names the founder's handle and the directory.
+ *   sentence that names the creator's handle and the directory.
  * - The manifest of a publication may also be a `propose-file` entry of the
  *   change lane (i5 edit): a one-file version of a change.
  */
@@ -510,7 +510,7 @@ export const destination2: PlatformData = {
     establish: {
       ...establish1,
       fields: { ...establish1.fields, "founderHandle": { ...NAME, required: true } },
-      // The founder's handle, before the mark `declare-first-head`, which stays the last effect.
+      // The creator's handle, before the mark `declare-first-head`, which stays the last effect.
       effects: [...establish1.effects.slice(0, -1), { value: { slot: "founderHandle", from: { field: "founderHandle" } } }, ...establish1.effects.slice(-1)],
     },
     // `read-token`: an act on the branch (the planner's decision for I5). Any active member may sign it: its grant,
@@ -1113,7 +1113,7 @@ const pushDecides: Decides = (given, push) => {
   return { effects: [...token.effects, ...table.effects], opens: [...token.opens, ...table.opens], update: table.update };
 };
 
-/** The first head an operation writes: its import's recorded commit, or the computed founding commit. */
+/** The first head an operation writes: its import's recorded commit, or the computed creation commit. */
 export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write: Operation, format: ObjectFormat): string {
   const branch = branchOf(state);
   if (!branch) throw new Error("a first head belongs to the destination's branch");
@@ -1127,9 +1127,9 @@ export function firstHeadCommit(state: Pick<StateView, "page">, own: Own, write:
 }
 
 /**
- * The founding commit and its objects, by the version that the scope
+ * The creation commit and its objects, by the version that the scope
  * pinned at its genesis. Version 1: the empty tree. Version 2: one file,
- * `README.md`, with the repository's name, the founder's handle and the
+ * `README.md`, with the repository's name, the creator's handle and the
  * directory's scope ID, each held by the branch since the genesis.
  */
 export function initialCommitOf(state: Pick<StateView, "page">, own: Own, format: ObjectFormat): DestinationCommit {
@@ -1937,7 +1937,7 @@ const WRITTEN: Rules = {
   /**
    * Row e, the outcome entries of a `revoke` (P16; the row `revoke` of "What
    * each rule of an outcome yields"). It yields nothing: a failed
-   * revocation is a duty, and decides nothing (section 6.6, step 5).
+   * revocation is a task, and decides nothing (section 6.6, step 5).
    * Another attempt follows `refused` or `unknown`, to 3.
    *
    * The body of every outcome is `{ token }`: the same ID as its mint's. A
@@ -1996,7 +1996,7 @@ const WRITTEN: Rules = {
       derives: (given, push) => { const { effects, opens } = pushDecides(given, push); return { effects, sends: [], opens }; },
     },
   },
-  /** Authority revision 28, row e: the parentless founding commit or the imported commit, with its own receipt. */
+  /** Authority revision 28, row e: the parentless creation commit or the imported commit, with its own receipt. */
   "first-head": createRule(firstHeadSeen, 15, 5),
   /** The same row's receipt column, including its next mint and one deciding read. */
   receipt: createRule(receiptSeen, 5, 3),
@@ -2132,7 +2132,7 @@ const WRITTEN_2: Rules = {
 /**
  * Runtime admission metadata for future, recovered and late publication
  * work. It changes neither platform data nor recorded outcome effects.
- * Cleanup and founding return null; malformed target provenance returns false.
+ * Cleanup and creation return null; malformed target provenance returns false.
  */
 export function publicationOrigin(state: StateView, operation: Operation, own: Own): PublicationOrigin | false | null {
   if (!["judge", "check-judge", "reservation-stage", "push", "mint", "read", "receipt"].includes(operation.kind)) return null;
@@ -2752,7 +2752,7 @@ export const destinationRules4: Rules = (() => {
   }));
 })();
 
-/** D1 is an explicit cohort; existing pins and default founding stay put.
+/** D1 is an explicit cohort; existing pins and default creation stay put.
  * Only regular review-backed publication receives the standing contract.
  * Automatic file-publication keeps its separate @4 authority journey. */
 export const DESTINATION_5 = "platform:destination@5" satisfies PlatformDefinition;

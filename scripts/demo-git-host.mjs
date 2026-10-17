@@ -135,7 +135,7 @@ export function buildPlan(state, deadline, now = Date.now()) {
   const intent = installIntent(state, deadline);
   const signedInstall = signIntent(intent, unb64url(state.roles.installer.secret));
   const registerSeed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(intent), ordinal: 0 };
-  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, "founding": { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key, idempotencyKey: state.creationId, requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
+  return { v: 1, plannedAt: stamp(now), definition: REGISTER, deadlineLocked: true, roleKeys: publicKeys(state), signedInstall, installDigest: intentDigest(intent), registerSeed, registerSeedDigest: seedDigest(registerSeed), registerScope: scopeIdOf(registerSeed), installRequest: { method: "POST", path: "/v1/scopes" }, creation: { branch: state.branch, "founderHandle": state["founderHandle"], recoveryKey: state.roles.recovery.key, idempotencyKey: state.creationId, requires: ["accepted-register-receipt", "expected-register-revision", "explicit-future-deadline"] } };
 }
 export async function plan({ directory, deadline }, now = Date.now()) {
   const target = await privateDirectory(directory, true);
@@ -154,7 +154,7 @@ function checkedPlan(plan) {
   } catch (failure) { throw error(failure, "invalid-plan"); }
 }
 
-/** No read/bootstrap is inferred from a founding receipt. The caller supplies
+/** No read/bootstrap is inferred from a creation receipt. The caller supplies
  * the actual accepted install receipt and current expected register revision. */
 export function buildCreation(state, publicPlan, acceptedInstall, revision, deadline, now = Date.now()) {
   checkedState(state);

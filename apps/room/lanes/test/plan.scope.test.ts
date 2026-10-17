@@ -80,7 +80,7 @@ describe("a plan's concerns are lanes of their own (lane forms, sections 3.5 and
     expect(through(goal)).toEqual([[G.name, 6], [g.office.name, 2], [K[0]!.name, 0], [K[1]!.name, 0]]);
     expect(through(child)).toEqual([[K[0]!.name, 1], [G.name, 5], [g.office.name, 2]]);
     expect([goal.dependencies.missing, goal.redacted, goal.trusts]).toEqual([[], [], [TRUSTS.clock, TRUSTS.head, TRUSTS.sources, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.authority, TRUSTS.bounds]]);
-    // The office was founded with a text beside its founding intent. The scope serves it under its digest, and the replay found it.
+    // The office was created with a text beside its creation intent. The scope serves it under its digest, and the replay found it.
     expect([(await g.office.handle.scope.text(textDigest(README))).ok, office.dependencies.missing]).toEqual([true, []]);
     // With no rules for the capabilities that the definition lists, nothing is derived: the limit that the report above is read with.
     expect(await replayed(G, false)).toMatchObject({ result: "unsupported-definition", at: { seq: 0 } });

@@ -35,7 +35,7 @@ export const routed = (url: string, init?: RequestInit): Promise<Response> => ro
 /** `seconds` after the shared clock's `now`. */
 export const soon = (seconds: number) => timeOf(timeMs(net.clock.now)! + seconds * 1000);
 
-/** A founding intent signed by rita for a directory under that definition, and the name of the object that holds it. */
+/** A creation intent signed by rita for a directory under that definition, and the name of the object that holds it. */
 export function creation(definition: ValidDefinition, fields: Intent["fields"]): { signed: SignedIntent; name: ScopeId } {
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const seed: Seed = { v: 1, kind: "directory", definition: definition.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
@@ -128,7 +128,7 @@ export async function later(seconds: number, ...nodes: readonly Node[]): Promise
 }
 
 /**
- * A desk founded by rita, with the declaration of the ticket its definition names in a `create`: the desk retains it,
+ * A desk created by rita, with the declaration of the ticket its definition names in a `create`: the desk retains it,
  * and each ticket reads it from the desk. Transport is undisturbed from here on.
  */
 export async function desk(): Promise<Node> {

@@ -50,10 +50,10 @@
  * genesis").
  *
  * One more thing cannot be written, and no mark can stand for it. The
- * register's `create` carries `founding`, the founder's signed intent. No
+ * register's `create` carries `founding`, the creator's signed intent. No
  * field type holds a signed intent, and it is no field value, so no rule of
  * a marked type could be given it. The data declares no such field. The
- * founder's intent is in the claim's entry, which the creation names by
+ * creator's intent is in the claim's entry, which the creation names by
  * its fact and the genesis retains (entry EP5; the contract's revision 19
  * confirms it).
  *
@@ -73,7 +73,7 @@ export { DIRECTORY };
 /**
  * The versions of the directory that this package serves, each with the
  * definitions of the three scopes that its genesis creates. Version 2
- * founds them on the second version of each. Both versions retain the
+ * creates them on the second version of each. Both versions retain the
  * definition-byte places shipped by actual main at1eed91aa.
  */
 export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefinition; rules: PlatformDefinition; destination: PlatformDefinition }>> = {
@@ -88,7 +88,7 @@ export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefiniti
   "platform:directory@7": { membership: "platform:membership@2", rules: "platform:rules@4", destination: "platform:destination@3" },
 };
 
-/** The bound on the attempts of the import that a founding opens (section 12.1.2, the row `establish`; U9). */
+/** The bound on the attempts of the import that a creation opens (section 12.1.2, the row `establish`; U9). */
 export const IMPORT_ATTEMPTS = CREATION_ATTEMPTS;
 /** The byte domain of a definition's bytes, which the directory reads from the rules scope by their digest (section 12.1.2, "Activation and the creator's read"). */
 export const DEFINITION_DOMAIN = "artroom-definition-1";
@@ -246,7 +246,7 @@ export const directory: PlatformData = {
         { ref: { slot: "claim", from: { field: "claim" } } },
         { value: { slot: "repository", from: { field: "repository" } } },
         { value: { slot: "branch", from: { field: "branch" } } },
-        // The founder's key: the value that the claim's entry set as the claim's `founder`, which is the key that signed it.
+        // The creator's key: the value that the claim's entry set as the claim's `founder`, which is the key that signed it.
         { value: { slot: "founder", from: { field: "claim", part: { set: { item: { field: "claim", part: "seq" }, slot: "founder" } } } } },
         { value: { slot: "founderHandle", from: { field: "founderHandle" } } },
         { value: { slot: "recoveryKey", from: { field: "recoveryKey" } } },
@@ -374,7 +374,7 @@ export const directory: PlatformData = {
  * `platform:directory@2`: version 1 with the newer child cohort. Its genesis creates
  * membership under `platform:membership@2` (the rules scope and the
  * destination follow from `SIBLINGS_OF`, by the rules of the two send
- * marks), and sends the founder handle for the destination's README.
+ * marks), and sends the creator handle for the destination's README.
  * Both versions preserve actual main's definition-byte places.
  */
 const establish1 = directory.acts["establish"]!;
@@ -794,7 +794,7 @@ export const directoryRules: Rules = {
           body: {
             fields: {
               repository: fields["repository"], branch: fields["branch"], import: fields["import"] !== undefined, claim: fields["claim"], directory: at, membership: siblingId(given, "membership"), rules: siblingId(given, "rules"),
-              // Version 2: the founder's handle, which the destination's founding commit names in its README.
+              // Version 2: the creator's handle, which the destination's creation commit names in its README.
               ...(pinnedBy(given) === "platform:directory@1" ? {} : { "founderHandle": fields["founderHandle"] }),
             },
           },

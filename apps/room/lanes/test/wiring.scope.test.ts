@@ -22,7 +22,7 @@ import { Platform, copied, merged, oid, paul, proposed, publicationOf, reported,
 
 type Issue = Node<typeof issue>;
 
-/** The time a scenario on a room may take: a founding and a few publications take some seconds, more under a loaded run. */
+/** The time a scenario on a room may take: a creation and a few publications take some seconds, more under a loaded run. */
 const ROOM_MS = 60_000;
 
 /** The extents of the first definition, with 1 approval for `source` and `infrastructure`, no check, and the declaration of the exception. */

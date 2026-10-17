@@ -1,4 +1,4 @@
-/** The steps every MCP story shares: a W2 marker, one act as a recipe step in either mode, and the founding of a room. */
+/** The steps every MCP story shares: a W2 marker, one act as a recipe step in either mode, and the creation of a room. */
 import { expect } from "vitest";
 import type { PlatformDefinition, ScopeId } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret } from "@generalbusiness/artroom-bytes";

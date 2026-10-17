@@ -29,7 +29,7 @@ function fixture() {
   return { values, storage, handed };
 }
 // Actual Page Store/lock/retention adapter and bytes over SCRIPTED shared CLI,
-// founder proof and native standing. Shared/native sender is proved separately.
+// creator proof and native standing. Shared/native sender is proved separately.
 test("connection custody reserves before the shared sender and retains opaque originals across reload Check/Continue; missing private snapshots never become fresh invitations", async () => {
   const f = fixture(); let posts = 0, firstOperation = "";
   const input: InvitationIssueInput = { kind: "person", handle: "@guest", role: "member", hours: 24 };

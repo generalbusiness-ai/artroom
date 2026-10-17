@@ -1,7 +1,7 @@
 /**
  * The hosted MCP endpoint on real scopes (notes/2026-10-13-hosted-mcp-endpoint.md, section 6): the registry and the agent
  * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the production app
- * Worker's default fetch, with the pinned MCP client where a client is named. rita founds the room through her own MCP service
+ * Worker's default fetch, with the pinned MCP client where a client is named. rita creates the room through her own MCP service
  * and performs the admin's acts; the agent is created by a control request she signs.
  */
 import { env } from "cloudflare:test";
@@ -152,7 +152,7 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
   } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
 
-/** A room founded by rita with the issue definition active, and one agent created under `op`; the agent's answer. */
+/** A room created by rita with the issue definition active, and one agent created under `op`; the agent's answer. */
 async function hosted(room: Room, rita: Agent, handle: string, op: string, signer: Uint8Array = rita.secret): Promise<{ agent: string; key: KeyId; bearer: string; link: string }> {
   const M = rita.config.repository!.membership;
   const { link } = await invite(room, rita, handle);

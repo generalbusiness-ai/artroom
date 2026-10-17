@@ -1,14 +1,14 @@
 /**
  * A room for the lane scenarios that run against the real platform scopes:
- * a repository founded whole on real scopes in the namespace `PLATFORM`, as
- * `packages/scope/test/creation-real.test.ts` founds one, with its members,
+ * a repository created whole on real scopes in the namespace `PLATFORM`, as
+ * `packages/scope/test/creation-real.test.ts` creates one, with its members,
  * and lanes that its real directory creates under the pinned lane digests.
  *
  * | Part | Is |
  * |---|---|
  * | The register, the directory, membership, the rules scope and the destination | Real scopes: the deployed class, the production authority and the platform package's own data and rules. No rule is a stand-in. |
  * | The lanes | Real scopes under the pinned digests, created by the real directory's `open-issue` and `open-pr` after the real rules scope activated each digest. Their grants are read from the real membership scope, by the production authority. |
- * | The members | Real members of the membership scope, each with one active key of derive's fixture key set: rita, the founder and the one admin; una and vic, members; paul, a member; sam, the recovery key. |
+ * | The members | Real members of the membership scope, each with one active key of derive's fixture key set: rita, the creator and the one admin; una and vic, members; paul, a member; sam, the recovery key. |
  * | The Git host | A STAND-IN, two parts. `OutsideDouble` of the scope package is the destination's and the register's outside port: it answers what the test writes. `Host` of `graph.ts` is a lane's outside port: it answers the attempts that the code of `hold@1` opens. No repository exists and no commit is read. |
  * | The changed set of a publication | SCRIPTED: the test states the paths that the host's judge read answers with. No tree is diffed. |
  * | The clock, transport and the readers | The scripted clock, the namespace's transport, and the test readers, as in every test of the namespace `PLATFORM`. |
@@ -241,7 +241,7 @@ export async function publicationOf(r: Room, C: { name: string }, merge: number)
 }
 
 /**
- * A room: a register installed by paul, founded by rita's claim, whose
+ * A room: a register installed by paul, created by rita's claim, whose
  * directory created membership, the rules scope and the destination; the
  * destination's first head and receipt written; rita seated as the one
  * admin; una, vic and paul invited as members, each with an active key.
@@ -276,14 +276,14 @@ export async function room(setup: RoomSetup = {}): Promise<Room> {
   const [M, rules, G] = [1, 2, 3].map((n) => new Platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed))) as [Platform, Platform, Platform];
   await settle(R, D, M, rules, G);
   wired.delete(R.name);
-  // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+  // The creation commit of `platform:destination@2`: one README that names the repository, the creator's handle and the directory.
   const readme = { name: repositoryName(seedDigest(seed), 1), handle: "@rita", directory: D.name };
   const firstHead = initialCommitObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!), readme).commit;
   const made = new Room(R, D, M, rules, G, firstHead, {});
   for (const kind of ["mint", "first-head", "mint", "receipt", "revoke"] as const) await made.drive(kind);
   expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: firstHead } });
 
-  // Membership: rita seated on the founding key, the one admin. una, vic and paul join as members, each by an invitation of rita's.
+  // Membership: rita seated on the creation key, the one admin. una, vic and paul join as members, each by an invitation of rita's.
   const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
   await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
   made.members["@rita"] = seat;

@@ -15,8 +15,8 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
  *
  * | Command | What it does |
  * |---|---|
- * | `install` | Founds the register by an `install` intent, signed by a new operator key that is also the one founder key. With `--plan`, it signs the intent and prints the register ID it will found, and founds nothing; `--planned` founds that plan. |
- * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the founder's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
+ * | `install` | Creates the register by an `install` intent, signed by a new operator key that is also the one creator key. With `--plan`, it signs the intent and prints the register ID it will found, and creates nothing; `--planned` creates that plan. |
+ * | `claim` | Signs the register's `found` act, then waits until the directory, membership, rules scope and destination are created and confirmed. Then it takes the creator's seat and first key in membership. A claim it gave up waiting on is kept as pending, and the next `claim` goes on from it; `--again` signs a new one. |
  * | `invite`, `join` | Membership's `invite-member` and `join`. The link carries the invitation's number and secret; the joining key is made and kept locally. |
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
  * | `act` | One act of any kind, through the client's declared handle for a declared definition, or as a signed intent for a platform one. |
@@ -52,7 +52,7 @@ export interface Context {
   store: Store;
   /** Replaces the runtime's `fetch`: a test passes the Worker's routes. */
   fetch?: Fetch;
-  /** Internal configured-service trust for this exact injected founding
+  /** Internal configured-service trust for this exact injected creation
    * transport. It authenticates no independent remote history. */
   trustedCreationService?: { service: string; fetch: Fetch };
   /** Explicit fixed-origin demo projection for fresh claim preflight only.
@@ -400,7 +400,7 @@ export function install(ctx: Context, service: string, options: InstallOptions =
     const { answer } = await create(transportOf(ctx, service), signed, NEW_REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${NEW_REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${NEW_REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one creator key.`);
   });
 }
 
@@ -412,8 +412,8 @@ async function installing(ctx: Context, options: { host?: string; namespace?: st
 }
 
 /**
- * The ID of the register that a founding by this intent, under this version, makes: a scope's ID is a function of its seed, and
- * a register's seed of the founding intent and the version alone (the scope's `found`).
+ * The ID of the register that a creation by this intent, under this version, makes: a scope's ID is a function of its seed, and
+ * a register's seed of the creation intent and the version alone (the scope's `found`).
  */
 const registerIdOf = (creation: SignedIntent, definition: PlatformDefinition): ScopeId =>
   scopeIdOf({ v: 1, kind: "register", definition, creator: null, cause: intentDigest(creation.intent), ordinal: 0 });
@@ -487,7 +487,7 @@ function plannedLines(plan: PlannedInstall): Outcome {
 
 /**
  * `dap install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
- * nothing. The intent lives as long as an intent may, so it can be founded until its `notAfter`, the time printed. The plan is
+ * nothing. The intent lives as long as an intent may, so it can be created until its `notAfter`, the time printed. The plan is
  * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
  * run `install --planned`. Only a definitely-unsent legacy plan may be replaced; a selected cohort plan stays exact.
  */
@@ -562,7 +562,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   }
   // The durable marker must precede the first possible request. An exact
   // attempted replay may recover an accepted genesis after expiry; the
-  // server still refuses an expired founding that was never accepted.
+  // server still refuses an expired creation that was never accepted.
   if (plan.attempted === undefined) {
     const pending: Config = { ...before!, plan: { ...plan, attempted: attempt } };
     if (strictCustody) await saveCohortConfig(ctx, pending);
@@ -598,7 +598,7 @@ function validRepository(repository: Repository, directory: Seed): boolean {
     if (!siblings) return false;
     const sibling = (kind: "membership" | "rules" | "destination", ordinal: number) => scopeIdOf({ v: 1, kind, definition: siblings[kind], creator: repository.directory, cause: seedDigest(directory), ordinal });
     // The pinned directory creates these three exact siblings in order. Both its exact
-    // seed and full confirmed reference determine their IDs; the same founder
+    // seed and full confirmed reference determine their IDs; the same creator
     // key/handle in another room cannot authorize a substituted cache.
     return repository.directory.scope === scopeIdOf(directory) && repository.directory.kind === "directory" && isIncarnation(repository.directory.inc)
       && isScopeId(repository.membership.scope) && repository.membership.kind === "membership" && isIncarnation(repository.membership.inc)
@@ -621,13 +621,13 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
 }
 
 /**
- * `dap create <name>`: the register's `found` act, signed by the founder
+ * `dap create <name>`: the register's `found` act, signed by the creator
  * key. The register fixes the directory's seed, so its ID is known from the
  * signed intent; the directory, once it exists, creates membership, the
- * rules scope and the destination. Then the founder takes the seat and the
+ * rules scope and the destination. Then the creator takes the seat and the
  * first key in membership, and so becomes its first admin.
  *
- * Every read here is a signed read by the founder key, which is the
+ * Every read here is a signed read by the creator key, which is the
  * operator key: the register's summary, where that key signed `install`;
  * then the directory that the claim caused, and the scopes that the
  * directory caused; then membership, where the key has signed `seat`.
@@ -799,7 +799,7 @@ function walkClaim(ctx: Context, name: string, options: { handle?: string; branc
     if (!validRepository(repository, seed)) return failed("The saved repository references do not match this claim; nothing was submitted.");
     const handle = pending.handle;
 
-    // The founder's seat and first key (`founding-key`): the first admin of the repository.
+    // The creator's seat and first key (`founding-key`): the first admin of the repository.
     const enrollment = { ...base, repository };
     const M = await handleOf(ctx, enrollment, repository.membership.scope);
     const mShape = platform(siblings.membership)!.data as unknown as DefinitionShape;

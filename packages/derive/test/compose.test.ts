@@ -21,7 +21,7 @@ const resealed = (from: Ledger, seq: number, sends: readonly Send[]): Source => 
 describe("founding a directory and creating a child (sections 7.1 and 7.2)", () => {
   test("four entries, each derived by its judge: the act, a provisional genesis, the result with its applied clause, and the confirmation", () => {
     const D = created();
-    // A directory has no creator to confirm it. Its genesis holds the founding intent, whose digest is the seed's cause.
+    // A directory has no creator to confirm it. Its genesis holds the creation intent, whose digest is the seed's cause.
     const matched = D.last.input as Extract<Input, { type: "genesis" }>;
     expect([D.state.scope()!.status, matched.seed.creator, matched.seed.cause, D.at.scope]).toEqual(["active", null, intentDigest(matched["founding"]!.intent), scopeIdOf(matched.seed)]);
 
@@ -41,7 +41,7 @@ describe("founding a directory and creating a child (sections 7.1 and 7.2)", () 
         { n: 1, to: D.at, message: { class: "advisory", type: "index", body: { fields: { title: "A flaky test" } } } },
       ],
     });
-    // The index row its genesis act declares is sealed as a duty and held: only the result leaves a provisional scope.
+    // The index row its genesis act declares is sealed as a task and held: only the result leaves a provisional scope.
     expect(I.state.scope()!.held).toEqual([1]);
     // While it is provisional it admits a repeat of its creation request, answered from its genesis, and nothing else.
     const P = new Scope(ticketDefinition);
@@ -424,7 +424,7 @@ describe("room to settle (section 17.2)", () => {
       d.acts.ask.sends.push(structuredClone(d.acts.ask.sends[0]));
     });
     const D = created();
-    const S = new Scope(x12);                                  // entries 0 and 1: one more than the contract's table, which has a founding only
+    const S = new Scope(x12);                                  // entries 0 and 1: one more than the contract's table, which has a creation only
     const ask = S.did(una, "ask", fields({ desk: D.at, until: t(-60) }));
     // The act: a deadline that reserves 1, two requests that reserve 3 each, and the closing checkpoint. It fits in 11 entries and not in 10.
     expect([row(S), fits(S.state, x12, { scopeEntries: 11 }, ask.input), fits(S.state, x12, { scopeEntries: 10 }, ask.input)]).toEqual([[3, 8], true, false]);
@@ -453,7 +453,7 @@ describe("room to settle (section 17.2)", () => {
   test("a pending job at a full budget (the first witness of section 17.4, in entries): its first answer is written from what the job reserved, also after its deadline and with the request it sends; an answer that leaves it pending, a second answer and every other new work are refused; a copy that awaits its settlement is the same", () => {
     // X15: a job is `requested` with a deadline, which times it out. `check` declares that it settles a job in the listed states.
     // It answers `ok` or not, and tells the job's desk. The `closes` handler declares that it settles a copy that is `set`. A
-    // `note` is a comment: one entry, and no duty. As in X12, the clause of another request, of `ask`, can start a deadline.
+    // `note` is a comment: one entry, and no task. As in X12, the clause of another request, of `ask`, can start a deadline.
     const form = { also: {}, fields: {}, guards: [], effects: [], sends: [], attention: [] };
     const jobs = (listed: string[]) => variant(ticket, (d) => {
       pausing(d);

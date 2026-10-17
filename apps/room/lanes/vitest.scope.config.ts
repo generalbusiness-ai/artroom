@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [cloudflareTest({ main: "./test/support/worker.ts", wrangler: { configPath: "./wrangler.test.jsonc" } })],
   test: {
     include: ["test/**/*.scope.test.ts"],
-    // One isolate for every file: the Worker is loaded once. Each test founds its own scopes, each its own object and storage.
+    // One isolate for every file: the Worker is loaded once. Each test creates its own scopes, each its own object and storage.
     isolate: false,
     maxWorkers: 1,
   },

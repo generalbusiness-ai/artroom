@@ -4,7 +4,7 @@
  * version. A scope pins the version at its genesis, `platform:<name>@<n>`,
  * and is judged and replayed by that version for as long as it exists. This
  * package serves every version that it has shipped, and new scopes are
- * founded on the newest.
+ * created on the newest.
  *
  * A rule that must state its own version, such as the owner of an operation
  * that it opens or the definition of a scope that it creates, reads it from

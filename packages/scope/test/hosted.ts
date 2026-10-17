@@ -59,7 +59,7 @@ export class Hosted {
   readonly log: string[] = [];
   /** The driver of the object's present life. A restart makes another, which holds nothing. */
   driver!: TokenDriver;
-  /** The founded lane. */
+  /** The created lane. */
   s!: Lane;
 
   /** The ports of one life of the object. */
@@ -82,7 +82,7 @@ export class Hosted {
     if (!read.ok) throw new Error(`no operation ${id}: ${read.reason}`);
     return read.value;
   }
-  /** The operations that are not settled: the duties this scope holds. */
+  /** The operations that are not settled: the pending work this scope holds. */
   async outboxItems(): Promise<string[]> {
     const read = await this.surface.operations(reader, undefined, true);
     if (!read.ok) throw new Error(`no operations: ${read.reason}`);
@@ -109,10 +109,10 @@ export class Hosted {
 export const C = (digit: string): string => digit.repeat(40);
 
 /**
- * A founded lane on the capability's code, with a held hold of una's, its
+ * A created lane on the capability's code, with a held hold of una's, its
  * current instance `i1`, and the entry of the step `stage` for a report of
  * commit `a`: a root that is `creating`, the two tokens of attempt 1, each
- * `minting`, and their operations. `before` runs when the scope is founded
+ * `minting`, and their operations. `before` runs when the scope is created
  * and nothing is opened, so a test can set the host's faults first: the
  * driver sends what an entry opened as soon as that entry is committed.
  */

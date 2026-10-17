@@ -84,9 +84,9 @@ assuming platform idempotency supplies missing local records.
 ## Follow effects to their own outcomes
 
 Attention names members and reasons; it does not confer permission.
-Messages have send duty IDs and receiver decisions. Outside operations keep
+Messages have send outbox IDs and receiver decisions. Outside operations keep
 attempts and confirmed, refused or unknown outcomes. Unknown mutation
-attempts remain duties; their driver does not re-send the original mutation
+attempts remain pending work; their driver does not re-send the original mutation
 just because its reply was lost.
 
 For a merge, the act opens the workflow when it takes effect. Later destination and

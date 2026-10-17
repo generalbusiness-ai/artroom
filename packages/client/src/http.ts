@@ -15,7 +15,7 @@
  * operation, with what that answer must carry (`answers.ts`), is no
  * outcome either. Each of these is a `TransportError`.
  *
- * A `TransportError` never says that nothing was recorded. For a founding
+ * A `TransportError` never says that nothing was recorded. For a creation
  * or an act it says the outcome of the submitted intent is unknown, and
  * that the same signed intent may be sent again.
  */
@@ -56,7 +56,7 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
 
   /** One request of operation `op`. Its reply is returned only when it is an answer of that operation. */
   async function call<K extends keyof HttpApi>(op: K, path: string, reader: unknown, body?: unknown, query?: ItemQuery): Promise<Answered<K>> {
-    // A founding, an act and a request for a step submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
+    // A creation, an act and a request for a step submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
     const failed = (what: string) => new TransportError(op === "create" || op === "submit" || op === "prepare" ? `${what}. ${UNKNOWN}` : `${what}. Nothing was read; the read may be made again.`);
     const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
     if (!send) throw new TransportError("this runtime has no fetch; nothing was sent");

@@ -41,7 +41,7 @@ test("one real route: a founding, an act and a request for a step through the Wo
 
 test("the HTTP boundary: a body is budgeted in raw bytes while it is read, and a path that is not percent-encoded text is refused; neither reaches an operation", async () => {
   const post = (body: BodyInit) => route(new Request("https://scopes.test/v1/scopes", { method: "POST", body }), env.NET);
-  // A founding that would be accepted, with a padding member of 400,000 three-byte characters: under 1 MiB of UTF-16 units, over it in bytes.
+  // A creation that would be accepted, with a padding member of 400,000 three-byte characters: under 1 MiB of UTF-16 units, over it in bytes.
   const { signed } = creation(definition, { title: "A lane", opener: rita.member });
   const asked = { creation: signed, definition: definition.declared };
   const padded = await post(JSON.stringify({ ...asked, pad: "\u4e00".repeat(400_000) }));
@@ -50,7 +50,7 @@ test("the HTTP boundary: a body is budgeted in raw bytes while it is read, and a
   let sent = 0;
   const endless = new ReadableStream<Uint8Array>({ pull(c) { sent += 65536; c.enqueue(new Uint8Array(65536).fill(32)); } }, { highWaterMark: 0 });
   expect([(await post(endless)).status, sent]).toEqual([400, 1024 * 1024 + 65536]);
-  // The same founding with no padding is accepted: it was the size that refused it.
+  // The same creation with no padding is accepted: it was the size that refused it.
   expect((await post(JSON.stringify(asked))).status).toBe(201);
 
   const malformed = await route(new Request("https://scopes.test/v1/scopes/%"), env.NET);

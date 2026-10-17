@@ -218,7 +218,7 @@ describe("the scope's budget (section 9.2), here 12 entries", () => {
     expect(await s.stub.checkpoint()).toMatchObject(beside);
     s.c.clock.now = at(HOLD);
     await s.alarm();
-    // No other duty is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
+    // No other task is pending and the head is not a checkpoint: this one is the closing checkpoint, and the history ends on it.
     expect([await s.stub.checkpoint(), (await s.head()).seq]).toMatchObject([{ answer: "written", fact: { seq: closing } }, scopeEntries - 1]);
   });
 

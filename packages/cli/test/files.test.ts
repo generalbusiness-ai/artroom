@@ -14,7 +14,7 @@ import { command } from "../src/line.ts";
 test("install keeps its operator key owner-only under the config directory, refuses to replace it, and prints only the key's ID; a refused founding is printed with its reason", async () => {
   const dir = join(mkdtempSync(join(tmpdir(), "artroom-cli-")), "artroom");
   const store = fileStore(dir);
-  // A service that refuses every founding: what it answers is not the point here, only what the command keeps and prints.
+  // A service that refuses every creation: what it answers is not the point here, only what the command keeps and prints.
   const fetch: Fetch = async () => new Response(JSON.stringify({ answer: "refused", reason: "unauthorized" }), { status: 403 }) as never;
   const outcome = await command({ store, fetch }, ["install", "https://service.test"]);
   expect(outcome).toEqual({ code: 1, lines: ["Refused: unauthorized. The request was refused."] });

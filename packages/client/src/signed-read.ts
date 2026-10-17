@@ -7,7 +7,7 @@
  * the entries whose cause chain leads to one of those, and the retained
  * inputs that those entries name. At a register, a recent local signer
  * reads every entry and its carried inputs. So the operator key that signed `install` reads the register,
- * and a founder's key that signed `found` reads the register's summary,
+ * and a creator's key that signed `found` reads the register's summary,
  * the directory that the claim caused, and membership, the rules scope and
  * the destination, which the directory caused; it learns membership's ID
  * from the directory, and asks there for a session once it holds a seat.

@@ -11,7 +11,7 @@ import { judgeReservation, type EditFile, type Statement } from "../src/reservat
 import { CREATED, HEAD, TREE, reading } from "./support-destination.ts";
 
 // A one-file edit (i5 edit; plan 025, section 2). The objects are checked against a real local Git repository in each object
-// format: the facts are made up, and no host, push or founding is shown. The judgment is the plain function, with a reading
+// format: the facts are made up, and no host, push or creation is shown. The judgment is the plain function, with a reading
 // written by hand.
 const scope = `sc_${"g".repeat(51)}a` as ScopeId;
 const operation: FactRef = { at: { kind: "lane", scope: `sc_${"l".repeat(51)}a`, inc: `in_${"l".repeat(25)}a` }, seq: 9, hash: `sha256:${"5".repeat(64)}` };

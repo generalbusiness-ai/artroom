@@ -241,7 +241,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   const enrollment = async (kind: string) => (await owner.required(() => M.entries())).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === kind);
   expect([(await enrollment("seat")).length, seatedPending.seat?.accepted, seatedPending.firstKey]).toEqual([1, undefined, undefined]);
   expect(sent["seat"]).toEqual([seatedPending.seat!.signed]);
-  // Same founder key and handle, different room: a stale cache cannot splice
+  // Same creator key and handle, different room: a stale cache cannot splice
   // the first claim's actual membership into the second directory's refs.
   const originalSeated = (await configOf())!;
   const beforeSeatCheckPosts = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];

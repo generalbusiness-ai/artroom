@@ -149,7 +149,7 @@ export interface Resolver { read(fact: FactRef, seconds: number, origin?: boolea
  * How transport answers one delivery (section 7.4). None of these is an
  * entry. `recorded`: the fact of the entry that recorded the message, now or
  * before; a repeat gets the same fact. `retry`: not decided yet; the sender
- * keeps the duty. Its reason `unsupported-definition`: a creation whose
+ * keeps the task. Its reason `unsupported-definition`: a creation whose
  * definition, as its creator holds it, is not one this runtime can pin. `routing`: the resolver of the name refused it before it
  * reached the scope's judgment, and nothing was recorded. `source-unverified`:
  * a source check failed, and nothing was recorded.
@@ -180,7 +180,7 @@ export interface Alarm { set(at: Timestamp | null): void | Promise<void> }
  * is read before the turn (section 5.1), and the reader checks the digest
  * itself. `holder` is the scope that retains the bytes (section 9.2): for a
  * child, the creator its seed names. Null: nobody is named, as for a
- * founding. `absent`: the holder answered, and it retains no bytes under
+ * creation. `absent`: the holder answered, and it retains no bytes under
  * that digest. `unavailable`: the bytes cannot be read now, and may be
  * later.
  *
@@ -261,7 +261,7 @@ export interface Ports {
    * `Capabilities`. A value may also hold the rules of a capability's steps
    * (derive's `Steps`), what a hold's entries derive for its workspace, and
    * the binding of a reserved request, and the most that each piece of the
-   * code derives in one entry. Null: it has none. A scope is not founded or
+   * code derives in one entry. Null: it has none. A scope is not created or
    * created under a definition that uses a form with no rule here, or whose
    * entries, counted with this code, pass the bound on derived effects:
    * `unsupported-definition`.

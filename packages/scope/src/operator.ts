@@ -13,7 +13,7 @@
  * - **It holds no credential and no private text.** A row is a kind from a
  *   fixed list and references of fixed forms: a position and a hash of this
  *   scope's history, an operation's ID with an attempt's number, and a
- *   send's duty ID. It has no member that takes free text, and `found`
+ *   send's outbox ID. It has no member that takes free text, and `found`
  *   refuses a row of any other form.
  * - **Bounded.** It keeps the latest `rows` rows and drops the oldest.
  *
@@ -162,7 +162,7 @@ export function waitingIn(outboxItem: { class: string; held: boolean; acknowledg
 
 /**
  * How an instruction to send again ended. `sent`: the one dispatch was
- * made, and `answer` is how transport answered it. Not sent: the duty ID
+ * made, and `answer` is how transport answered it. Not sent: the outbox ID
  * names no send of this scope; the send is in neither list; or this scope
  * has no transport.
  */
@@ -170,7 +170,7 @@ export type Resent = { sent: true; answer: Dispatched["answer"] | "source-unveri
 
 /**
  * The operator's instruction to send one waiting request again (G17,
- * "Sending again"). It names the duty by its entry and ordinal. The runtime
+ * "Sending again"). It names the task by its entry and ordinal. The runtime
  * dispatches the same envelope again, once: the same source entry, ordinal
  * and message, so the request keeps its identity and a late result settles
  * it. It is bookkeeping: it writes no entry, reserves nothing and offers no

@@ -1,4 +1,4 @@
-/** Native founding through the existing CLI workflow, with private browser recovery.
+/** Native creation through the existing CLI workflow, with private browser recovery.
  * A typed label is local intent, not the repository name selected by the host.
  * This module never installs a register or imports an operator key. */
 import type { PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
@@ -43,7 +43,7 @@ export interface ClaimedRoom {
 interface Kept { v: 1; binding: string; label: string; config: Config; recovery?: string; completed?: PendingClaim }
 interface Journal { v: 2; binding: string; active: string; claims: Record<string, string>; originalLegacy?: string }
 export interface ClaimStatus { operation: string; label: string; state: "pending" | "complete" }
-/** A client storage bound, not native founding permission or capacity. No
+/** A client storage bound, not native creation permission or capacity. No
  * archived or unknown operation is evicted to admit another one. */
 const MAX_CLAIMS = 64;
 const operationId = (id: string): boolean => id === "legacy" || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
@@ -210,7 +210,7 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
       checkCurrent();
       const eligible = options.creationOffer ? await (async () => {
         const offer = await options.creationOffer!(configured.register);
-        if (!isCreationOffer(offer, session.service, configured.register)) throw new Error("The founding offer does not match this exact origin and register. Nothing was submitted.");
+        if (!isCreationOffer(offer, session.service, configured.register)) throw new Error("The creation offer does not match this exact origin and register. Nothing was submitted.");
         return { definition: offer.definition };
       })() : await allowedClaim(session, configured.register);
       if (eligible.definition !== configured.definition) throw new Error("The register read does not match the configured pinned version. Nothing was submitted.");

@@ -1,10 +1,10 @@
 /**
- * What a duty reserves, as far as the definition decides it (scope contract,
+ * What a task reserves, as far as the definition decides it (scope contract,
  * section 17.2): the chain of timed rules from each state, what
  * an item or a copy that awaits its settlement reserves, and the most that
  * a result clause can start.
  *
- * A reservation is of a duty's whole closure: the duty, and every duty that
+ * A reservation is of a task's whole closure: the task, and every task that
  * a settling entry of the closure can create. A settling entry is written
  * whatever is free, so the room for what it starts exists before it.
  */
@@ -20,7 +20,7 @@ import type { TimedGraph, TimedMove } from "./timed.ts";
 export interface PendingCopy { name: string; kind: ScopeKind; states: readonly string[]; entries: number }
 
 /**
- * The known declared duty terms, in Amount form: entries, declared future requests, and their entries' stand-in bytes, including
+ * The known declared task terms, in Amount form: entries, declared future requests, and their entries' stand-in bytes, including
  * each result's foreign source entry, a declared primary opening and a possible first relationship copy. Other item/record
  * terms and retained inputs remain owed under cc570904. The numeric
  * fields of Capacity are entry projections of these amounts, not a second calculation or five-dimensional admission.
@@ -53,7 +53,7 @@ export interface Capacity {
 export function capacityOf(d: Pick<Defining, "bad" | "bounds" | "pendingWork" | "clauseSets" | "types">, graph: TimedGraph, moves: readonly TimedMove[]): Capacity {
   const entry: Amount = { ...NOTHING, entries: 1, bytes: d.bounds.entryBytes };
   // One settling form's own entry and declared openings. Changes to existing subjects and to the copy being settled create
-  // no new item/key. Initial-state duties remain in starts, so the opening unit is included once, beside those duties.
+  // no new item/key. Initial-state pending work remains in starts, so the opening unit is included once, beside that pending work.
   const entryFor = (form: PendingWork): Amount => sum(entry, { ...NOTHING, items: form.opens === null ? 0 : 1, records: form.mayCreateCopy ? 1 : 0 });
   const deadline = (entries: number): Amount => times(entries, entry);
   /** A deadline's known amount in that state, with each timed entry at the entry-size stand-in. */

@@ -101,10 +101,10 @@ journals; that historical correspondence remains owed.
 | Definition | Version 1 | Version 2 |
 |---|---|---|
 | `platform:register` | Main's declaration; creates the version 1 cohort. | The same declaration; creates the directory at version 2. |
-| `platform:directory` | Main's definition-byte places on `open-issue` and `open-pr`; missing bytes are `bad-field`. | Preserves those places and creates its three scopes at version 2, carrying the founder handle for the README. |
+| `platform:directory` | Main's definition-byte places on `open-issue` and `open-pr`; missing bytes are `bad-field`. | Preserves those places and creates its three scopes at version 2, carrying the creator handle for the README. |
 | `platform:membership` | Main's declaration and version 1 standing. | The same declaration, with version 2 standing. |
 | `platform:rules` | Main's definition-byte place on `activate.digest`. | The same declaration, with version 2 cohort and observation identity. |
-| `platform:destination` | Main's declaration: no `read-token`, and a first commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the first commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
+| `platform:destination` | Main's declaration: no `read-token`, and a first commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the creator's handle, and the first commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
 | `platform:inbox` | Main's declaration. | None. |
 
 ## Identity and incarnation
@@ -141,7 +141,7 @@ contains its own digest: an entry has no field for its own hash.
 `canonicalize` and `parseStrict`; `scopeIdOf`, `entryHash`, `intentDigest`,
 `definitionDigest`, `textDigest` and the other digests; `signIntent` and `verifySignedIntent`; and the
 guards `isDigest`, `isScopeId`, `isIncarnation`, `isKeyId`, `isMemberId`,
-`isDutyId`, `isOperationId`, `isPlatformDefinition` and `isScopeKind`.
+`isOutboxId`, `isOperationId`, `isPlatformDefinition` and `isScopeKind`.
 
 ## Entries
 
@@ -198,7 +198,7 @@ A scope answers a submitted intent in one of four ways (`Answer`):
 | `mismatch` | The same actor and key are on an entry with another intent. | Inspect the recorded intent and original request before another mutation. |
 
 A **receipt** (`Receipt`) holds the fact of the entry, the effects it
-derived, and a duty ID for each message it sent.
+derived, and a outbox ID for each message it sent.
 
 The idempotency key belongs to the first intent that took effect under it, for the life of the scope. Exact replay can return the earlier receipt without judging the act again. A timed drain can run first and return
 unavailable before that receipt. Keep the original signed envelope and inspect
@@ -235,18 +235,18 @@ judges no time is written with the previous entry's time and
 `clamped: true`.
 
 **Room to settle.** A scope has a budget of entries. Some entries create
-duties that need a later entry: a deadline needs its timed entry, a
+pending work that needs a later entry: a deadline needs its timed entry, a
 request needs its result, and an item in a state that an act or handler
 declares with `settles` needs that act's or handler's entry. Before an
 entry that is new work is kept, the
-scope counts the entries its pending duties still need, and one for a
+scope counts the entries its pending work still needs, and one for a
 closing checkpoint. If they do not all fit, nothing is written and an act
-is refused `scope-full`. So a duty that took effect can always be
+is refused `scope-full`. So a task that took effect can always be
 recorded as ended. `owed` and `fits`, in `derive`, do the count.
 
 An entry that takes an item or a copy out of the states its form's
 `settles` lists is a settling entry. It is written against the reservation
-of that duty, and is not asked whether it fits. Every other entry of the
+of that task, and is not asked whether it fits. Every other entry of the
 same form is new work, and so is every refusal. The validator derives what
 each pending state reserves, and refuses, as `reserve-unbounded`, forms
 that settle one another's pending states in a cycle. The count is of
@@ -654,7 +654,7 @@ a cursor `next` when there is more; or a refusal with a reason.
 | `history` | A page of entries, each with its hash. |
 | `entry` | One entry. |
 | `outbox` | A page of the scope's sends, with the attempts and result of each. |
-| `duty` | The outbox row of one send, by its duty ID. |
+| `outboxItem` | The outbox row of one send, by its outbox ID. |
 | `log` | A page of the journal as stored: each entry's canonical bytes. For a verifier. |
 | `retained` | One retained input, by kind and digest: a definition, a foreign entry, a rule's input, a detached text until it is redacted, or a value in its byte domain. |
 
@@ -695,7 +695,7 @@ the entry that sent it, a child's genesis to what created it), and the
 retained inputs that those entries carry. A quoted digest in unrelated text
 is not provenance for an input. A filtered journal has only the coverage it
 actually supplies; it does not establish complete replay of omitted entries. So the operator key that signed
-`install` reads the register, and a founder's key reads the register's
+`install` reads the register, and a creator's key reads the register's
 record of its claim, the directory and its three children, before it
 holds a session. Under decision ca8ad1cf, a recent local register signer reads its whole
 journal and typed retained inputs. An authenticated session of membership
@@ -782,8 +782,8 @@ if (answer.answer === "accepted") await scope.followReceipt(answer.receipt);
   a key ID and signatures, never a private key. The value returned is the
   value signed: keep it, and retry with it.
 - `ScopeHandle` has `submit`, `settle`, the reads, `definition`, `text`,
-  `followReceipt` and `followDuty`. `found` sends the `found` intent, which creates a directory, or, under a version of `platform:register`, sends an `install`, which creates a register. `submit`
-  and `found` take, as one more argument, what travels beside the intent:
+  `followReceipt` and `followOutbox`. `create` sends the `found` intent, which creates a directory, or, under a version of `platform:register`, sends an `install`, which creates a register. `submit`
+  and `create` take, as one more argument, what travels beside the intent:
   the detached texts, the declared named values and, for an act, the
   presented facts.
 - `declaredHandle(scope, definition)` gives a handle that is typed from a
@@ -817,7 +817,7 @@ bindings; they grant no source approval, receipt or request closure.
 | Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | `packages/platform` supplies six runnable definitions: register, directory, membership, rules, destination and inbox. Each carries every rule of its marks. `platform:task@1` is not supplied, and a runtime or replay that lacks any rule of a pinned version answers `unsupported-definition` for the whole scope. The rules scope answers observations with its revision, the digest of its extents, and the separately retained canonical value. Platform data now states the subjects that acts, outcomes and result clauses observe; the runtime reads them before the turn and retains what the declared rows require. It also reads named values in declared byte domains. The destination reads its reservation evidence from the retained lane entries, observes membership and the rules, judges the touched extents, and counts its work under the branch and publication holders. Its first-head, receipt and deciding-read rules are tested with the real judges in memory (`packages/platform/test/destination-creates.test.ts`); its computed objects and public ref names are checked with real local Git in both object formats (`destination-objects.test.ts`). These witnesses use a made-up bureau or host answers where labelled. The initial GitHub adapter checkpoint owed a deployed run; the [GitHub component witness](../notes/implementation/2026-10-07-demo-git-host-live-witness.md) later recorded a real first publication and public clone at source `dfaa5395`, while its authenticated replay probes failed. The separately bound expanded own-host witness above records six consistent authenticated replays. Neither closes full I3 or supplies the task definition. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch and its timed end. `workspaceEffects` in `packages/derive` derives its workspace records when the judge has the code of `hold@1`; the production ports supply that code. The production authority reads the membership scope that a lane records. The directory now declares observations of active definitions for `open-issue` and `open-pr`, and of the worker for `open-task`; the runtime can read those subjects before a turn. Native lane hold-token minting and revocation have a driver, but no production adapter reaches a real Git host for those operations. |
 | The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). With only the production defaults no grant is read and nothing is sent outside, so every act and step is refused `unauthorized` and no attempt is sent. A verifier runs them when its caller gives them (`Options.capabilities` and `Options.owners`, in `packages/replay`). The replay command gives none, and answers `unsupported-definition` for a journal that needs them. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
-| Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and cleanup duties after it becomes final, and releases the remaining reservation when those duties settle. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The first-commit and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. The ARTIFACTS binding and ARTIFACTS_CONFIG enable the hosting service adapter; the Worker selects the recorded host, and the demo namespace is pinned to artroom-demo ([hosts.md](hosts.md)). Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated. The expanded live witness records the own-host first head and receipt, their recorded token cleanup answers, and a real clone that advertised both refs. Replay accepts those outside answers as recorded; it does not independently verify provider revocation. That first publication contains an empty tree and establishes no native content-change publication. Native lane hold and Git-read operations still have no production host adapter. |
+| Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and pending cleanup after it becomes final, and releases the remaining reservation when that pending work settles. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The first-commit and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. The ARTIFACTS binding and ARTIFACTS_CONFIG enable the hosting service adapter; the Worker selects the recorded host, and the demo namespace is pinned to artroom-demo ([hosts.md](hosts.md)). Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated. The expanded live witness records the own-host first head and receipt, their recorded token cleanup answers, and a real clone that advertised both refs. Replay accepts those outside answers as recorded; it does not independently verify provider revocation. That first publication contains an empty tree and establishes no native content-change publication. Native lane hold and Git-read operations still have no production host adapter. |
 | Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `apps/room/lanes`, validated whole and pinned by digest. Both use capability forms, whose code the production ports hold, so a scope can be created under either. With only the production defaults no act and no step takes effect, because no grant is read. W1 to W5 and the demo story run real lanes created by the real directory with production membership authority; their Git host and changed set are stand-ins, and W5 signs the checker answer in the test with no runner. The separate graph fixture uses a made-up directory and test authority. [lanes.md](../apps/room/docs/lanes.md) states the remaining native host and live journey limits. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle and the command in `packages/cli`, described in [cli.md](cli.md). Its story fixture uses real authority, signed reads and sessions, a stand-in Git host and test-driven dispatchers. It establishes no complete deployed journey. |
 | Deployment and live journey | Demo gate 1, request `225da894` | The recorded source used `packages/scope/wrangler.jsonc`; the current configuration is `apps/room/wrangler.jsonc`. The initial checkpoint owed live evidence; the exact isolated expanded run above now records own-host creation, an empty-tree first head and receipt, operator-token clones and six consistent authenticated replays. Its operator token is a labelled stand-in for the separate room-issued CLI credential flow, and its operator is builder rather than a fresh person. Native lane hold and content-change publication, browser obligations, fresh-person signoff and the rest of I3 remain open. These producer observations grant no source approval or request closure. |

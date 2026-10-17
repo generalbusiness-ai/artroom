@@ -20,7 +20,7 @@ import { declaredChangeAttack } from "../../../../packages/scope/test/support/de
 // Invariant: an arbitrary application cannot acquire a native change lane's
 // destination publication privilege by declaring the same name.
 // Real PlatformScope, SQLite, factory, membership authority, rules and source
-// resolution. Git creation and founding writes use existing OutsideDouble;
+// resolution. Git creation and creation writes use existing OutsideDouble;
 // no provider, production Git repository, or network is mutated. Scripted
 // clock and inspector reads are labelled stand-ins; grants are native.
 // This successor checks only reserve admission, not an outside judge or push.

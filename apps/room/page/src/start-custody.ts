@@ -75,7 +75,7 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
     let row = read(origin, storage);
     if (options.mode === "new") {
       if (row) throw new Error("An original Start is already retained. Check status or explicitly Continue that original creation.");
-      if (!options.offer || !isCreationOffer(options.offer, origin) || options.offer.definition !== "platform:register@8") throw new Error("A current same-origin register8 demo founding offer is required. Nothing was submitted.");
+      if (!options.offer || !isCreationOffer(options.offer, origin) || options.offer.definition !== "platform:register@8") throw new Error("A current same-origin register8 demo creation offer is required. Nothing was submitted.");
       const label = options.label?.trim() ?? "";
       if (!label || label.length > 256) throw new Error("Enter a personal room label of at most 256 characters.");
       const secret = crypto.getRandomValues(new Uint8Array(32));
@@ -110,7 +110,7 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
 }
 
 /** One optional recovery-download attempt, separately from CLI connection files.
- * The caller must first reverify the enrolled founder; this binds that public
+ * The caller must first reverify the enrolled creator; this binds that public
  * key/operation and reads back the once marker before releasing key bytes. */
 export async function recoveryKeyOnce(origin: string, storage: ClaimStorage, expected: { key: KeyId; operation: string }, options: Pick<StartOptions, "locks" | "current"> = {}): Promise<string> {
   originOf(origin);
@@ -123,7 +123,7 @@ export async function recoveryKeyOnce(origin: string, storage: ClaimStorage, exp
     const row = read(origin, storage);
     if (!row) throw unavailable();
     const status = publicOf(row, storage);
-    if (status.state !== "complete" || status.key !== expected.key || status.operation !== expected.operation || row.recoverySaved) throw new Error("The optional recovery file was already offered or its verified founder context changed. No key was exported.");
+    if (status.state !== "complete" || status.key !== expected.key || status.operation !== expected.operation || row.recoverySaved) throw new Error("The optional recovery file was already offered or its verified creator context changed. No key was exported.");
     const saved = save({ ...row, recoverySaved: true }, storage, guard);
     return saved.secret + "\n";
   });

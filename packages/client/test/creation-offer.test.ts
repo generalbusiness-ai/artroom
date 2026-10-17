@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { newIncarnation, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { creationOffer, isCreationOffer, type CreationOffer, type CreationOfferFetch } from "../src/creation-offer.ts";
 
-// Actual SDK byte/URL guard over SCRIPTED HTTP, no native founding or permission.
+// Actual SDK byte/URL guard over SCRIPTED HTTP, no native creation or permission.
 test("fixed same-origin founding discovery accepts only the closed bounded demo projection and refuses redirects without consuming their body", async () => {
   const origin = "https://offer.test";
   const register = { kind: "register" as const, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@8", creator: null, cause: textDigest("TEST offer"), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(8)) };

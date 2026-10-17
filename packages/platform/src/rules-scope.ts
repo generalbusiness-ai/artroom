@@ -307,7 +307,7 @@ export const rulesScope: PlatformData = {
       attention: [],
     },
   },
-  // No timed rule exists. No entry starts a duty beyond its own request and result.
+  // No timed rule exists. No entry starts a task beyond its own request and result.
   timed: {},
   rules: {},
   // The rules scope opens no operation.

@@ -71,7 +71,7 @@ export interface ValidDefinition {
   readonly pending: Readonly<Record<string, Readonly<Record<string, number>>>>;
   /** Section 17.2, row 4: each relationship whose copies await a settlement, with the states and the entries a copy in one of them reserves. */
   readonly pendingCopies: readonly PendingCopy[];
-  /** Known declared duty terms, including future requests and their result-source bytes. Other axes/retention remain partial. */
+  /** Known declared task terms, including future requests and their result-source bytes. Other axes/retention remain partial. */
   readonly pendingWorkAmounts: PendingWorkAmounts;
   /**
    * Section 6.11: each form that this package reads and does not derive by
@@ -97,7 +97,7 @@ export interface ValidDefinition {
   readonly reserving?: Reserving;
   /**
    * Section 17.2, "A marker duty" (revision 22): each item type that some
-   * form settles by a mark, with what the amounts of its duties are derived
+   * form settles by a mark, with what the amounts of its pending work is derived
    * from (`markers.ts`). An item of such a type reserves by its state and
    * by the marks that are `true`, so `pending` has no row for the type.
    * Absent: no form of the definition settles by a mark.

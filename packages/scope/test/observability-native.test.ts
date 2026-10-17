@@ -113,7 +113,7 @@ test("absent, throwing, slow and SQL-faulted telemetry preserve native creation,
   }
 });
 
-// Invariant: one actual alarm can settle more native duties than the AE cap
+// Invariant: one actual alarm can settle more native pending work than the AE cap
 // without losing a native end or changing any entry/send. Routing replies,
 // authority, clock and deterministic incarnations are labelled stand-ins.
 test("an alarm settles 251 native requests with exact turn multiplicity inside the 250 point cap", async () => {

@@ -129,9 +129,9 @@ class ScriptedGitHub {
   };
 }
 
-// Invariant: a real register/directory founding reaches the actual configured
+// Invariant: a real register/directory creation reaches the actual configured
 // GitHub factory and destination adapters, retains its scoped credentials in
-// private SQLite, and writes only the exact founding head and own receipt.
+// private SQLite, and writes only the exact creation head and own receipt.
 // All five objects, platform rules, membership authority, turn/dispatch and
 // Operations are real. HTTP/Git upstream and clock are labelled stand-ins;
 // fixture inspection uses an explicit reader bypass, while destination reads
@@ -200,7 +200,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     }
     const registerEntries = await R.entries();
     const genesis = (await G.entries())[0]!;
-    // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+    // The creation commit of `platform:destination@2`: one README that names the repository, the creator's handle and the directory.
     const first = initialCommitObjects("sha1", G.name, genesis.time, factRefOf(registerEntries[1]!), { name: host.name!, handle: "@rita", directory: D.name });
     expect(host.creates).toBe(1);
     expect(host.emptyAdvertisements).toBeGreaterThan(0);

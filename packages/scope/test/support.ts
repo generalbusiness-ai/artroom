@@ -1,6 +1,6 @@
 /**
  * What every workerd test of the scope shares: one definition, built from
- * derive's fixture lane; a founded scope on real Durable Object storage,
+ * derive's fixture lane; a created scope on real Durable Object storage,
  * with the controls the test steers it by; and short forms for its acts.
  */
 
@@ -27,7 +27,7 @@ export const HOLD = 600;
 /**
  * Derive's fixture lane, with room for four live holds, a rule on `assign`
  * (the requester may not assign themselves), a fact that a remark may
- * name, and a report that awaits its acceptance (section 17.2, row 3). A directory is founded under it: the kind of a scope is in its seed,
+ * name, and a report that awaits its acceptance (section 17.2, row 3). A directory is created under it: the kind of a scope is in its seed,
  * and no form of this definition reads it.
  */
 export const definition = variant(lane, (def) => {
@@ -42,7 +42,7 @@ const actions = Object.values(definition.declared.acts).map((a) => a.grant);
 /** Any value: the test readers port lets every reader read. */
 export const reader = "a test reader";
 
-/** A founding intent signed by rita, the seed it asks for, and the name of the object that holds that scope. `under`: the definition, when it is not the one above. */
+/** A creation intent signed by rita, the seed it asks for, and the name of the object that holds that scope. `under`: the definition, when it is not the one above. */
 export function creation(notAfter: Timestamp = at(60), under: ValidDefinition = definition): { signed: SignedIntent; seed: Seed; name: ScopeId } {
   const intent: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields: { title: "A lane", opener: rita.member }, idempotencyKey: crypto.randomUUID(), notAfter };
   const seed: Seed = { v: 1, kind: "directory", definition: under.digest, creator: null, cause: intentDigest(intent), ordinal: 0 };
@@ -57,7 +57,7 @@ export type Remote = { [K in keyof Surface]: (...args: Parameters<Surface[K]>) =
 export const objectOf = (name: string, namespace: DurableObjectNamespace = env.SCOPES): DurableObjectStub => namespace.get(namespace.idFromName(name));
 export const stubOf = (name: string, namespace?: DurableObjectNamespace): Remote => objectOf(name, namespace) as unknown as Remote;
 
-/** One founded scope: entry 0 opened intent 0, requested by rita. */
+/** One created scope: entry 0 opened intent 0, requested by rita. */
 export class Lane {
   #keys = 0;
   constructor(readonly name: ScopeId, readonly c: Controls, readonly at: ScopeRef, readonly genesis: Receipt, readonly signed: SignedIntent) {}

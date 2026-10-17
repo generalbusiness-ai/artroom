@@ -56,8 +56,8 @@ describe("the token ledger at a real scope, through the host port (authority not
     const owed = revocations[0]!;
     expect(await h.seen(owed)).toMatchObject({ state: "pending", operation: { attempts: [{ attempt: 1, outcomes: [{ result: "unknown" }] }, { attempt: 2, outcomes: [] }] } });
 
-    // A revocation that is not confirmed stays a duty. Its second and third attempts are new requests, and the host answers each
-    // that no such token is live. That settles nothing about the first: the token is still `revoking`, and the operation is a duty.
+    // A revocation that is not confirmed stays a task. Its second and third attempts are new requests, and the host answers each
+    // that no such token is live. That settles nothing about the first: the token is still `revoking`, and the operation is a task.
     s.c.clock.now = at(DAY + RETRY);
     expect(await s.alarm()).toBe(true);
     s.c.clock.now = at(DAY + 3 * RETRY);
@@ -69,7 +69,7 @@ describe("the token ledger at a real scope, through the host port (authority not
     ]);
     expect((await h.seen(owed)).operation.attempts.map((a) => a.outcomes.map((o) => o.result))).toEqual([["unknown"], ["refused"], ["refused"]]);
 
-    // Only the first request's own answer settles it: the token is `ended`, and the duty is gone. The first `unknown` entry stays.
+    // Only the first request's own answer settles it: the token is `ended`, and the task is gone. The first `unknown` entry stays.
     expect([await h.redeliver("revoke", 1), await h.tokens(), (await h.seen(owed)).state, (await h.seen(owed)).operation.attempts[0]!.outcomes.map((o) => o.result), (await h.outboxItems()).filter((d) => d.includes("revoke") || d.includes("mint"))]).toMatchObject([
       { recorded: "written" }, { 1: "ended", 2: "ended" }, "settled", ["unknown", "confirmed"], [],
     ]);

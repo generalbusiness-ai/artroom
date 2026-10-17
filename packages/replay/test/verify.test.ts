@@ -64,7 +64,7 @@ test("a replay without native identity policy leaves a reserved declared source 
   const missing = await verify(source(), options);
   expect([missing.report.result, missing.why]).toEqual(["incomplete", "the replay has no supplied source-identity policy for a reserved declared name"]);
   // Explicit catalog policy still cannot bless the raw reserved alias of an
-  // ordinary founding. Its source history is checked, without an anchor.
+  // ordinary creation. Its source history is checked, without an anchor.
   const classified = await verify(source(), { ...options, sourceName });
   expect([classified.report.result, classified.report.anchors, classified.why]).toEqual([
     "mismatch", [], `the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`,
@@ -485,7 +485,7 @@ describe("an outcome entry of a platform definition, and where a scope records i
   });
 
   test("a scope whose platform version records its membership reference in its state is replayed on that reference, as a directory's slot is read; with no such reference its grant covers nothing (I3 deltas, entry EP14)", async () => {
-    // The scope was founded, so its genesis records no membership scope. Its grants are filters on the membership scope.
+    // The scope was created, so its genesis records no membership scope. Its grants are filters on the membership scope.
     const g = new Gate(opens as never);
     const [recorded, none] = [await replayed(g, g.served(), g.coded()), await replayed(g, g.served(), g.coded(g.rules, null))];
     expect([recorded.report.result, none.report.result, none.report.at?.seq, none.why]).toEqual(["consistent", "mismatch", 1, "the entry records a grant, and its row or its step names no action, its scope records no membership scope, or no window is stated for it"]);

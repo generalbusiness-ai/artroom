@@ -153,7 +153,7 @@ export class Staging extends Scope {
   given(over: Partial<CapabilityGiven> = {}): CapabilityGiven {
     return { view: this.state, definition: this.definition, scope: { at: this.at, creator: null }, self: this.head.seq + 1, kind: "", fields: {}, signer: null, facts: new Map(), own: this.own, snapshot: (digest) => snapshots.get(digest) ?? null, clock: clockOf(this.state, this.now), ...over };
   }
-  /** The entries that the pending duties reserve, with what the capability declares. */
+  /** The entries that the pending work reserves, with what the capability declares. */
   reserved(): number { return owed(this.state, this.definition, this.last.input, cap); }
 }
 

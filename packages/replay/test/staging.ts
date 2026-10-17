@@ -162,9 +162,9 @@ const RULES_HEAD = { seq: 12, hash: d("9") } as const;
 const PROOF_DOMAIN = "gate-proof-1";
 
 /**
- * A scope under made-up platform data, founded by `rita`: derive's fixture
+ * A scope under made-up platform data, created by `rita`: derive's fixture
  * `gate`, whose act `enter` opens one operation `probe` by its rule
- * `key-id`. Entry 0 is the founding, entry 1 issues a ticket, entry 2 is
+ * `key-id`. Entry 0 is the creation, entry 1 issues a ticket, entry 2 is
  * `una`'s `enter`, and entry 3 is the `confirmed` outcome of the probe, for
  * which the rule `probe` gives `derives`.
  *

@@ -1254,7 +1254,7 @@ derives it again and compares.
 | `repository.resend` | platform:destination `resend` | resend: moves a publication; needs ledger.retry, which your role (admin) holds. Fields: none. Guards: the earlier attempt is unanswered and its retry is due (resend-not-due). |
 | `repository.resend-receipt` | platform:destination `resend-receipt` | resend-receipt: moves a branch; needs ledger.retry, which your role (admin) holds. Fields: receipt (required): the ID of a receipt item on this scope. Guards: the receipt is owed (receipt-not-owed); the earlier attempt is unanswered and its retry is due (resend-not-due). |
 | `repository.retry-import` | platform:directory `retry-import` | retry-import: moves a repository; needs ledger.retry, which your role (admin) holds. Fields: none. Guards: the repository's import has ended without success, so it may be tried again (import-not-spent). |
-| `room.create` | platform:register `found` | found: opens a claim; the rule founding-policy decides who may sign. Fields: branch (required): text up to 256 bytes. founderHandle (required): text up to 256 bytes. recoveryKey (required): text up to 64 bytes. import: text up to 2048 bytes. Guards: the founder's handle is a handle: @, then letters, digits, dots, dashes or underscores (bad-handle). |
+| `room.create` | platform:register `found` | found: opens a claim; the rule founding-policy decides who may sign. Fields: branch (required): text up to 256 bytes. founderHandle (required): text up to 256 bytes. recoveryKey (required): text up to 64 bytes. import: text up to 2048 bytes. Guards: the creator's handle is a handle: @, then letters, digits, dots, dashes or underscores (bad-handle). |
 | `room.enrol` | platform:membership `enrol` | enrol: moves a roster; the rule by-invitation decides who may sign. Fields: invitation (required): a whole number from 0 to 1000000000. secret (required): text up to 256 bytes. Guards: the key is invited or lapsed (invitation-used); now is before the key's inviteEnds (invitation-expired); the key is invited (invitation-expired); the member is active (member-removed). |
 | `room.first-key` | platform:membership `first-key` | first-key: opens a key; the rule founding-key decides who may sign. Fields: member (required): the ID of a member item on this scope. Guards: no key is invited, active, retired or compromised; the member is active; the member's handle equals the roster's foundingHandle. |
 | `room.join` | platform:membership `join` | join: opens a key; the rule by-invitation decides who may sign. Fields: invitation (required): a whole number from 0 to 1000000000. secret (required): text up to 256 bytes. Guards: the member is invited or lapsed (invitation-used); now is before the member's inviteEnds (invitation-expired); the member is invited (invitation-expired). |
@@ -1329,8 +1329,8 @@ works; the count given is the default recipe's.
 
 | Activity | Default | --generic | --generic=add |
 |---|---|---|---|
-| `dap install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and founder keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
-| `dap create <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
+| `dap install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and creator keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
+| `dap create <name>` | `room.create` on the register with the branch, the creator's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
 | Page: Create room | the same calls as `dap create`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `dap create`: 7 | 5 |
 | `dap invite <@member> --role <role>` | `member.invite` with the handle, the role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the link with the number and secret to the member: 1 | `actions` on membership, `act`: 2 | 1 |
 | `dap join <link>` | `join` with the link, from an empty configuration, then `wait` for the inbox: 2 | `join`, `wait`: 2 | 2 |
@@ -1425,7 +1425,7 @@ the room's application factory creates, in a room of the
 `application-publication` cohort. Its definition name is `lending`, so
 its act tools are `lending.donate`, `lending.borrow`, `lending.return`,
 `lending.cancel` and `lending.publish`. The caller's genesis values are
-`{}`: the factory makes the signer the founder and supplies the room's
+`{}`: the factory makes the signer the creator and supplies the room's
 destination. A donation opens a thing at the entry that records it, so
 the position of the act's fact is the thing's ID. `borrow`, `return` and
 `cancel` name that ID in `on`.
@@ -1726,5 +1726,5 @@ one job; `--generic` replaces the act tools with the pair.
 ### List changes in the room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in both modes: the founder's subscribed client was told of 7 list
-changes (3 while founding the room), and the second member's of 4.
+Worker, in both modes: the creator's subscribed client was told of 7 list
+changes (3 while creation the room), and the second member's of 4.

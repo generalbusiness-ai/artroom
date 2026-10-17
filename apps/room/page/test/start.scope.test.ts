@@ -183,7 +183,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
       expect((await lifetime.wait(() => command({ store: cliCreator, fetch: native, now: lifetime.now }, ["acts", "membership"]))).code).toBe(0);
     } finally { exportedSeed.fill(0); }
     const savedRecovery = await lifetime.wait(() => saveCreatorRecoveryOnce(origin, reload, binding, ready));
-    expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native founder backup, not the internal CLI recovery key.
+    expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native creator backup, not the internal CLI recovery key.
     await expect(lifetime.wait(() => saveCreatorRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
     const creatorSent: SignedIntent[] = [], creatorMutationPaths: string[] = [], creatorReplies: { kind: string; answer: string; reason: string | null; name: string | null }[] = [];
     let creatorSessions = 0;

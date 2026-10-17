@@ -1,4 +1,4 @@
-/** Native static create-definition edges, shared by founding and archive closure. */
+/** Native static create-definition edges, shared by creation and archive closure. */
 import type { DeclaredDefinition, Digest } from "@generalbusiness/dap-contract";
 import { isDigest } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "./values.ts";

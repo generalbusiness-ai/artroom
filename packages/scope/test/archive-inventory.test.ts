@@ -1,4 +1,4 @@
-/** Native read frames, SQLite and genuine founding/acts. All reviewed
+/** Native read frames, SQLite and genuine creation/acts. All reviewed
  * policies/certificates are explicit TEST STAND-INS, never production
  * certifications. Synthetic/corrupt rows are labelled at their witnesses.
  * No inventory result proves authority, replay, ancestry or host custody. */
@@ -226,7 +226,7 @@ test("native declaration metadata admits exactly 64 aggregate nodes while retain
 });
 
 test("a genuine native pin to legacy membership refuses before local entry/dependency bodies despite a supplied support claim", async () => {
-  // Stand-in platform data/rule and founding authority; native seed/name,
+  // Stand-in platform data/rule and creation authority; native seed/name,
   // genesis write, pin binding and legacy-policy ordering are exercised.
   const { standingData } = await import("../../derive/test/fixtures-standing.ts");
   const { wired } = await import("./outside.ts");

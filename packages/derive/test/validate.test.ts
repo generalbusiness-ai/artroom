@@ -76,7 +76,7 @@ const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode 
   }, "timed-partial"],
   ["a timed rule that sets a time from the commit clock, which a commit could refuse", lane, (d) => d.timed["hold-end"].effects.push({ value: { slot: "until", from: { time: { plusSeconds: 60 } } } }), "timed-partial"],
   ["a timed rule whose entry, with its attention reason, could pass the entry size bound: its due item could never be written", lane, (d) => { d.timed["hold-end"].attention[0].notify.reason = "r".repeat(PROPOSED_BOUNDS.entryBytes); }, "bound"],
-  // Section 17.2: a reservation covers what its duty can start, so that must be finite.
+  // Section 17.2: a reservation covers what its task can start, so that must be finite.
   ["timed rules of one type that lead to one another in a cycle", ticket, pausing((d) => { d.timed.resume = { ...d.timed.pause, states: ["paused"], effects: [{ state: "asked" }] }; }), "reserve-unbounded"],
   ["forms that settle create one another's pending states in a cycle", ticket, pausing((d) => {
     const moves = (from: string, to: string) => ({ ...clone(d.acts.approve), on: "request", settles: { of: "on", in: [from] }, guards: [{ state: [from] }], effects: [{ state: to }] });

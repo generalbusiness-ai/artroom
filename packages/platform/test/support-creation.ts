@@ -13,7 +13,7 @@
  *   is the register's entry that records the directory's result, with
  *   its clause and its confirmation. The genesis of each of the
  *   directory's three children is SCRIPTED: an entry made by hand. It shows the directory's
- *   rows and rules. A founding on scope objects is the scope package's
+ *   rows and rules. A creation on scope objects is the scope package's
  *   (`packages/scope/test/creation-real.test.ts`).
  */
 
@@ -47,7 +47,7 @@ function written(judgment: Judgment): Extract<Judgment, { result: "write" }>["dr
   return judgment.draft;
 }
 
-/** The founding intent of a register: an `install`, signed by that key, with `to: null`. */
+/** The creation intent of a register: an `install`, signed by that key, with `to: null`. */
 export const installing = (who: Actor, policy: "keys" | "open", creators: readonly string[] | undefined, kind = "install"): SignedIntent =>
   signIntent({ v: 1, to: null, actor: who.key, kind, on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy, ...(creators ? { "founders": [...creators] } : {}) }, idempotencyKey: "install", notAfter: t(60) }, who.secret);
 
@@ -55,8 +55,8 @@ export const installing = (who: Actor, policy: "keys" | "open", creators: readon
 export const registerSeed = (install: SignedIntent, over: Partial<Seed> = {}): Seed => ({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0, ...over });
 
 /**
- * A register in memory, founded by paul's `install` intent, with the policy
- * `keys` and rita's key as the one founder. Its genesis and its `found`
+ * A register in memory, created by paul's `install` intent, with the policy
+ * `keys` and rita's key as the one creator. Its genesis and its `found`
  * acts and the outcomes of its operations are judged by derive's judges
  * with the register's own rules.
  */
@@ -73,7 +73,7 @@ export class Register extends Ledger {
     return super.act(who, kind, over, { platform: registerPlatform, grants: [], ...context });
   }
 
-  /** A founding by that key: the `found` act, with the fields of a founding intent. Returns the judgment. */
+  /** A creation by that key: the `found` act, with the fields of a creation intent. Returns the judgment. */
   create(who: Actor, more: Record<string, string> = {}, key = "a founding"): ActJudgment {
     return this.act(who, "found", { expected: { register: this.item(0).revision }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: sam.key, ...more }, idempotencyKey: key });
   }
@@ -102,7 +102,7 @@ export const scripted = (at: ScopeRef, seq: number, input: Entry["input"], sends
 
 /**
  * A directory in memory, below a SCRIPTED register: see the head of this
- * file. rita founds it. Its genesis, its acts, its handlers, its clauses and
+ * file. rita creates it. Its genesis, its acts, its handlers, its clauses and
  * the outcomes of its import are judged by derive's judges, with the
  * directory's own rules. Its acts are judged on the grants of
  * the test authority: every actor of the key set holds every action here.

@@ -471,7 +471,7 @@ export function deriveEffects(j: Judging, forms: readonly EffectForm[], attentio
     }
   }
   // The whole-entry boundary for what the rules gave: every form of the list is derived, so every mark has joined. Section 4.3,
-  // item 1: a genesis may seal an operation as a held duty, with no attempt. Which genesis does is not built yet (I3 deltas, entry
+  // item 1: a genesis may seal an operation as a held task, with no attempt. Which genesis does is not built yet (I3 deltas, entry
   // EB12), so a genesis is not asked.
   if (j.self !== 0) paired();
   // Section 6.8: a hold ends with what it is under. These are the capability's own effects, after the written ones (section 4.1):

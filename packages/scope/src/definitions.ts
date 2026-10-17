@@ -6,7 +6,7 @@
  *
  * - A scope retains its own declaration, and the declaration of every
  *   definition its own names in a `create` send, and of every definition
- *   those name in turn. They are supplied when a directory is founded, and
+ *   those name in turn. They are supplied when a directory is created, and
  *   read from the creator when a child is created.
  * - A child, before its genesis turn, reads the declaration its seed names
  *   from its creator, by digest, and checks the digest.

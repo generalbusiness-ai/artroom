@@ -396,7 +396,7 @@ export class SqliteStore implements Store {
       // A new send is due at once: its first attempt may start at its entry's time.
       this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
     }
-    // Authority note, section 5.4, rule 1: the duty is written before the request that could cause the effect is sent, with a
+    // Authority note, section 5.4, rule 1: the task is written before the request that could cause the effect is sent, with a
     // wake-up. The row of an attempt is written here, in the commit of the entry that opens it, and the driver sends from rows only.
     for (const effect of entry.effects) {
       if (effect.effect !== "attempt" || effect.result !== "opened") continue;
@@ -516,7 +516,7 @@ function sendingOf(row: Row): Sending {
   return { operation: operationId(row["seq"] as number, row["k"] as number), attempt: row["attempt"] as number, opened: row["opened"] as number, next: row["next"] as number | null, sent: row["sent"] as Timestamp | null };
 }
 
-/** The columns of an outbox row that a read of its duty returns. */
+/** The columns of an outbox row that a read of its task returns. */
 const OUTBOX = "seq, n, target, class, held, attempts, ack, result, diagnosis";
 
 function outboxItemOf(row: Row): OutboxItem {

@@ -18,7 +18,7 @@ function libraryRecipe(mode: "default" | "generic"): { tools: string[]; count: n
   return { tools: [...cell.matchAll(/`([a-z][a-z0-9.-]*)`/g)].map((m) => m[1]!), count: Number([...cell.matchAll(/: (\d+)/g)].at(-1)![1]) };
 }
 
-/** A room of the application-publication cohort, founded by rita, with the library's definition active and its actions in the admin role. */
+/** A room of the application-publication cohort, created by rita, with the library's definition active and its actions in the admin role. */
 async function libraryRoom(room: Room): Promise<Agent> {
   const rita = room.agent("rita");
   const installed = await rita.ok("create", { definition: FILE_PUBLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", "founders": [rita.key] }, idempotencyKey: "install" });

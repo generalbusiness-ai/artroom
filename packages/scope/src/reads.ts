@@ -55,8 +55,8 @@ const no = (reason: ReadRefusal) => ({ ok: false, reason }) as const;
 /** A cursor made here is a decimal number. */
 const position = (cursor: Cursor | undefined, first: number | null): number | null | undefined => (cursor === undefined ? first : (positionOf(cursor) ?? undefined));
 
-/** A duty ID: the `seq` of an entry and the ordinal of one of its sends. */
-/** The entry and the ordinal a duty ID names, or null. The form is the bytes package's to judge. */
+/** A outbox ID: the `seq` of an entry and the ordinal of one of its sends. */
+/** The entry and the ordinal a outbox ID names, or null. The form is the bytes package's to judge. */
 const outboxItemOf = (outboxId: unknown): [seq: number, n: number] | null => (isOutboxId(outboxId) ? (outboxId.split(".").map(Number) as [number, number]) : null);
 
 /** The entry that opened an operation and its ordinal there, from its ID, or null. The form is the bytes package's to judge. */
@@ -314,7 +314,7 @@ export class Reads {
     return { ok: true, at: open.scope.head, value: { entry: JSON.parse(row.bytes) as Entry, hash: row.hash }, complete: true };
   }
 
-  /** A page of the outbox: each send in the order of its entry and ordinal. The cursor is the last duty of the page before. */
+  /** A page of the outbox: each send in the order of its entry and ordinal. The cursor is the last task of the page before. */
   outbox(reader: unknown, cursor?: Cursor): Read<readonly OutboxItem[]> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
@@ -324,7 +324,7 @@ export class Reads {
     return { ok: true, at: open.scope.head, value: page.outboxItems, complete: !page.more, ...(page.more ? { next: page.outboxItems.at(-1)!.outboxId } : {}) };
   }
 
-  /** The outbox row of one send, by its duty ID. */
+  /** The outbox row of one send, by its outbox ID. */
   outboxItem(reader: unknown, outboxId: OutboxId): Read<OutboxItem> {
     const open = this.#open(reader, "outbox");
     if (!("scope" in open)) return open;
@@ -338,7 +338,7 @@ export class Reads {
    * entry that opened each and its ordinal there: each with its attempts,
    * their outcomes, its state as a preparation status gives it, and the
    * driver's bookkeeping, which is no history. `open`: only the operations
-   * that are not settled, which are the duties this scope still holds. The
+   * that are not settled, which make up the pending work this scope still holds. The
    * cursor is the ID of the last operation of the page before.
    */
   operations(reader: unknown, cursor?: Cursor, open = false): Read<readonly OperationStatus[]> {

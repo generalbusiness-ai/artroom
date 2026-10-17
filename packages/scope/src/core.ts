@@ -3,8 +3,8 @@
  * directory, submit an act, settle an accepted act, run an alarm's turn,
  * and write a checkpoint. Each is a waiting input handed to the turn, or a
  * read of the history. The judges are derive's; this file builds what they
- * are given and turns what they answer into the caller's answer. `Founded`,
- * the answer to a founding, is the contract's, and is exported here again.
+ * are given and turns what they answer into the caller's answer. `Created`,
+ * the answer to a creation, is the contract's, and is exported here again.
  */
 
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, OutboxId, Entry, FactRef, Created, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
@@ -122,8 +122,8 @@ export class Received {
 }
 
 /**
- * The kind of the scope that a founding under that definition makes
- * (section 7.1; I3 delta EP2): the register's platform definition founds a
+ * The kind of the scope that a creation under that definition makes
+ * (section 7.1; I3 delta EP2): the register's platform definition creates a
  * register, and no other definition does. The genesis judge checks the
  * three together: the kind `register`, an intent of the kind `install`, and
  * the register's definition, each only with the other two. The Worker
@@ -351,7 +351,7 @@ export class Scope {
    * turn under its whole pinned definition, or none". The data holds a mark
    * at each place that is code, and the validator lists the marks. When one
    * mark of that list has no rule, the definition is null: no scope is
-   * founded under it, and a scope that exists under it admits nothing (I3
+   * created under it, and a scope that exists under it admits nothing (I3
    * deltas, entry EC4).
    */
   platform(named: PlatformDefinition): Supplied | null {
@@ -404,10 +404,10 @@ export class Scope {
 
   /**
    * Found a scope with no creator (section 7.1). Under the register's
-   * platform definition it is the founding register, of the kind `register`,
+   * platform definition it is the creation register, of the kind `register`,
    * which an `install` intent asks for. Under any other definition it is a
    * directory with no creator, by a `found` intent: the first delivery's
-   * stand-in for a register, which stays until a repository's founding by
+   * stand-in for a register, which stays until a repository's creation by
    * its register is whole (I3 plan, step 10). The seed is built from the
    * signed intent and the definition, and the genesis judge checks that its
    * digest is this object's name. The incarnation is minted in the commit.
@@ -424,7 +424,7 @@ export class Scope {
    * retained, and a creation under it waits. One that is supplied and is not
    * a valid declaration is refused `unsupported-definition`.
    *
-   * `beside`: the detached texts that the founding intent's fields name
+   * `beside`: the detached texts that the creation intent's fields name
    * (section 6.2). Each is checked against its digest and retained with the
    * genesis.
    *
@@ -443,9 +443,9 @@ export class Scope {
     let valid: ValidDefinition | null;
     let platform: PlatformRules | null = null;
     if (typeof definition === "string" && definition.startsWith("platform:")) {
-      // Section 6.1: the founding names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
+      // Section 6.1: the creation names a platform definition, and the runtime's code supplies it. Nothing of it comes from the input.
       const supplied = isPlatformDefinition(definition) ? this.platform(definition) : null;
-      // Null: a mark of the definition has no rule, so nothing is founded under it.
+      // Null: a mark of the definition has no rule, so nothing is created under it.
       if (!supplied) return refused("unsupported-definition");
       ({ definition: valid, platform } = supplied);
     } else {
@@ -466,7 +466,7 @@ export class Scope {
     // What the seed names: the platform name, or the digest of the declaration.
     const names: Digest | PlatformDefinition = bytes === null ? definition as PlatformDefinition : valid.digest;
 
-    // Section 9.2: the declarations this scope retains for its children, from what the founder supplied.
+    // Section 9.2: the declarations this scope retains for its children, from what the creator supplied.
     const supplied = new Map<Digest, string>();
     try {
       for (const declared of Array.isArray(definitions) ? definitions : []) supplied.set(definitionDigest(declared), canonicalize(declared));
@@ -480,12 +480,12 @@ export class Scope {
     if (!children.ok) return refused("unsupported-definition");
 
     const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
-    // Step 1: the facts the founding intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
-    // from the genesis, or refuses it as another founding, and reads no fact. So none is fetched, and a fact that cannot be read
+    // Step 1: the facts the creation intent's fields name. A scope that has its genesis is asked again, a repeat: the judge answers it
+    // from the genesis, or refuses it as another creation, and reads no fact. So none is fetched, and a fact that cannot be read
     // now does not hide the receipt (section 7.4, as for a delivery that the store has decided).
     const act = own(valid.declared.acts, valid.declared.genesis)!;
     const fields = readFields(act.fields, creation.intent.fields, bounds);
-    // No scope exists yet, so no fact can name it: every fact a founding names is foreign.
+    // No scope exists yet, so no fact can name it: every fact a creation names is foreign.
     const named = fields.ok && !this.#store.scope() ? factsNamed(act.fields, fields.fields, null) : [];
     const facts = named.length > bounds.usesPerEntry ? null : await fetchFacts(resolver, bounds, named);
     if (!facts) return unavailable("dependency-unavailable");
@@ -629,7 +629,7 @@ export class Scope {
               },
               // An entry over the size bound, or a grant that is not canonical values, is never written.
               unfit: (why) => ({ answer: "refused", reason: why === "size" ? "bad-field" : "unauthorized", judgedAt: head }),
-              // Section 9.2: an act is refused when the duties it would admit, with those already admitted, have no room to settle.
+              // Section 9.2: an act is refused when the pending work it would admit, with that already admitted, has no room to settle.
               full: () => ({ answer: "refused", reason: "scope-full", judgedAt: head }),
             };
           }
@@ -768,9 +768,9 @@ export class Scope {
 
   /**
    * Write a checkpoint through the head (section 9.2). It judges no time, so
-   * it may be written clamped (section 5.3). Written with no other duty
+   * it may be written clamped (section 5.3). Written with no other task
    * pending, it is the closing checkpoint and uses the entry reserved for
-   * one. Written beside a pending duty it is new work and needs a free
+   * one. Written beside a pending task it is new work and needs a free
    * entry (derive's `fits`); without one it is `unavailable` and nothing is
    * written.
    * Reading the whole state is the one read that is not bounded.

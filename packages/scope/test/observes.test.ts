@@ -36,7 +36,7 @@ interface Script { asked: string[]; silent: Set<string>; required: string[]; bes
 /** The name of what one read asks: `key:…`, `member:…`, `rules` or `holders:…`. */
 const naming = (asked: ObservationRequest): string => ("key" in asked ? `key:${asked.key}` : "member" in asked ? `member:${asked.member}` : "holders" in asked ? `holders:${asked.holders}` : asked.asked);
 
-/** A scope under the made-up data, founded on real storage, with its two scripted scopes. */
+/** A scope under the made-up data, created on real storage, with its two scripted scopes. */
 async function weighing(change: Parameters<typeof weigherWith>[0] = () => {}, first: Parameters<typeof weigherRules>[1] = signers) {
   const data = weigherWith(change).declared;
   const seen: Seen = { rows: [], read: [], named: [] };

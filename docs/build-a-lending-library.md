@@ -76,7 +76,7 @@ export const lending: DeclaredDefinition = {
 ```
 
 Create `run.ts`. It checks the description, sets up a library in memory
-with `@rita` as its founder, and prints the library:
+with `@rita` as its creator, and prints the library:
 
 ```ts
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";

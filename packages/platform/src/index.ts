@@ -129,7 +129,7 @@ export interface Platform {
  * establish original historical admission/source chronology. Version 2 of
  * the register, directory, membership, rules and destination keeps the I5
  * child cohort, version-named observations, the destination's read-token
- * and its role row, and a founding commit with a README. The inbox has
+ * and its role row, and a creation commit with a README. The inbox has
  * one version. A version that is not listed here is one that this package
  * cannot run.
  */
@@ -175,7 +175,7 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
 /** Stable native code objects with the same source policy for runtime and replay. */
 export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName, receiverIdentity: PARTITION_IDENTITY_POLICY }]));
 
-/** Existing default founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
+/** Existing default creation cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {
   "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": "platform:register@3", "platform:directory": "platform:directory@3", "platform:rules": RULES_SCOPE, "platform:destination": "platform:destination@3",
 };

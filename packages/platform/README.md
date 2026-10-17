@@ -10,7 +10,7 @@ membership and rules-reference functions. A missing version returns `null`.
 `APPLICATION_COHORT` names the original supporting application cohort;
 `FILE_PUBLICATION_COHORT` names the additive register@9, directory@8,
 membership@4, rules@3, destination@4 and inbox@1 cohort.
-`NEWEST` describes the existing default founding cohort. None of these selects a
+`NEWEST` describes the existing default creation cohort. None of these selects a
 new version for an existing scope or history.
 
 Destination@4 admits `publish-file` from an application whose native origin

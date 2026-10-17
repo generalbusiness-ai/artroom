@@ -1,5 +1,5 @@
 /**
- * The founding publication of a real destination, with a STAND-IN Git host.
+ * The creation publication of a real destination, with a STAND-IN Git host.
  *
  * A destination that is created with no import opens `first-head` in its
  * genesis, and the outcome of each of its operations opens the next: a
@@ -25,8 +25,8 @@ import type { Platform } from "./repository.ts";
 import type { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 /**
- * Drive the founding publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
- * written. The first head is the founding commit of the destination's own version, from its own records (`foundingOf`). The
+ * Drive the creation publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
+ * written. The first head is the creation commit of the destination's own version, from its own records (`foundingOf`). The
  * STAND-IN host is wired for the destination while this runs, and unwired after.
  */
 export async function initialPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {

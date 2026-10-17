@@ -22,7 +22,7 @@
  * So a recorded attempt is sent at most once, across restarts. An attempt
  * that is found marked, with no outcome, is one whose process stopped
  * between the send and the outcome. It may have reached the outside system,
- * so it is never sent again: its outcome is `unknown`, and it stays a duty
+ * so it is never sent again: its outcome is `unknown`, and it stays a task
  * until that request's own answer arrives (rule 2). A delivery to a scope is
  * idempotent and is sent again until it is acknowledged. An outside effect
  * is not, so nothing of the dispatcher's retry rule is here. A further try
@@ -221,7 +221,7 @@ export class Operations {
    * request of an attempt left once.
    *
    * They are in memory only. A process that ends loses them: the outside
-   * system's answer is then gone, and the attempt stays `unknown`, a duty,
+   * system's answer is then gone, and the attempt stays `unknown`, a task,
    * as rule 2 requires, until that request's own answer is given again.
    */
   readonly #held = new Map<string, Outcome>();

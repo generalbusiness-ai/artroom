@@ -7,7 +7,7 @@ import type { Draft, PlatformRules, RuleEffect, ValidDefinition } from "../src/i
 import { Scope, arriving, directory, fields, forged, keys, on, valid, type Over } from "./fixtures.ts";
 
 /**
- * Settlement by a mark, and marker duties (scope contract, revision 22,
+ * Settlement by a mark, and pending marker work (scope contract, revision 22,
  * sections 6.4 and 17.2; rows I3-54 and I3-59; witnesses 18.54 and 18.51).
  * Every definition here is made up, and every number is the witness's.
  *
@@ -128,9 +128,9 @@ describe("18.54: two marks on one item, and a state settlement beside them", () 
     const b = seven.started();
     expect([seven.does("mark-a-far", on(seven, b)), seven.awaits(b), seven.state.outstanding().requests]).toEqual(["settles", 2, 1]);
     expect(seven.row()[0] + seven.row()[1]).toBe(seven.budget);
-    // A `mark-a` after it is new work: the duty was one, and one form settled it.
+    // A `mark-a` after it is new work: the task was one, and one form settled it.
     expect(seven.does("mark-a", on(seven, b))).toBe("scope-full");
-    // Case 8. `close` settles the state duty. The job is `done`, outside the `in` of both marks: their 4 entries are released.
+    // Case 8. `close` settles the state task. The job is `done`, outside the `in` of both marks: their 4 entries are released.
     const eight = new Full(m);
     const c = eight.started();
     const reserved = eight.row()[1];
@@ -144,9 +144,9 @@ describe("18.54: two marks on one item, and a state settlement beside them", () 
       d.acts.close.effects = [{ state: "held" }];
       d.acts.finish = act({ step: "transition", on: "job", grant: "close", settles: { of: "on", in: ["held"] }, guards: [{ state: ["held"] }], effects: [{ state: "done" }] });
     }));
-    // Case 9. The state duty is `close` and what the job reserves in `held`: `finish`, (job, a) by `mark-a`, and (job, b). 1 and 3.
+    // Case 9. The state task is `close` and what the job reserves in `held`: `finish`, (job, a) by `mark-a`, and (job, b). 1 and 3.
     expect([job(m2, "open"), job(m2, "held")]).toEqual([8, 3]);
-    // Case 10. With `a` completed the state duty is 1 and 2, and the job reserves 1 and 3. After `close` it reserves 2.
+    // Case 10. With `a` completed the state task is 1 and 2, and the job reserves 1 and 3. After `close` it reserves 2.
     expect([job(m2, "open", ["a"]), job(m2, "held", ["a"])]).toEqual([4, 2]);
 
     // M3: `mark-a` lists `open` and sets `held`; `mark-b` lists `held` and sets `open`. The path is a, then b, and it ends.
@@ -181,7 +181,7 @@ describe("18.54: two marks on one item, and a state settlement beside them", () 
 describe("the form `{ of, sets, in }` at the validator", () => {
   test("a canonical settling closure that returns through a timed state with no settler is refused; the finite path retains its whole duty", () => {
     // Made-up data. Settling the root's mark can put a job in held. Its timer leads to open, where close either ends it or
-    // puts it back in held. The timed graph alone is acyclic, and no form settles held; the repeated job duty is not finite.
+    // puts it back in held. The timed graph alone is acyclic, and no form settles held; the repeated job task is not finite.
     const load = (to: "held" | "done") => {
       const data = structuredClone(M);
       for (const name of ["mark-a", "mark-a-far", "mark-b"]) delete data.acts[name];
@@ -242,7 +242,7 @@ describe("the form `{ of, sets, in }` at the validator", () => {
     expect(amounts.map((amount) => amount.bytes)).toEqual([7, 10, 16, 16, 33].map((units) => units * PROPOSED_BOUNDS.entryBytes));
     expect(r.holders["root"]!.amount.entries).toBe(28);
     expect(amounts.map(({ items, records }) => [items, records])).toEqual([[2, 1], [1, 1], [2, 2], [4, 2], [5, 4]]);
-    // The shared marker sum already includes the state duty. Adding the pending table again would double-count it.
+    // The shared marker sum already includes the state task. Adding the pending table again would double-count it.
     expect(markerAmounts(definition.markers!).awaits("job", "open", [])).toBe(5);
     const marks = markerReservations(definition.markers!);
     expect([marks.awaits("job", "open", []).requests, marks.awaits("job", "open", ["a"]).requests]).toEqual([1, 0]);

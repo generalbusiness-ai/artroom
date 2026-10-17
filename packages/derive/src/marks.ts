@@ -33,7 +33,7 @@ import { isObject, own } from "./values.ts";
  * The input of the entry that is judged, whole, as it arrived (section 6.1,
  * "What a rule is given", item 2): an act's signed intent, whose `actor` is
  * the signing key, with the grant and what was presented beside it; a
- * genesis's seed, with the founding intent or the creation request; a
+ * genesis's seed, with the creation intent or the creation request; a
  * delivery's `from` and message; an outcome's evidence; and a diagnosis's
  * attempt log, for a mark in the `undelivered` clause that it runs.
  *

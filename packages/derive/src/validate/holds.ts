@@ -16,7 +16,7 @@
  * | 5, edge 3 | The same, for each kind that no item holds below it: every such kind is checked by edges 1 and 2 | `reserve-unbounded` |
  *
  * A definition with a problem `holds` does not validate, and no scope is
- * founded or created under it: `unsupported-definition`. The ceiling of a
+ * created or created under it: `unsupported-definition`. The ceiling of a
  * count is R4's to set. Until it does, the bound on the elements of a list
  * stands in for it (section 17.2a, check 1).
  *
@@ -260,7 +260,7 @@ export function reserving(d: Defining, top: Rec, capacity: Pick<Capacity, "pendi
   if (kindsWritten && Object.keys(kindsWritten).length === 0 && holderTypes.size === 0 && adds.size === 0) return undefined;
 
   // Rule 11 of "A marker duty": an unnamed item reserves the whole sum of rule 6, with no mark completed. A marked type has no
-  // row in pending: its state duty and each marker duty are counted together by the shared calculator, beside its deadline.
+  // row in pending: its state task and each marker task are counted together by the shared calculator, beside its deadline.
   const markedAmounts = capacity.markers ? markerReservations(capacity.markers) : null;
   const inState = (type: string, state: string): Amount => sum(
     own(own(capacity.pendingWorkAmounts.deadlines, type), state) ?? NOTHING,

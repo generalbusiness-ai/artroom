@@ -18,7 +18,7 @@ async function accepted(room: Room, agent: Agent, tool: string, args: Record<str
   }
 }
 
-/** A room whose directory has created the pantry as lane 1, with rita, its founder, in the given mode. */
+/** A room whose directory has created the pantry as lane 1, with rita, its creator, in the given mode. */
 async function pantryRoom(room: Room, mode: "default" | "add"): Promise<Agent> {
   const rita = room.agent("rita", { mode });
   await created(room, rita);

@@ -1,7 +1,7 @@
 /**
  * `platform:register@1` and `@2`, as data, with their rules (authority note, sections
  * 3.8 and 12.1.1; its table of marks, section 12.1.8, rows 2 to 6, c, k, r
- * and v). One register for a deployment. It holds founding claims, and it
+ * and v). One register for a deployment. It holds creation claims, and it
  * owns one kind of outside effect: creating the repository at the Git host.
  * It is the one scope with no creator (the scope contract, section 7.1).
  *
@@ -50,17 +50,17 @@ import { pinnedBy } from "./versions.ts";
  * The versions of the register that this package serves, each with the
  * definition under which its `create` makes a directory (section 12.1,
  * "Names, creation and activation"). The data and the rules are the same
- * for both. Version 2 differs in one thing: its directories are founded on
+ * for both. Version 2 differs in one thing: its directories are created on
  * `platform:directory@2` (`versions.ts`). The `operation` effects of its
  * rules state the scope's own version as their owner.
  */
 export const DIRECTORY_OF: Readonly<Record<string, PlatformDefinition>> = { "platform:register@1": "platform:directory@1", "platform:register@2": "platform:directory@2", "platform:register@3": "platform:directory@3", "platform:register@5": "platform:directory@5", "platform:register@6": "platform:directory@6", "platform:register@7": "platform:directory@3", "platform:register@8": "platform:directory@7", "platform:register@9": "platform:directory@8", "platform:register@10": "platform:directory@9", "platform:register@11": "platform:directory@10" };
-/** The newest version of the register: the one under which `install` founds a register. */
+/** The newest version of the register: the one under which `install` creates a register. */
 export const REGISTER = "platform:register@2" satisfies PlatformDefinition;
 /** The directory that the newest register creates. */
 export const DIRECTORY = DIRECTORY_OF[REGISTER]!;
 
-/** The bound on the creation attempts of one founding claim, and on the attempts of each cleanup (section 3.8; U9). */
+/** The bound on the creation attempts of one creation claim, and on the attempts of each cleanup (section 3.8; U9). */
 export const CREATION_ATTEMPTS = 3;
 
 const KEY = { type: "text", max: 64 } as const;
@@ -135,9 +135,9 @@ export const register: PlatformData = {
       sends: [],
       attention: [],
     },
-    // `found`: an act, signed by the founder's key (Code P13 and P14). It is judged by the founding policy in place of a grant: the
-    // rule at `grant` is the row's guard, and it refuses `unauthorized`. It opens `claim`, `pending`. A founding intent's fields are
-    // `branch`, `founderHandle`, `recoveryKey` and, for a founding by import, `import`.
+    // `found`: an act, signed by the creator's key (Code P13 and P14). It is judged by the creation policy in place of a grant: the
+    // rule at `grant` is the row's guard, and it refuses `unauthorized`. It opens `claim`, `pending`. A creation intent's fields are
+    // `branch`, `founderHandle`, `recoveryKey` and, for a creation by import, `import`.
     "found": {
       step: "open", on: "claim", grant: { code: "founding-policy", row: "P13" },
       also: { register: { item: "register", one: true } },
@@ -189,9 +189,9 @@ const signed = ({ input }: RuleGiven) => {
 };
 
 /**
- * The seed of the directory that a founding intent asks for (the contract's
+ * The seed of the directory that a creation intent asks for (the contract's
  * section 7.1, step 1): its creator is the register, and its cause is the
- * digest of the founder's intent, which is the contract's fourth cause. It
+ * digest of the creator's intent, which is the contract's fourth cause. It
  * is fixed by the `found` entry, and the directory's scope ID is its digest.
  */
 export const directorySeed = (given: RuleGiven): Seed =>
@@ -300,7 +300,7 @@ export const registerRules: Rules = {
   /**
    * Row r, the guard of `found` (P27), on the field `founderHandle`: the
    * register's own rule of this name, with the same check as membership's
-   * (section 3.1). A founding whose handle is no handle is refused
+   * (section 3.1). A creation whose handle is no handle is refused
    * `bad-field`, named `bad-handle`, and no claim is opened.
    */
   "handle-form": handleForm("founderHandle"),
@@ -397,7 +397,7 @@ export const registerRules: Rules = {
    * revision 20, section 6.1; row I3-47). It derives nothing of it again.
    *
    * The request is the `create` of the directory. Its seed names this
-   * register as creator, and its cause is the digest of the founder's
+   * register as creator, and its cause is the digest of the creator's
    * `found` intent, which the opening entry holds: the contract's fourth
    * cause. It is the seed whose digest the rule `claim-seed` gave the claim.
    * The fields: `claim`, the fact of the `found` entry, which is the opening

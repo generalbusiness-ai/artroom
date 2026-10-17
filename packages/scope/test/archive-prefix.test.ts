@@ -1,6 +1,6 @@
 /** Native SQLite scalar admission, not complete privacy or integrity proof.
  * The lane certificate and additional/corrupt history rows are stand-ins.
- * Founding, pin writes, SQL sizes, row limits and budget execution are real. */
+ * Creation, pin writes, SQL sizes, row limits and budget execution are real. */
 import { expect, test } from "vitest";
 import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";

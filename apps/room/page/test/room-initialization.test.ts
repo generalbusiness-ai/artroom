@@ -5,7 +5,7 @@ import { Session as ReadSession } from "@generalbusiness/artroom-client";
 import { roomInitialization, initializationStillCurrent, type Room } from "../src/data.ts";
 import { initializationMessage } from "../src/shell.ts";
 
-// Scripted authenticated read answers, not native founding or permission evidence.
+// Scripted authenticated read answers, not native creation or permission evidence.
 // Real client HTTP reads and bounded current/final selection replies are exercised.
 test("initialization guidance needs complete initial rules and no live or retired definitions; read failures and changed context stay unknown", async () => {
   const digest = digestBytes(new Uint8Array([1]));

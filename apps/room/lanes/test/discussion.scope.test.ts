@@ -14,7 +14,7 @@ test("T6, bounded attention inside the application: a comment tells the members 
   // One attention effect, for exactly the two members named, with a member named twice told once. The author is not told.
   expect(said.effects.filter((e) => e.effect === "attention")).toEqual([{ effect: "attention", item: said.fact.seq, members: [una.member, vic.member], reason: "mentioned" }]);
   expect((await G.item(said.fact.seq)).parties).toEqual({ author: rita.member, mentioned: [una.member, vic.member] });
-  // The entry holds the digest of the body, and the scope keeps the text beside it. Nothing left the lane: no send, and no new duty.
+  // The entry holds the digest of the body, and the scope keeps the text beside it. Nothing left the lane: no send, and no new task.
   expect([said.sends, (await G.outboxItems()).length, (await G.handle.scope.text(textDigest(body))).ok]).toEqual([[], outboxItems, true]);
   // A reply that names nobody tells nobody: not the author of the comment it answers, and not the requester of the goal.
   const reply = await G.did(paul, "comment", { fields: { body: "A reply.", replyTo: said.fact.seq } });

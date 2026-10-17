@@ -10,7 +10,7 @@ import { Directory, directoryDefinition, rita, sam, scripted, una, vic } from ".
 
 // Every directory here is a `Directory` of test support: a directory in memory that a register in memory created, by its own rules,
 // with children and lanes whose entries are SCRIPTED, made by hand. The rows and the rules that are tested are the platform
-// package's, and no rule is a stand-in. A founding on scope objects is the scope package's.
+// package's, and no rule is a stand-in. A creation on scope objects is the scope package's.
 
 const IMPORT = "https://git.example/elsewhere/repo.git";
 /** What a judgment answered: the result, with the reason and the refusal's name where it has them. */
@@ -78,7 +78,7 @@ test("the directory definition validates whole with the platform option; every m
 // of marks (section 12.1.8, rows 7 to 13, a and d) and the cases of section 12.1.2. No scope, no port and no host: a rule is called
 // with what a judge gives it, over the folded state of a directory in memory.
 describe("the rules of platform:directory@1, each as a plain function (authority note, section 12.1.8)", () => {
-  /** A directory that was founded by import, and one that was not. Each holds its three children, and no lane. */
+  /** A directory that was created by import, and one that was not. Each holds its three children, and no lane. */
   const d = new Directory({ import: IMPORT });
   const plain = new Directory();
   const { membership, rules } = d.children as Required<Directory["children"]>;
@@ -195,15 +195,15 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   const genesis = p.last.input as Extract<Input, { type: "genesis" }>;
   const claim = p.register.item(p.claim.seq);
   // The seed is the one that the register's `found` entry fixed: the directory's scope ID is the digest that the claim holds, and
-  // the cause is the founder's intent. The genesis retains the outcome entry and the claim's entry.
+  // the cause is the creator's intent. The genesis retains the outcome entry and the claim's entry.
   expect([seedDigest(genesis.seed), genesis.seed.cause, p.at.scope, p.last.uses.map((use) => use.fact.seq)]).toEqual([claim.values["seed"], claim.values["intent"], scopeIdOf(genesis.seed), [p.claim.seq + 1, p.claim.seq]]);
-  // The fixed slots, from the creation's fields. The register is the scope of the claim, and the founder is the key that signed it.
+  // The fixed slots, from the creation's fields. The register is the scope of the claim, and the creator is the key that signed it.
   expect([p.item(0).refs, p.item(0).values]).toEqual([
     { register: p.register.at, claim: p.claim, membership: null, rules: null, destination: null },
     { repository: { host: "git.example", namespace: "artroom", name: repositoryName(seedDigest(genesis.seed), 1), id: "r-1" }, branch: "main", "founder": rita.key, "founderHandle": "@rita", recoveryKey: sam.key, import: null, imported: null, lastNumber: 0 },
   ]);
   // Three creations, in the order membership, rules, destination, each with the digest of the directory's seed as its cause. The
-  // result is at ordinal 0, and the three are sealed as duties and held. The second and the third are by the package's rules
+  // result is at ordinal 0, and the three are sealed as pending work and held. The second and the third are by the package's rules
   // `create-rules` and `create-destination`, at two send marks that both state `always`: each creation is at the position of its form.
   const cause = seedDigest(genesis.seed);
   expect(p.last.sends.slice(1).map((send) => { const to = send.to as Seed; return [send.n, to.kind, to.definition, to.ordinal, to.cause === cause, to.creator]; })).toEqual([
@@ -215,7 +215,7 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   // Its body holds no member `membership`, as the written `create` of membership beside it holds none.
   expect((p.last.sends[2]!.message as { body: unknown }).body).toEqual({ fields: { branch: "main", directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed) } });
   // The creation of the destination carries its eight fields: `import` as a truth value, the scope IDs of its two siblings, and, at
-  // version 2, the founder's handle, which the destination's founding commit names in its README.
+  // version 2, the creator's handle, which the destination's creation commit names in its README.
   const forDestination = (of: Directory) => (of.entries[0]!.entry.sends[3]!.message as { body: unknown }).body;
   expect([forDestination(p), (forDestination(new Directory({ import: IMPORT, confirmed: false })) as { fields: Record<string, unknown> }).fields["import"]]).toEqual([
     { fields: { repository: p.item(0).values["repository"], branch: "main", import: false, claim: p.claim, directory: p.at, membership: scopeIdOf(p.last.sends[1]!.to as Seed), rules: scopeIdOf(p.last.sends[2]!.to as Seed), "founderHandle": "@rita" } },
@@ -246,7 +246,7 @@ test("a directory's genesis, by an outcome entry of its register, opens the repo
   // Case b: `open-pr` before the destination's applied result is recorded. No destination.
   const pull = { expected: { repository: d.item(0).revision }, fields: { definition: ticketDefinition.digest, title: "A change", draft: false } };
   expect(said(d.act(rita, "open-pr", pull, active(d)))).toEqual(["refused", "guard-failed", null]);
-  // Row 7: the entry that records the destination's applied result opens the import, when the founding names one, and nothing otherwise.
+  // Row 7: the entry that records the destination's applied result opens the import, when the creation names one, and nothing otherwise.
   d.answered("destination");
   expect([d.item(0).refs["destination"], d.last.effects.map((effect) => effect.effect)]).toEqual([d.children.destination, ["ref"]]);
   const imported = new Directory({ import: IMPORT });
@@ -364,8 +364,8 @@ test("a `compromised` notice from the repository's membership scope is sent on t
   const other = notice({ scope: membership.scope, kind: "membership", inc: newIncarnation(new Uint8Array(16).fill(80)) });
   expect(other.sends.map((send) => send.message)).toMatchObject([{ class: "result", outcome: "refused", reason: { code: "guard-failed", name: "not-the-membership" } }]);
 
-  // The import that the founding opened, with 3 attempts. `retry-import` waits until they are used, by the rule `import-spent`
-  // (revision 25, row u): every stated attempt is opened and has an outcome. A directory that was founded with no import is never
+  // The import that the creation opened, with 3 attempts. `retry-import` waits until they are used, by the rule `import-spent`
+  // (revision 25, row u): every stated attempt is opened and has an outcome. A directory that was created with no import is never
   // spent: it asked for none.
   const retry = (of = d) => of.act(rita, "retry-import", { on: 0, expected: { on: of.item(0).revision } });
   const first = [...d.entries].reverse().find(({ entry }) => entry.effects.some((effect) => effect.effect === "operation"))!.entry.seq;
@@ -381,7 +381,7 @@ test("a `compromised` notice from the repository's membership scope is sent on t
   expect([d.entries.slice(-3).map(({ entry }) => entry.sends), said(d.outcome(operation, 2, "confirmed", { commit: "a".repeat(40) }, "read")), said(d.outcome(operation, 2, "confirmed", { head: "main" }))])
     .toEqual([[[], [], []], ["refused", "bad-input", null], ["refused", "bad-input", null]]);
   // An `unknown` attempt counts as used: its request was sent, and its outcome is recorded. So the import is spent while attempt 2
-  // is still `unknown`, and one lost reply does not end a founding by import. `retry-import` opens one new import, with 1 attempt.
+  // is still `unknown`, and one lost reply does not end a creation by import. `retry-import` opens one new import, with 1 attempt.
   expect(said(retry())).toEqual(WRITTEN);
   const again = `${d.head.seq}:0` as const;
   expect(d.state.operation(again)).toMatchObject({ owner: DIRECTORY, kind: "import", most: 1, attempts: [{ attempt: 1 }] });
@@ -400,7 +400,7 @@ test("a `compromised` notice from the repository's membership scope is sent on t
   ]);
 
   // One import is used (revision 25, the delta EP9): the kind selects one result, guarded by `repository.imported`. Every attempt
-  // of another founding's import is `unknown`. A retried import is `confirmed` and selected. Then the late answer of attempt 1 of
+  // of another creation's import is `unknown`. A retried import is `confirmed` and selected. Then the late answer of attempt 1 of
   // the first operation says `confirmed`, with another head. That operation has selected nothing, and the guard does not hold: the
   // outcome is not selected, derives nothing and sends nothing, and the repository keeps the first head.
   const e = new Directory({ import: IMPORT });

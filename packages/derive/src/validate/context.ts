@@ -58,7 +58,7 @@ export type ClauseSet = { subject: string; type: string; state?: string; slot?: 
  * its own effects can set, and the item it opens. `requests`: each request among its send forms, with the most
  * sends that form can make and what each reserved clause can set. `opens`: the declared primary type, if the form may open it;
  * this is distinct from a state/slot change on an existing subject. `mayCreateCopy`: a relate handler can receive a first key,
- * except when its own copy is the duty being settled, which already implies that key.
+ * except when its own copy is the task being settled, which already implies that key.
  */
 export interface PendingWork {
   path: string;

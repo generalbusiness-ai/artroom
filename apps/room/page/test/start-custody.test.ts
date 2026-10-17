@@ -84,7 +84,7 @@ test("scripted retained register7 Start keeps its founder key before the CLI bou
     await expect(startRoom(origin, reload, { mode: "check", locks })).rejects.toThrow("private Start");
     expect(cli.claim).toHaveBeenCalledTimes(2); expect(cli.checkClaim).toHaveBeenCalledTimes(1);
     expect(posts).toBe(2); expect(uuid).not.toHaveBeenCalled(); // Public-key derivation uses 16-byte scalar blinding in the pinned
-    // curve implementation; a new founder seed would require 32 bytes.
+    // curve implementation; a new creator seed would require 32 bytes.
     expect(randomness.mock.calls.some(([array]) => array?.byteLength === 32)).toBe(false);
     expect(f.values.get(`artroom-page-start:${origin}`) === descriptorBeforeLoss).toBe(true);
   } finally { uuid.mockRestore(); randomness.mockRestore(); }

@@ -32,7 +32,7 @@
  *    require at least one eligible root before revealing the scope head.
  *
  * **Who signed an entry.** The actor of the signed intent of an `act` or
- * a `preparation`, and, for a genesis that took effect with a founding
+ * a `preparation`, and, for a genesis that took effect with a creation
  * intent, as a register's does, the actor of that intent. No other entry
  * has a signer.
  *

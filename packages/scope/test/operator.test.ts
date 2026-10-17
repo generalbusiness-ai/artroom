@@ -71,12 +71,12 @@ describe("the operator's record and the requests that wait (authority note, sect
     for (const seconds of [60, 600]) await later(seconds, S);
     expect([await S.summary().then((s) => [s.at, s.value.items]), (await S.entries()).length, after.diagnosis, after.result, after.attempts.length, sent.length, await listed(S, "diagnosed")])
       .toEqual([[before.summary.at, before.summary.value.items], before.entries, before.row.diagnosis, null, before.row.attempts.length + 1, 1, [outboxId(diagnosed)]]);
-    // It is written to the operator's record, with the scope and the duty, and nothing else.
+    // It is written to the operator's record, with the scope and the task, and nothing else.
     expect(await recorded(S)).toEqual([{ kind: "sent-again", refs: [{ outboxId: outboxId(diagnosed) }], scope: await S.at() }]);
 
     expect(metrics.filter(p => p.blobs[0] === "incident" && p.blobs[5] === "sent-again").map(p => p.doubles)).toEqual([[1, 0, 1, 0, 0, 0]]);
 
-    // A request that is in neither list is not sent again: one that was settled `undelivered`, one that no entry sent, and a value that is no duty ID.
+    // A request that is in neither list is not sent again: one that was settled `undelivered`, one that no entry sent, and a value that is no outbox ID.
     expect([await surface(S).resend(outboxId(refused)), await surface(S).resend("999.0"), await surface(S).resend({ outboxId: 1 }), sent.length, (await recorded(S)).length])
       .toEqual([{ sent: false, reason: "not-waiting" }, { sent: false, reason: "not-found" }, { sent: false, reason: "not-found" }, 1, 1]);
 

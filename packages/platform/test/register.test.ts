@@ -27,7 +27,7 @@ test("the register definition validates whole with the platform option; every ma
     [7, "outcomes.revoke-credential", "revoke-credential", "P16"], [7, "outcomes.delete-repository", "delete-repository", "P16"],
   ]);
   // The whole-scope rule (the contract's section 6.1): a version that lacks a rule runs nothing. The package has a rule of the kind
-  // of its place for every mark, so a register can be founded under the package's rules. Without any one of them it cannot.
+  // of its place for every mark, so a register can be created under the package's rules. Without any one of them it cannot.
   const { rules } = platform(REGISTER)!;
   expect([rules === registerRules, valid.marks.filter((mark) => !Object.hasOwn(rules, mark.code)).map((mark) => mark.code)]).toEqual([true, []]);
   expect([runnable(valid, rules), ...Object.keys(rules).map((lost) => runnable(valid, { ...rules, [lost]: undefined as never }))]).toEqual([true, ...Object.keys(rules).map(() => false)]);
@@ -43,7 +43,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
     state: r.state, input: { type: "act", signed: r.intent(who, "found"), grant: null, presented: {} }, time: r.now, uses: [], own: r.own,
     resolved: { at: r.at, self: r.head.seq + 1, fields: {}, subjects: new Map(), signer: null, bounds: PROPOSED_BOUNDS }, observed: () => null, value: () => undefined, placed: () => undefined,
   });
-  /** What the rule `install` is given: the genesis, with its seed and its founding intent. */
+  /** What the rule `install` is given: the genesis, with its seed and its creation intent. */
   const installed = (install: SignedIntent, cause = intentDigest(install.intent)): RuleGiven =>
     ({ ...given(keyed, paul), input: { type: "genesis", seed: registerSeed(install, { cause }), "founding": install, source: null, n: null, message: null } });
   const run = (name: string, ...args: unknown[]): unknown => (registerRules[name] as PlatformRule & { run: (...args: unknown[]) => unknown }).run(...args);
@@ -62,7 +62,7 @@ describe("the rules of platform:register@1, each as a plain function (authority 
     ["3: under `open`, any key passes", "founding-policy", [given(open, una)], PASS],
     // Row 4: `founder` is the signing key, on the claim that the entry opens.
     ["4: the claim's founder is the signing key", "founder-key", [byRita], [{ effect: "value", item: keyed.head.seq + 1, slot: "founder", value: rita.key }]],
-    // Row 5: `seed` is the digest of the directory's seed: this register as creator, and the founder's intent as cause.
+    // Row 5: `seed` is the digest of the directory's seed: this register as creator, and the creator's intent as cause.
     ["5: the claim's seed is the digest of the directory's seed", "claim-seed", [byRita], [{ effect: "value", item: keyed.head.seq + 1, slot: "seed", value: seedDigest(seed) }]],
     // Row 6: the operation, with 3 attempts, and its attempt 1.
     ["6: the operation and its first attempt", "open-create-repository", [byRita], [
@@ -102,14 +102,14 @@ test("a register is founded by an install intent, under its own definition and n
     create(),
     // A register is asked for by an `install`, and a `found` asks for none.
     create(registerSeed(byCreation), byCreation),
-    // The register's definition founds a register, and no directory.
+    // The register's definition creates a register, and no directory.
     create(registerSeed(install, { kind: "directory" })),
-    // A register is founded under its own definition, and under no other.
+    // A register is created under its own definition, and under no other.
     create(registerSeed(install, { definition: deskDefinition.digest }), install, deskDefinition),
     // No other kind of scope has no creator.
     create(registerSeed(install, { kind: "membership" })),
   ]).toEqual(["write", "refused", "source-unverified", "source-unverified", "source-unverified"]);
-  // The first delivery's founding of a directory, by a `found` intent, stands as it was.
+  // The first delivery's creation of a directory, by a `found` intent, stands as it was.
   expect(created().at.kind).toBe("directory");
 });
 
@@ -119,7 +119,7 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   const r = new Register();
   // Case a: a `found` by a key that is not in `founders`, under the policy `keys`.
   expect([r.create(una), r.state.count("claim", "pending")]).toMatchObject([{ result: "refused", reason: "unauthorized" }, 0]);
-  // Section 12.1.1, the row `found`, and row r of the table of marks: a founding whose `founderHandle` is no handle is refused
+  // Section 12.1.1, the row `found`, and row r of the table of marks: a creation whose `founderHandle` is no handle is refused
   // `bad-field`, named `bad-handle`, by the register's own rule `handle-form`, and opens no claim.
   expect([r.create(rita, { "founderHandle": "@Rita" }, "no handle"), r.create(rita, { "founderHandle": "rita" }, "no at-sign"), r.state.count("claim", "pending")])
     .toMatchObject([{ result: "refused", reason: "bad-field", name: "bad-handle" }, { result: "refused", reason: "bad-field", name: "bad-handle" }, 0]);
@@ -134,7 +134,7 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
     .toEqual(["pending", { intent: intentDigest(signed.intent), seed: seedDigest(seed), "founder": rita.key, policy: "keys", branch: "main", repository: null }, [], []]);
   const creation = `${claim}:0` as const;
   expect(r.state.operation(creation)).toMatchObject({ owner: REGISTER, kind: "create-repository", most: 3, attempts: [{ attempt: 1, outcomes: [] }], selected: null });
-  // Case b: the same founding intent again, after its claim exists. Nothing is opened.
+  // Case b: the same creation intent again, after its claim exists. Nothing is opened.
   expect([r.submit(signed, { platform: registerPlatform, grants: [] }), r.head.seq]).toMatchObject([{ result: "accepted-before", seq: claim }, claim]);
 
   // The attempt's own name: the 52 characters of the directory's scope ID after `sc_`, a hyphen and the attempt's number. The
@@ -163,8 +163,8 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
     { effect: "operation", k: 0, owner: REGISTER, kind: "revoke-credential", attempts: 3 }, { effect: "attempt", operation: { k: 0 }, attempt: 1, result: "opened", selected: null },
   ]);
   // The selecting outcome sends the `create` of the directory at ordinal 0, by the rule `create-directory`. Its seed is the one whose
-  // digest the claim holds, with the founder's intent as its cause. It names the `found` entry by its fact, as `claim`, and carries
-  // the record that this outcome set, with the fields of the founding intent. It carries no signed intent.
+  // digest the claim holds, with the creator's intent as its cause. It names the `found` entry by its fact, as `claim`, and carries
+  // the record that this outcome set, with the fields of the creation intent. It carries no signed intent.
   expect(r.last.sends).toEqual([{ n: 0, to: seed, message: { class: "request", type: "create", body: { fields: {
     claim: r.fact(claim), repository: { host: "git.example", namespace: "artroom", name: name(2), id: "r2" }, branch: "main", "founderHandle": "@rita", recoveryKey: paul.key,
   } } } }]);
@@ -178,7 +178,7 @@ test("a founding opens one claim and one creation of three attempts; a key outsi
   // No other outcome sends the `create`: the claim has its repository.
   expect(r.last.sends).toEqual([]);
 
-  // A second founding, refused at the host for its name: the outcome records the answer, opens the next attempt and derives nothing.
+  // A second creation, refused at the host for its name: the outcome records the answer, opens the next attempt and derives nothing.
   const other = r.intent(rita, "found", { expected: { register: 1 }, fields: { branch: "main", "founderHandle": "@rita", recoveryKey: paul.key }, idempotencyKey: "another founding" });
   expect(r.submit(other, { platform: registerPlatform, grants: [] }).result).toBe("write");
   const second = `${r.head.seq}:0` as const;

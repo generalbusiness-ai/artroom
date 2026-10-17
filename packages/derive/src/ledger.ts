@@ -84,7 +84,7 @@ export interface EvidenceValue extends EvidenceValueDomain { digest: Digest }
 
 /** The owner's rules for one kind of operation. Each is a function of what it is given, and reads nothing else. */
 export interface OperationRules {
-  /** Item 7: the kind selects one result, as a founding claim selects one repository. */
+  /** Item 7: the kind selects one result, as a creation claim selects one repository. */
   selects: boolean;
   /** Item 4: a read of the outside system is decisive for this kind. Rule 3: it never is for a create. */
   read: boolean;
@@ -208,9 +208,9 @@ export const reservedBy = (open: Opening, owners: Owners | null | undefined, def
 /**
  * The effects that open one operation in the entry being derived, at its
  * ordinal `k` there (item 1): its record, and attempt 1 (item 2). Rule 1:
- * these effects are the duty, and they are sealed before any request of the
+ * these effects are the task, and they are sealed before any request of the
  * attempt is sent. `held`: a provisional scope's genesis seals the operation
- * as a held duty, with no attempt (item 1; section 7.2).
+ * as a held task, with no attempt (item 1; section 7.2).
  *
  * Section 5.8: the entry that opens an operation reserves for every attempt
  * it states, so the number is fixed here and never raised.

@@ -4,7 +4,7 @@ import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/d
 import { canonicalize, factRefOf, parseStrict } from "@generalbusiness/artroom-bytes";
 import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/dap-derive";
 import { t } from "@generalbusiness/dap-derive/testing";
-// The data and the rules of the newest version, `platform:destination@2`, which every test here founds on.
+// The data and the rules of the newest version, `platform:destination@2`, which every test here creates on.
 import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination2 as destination, destinationRules2 as destinationRules, revokedToken, writeSends } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { platform } from "../src/index.ts";
@@ -186,7 +186,7 @@ test("a founding with no import declares the first head and its mint in the gene
   ]);
   // That mint serves attempt 1 of the first head: its `confirmed` outcome names itself in `branch.token`.
   expect([said(b.answered("0:1", 1, "confirmed", TOKEN)), b.branch.values["token"]]).toEqual([WRITTEN, "0:1"]);
-  // The row `import` asks that `import` is true: an update for a founding with no import is refused `not-importing`, and opens nothing.
+  // The row `import` asks that `import` is true: an update for a creation with no import is refused `not-importing`, and opens nothing.
   expect([said(b.imported("done")), result(b), b.opened]).toEqual([WRITTEN, ["refused", "guard-failed", "not-importing"], []]);
 
   // By import. The genesis declares nothing, and the confirmation opens nothing.
@@ -388,7 +388,7 @@ test("the unknown outcome of a push leaves only its own answer able to follow; t
   expect([said(b.lost(revoke, 1)), b.last.input.type === "outcome" && b.last.input.evidence, b.state.operation(revoke)!.attempts.length]).toEqual([WRITTEN, { basis: "none", body: { token: TOKEN.token } }, 2]);
   // A body that names another token than its mint's does not follow. The mint's own does.
   expect([said(b.answered(revoke, 2, "confirmed", { token: "another" })), said(b.answered(revoke, 2, "confirmed", {})), said(b.answered(revoke, 2, "confirmed", { token: TOKEN.token }))]).toEqual([BAD_INPUT, BAD_INPUT, WRITTEN]);
-  // A failed revocation is a duty, and decides nothing: the entries of a revocation hold the ledger's records alone.
+  // A failed revocation is a task, and decides nothing: the entries of a revocation hold the ledger's records alone.
   expect(b.last.effects).toEqual([{ effect: "attempt", operation: revoke, attempt: 2, result: "confirmed", selected: null }]);
 });
 

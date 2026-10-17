@@ -3,11 +3,11 @@
  * entry of a scope with no creator, which a signed intent asks for, and of
  * a child, which a `create` send of its creator asks for.
  *
- * A scope with no creator is the founding register, which an `install`
- * intent founds under `platform:register` (section 7.1). The first delivery
- * founded a directory with no creator, by a `found` intent, as its stand-in
+ * A scope with no creator is the creation register, which an `install`
+ * intent creates under `platform:register` (section 7.1). The first delivery
+ * created a directory with no creator, by a `found` intent, as its stand-in
  * for a register (section 7.2, "Where each scope reads its closure"). That
- * founding stays, for the scopes of today's tests, and it is never of the
+ * creation stays, for the scopes of today's tests, and it is never of the
  * kind `register` or under the register's definition.
  */
 
@@ -37,7 +37,7 @@ export interface SignedCreation { name: ScopeId; inc: Incarnation; seed: Seed; c
 /** What asks for a child (section 7.2): the delivery of a `create`, which is addressed by its seed. */
 export interface Creation { name: ScopeId; inc: Incarnation; to: Seed; from: FactRef; n: number; message: Request }
 
-/** The name that the founding register's definition states (section 7.1; authority note, section 12.1). */
+/** The name that the creation register's definition states (section 7.1; authority note, section 12.1). */
 const REGISTER = "platform:register";
 
 /**
@@ -116,14 +116,14 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Sign
 
   let source: Fetched | null = null;
   if ("creation" in asked) {
-    // Section 7.1: the founder's signature commits to the inputs of the seed, and the intent's digest is the seed's cause.
+    // Section 7.1: the creator's signature commits to the inputs of the seed, and the intent's digest is the seed's cause.
     const intent = asked.creation.intent;
     if (!verifySignedIntent(asked.creation) || !isIntent(intent)) return unverified("not a signed intent");
-    // The register is founded by an `install` intent, under its own definition and no other. A directory with no creator is the
+    // The register is created by an `install` intent, under its own definition and no other. A directory with no creator is the
     // first delivery's stand-in, by a `found` intent. No other kind of scope has no creator.
     const asks = seed.kind === "register" ? "install" : seed.kind === "directory" ? "found" : null;
-    if (seed.creator !== null || asks === null || (seed.kind === "register") !== (definition.declared.name === REGISTER) || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this founding intent asks for");
-    if (intent.to !== null || intent.kind !== asks || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: `a founding intent has kind ${asks}, and names no scope and no item` };
+    if (seed.creator !== null || asks === null || (seed.kind === "register") !== (definition.declared.name === REGISTER) || seed.ordinal !== 0 || intentDigest(intent) !== seed.cause) return unverified("the seed is not the one this creation intent asks for");
+    if (intent.to !== null || intent.kind !== asks || intent.on !== null || Object.keys(intent.expected).length > 0) return { result: "refused", reason: "bad-intent", detail: `a creation intent has kind ${asks}, and names no scope and no item` };
     const now = timeMs(clock.reading)!;
     const notAfter = timeMs(intent.notAfter)!;
     if (now >= notAfter) return { result: "refused", reason: "expired", detail: "notAfter" };
@@ -160,8 +160,8 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Sign
   // declared child sends. An absent marker preserves the legacy judgment.
   if (child && creationContextOf(child.message.body).kind === "invalid") return refuse({ code: "bad-field" });
 
-  // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
-  // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.
+  // The genesis act, with the opener's parties from the creation message, or with the creation intent's fields. It has no signer:
+  // nobody signs for a scope that does not exist yet, and the creation rule is the authority note's.
   const act = own(definition.declared.acts, definition.declared.genesis)!;
   const given = creation ? creation.intent.fields : creationFields(child!.message, child!.from, act.fields);
   const read = given ? readFields(act.fields, given, bounds) : null;
@@ -179,12 +179,12 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Sign
   const g = giving(view, context, { at, creator: seed.creator }, 0, judged, clocked, named.fields, named.facts, source ?? undefined);
   if (fieldOutsideType(g, act.fields)) return refuse({ code: "bad-field" }, uses);
   // Section 4.2, "A founding": the genesis of a scope with no creator makes no check 9. When the genesis act's `grant` is a mark,
-  // its rule is run, after the signature and the seed are checked. A founding that the rule does not pass is refused
+  // its rule is run, after the signature and the seed are checked. A creation that the rule does not pass is refused
   // `unauthorized`, and nothing is written: no scope exists on an authority that was not shown. The genesis of a child runs no
   // such rule: its authority is its creator's entry.
   const mark = creation ? (markOf(act.grant) as GrantMark | null) : null;
   const passed = mark ? grantByRule(g, mark) : null;
-  if (passed && !passed.pass) return { result: "refused", reason: "unauthorized", detail: `the rule ${mark!.code} does not pass the founding key${passed.name === undefined ? "" : `: ${passed.name}`}` };
+  if (passed && !passed.pass) return { result: "refused", reason: "unauthorized", detail: `the rule ${mark!.code} does not pass the initial key${passed.name === undefined ? "" : `: ${passed.name}`}` };
   const signer = passed?.pass && passed.member ? { member: passed.member, principal: null } : null;
 
   const j: Judging = {

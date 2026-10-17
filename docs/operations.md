@@ -39,7 +39,7 @@ not a complete room inventory.
 `dap status --request <16-hex-id>` also reads retained correlation rows
 for that server request ID, through the admin session. The selector uses
 exactly 16 lowercase hexadecimal characters. This column includes the
-retained window and each row's entry or duty reference. A window change
+retained window and each row's entry or task reference. A window change
 between pages produces `unknown`. Without `--request`, status makes no
 correlation read. Status requires a room session and does not fall back
 to signed entry reads.

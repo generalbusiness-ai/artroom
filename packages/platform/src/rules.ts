@@ -11,7 +11,7 @@
  * table beside the data says which entries are code. The validator lists
  * the marks of the data, and a runtime or a verifier runs a definition only
  * with a rule of the right kind for every mark of that list. Without one it
- * answers `unsupported-definition` for the whole scope: nothing is founded
+ * answers `unsupported-definition` for the whole scope: nothing is created
  * under the definition, and a scope that exists under it admits nothing (I3
  * deltas, entry EC4).
  *
@@ -63,6 +63,6 @@ export const RULES: RuleTable = {
   // The six rules of the rules scope are the whole of its version, so `platform:rules@1` is runnable (`rules-scope.ts`).
   "platform:rules": rulesScopeRules,
   // Every destination mark has its rule, including `first-head` and `receipt`, so `platform:destination@2` is runnable
-  // (`destination.ts`). The real-scope founding and publication witness uses a scripted Git host (`scope/test/creation-real.test.ts`).
+  // (`destination.ts`). The real-scope creation and publication witness uses a scripted Git host (`scope/test/creation-real.test.ts`).
   "platform:destination": destinationRules2,
 };

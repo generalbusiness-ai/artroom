@@ -45,7 +45,7 @@ test("replay admission counts the actual register's legacy cleanup closure and p
 
 /**
  * Made-up platform data. The receiver's entries are judged, including its
- * founding and the refused bound decision. The sender's entries are
+ * creation and the refused bound decision. The sender's entries are
  * stand-ins written by hand, retained and anchored. The real holder ledger
  * funds the decision, and the real verifier derives its draw again.
  */
@@ -128,7 +128,7 @@ test("replay and a closing checkpoint preserve the early field refusal and draw 
   expect([replay.report.result, replay.why, guards]).toEqual(["consistent", null, 2]);
 });
 
-/** A larger founding field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
+/** A larger creation field really holds the text before the smaller stop field reads it. Every receiver entry is judged. */
 function redacted(text: string, decision: "bare" | "named" | "other" | "applied" | "invalid" | "spent" | "known" = "bare") {
   const data = structuredClone(DATA);
   const memo = { type: "text", max: 16, detached: true } as const;

@@ -66,7 +66,7 @@ function activeKept(bytes: string): any {
   const journal = JSON.parse(bytes);
   return journal.v === 1 ? journal : JSON.parse(journal.claims[journal.active]);
 }
-// Invariant: the browser founds through native configured-register policy and
+// Invariant: the browser creates through native configured-register policy and
 // enrollment, retaining exact signed requests before delivery and across loss;
 // wrong pins, ineligible keys and failed private storage cannot submit a found.
 // Real Worker routes, register/directory/membership/rules/destination and signed

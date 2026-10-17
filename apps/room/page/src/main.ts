@@ -620,7 +620,7 @@ function startScreen(): HTMLElement {
     } catch { blocked = true; name.setAttribute("disabled", ""); submit.setAttribute("disabled", ""); check.setAttribute("disabled", ""); tell("Original Start custody is unavailable. Nothing will be replaced.", true); }
   };
   restore();
-  if (original) tell("Your original Start and founder key are retained. Check status only reads; Continue creation explicitly resumes its original requests.");
+  if (original) tell("Your original Start and creator key are retained. Check status only reads; Continue creation explicitly resumes its original requests.");
   name.addEventListener("input", () => { startDraft = name.value; });
   const download = (filename: string, text: string, type: string) => {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -635,8 +635,8 @@ function startScreen(): HTMLElement {
       const place: Place = { directory: result.repository.directory.scope, membership: result.repository.membership };
       const room = await openRoom({ service: location.origin, secret }, place);
       if (!current()) return;
-      if (!verifiedRoom(room) || room.key !== result.key || room.me.handle !== result.handle) { tell("The created room has not verified this original founder key. Check status before opening it.", true); return; }
-      // This is the actual enrolled founder seed; the journal's internal
+      if (!verifiedRoom(room) || room.key !== result.key || room.me.handle !== result.handle) { tell("The created room has not verified this original creator key. Check status before opening it.", true); return; }
+      // This is the actual enrolled creator seed; the journal's internal
       // recovery key is never exposed as a usable member/device key.
       const encoded = b64url(secret);
       const next: Settings = { place, secret: encoded, register: result.configured.register,
@@ -694,7 +694,7 @@ function startScreen(): HTMLElement {
               const copy = h("button", { type: "button", class: "link-button" }, "Copy invitation link");
               copy.addEventListener("click", () => { if (!current()) return; if (!navigator.clipboard) { answer.textContent = "Select the private invitation link to copy it yourself."; return; } void navigator.clipboard.writeText(issued.link!).catch(() => { if (current()) answer.textContent = "Copy was unavailable. Select the private invitation link to copy it yourself."; }); });
               const instructions = issued.kind === "agent-key" ? h("div", {},
-                h("p", {}, "On the agent’s computer, use a new owner-only ARTROOM_HOME directory so it creates its own key. Do not use the founder’s config or key."),
+                h("p", {}, "On the agent’s computer, use a new owner-only ARTROOM_HOME directory so it creates its own key. Do not use the creator’s config or key."),
                 h("pre", {}, "dap join <private invitation link>"),
                 h("p", {}, "If its reply is lost, check the exact original without submitting:"), h("pre", {}, "dap join <same-private-link> --check")) : null;
               linkHost.replaceChildren(privateLink, copy, ...(instructions ? [instructions] : []));
@@ -717,7 +717,7 @@ function startScreen(): HTMLElement {
         button.addEventListener("click", action);
         return h("div", { class: "start-connection" }, h("div", {}, h("h2", {}, title), h("p", {}, description)), button);
       };
-      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void creatorConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original founder connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
+      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void creatorConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "dap issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original creator connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
       const recovery = h("button", { type: "button", class: "link-button" }, "Save a recovery file");
       try { if (originalStart(location.origin, localStorage)?.recoverySaved) recovery.setAttribute("disabled", ""); } catch { recovery.setAttribute("disabled", ""); }
       recovery.addEventListener("click", () => {
@@ -756,7 +756,7 @@ function startScreen(): HTMLElement {
   };
   form.addEventListener("submit", event => { event.preventDefault(); void run(original ? "continue" : "new"); });
   check.addEventListener("click", () => { void run("check"); });
-  const about = h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your founder key when you explicitly start. Keep the recovery file to reconnect to the same room."));
+  const about = h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your creator key when you explicitly start. Keep the recovery file to reconnect to the same room."));
   return h("main", { class: "screen entry-screen entry-start" }, h("a", { class: "entry-back", href: "#/join" }, "‹", "Back"),
     heading, intro, form, message, check, ready, about);
 }

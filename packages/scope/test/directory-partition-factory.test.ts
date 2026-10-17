@@ -141,7 +141,7 @@ test("the shared membership6 pin keeps legacy receiver policy when its actual na
   } finally { life.release(); }
 });
 
-// Native admission and driver fence only. The founding Git replies and the
+// Native admission and driver fence only. The creation Git replies and the
 // file-judge outside port are explicit stand-ins; no Git object or push runs.
 test("a partition-created Lending file reaches the destination6 driver once its actual immutable origin is proved", async () => {
   const { life, D, children } = await sessionRoom(C.register);

@@ -14,7 +14,7 @@ const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
 const reader = "a test reader";
 
-// Invariant: the register ID that `install --plan` prints is the one that `install --planned` founds, so the Git host's setting
+// Invariant: the register ID that `install --plan` prints is the one that `install --planned` creates, so the Git host's setting
 // can pin it before the register exists, and a claim then creates its repository with no restart and no second run; a plan
 // whose ID is not the one its intent makes, or whose time is over, is refused by name and nothing is sent; the config never
 // holds a secret.
@@ -183,7 +183,7 @@ async function planned(): Promise<void> {
   const mismatched = await command(sam, ["install", "--planned"]);
   expect([mismatched.code, mismatched.lines[0]?.split(".")[0]]).toEqual([1, "Refused: plan-mismatch"]);
   expect([(await sam.store.config())!.register, await exists(samPlan.register), await exists(other)]).toEqual([undefined, false, false]);
-  // Control: the same plan, unchanged, founds.
+  // Control: the same plan, unchanged, creates.
   await sam.store.save({ ...(await sam.store.config())!, plan: samPlan });
 
   // An expired plan: refused by name before anything is sent.
@@ -193,7 +193,7 @@ async function planned(): Promise<void> {
   const kept = await command(sam, ["install", "--planned"]);
   expect([kept.code, (await sam.store.config())!.register?.scope]).toEqual([0, samPlan.register]);
 
-  // Control: a plan, then a plain install, founds another register than the planned one.
+  // Control: a plan, then a plain install, creates another register than the planned one.
   const paul: Context = { store: memoryStore(), fetch, now };
   expect((await command(paul, ["install", "--plan", SERVICE])).code).toBe(0);
   const paulPlan = (await paul.store.config())!.plan!;
@@ -233,7 +233,7 @@ async function planned(): Promise<void> {
   host.R = R;
   host.registerDefinition = kept1.plan!.definition;
 
-  // Install as planned: the founded register is the planned one.
+  // Install as planned: the created register is the planned one.
   const installed = await run("install", "--planned");
   expect([installed.code, installed.lines[0], (await rita.store.config())!.register?.scope]).toEqual([0, `Installed: register ${R.name}, under ${kept1.plan!.definition}, as planned.`, R.name]);
   expect((await rita.store.config())!.plan).toMatchObject({ ...kept1.plan!, acknowledged: { status: "service-acknowledged", service: SERVICE } });

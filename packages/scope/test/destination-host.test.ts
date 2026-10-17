@@ -75,7 +75,7 @@ const operation = (branch: Branch, kind: string) => {
 };
 
 describe("destination outside adapter; scripted host, platform judgments in memory and private SQLite custody", () => {
-  // Invariant: each write uses only its own durably held and judged mint, and writes exact founding/receipt objects without recording secrets.
+  // Invariant: each write uses only its own durably held and judged mint, and writes exact creation/receipt objects without recording secrets.
   test("founding and receipt sends use each exact mint and the platform's computed objects", async () => {
     const storage = await create();
     await storage.inside(async (state) => {
@@ -102,7 +102,7 @@ describe("destination outside adapter; scripted host, platform judgments in memo
       expect(written).toMatchObject({ result: "confirmed", evidence: { body: { send: "accepted" } } });
       const sent = f.provider.calls.find((call) => call.kind === "send")!.body as Parameters<DestinationProvider["send"]>[0];
       const genesis = f.branch.own(0)!.entry;
-      // The founding commit of `platform:destination@2`: one README that names the repository, the founder's handle and the directory.
+      // The creation commit of `platform:destination@2`: one README that names the repository, the creator's handle and the directory.
       const readme = { name: (f.branch.branch.values["repository"] as { name: string }).name, handle: "@rita", directory: (f.branch.branch.refs["directory"] as { scope: ScopeId }).scope };
       const expected = initialCommitObjects("sha1", genesis.at.scope, genesis.time, f.branch.branch.refs["claim"] as never, readme);
       expect({ commit: sent.commit, objects: sent.objects }).toEqual(expected);

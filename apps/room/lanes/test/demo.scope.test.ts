@@ -148,7 +148,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
 
   // Not a test of a property: the recorder for `scripts/demo-captures.ts --recorded`. It runs only when the root config provides
   // `demoRecord`, which `DEMO_RECORD=1` sets. It rehearses on a fresh room, as the test above does, then reads each screen of the
-  // captures as the browser will, through the page's data functions, signed in as the founder, and asks the Worker's entry for the
+  // captures as the browser will, through the page's data functions, signed in as the creator, and asks the Worker's entry for the
   // page's two files. Each request and its answer is printed, in lines that begin `DEMO-RECORD `, for the script to give the browser
   // in place of a service, as `apps/room/page/test/screens.mjs` does with its own recorder.
   test.skipIf(!inject("demoRecord"))("record the Worker's answers to the page's reads on the rehearsal's room, for demo-captures (runs only with DEMO_RECORD=1)", async () => {
@@ -408,7 +408,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(loaded).toBe(0);
 
   // Each of the shots that the table lists as the script's outcomes is what the room holds: the issue is closed, the branch
-  // holds the three commits after the founding one in order, and the refused change is not on it.
+  // holds the three commits after the creation one in order, and the refused change is not on it.
   const lines = (n: number) => rehearsal.shots[n - 1]!.lines;
   expect(lines(22)[0]).toMatch(/^#1 {2}closed \(completed\) {2}Add a getting-started page; assigned to @paul; lane sc_/);
   const pushed = at.stand.pushes.filter((push) => push.ref === "refs/heads/main").map((push) => push.commit);

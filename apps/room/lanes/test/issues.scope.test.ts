@@ -79,7 +79,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const run = (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
   const ok = (outcome: Outcome) => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
 
-  // A room on the stand-in host, founded by rita, the admin; una and paul join as members.
+  // A room on the stand-in host, created by rita, the admin; una and paul join as members.
   ok(await run(rita, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
   R = new Platform((await rita.store.config())!.register!.scope);
   wire(R.name);

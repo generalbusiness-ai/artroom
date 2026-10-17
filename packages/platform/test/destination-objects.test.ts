@@ -8,7 +8,7 @@ import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 import { initialCommitObjects, importRef, readmeText, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat, type Readme } from "../src/destination-objects.ts";
 
 // A real local Git repository in each object format. Facts are made up:
-// this checks the byte forms and Git's names, and shows no host or founding.
+// this checks the byte forms and Git's names, and shows no host or creation.
 const scope = `sc_${"g".repeat(51)}a` as ScopeId;
 const claim: FactRef = { at: { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` }, seq: 7, hash: `sha256:${"1".repeat(64)}` };
 const time = "2026-10-03T02:40:00Z" as Timestamp;
@@ -63,7 +63,7 @@ test("a receipt's object format is a stated input, and neither a retry nor anoth
   expect(receiptObjects("sha1", scope, "2026-10-03T02:40:01Z", operation, file).commit).not.toBe(inFormat("sha1").commit);
 });
 
-// The planner's decision of 2026-10-07: the founding commit of `platform:destination@2` writes one file, `README.md`, so that a
+// The planner's decision of 2026-10-07: the creation commit of `platform:destination@2` writes one file, `README.md`, so that a
 // room's first page has content; version 1 keeps the empty tree. Made-up facts, in a real local Git repository.
 test("Git gives version 2's founding commit with one file, README.md, holding the repository's name as a heading and the founding sentence; its ID is stable, and version 1's stays the empty tree", () => {
   const directory = mkdtempSync(join(tmpdir(), "artroom-readme-"));

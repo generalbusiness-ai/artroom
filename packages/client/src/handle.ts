@@ -1,7 +1,7 @@
 /**
  * A handle on one scope (scope contract, sections 4.2, 9.1 and 11.5), over a
  * `Transport`. It submits and settles signed intents, makes the bounded
- * reads, and follows a receipt and a duty.
+ * reads, and follows a receipt and a task.
  *
  * It derives no judgment. What a caller may do in a scope it learns by
  * reading: the summary, and the scope's published definition.
@@ -141,16 +141,16 @@ export class ScopeHandle {
     return { ok: false, reason: "unavailable" };
   }
 
-  /** Follow a duty: the outbox status of one send, by the duty ID a receipt lists. */
+  /** Follow a task: the outbox status of one send, by the outbox ID a receipt lists. */
   followOutbox(outboxId: OutboxId): Promise<Read<OutboxItem>> { return this.#transport.outboxItem(this.scope, this.#reader, outboxId); }
 }
 
 /**
  * Found a repository's directory (section 7.1), and take a handle on it when
- * the founding is accepted. `definitions`: the declarations the directory's
+ * the creation is accepted. `definitions`: the declarations the directory's
  * definition names in `create` sends, which the directory retains for its
- * children. `beside`: the detached texts that the founding intent's fields
- * name. A founding is retried with the same signed intent, like an act.
+ * children. `beside`: the detached texts that the creation intent's fields
+ * name. A creation is retried with the same signed intent, like an act.
  */
 export async function create(
   transport: Transport, creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], reader: unknown = null, beside: Beside = {},

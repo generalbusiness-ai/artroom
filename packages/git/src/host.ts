@@ -6,7 +6,7 @@
  *
  * A token is minted and revoked at a Git host as two operations of the
  * ledger of outside effects, which the scope keeps (`derive/src/ledger.ts`,
- * `scope/src/operations.ts`). That ledger records the duty before a request
+ * `scope/src/operations.ts`). That ledger records the task before a request
  * is sent, sends the one request of an attempt at most once, and keeps an
  * outcome that is not known as `unknown`. This file adds no second ledger.
  * It is the port that the scope's driver gives one request to, for the two
@@ -54,7 +54,7 @@
  *   follow, given to `answered` when the host delivers it. No revocation is
  *   sent on a guess, because no ID is known.
  * - A revocation: the token's record stays `revoking`, and the operation is
- *   not settled. The duty stays. A further attempt is a new request with
+ *   not settled. The task stays. A further attempt is a new request with
  *   its own number, which the ledger opens, and its answer settles nothing
  *   about the earlier one. Only a `confirmed` revocation makes the record
  *   `ended`.

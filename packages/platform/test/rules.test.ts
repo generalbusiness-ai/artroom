@@ -36,7 +36,7 @@ const authority = (m: Roster): readonly Grant[] | null => (m.last.input.type ===
 // marks (section 12.1.8) and the cases of sections 3.1, 3.6 and 12.1.3. No scope, no port and no host: a rule is called with what a
 // judge gives it, over the folded state of a roster in memory.
 describe("the rules of platform:membership@1, each as a plain function (authority note, section 12.1.8)", () => {
-  /** A roster with rita seated on the founding key, una invited as a member (item 4) and a key invited for rita (item 5). */
+  /** A roster with rita seated on the creation key, una invited as a member (item 4) and a key invited for rita (item 5). */
   const m = new Roster().seated();
   const [invitation, keyInvitation] = [invited(m), keyInvited(m, 2)];
   /** What a rule is given for an act of that signer: the state, the act, and what the judge resolved before the rule's place. */
@@ -54,7 +54,7 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
   const secret = { invitation, secret: "a secret of an invitation" };
 
   const rows: readonly (readonly [row: string, rule: string, args: readonly unknown[], expected: unknown])[] = [
-    // Rows 14 and 15: the founding key that the genesis recorded, and no other key.
+    // Rows 14 and 15: the creation key that the genesis recorded, and no other key.
     ["14, 15: the founding key passes, with no member", "founding-key", [given(rita)], PASS],
     ["14, 15: another key does not", "founding-key", [given(una)], { pass: false }],
     // Rows 16, 22, 24 and 25: the recovery key alone. A member's key is not it.
@@ -85,7 +85,7 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
     ["i: the recovery key revokes it", "last-admin-kept", [given(sam, {}, { on: 3, "also.member": 2 })], { holds: true }],
     // Row o: the five lists, each set whole on the roster that the entry opens, in the order of the note's table.
     ["o: five `value` effects on the roster that the entry opens", "role-table", [given(rita)], (Object.keys(ROLE_LISTS) as Role[]).map((role) => ({ effect: "value", item: m.head.seq + 1, slot: ROLE_LISTS[role], value: FIRST_ACTIONS[role] }))],
-    // Row p: the member reference of this scope and the handle, on the member that the entry opens. `seat` reads the founding handle.
+    // Row p: the member reference of this scope and the handle, on the member that the entry opens. `seat` reads the creation handle.
     ["p: for `invite-member` and `add-member`, the field `handle`", "member-of", [given(rita, { handle: "@quinn" }, {}, null, "add-member")], [{ effect: "party", item: m.head.seq + 1, slot: "member", member: { membership: m.at, member: "@quinn" } }]],
     ["p: for `seat`, the founding handle of the roster, whatever the act's fields hold", "member-of", [given(rita, { handle: "@quinn" }, {}, null, "seat")], [{ effect: "party", item: m.head.seq + 1, slot: "member", member: { membership: m.at, member: "@rita" } }]],
     // Row q: `@`, then lowercase ASCII letters, digits and hyphens, with no hyphen first or last.
@@ -115,7 +115,7 @@ describe("the rules of platform:membership@1, each as a plain function (authorit
 // The plan's T10 (the proof plan's V6; review row L1), as judgments of the real rows with the real rules, over a roster in memory.
 test("a join with a valid invitation admits the key; a used one and none are each refused with its reason, and an ended one after its timed end; a recovery key that signs a join is refused before the secret is compared", () => {
   const m = new Roster().seated();
-  // The founder, in two acts (section 12.1.3): each is admitted once, on the founding key and on no grant.
+  // The creator, in two acts (section 12.1.3): each is admitted once, on the creation key and on no grant.
   expect([said(m.act(rita, "seat", { expected: { roster: 1 } })), said(m.act(una, "seat", { expected: { roster: 1 } })), m.entries[2]!.entry.input.type === "act" && m.entries[2]!.entry.input.authority])
     .toEqual([["refused", "guard-failed", null], ["refused", "unauthorized", null], []]);
   const invitation = invited(m);

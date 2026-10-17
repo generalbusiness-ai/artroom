@@ -6,7 +6,7 @@
 //   PLAYWRIGHT_CORE=<...> node --import tsx --no-warnings scripts/demo-captures.ts --recorded --out <directory>
 //
 // The first form opens the deployment's page at <base-url>/page/, signed in with the key that the config directory keeps (the
-// founder's, from demo-run.ts), on the room that room.json names. The second form runs the rehearsal on the test Worker instead
+// creator's, from demo-run.ts), on the room that room.json names. The second form runs the rehearsal on the test Worker instead
 // (`apps/room/lanes/test/demo.scope.test.ts` with DEMO_RECORD=1) and answers the browser with what the Worker answered there,
 // request by request, as `apps/room/page/test/screens.mjs` does; a request the recorder did not make fails the script.
 //
@@ -222,7 +222,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   return sizes;
 }
 
-/** Production Page UI over actor-bound native read records. Founding transport
+/** Production Page UI over actor-bound native read records. Creation transport
  * loss is a labelled stand-in: intercepted requests never reach a Scope. */
 async function claimWitness(chromium: Chromium, executablePath: string, sitting: Sitting, out: string): Promise<void> {
   const native = sitting.claimWitness;

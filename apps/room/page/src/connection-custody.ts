@@ -61,7 +61,7 @@ async function withCreator<T>(origin: string, storage: ClaimStorage, expected: C
   const result = await startRoom(origin, storage, { ...options, mode: "check" });
   const secret = result.secret;
   try {
-    if (!result.repository || !secret || result.operation !== expected.operation || result.key !== expected.key || canonicalize(result.repository.membership) !== canonicalize(expected.membership)) throw new Error("The original founder proof is not verified. Check the original Start; no connection was submitted.");
+    if (!result.repository || !secret || result.operation !== expected.operation || result.key !== expected.key || canonicalize(result.repository.membership) !== canonicalize(expected.membership)) throw new Error("The original creator proof is not verified. Check the original Start; no connection was submitted.");
     const room = await openRoom({ service: origin, secret, ...(options.fetch ? { fetch: options.fetch } : {}), ...(options.now ? { now: options.now } : {}) }, { directory: result.repository.directory.scope, membership: result.repository.membership });
     if (options.current?.() === false || room.session.service !== origin || room.directory !== result.repository.directory.scope || canonicalize(room.membership) !== canonicalize(expected.membership) || room.key !== expected.key || room.key !== keyIdOfSecret(secret) || room.me?.handle !== result.handle) throw unavailable();
     return await work(room, { v: 1, service: origin, key: "browser", register: result.configured.register, repository: result.repository, handle: result.handle });
@@ -84,7 +84,7 @@ export async function connectInvitation(origin: string, storage: ClaimStorage, e
     if (options.mode === "new") {
       if (active && !["verified", "refused"].includes(active.state)) throw new Error("An original connection remains unresolved. Check or explicitly Continue it before another invitation.");
       if (Object.keys(journal.rows).length >= MAX_OPERATIONS) throw new Error("Private connection history is full. No original is evicted for another invitation.");
-      if (!room.me?.actions.includes("membership.invite") || input.kind === "agent-key" && (!room.me.actions.includes("membership.manage") || !room.me.ref)) throw new Error("This verified founder cannot currently create that connection. Nothing was submitted.");
+      if (!room.me?.actions.includes("membership.invite") || input.kind === "agent-key" && (!room.me.actions.includes("membership.manage") || !room.me.ref)) throw new Error("This verified creator cannot currently create that connection. Nothing was submitted.");
       const actualInput: InvitationIssueInput = input.kind === "agent-key" ? { ...input, controller: room.me.ref! } : input;
       if (!isInvitationIssueInput(actualInput)) throw new Error("Enter a valid handle and supported connection details. Nothing was reserved or submitted.");
       const operation = crypto.randomUUID();
@@ -108,7 +108,7 @@ export async function connectInvitation(origin: string, storage: ClaimStorage, e
         update({ ...row, config: structuredClone(config), state: "entered" });
       },
       secret: async name => name === "browser" ? room.session.secret.slice() : null,
-      keep: async () => { throw new Error("Connection creation never replaces or generates a founder signing key."); },
+      keep: async () => { throw new Error("Connection creation never replaces or generates a creator signing key."); },
       private: async name => row.private[name] === undefined ? null : utf8(row.private[name]!),
       keepPrivate: async (name, bytes) => {
         if (!/^[A-Za-z0-9._-]{1,160}$/.test(name)) throw unavailable();

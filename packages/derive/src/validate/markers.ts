@@ -3,7 +3,7 @@
  * section 6.4, "`settles` by a mark" and "Several marks on one item";
  * section 17.2, "A marker duty"; rows I3-54 and I3-59): the grammar of the
  * third form, the rule that a mark is set once, and what the amounts of the
- * marker duties are derived from. The amounts themselves are `markers.ts`,
+ * pending marker work is derived from. The amounts themselves are `markers.ts`,
  * which the runtime runs on the folded state with the same code.
  */
 
@@ -69,7 +69,7 @@ export interface Counting {
 
 /**
  * The types that have marks, with every form that settles an item of one,
- * as `markers.ts` reads them. `unbounded` takes each form whose duty
+ * as `markers.ts` reads them. `unbounded` takes each form whose task
  * reaches itself (rule 9): the definition is then refused
  * `reserve-unbounded`. `awaits` is what an item of such a type awaits in a
  * state with no mark completed, which is what the count of any item that

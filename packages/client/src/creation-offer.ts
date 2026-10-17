@@ -20,7 +20,7 @@ export type CreationOfferFetch = (url: string, init: {
   headers: Record<string, string>; signal: never;
 }) => Promise<{ status: number; url: string; redirected: boolean; body: ByteStream | null }>;
 const MOST = 16 * 1024;
-const failed = () => new TransportError("The same-origin founding offer is unavailable or invalid. No claim was submitted.");
+const failed = () => new TransportError("The same-origin creation offer is unavailable or invalid. No claim was submitted.");
 const closed = (value: unknown, fields: readonly string[]): value is Record<string, unknown> => isRecord(value)
   && Object.keys(value).length === fields.length && fields.every(field => Object.hasOwn(value, field));
 /** URL is provided by the fetch runtimes; no DOM library or ambient types are added. */

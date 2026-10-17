@@ -4,7 +4,7 @@
 //   node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> \
 //     --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace] [--manifest]
 //
-// It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the founder,
+// It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the creator,
 // a member and a maintainer, each with a fresh config directory under the scratch directory (`founder`, `member`, `maintainer`).
 // The local files the commands read, and the member's clone, are in `work` under it. After the plan it prints the register ID
 // and waits for Enter while the operator pins it in the Git host's setting; `--setting-set` skips that wait.

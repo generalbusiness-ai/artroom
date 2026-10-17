@@ -8,7 +8,7 @@ import { garden } from "./support/garden.ts";
 import { mcpRoom } from "./support/room.ts";
 import { created } from "./support/story.ts";
 
-// Invariant: the list is a function of the configured inventory and the caller's standing, never of a connection: a scope founded
+// Invariant: the list is a function of the configured inventory and the caller's standing, never of a connection: a scope created
 // on one connection is listed by a second and by a restarted one; an idle subscribed client is told of an activation made
 // elsewhere at the watch's next run; an ordinary head advance is told nothing and keeps cursors good, while a genuine change is
 // told once and restarts a cursor; and a room with mixed standing lists each scope's acts under its own.
@@ -24,7 +24,7 @@ test("discovery: shared configuration, idle watch, heads against generations, cu
     await rita.tick(); await rita.tick();
     const baseline = rita.told;
 
-    // A standalone scope founded through one connection. The configuration records it; a second connection of the same
+    // A standalone scope created through one connection. The configuration records it; a second connection of the same
     // configuration, and a restarted one, list its acts.
     const second = room.agent("rita, second connection", { secret: rita.secret, config: rita.config, share: true });
     // The second connection has derived its list once, before the scope exists.

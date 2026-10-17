@@ -25,7 +25,7 @@ import { TEST_DEPLOYMENT, metricBindings, platformNet } from "./worker.ts";
 const { paul, vic } = keys;
 const SERVICE = "https://scopes.test";
 
-/** A register that `who` founds by an `install` that names rita a founder, as an operator's key would. */
+/** A register that `who` creates by an `install` that names rita a creator, as an operator's key would. */
 async function installed(who: Actor, before?: (name: ScopeId) => void, creators: readonly Actor[] = [rita]): Promise<Platform> {
   const install: Intent = { v: 1, to: null, actor: who.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", "founders": creators.map((f) => f.key) }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
@@ -35,7 +35,7 @@ async function installed(who: Actor, before?: (name: ScopeId) => void, creators:
 }
 
 /**
- * A register that paul installs, naming rita a founder, and rita's claim, with the repository creation answered by a STAND-IN Git
+ * A register that paul installs, naming rita a creator, and rita's claim, with the repository creation answered by a STAND-IN Git
  * host (`outside.ts`): the reply to attempt 1 is lost, and attempt 2, made `delay` seconds after the claim, is confirmed. The
  * directory is created then, and its genesis creates membership, the rules scope and the destination, which are confirmed.
  */
@@ -262,7 +262,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
 
   // Invariant: recent register signers read every claim and its actual
   // carried inputs. Child scopes retain causal restrictions. Real scopes
-  // with two founders; only the Git creation replies are stand-ins.
+  // with two creators; only the Git creation replies are stand-ins.
   test("multiple cofounders and the install signer read every claim and carried input of the register; register and own-directory replay are contiguous and consistent", async () => {
     const owner = beginSessionFixture({ secret: b64url(new Uint8Array(32).fill(9)), sessions: false, inspector: null });
     onTestFinished(owner.close);
@@ -402,8 +402,8 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
   // the summary, the items, every entry, those that no member signed among them, and the retained inputs (decision ca8ad1cf). The
   // scope resolves its exact membership incarnation from its actual directory before any retained observation. A session of another room's
   // membership reads none of it, and a key with no session keeps the signed-read rule.
-  // On real scopes: two rooms founded on one register, with the STAND-IN Git host of `outside.ts` for the register and for rita's
-  // destination's founding publication (`publication.ts`).
+  // On real scopes: two rooms created on one register, with the STAND-IN Git host of `outside.ts` for the register and for rita's
+  // destination's creation publication (`publication.ts`).
   test("after the founding publication, a session of the room's membership reads the destination's whole history, its host outcomes and receipt among them, its summary, its branch item and receipt item, and the rules scope and the directory whole; a session of another room's membership is refused there; the founder's key with no session is refused once its window has passed", async () => {
     const owner = beginSessionFixture({ secret: b64url(new Uint8Array(32).fill(9)), sessions: false, inspector: null });
     onTestFinished(owner.close);
@@ -464,7 +464,7 @@ describe("signed reads on real registers (the planner's decisions 61cc5e50, c649
 
   // Made by hand: a chain of geneses, each the creation of the one before, from rita's act, an outcome of that act's operation, and
   // deliveries from the geneses. No scope judged them. It shows the bound of `rootOf`, which no real chain passes: the longest of the
-  // platform's founding is four causes, from an entry of membership that the directory's confirmation wrote to the claim.
+  // platform's creation is four causes, from an entry of membership that the directory's confirmation wrote to the claim.
   test("a cause chain is followed through at most four causes: a genesis four creations from the signed act has its root, one five creations away has none; an outcome leads to the act that opened its operation, in its own scope only; a delivery leads to the entry that sent it, within the same bound; an entry that cannot be read is unavailable, and a cause that names no source has no root", async () => {
     const act: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: t(0), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: rita.key, kind: "split", on: null, expected: {}, fields: {}, idempotencyKey: "split", notAfter: t(60) }, rita.secret), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [] };
     const fact = (entry: Entry): FactRef => ({ at: entry.at, seq: entry.seq, hash: entryHash(entry) });

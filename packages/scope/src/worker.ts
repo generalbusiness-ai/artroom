@@ -28,7 +28,7 @@ import { health } from "./health.ts";
  *
  * | Route | Operation |
  * |---|---|
- * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the founding register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
+ * | `POST /v1/scopes` | Found a scope with no creator: under `platform:register@1` the creation register, by an `install` intent; under another definition a directory. Body `{ founding, definition, definitions?, texts? }`. |
  * | `POST /v1/scopes/:scope/acts` | Submit an act. Body `{ signed, grants, texts?, presented?, values? }`. `texts`: each detached text that a field names by digest. `presented`: the facts presented beside the intent, by name. `values`: each value that a place of the act names by digest, as its canonical bytes; only an act of a platform definition has a place. |
  * | `POST /v1/scopes/:scope/preparations` | Ask for one step of a capability. Body `{ signed, grants, capability, step }`. `signed`: the signed intent that the step prepares for. |
  * | `POST /v1/scopes/:scope/settle` | The receipt of an accepted act. Body `{ signed }`. |
@@ -181,13 +181,13 @@ export function api(binding: Binding, address: string | null = null): Api {
      * that name checks both again. `definition` is a declaration, or the
      * digest or platform name of one. `definitions`: the declarations it
      * names in `create` sends, which the directory retains for its children.
-     * `beside`: the detached texts that the founding intent's fields name.
+     * `beside`: the detached texts that the creation intent's fields name.
      */
     async create(creation: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions: readonly DeclaredDefinition[] = [], beside: Beside = {}): Promise<Created> {
       let name: ScopeId;
       try {
         const names = typeof definition === "string" ? definition : definitionDigest(definition);
-        // Under the register's platform definition the scope is the founding register, of the kind `register` (I3 delta EP2).
+        // Under the register's platform definition the scope is the creation register, of the kind `register` (I3 delta EP2).
         const seed: Seed = { v: 1, kind: creationKind(names), definition: names, creator: null, cause: intentDigest(creation.intent), ordinal: 0 };
         name = scopeIdOf(seed);
       } catch {
@@ -232,7 +232,7 @@ const BODY_BYTES = 1024 * 1024;
 
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
-/** The status of an answer to a founding or an act (section 4.2). The body says which. */
+/** The status of an answer to a creation or an act (section 4.2). The body says which. */
 function answered(answer: Created | Answer, accepted: number): Response {
   const status = answer.answer === "accepted" ? accepted : answer.answer === "unavailable" ? 503 : answer.answer === "mismatch" ? 409 : answer.reason === "unauthorized" ? 403 : 422;
   return json(status, answer);

@@ -1,5 +1,5 @@
 /**
- * The judges of the entries a scope writes about its own duties (scope
+ * The judges of the entries a scope writes about its own pending work (scope
  * contract, sections 4.3, 7.4 and 9.2): a diagnosis of a request that could
  * not be delivered, the outcome of an attempt of an outside operation, and a
  * checkpoint. None has a caller outside the scope: one that is not written

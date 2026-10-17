@@ -31,7 +31,7 @@ describe("reads (section 9.1)", () => {
       [13, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], false, "10"], [13, [10, 11, 12, 13], true, undefined],
     ]);
 
-    // The outbox has one row for each send of the entry, by its duty ID. Nothing has dispatched them.
+    // The outbox has one row for each send of the entry, by its outbox ID. Nothing has dispatched them.
     const outboxId = { held: false, attempts: [], result: null, diagnosis: null };
     expect(await s.stub.outbox(reader)).toMatchObject({
       ok: true, at: summary.at, complete: true,

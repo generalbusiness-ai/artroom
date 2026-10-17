@@ -739,7 +739,7 @@ export class McpService {
     } else return failed({ error: "target", what: "give target, or definition for a creation" });
     const settled = await this.custody.settle(identity, async (envelope) => {
       if (envelope.creation) {
-        // A creation settles by the scope it founded: its genesis carries the founding intent.
+        // A creation settles by the scope it created: its genesis carries the creation intent.
         const kind = isPlatformDefinition(envelope.creation.definition) && envelope.creation.definition.startsWith("platform:register@") ? "register" : "directory";
         const definition = typeof envelope.creation.definition === "string" ? envelope.creation.definition : definitionDigest(envelope.creation.definition);
         const created = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
@@ -809,7 +809,7 @@ export class McpService {
       let shaped: { fields: Record<string, FieldValue>; texts: string[] };
       try { shaped = shapeFields(act, fieldsGiven, textsGiven, membership); }
       catch (error) { if (error instanceof Unshaped) return stop({ error: "shape", field: error.field, what: error.what, declared: error.declared }); throw error; }
-      // A founding intent's kind is the founding's, not the genesis act's: `install` for a register, `found` for any other scope
+      // A creation intent's kind is the creation's, not the genesis act's: `install` for a register, `found` for any other scope
       // with no creator (the scope contract, section 7.1). The genesis act then applies with the intent's fields.
       const creation = data!.name === "platform:register" ? "install" : "found";
       const signed = await signedIntent(this.#port.signer, { to: null, kind: creation, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
@@ -819,7 +819,7 @@ export class McpService {
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try {
         const created = await this.#reads.transport.create(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
-        // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
+        // A creation has no mismatch and its refusal names no head: give it the shape of an act's answer.
         return created.answer === "refused" ? { answer: "refused", reason: created.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : created as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: bytesOf({ definition: args["definition"], fields: fieldsGiven, texts: textsGiven, definitions }) });

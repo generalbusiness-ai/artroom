@@ -19,7 +19,7 @@
  * the texts port before the turn, checks them against the digest, and
  * retains them with the entry that records the message. While a text
  * cannot be read the delivery is not decided, and the sender keeps the
- * duty.
+ * task.
  */
 
 import type { Bounds, Digest, Entry, FactRef, Incarnation, PlatformDefinition, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
@@ -64,7 +64,7 @@ export class Deliveries {
    *
    * A seed that names a platform definition pins the runtime's own code, by
    * that name and version (section 6.1): its data and its rules, as
-   * `Scope.platform` reads them for a founding. Nothing of it is read from
+   * `Scope.platform` reads them for a creation. Nothing of it is read from
    * the creator, and no bytes are retained for it. The declarations that
    * its data names by digest in `create` sends are read from the creator.
    *
@@ -169,7 +169,7 @@ export class Deliveries {
     // message's class. A send that this scope has recorded is answered from that entry. The source entry is still read and checked.
     // The answer reads no other foreign entry and no text, so none is fetched for it, and a text that both scopes have redacted since
     // cannot hide it. The judge still makes every check in that order, and gives the answer. A recorded decision stays recorded, so
-    // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
+    // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the creation branch below,
     // which reads a creation's texts, is not taken.
     if (!known && message.class !== "control") {
       reader ??= !pinned && creation && message.class === "request" && message.type === "create"
@@ -273,7 +273,7 @@ export class Deliveries {
             return {
               verdict: "write", draft: judged.draft, facts: [source, ...facts], retain,
               sealed: ({ entry, hash }) => { rows.sealed({ entry, hash }); return { answer: "recorded", fact: { at: entry.at, seq: entry.seq, hash } }; },
-              // An entry that cannot be written now is not a decision: the sender keeps the duty.
+              // An entry that cannot be written now is not a decision: the sender keeps the task.
               unfit: () => retry("unavailable"), full: () => retry("scope-full"),
             };
           }

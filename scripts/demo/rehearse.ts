@@ -40,7 +40,7 @@ export interface Stage {
   service: string;
   host: string;
   namespace: string;
-  /** The name of the room that the founder claims. */
+  /** The name of the room that the creator claims. */
   name: string;
   /** A fresh context for one person, whose `read` gives the bytes of `FILES` by name. Called once for each person. */
   person(who: Person): Context | Promise<Context>;
@@ -455,7 +455,7 @@ export async function plannedOperator(ctx: Context, stage: Pick<Stage, "service"
   const raw = config?.plan as unknown;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const plan = raw as Record<string, unknown>;
-  const creation = plan["founding"];
+  const creation = plan.creation;
   if (!config || config.key !== "operator" || config.service !== stage.service || plan["service"] !== stage.service
     || plan["register"] !== register || !isScopeId(register) || plan["definition"] !== definition
     || !isPlatformDefinition(definition) || platformName(definition) !== "platform:register" || platform(definition) === null

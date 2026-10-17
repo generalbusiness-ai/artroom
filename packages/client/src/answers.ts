@@ -18,9 +18,9 @@ import type { Answer, DeliveryRefusal, Created, MismatchReason, RefusalReason, S
 import { REFUSAL_REASONS, isItemQueryRead, among, isOutboxItem, isHead, isItem, isListOf, isLogPage, isRead, isReceipt, isRecord, isRetainedInput, isSealed, isSummary } from "@generalbusiness/artroom-bytes";
 
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.
-/** Why an act is refused (`Answer`). A source check and a platform definition are a founding's to answer, and are not here. */
+/** Why an act is refused (`Answer`). A source check and a platform definition are a creation's to answer, and are not here. */
 const ACT_REFUSED: Record<RefusalReason, true> = REFUSAL_REASONS;
-/** Why a founding is refused (`Founded`). */
+/** Why a creation is refused (`Created`). */
 const CREATION_REFUSED: Record<RefusalReason | DeliveryRefusal | "unsupported-definition", true> = { ...REFUSAL_REASONS, "source-unverified": true, "unsupported-definition": true };
 const UNAVAILABLE: Record<UnavailableReason, true> = { "dependency-unavailable": true, busy: true, "clock-behind": true, "scope-provisional": true, "guard-incomplete": true, "authority-unavailable": true, unavailable: true, "rate-limited": true };
 const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
@@ -28,7 +28,7 @@ const MISMATCH: Record<MismatchReason, true> = { "idempotency-mismatch": true };
 /** A record with exactly these members. */
 const only = (v: Record<string, unknown>, ...members: string[]): boolean => Object.keys(v).length === members.length && members.every((m) => Object.hasOwn(v, m));
 
-/** The answer to a founding (section 7.1): it has no `mismatch`, and its refusal names no head. */
+/** The answer to a creation (section 7.1): it has no `mismatch`, and its refusal names no head. */
 function isCreated(v: unknown): v is Created {
   if (!isRecord(v)) return false;
   switch (v["answer"]) {

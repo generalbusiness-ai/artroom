@@ -96,7 +96,7 @@ test("each operation of the handle returns a reply only when it has every member
       [{ answer: "accepted", receipt }, { answer: "refused", reason: "unsupported-definition" }, { answer: "refused", reason: "source-unverified" }, { answer: "unavailable", reason: "busy" }],
       [{ answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "not-found" }, ...each(receipt).map((r) => ({ answer: "accepted", receipt: r }))]],
     ["submit", (t) => handle(t).submit({} as never), [{ answer: "accepted", receipt }], [...each(receipt).map((r) => ({ answer: "accepted", receipt: r })), { answer: "accepted", receipt: { ...receipt, sends: ["first"] } },
-      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check is a founding's.
+      // An effect is one of the contract's, with its members; and an act's refusal is one an act can meet: a source check is a creation's.
       // `unsupported-definition` is now one that an act can meet: a guard that is a mark of a platform definition may refuse with it (the
       // contract's revision 15, section 4.2, the table of refusal reasons).
       ...[{ effect: "state" }, { effect: "vanish" }].map((e) => ({ answer: "accepted", receipt: { ...receipt, effects: [e] } })),

@@ -69,7 +69,7 @@ shows where a count is taken, drawn and released, and nothing about a
 count or a rule of a platform definition. The destination now states
 `holds` for its branch and publication types;
 `packages/platform/test/destination-creates.test.ts` checks their cleanup
-and receipt duties with the package's real rules.
+and receipt pending work with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a

@@ -124,7 +124,7 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
 
 /**
  * A field of the entry's intent, or of the message it delivered. A genesis
- * has the fields of its founding intent, or of its creation request.
+ * has the fields of its creation intent, or of its creation request.
  *
  * The rule: a field is read as the scope that wrote the entry holds it, and
  * never through a declaration of another scope. `local`: the entry is this
@@ -136,7 +136,7 @@ function given(entry: Entry, item: unknown, slot: string): unknown {
  * own with the same name says nothing about it. So a field of a foreign
  * entry is the value that the entry's bytes hold, with no type applied:
  *
- * - of an act, and of a founded genesis, the field of the signed intent;
+ * - of an act, and of a created genesis, the field of the signed intent;
  * - of a delivered request, the field of the message as it was sent: the
  *   `fields` of a `tell`, and the `detail` of a `relate`;
  * - of a created genesis, the field of the creation request as it was sent.

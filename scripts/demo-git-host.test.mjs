@@ -18,7 +18,7 @@ const childRuntime = [...loader, "--disable-warning=DEP0205"];
 
 // Invariant: actual filesystem preparation preserves private keys on repeat,
 // restricts custody to the owner, and exposes a genuine signed public install
-// whose founder/recovery keys and register pin are stable until its fixed end.
+// whose creator/recovery keys and register pin are stable until its fixed end.
 test("owner-only exclusive preparation keeps keys off stdout and locks one genuinely signed install plan", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "artroom-demo-host-"));
   const directory = join(scratch, "private");
@@ -45,9 +45,9 @@ test("owner-only exclusive preparation keeps keys off stdout and locks one genui
     assert.equal(verify(null, domainBytes(DOMAINS.intent, signed.intent), pub, unb64url(signed.sig)), true);
     assert.equal(signed.intent.actor, prepared.roleKeys.installer.key);
     assert.deepEqual(signed.intent.fields["founders"], [prepared.roleKeys["founder"].key]);
-    assert.equal(publicPlan["founding"].recoveryKey, prepared.roleKeys.recovery.key);
-    assert.equal(publicPlan["founding"].branch, "main");
-    assert.equal(publicPlan["founding"]["founderHandle"], "@demo-owner");
+    assert.equal(publicPlan.creation.recoveryKey, prepared.roleKeys.recovery.key);
+    assert.equal(publicPlan.creation.branch, "main");
+    assert.equal(publicPlan.creation["founderHandle"], "@demo-owner");
     assert.equal(isScopeId(publicPlan.registerScope), true);
     assert.equal(publicPlan.registerSeed.cause, publicPlan.installDigest);
     assert.equal(signed.intent.notAfter, "2030-01-01T00:10:00Z");

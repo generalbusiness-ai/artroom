@@ -28,7 +28,7 @@ different lifetime under the same scope ID.
 ## Keep the receipt
 
 An act that takes effect returns a receipt containing its fact reference, pinned
-definition, intent digest, effects and send duty IDs. It identifies the
+definition, intent digest, effects and send outbox IDs. It identifies the
 local entry the scope committed. The receipt is built after sealing; it is
 not inserted into that entry's own bytes.
 
@@ -88,7 +88,7 @@ Use a receipt you kept to identify a head when comparing records. Read a
 missing-dependency, incomplete or unsupported-definition report as a limit
 on the conclusion, not as success. Room discovery in `verify --all` is also
 bounded: it follows recorded creation journals for that room, not every
-scope on the service. Check publication and outstanding duties separately.
+scope on the service. Check publication and outstanding pending work separately.
 
 ## Source and acceptance
 

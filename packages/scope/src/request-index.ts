@@ -9,7 +9,7 @@ export const REQUEST_ROWS = 4096;
 export const REQUEST_PAGE = 100;
 export const REQUEST_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const position = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
-// Keep the private duty column so retained operational rows survive the public rename.
+// Keep the private task column so retained operational rows survive the public rename.
 const SCHEMA = `CREATE TABLE IF NOT EXISTS request_index (
   n INTEGER PRIMARY KEY AUTOINCREMENT CHECK(n <= 9007199254740991),
   request TEXT NOT NULL, trace TEXT, time INTEGER NOT NULL, seq INTEGER, duty TEXT

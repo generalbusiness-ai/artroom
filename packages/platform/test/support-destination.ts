@@ -14,8 +14,8 @@
  *   itself. The rule `judge` reads each observation through the judge. Of
  *   the reader, only the lane's part is a stand-in: `LaneRead`.
  * - `bureau`: a made-up directory that creates one destination scope at its
- *   founding. It stands for the real directory's genesis, below a register
- *   (authority note, section 12.1). It shows nothing of a founding.
+ *   creation. It stands for the real directory's genesis, below a register
+ *   (authority note, section 12.1). It shows nothing of a creation.
  * - The lane and its entries: a lane in memory whose entries are made by
  *   hand, read as a lane under `change`. Nothing judged them. They stand for
  *   the `merge`, `propose-manifest` and `cancel-merge` entries of a real
@@ -109,7 +109,7 @@ const NAME = { type: "text", max: 256 } as const;
 
 /**
  * STAND-IN: a made-up directory, for the creator of a destination scope.
- * Its founding creates one destination, with the fields that the
+ * Its creation creates one destination, with the fields that the
  * directory's genesis sends (authority note, section 12.1, "Messages
  * between scopes"). It has no other act and no handler.
  */
@@ -212,9 +212,9 @@ const claim = handMade(register, "found");
 export const said = (j: Judgment | ActJudgment | OutcomeJudgment) => [j.result, "reason" in j ? j.reason : null, "name" in j ? (j.name ?? null) : null];
 
 /**
- * A destination scope in memory, below a stand-in bureau that rita founded:
+ * A destination scope in memory, below a stand-in bureau that rita created:
  * its genesis, by the bureau's `create`, and the bureau's confirmation.
- * `importing`: the founding is by import, so the genesis declares no first
+ * `importing`: the creation is by import, so the genesis declares no first
  * head. The membership and the rules scope are named by made-up scope IDs:
  * nothing here observes either.
  */
@@ -245,7 +245,7 @@ export class Branch extends Ledger {
   constructor(importing: boolean) {
     super(destinationDefinition, "platform:destination");
     const facts = [fetched(claim, "platform:register")];
-    // The bureau is founded as a directory is: by rita's signed intent. It is read as a directory under `platform:directory`.
+    // The bureau is created as a directory is: by rita's signed intent. It is read as a directory under `platform:directory`.
     this.bureau = new Ledger(bureauDefinition, "platform:directory");
     const creation = signIntent({
       v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, idempotencyKey: `found-${importing}`, notAfter: t(60),

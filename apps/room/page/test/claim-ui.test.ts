@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 
 // Real shell/modal handlers with scripted adapter/data and DOM boundaries.
-// Native founding/recovery is witnessed separately against real scopes.
+// Native creation/recovery is witnessed separately against real scopes.
 test("only an eligible configured founder sees creation; an in-flight or stale claim cannot replace another room", async () => {
   const gate = () => { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; };
   let rendered = gate();

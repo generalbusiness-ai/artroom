@@ -8,7 +8,7 @@
  * |---|---|
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
- * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. Ordinary office founding uses the same native service operations; a dedicated wire witness founds it over HTTP, and `over` sends one act over that transport. |
+ * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. Ordinary office creation uses the same native service operations; a dedicated wire witness creates it over HTTP, and `over` sends one act over that transport. |
  * | The office | A made-up directory definition that creates the lanes. A test fixture. The separate `room.ts` fixture uses the real platform directory, which creates lanes after the runtime reads its declared active-definition observations from the real rules scope. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
@@ -46,7 +46,7 @@ export const reader = "a test reader";
  * entrypoint both call and add nothing to), called in the test's isolate:
  * every act and read of the fixture goes through it. `http` is the client's
  * transport over the Worker's HTTP routes, for the few calls that are about
- * a route: one dedicated office founding, an explicit act, and the replay.
+ * a route: one dedicated office creation, an explicit act, and the replay.
  *
  * The reason is cost. In the Workers pool a call through the Worker's
  * entrypoint, by `SELF.fetch` or by a service binding, takes longer the more
@@ -69,8 +69,8 @@ function valid(definition: DeclaredDefinition): ValidDefinition {
 }
 
 /**
- * The office: a made-up directory, and a test fixture. It is founded with a
- * text beside its founding intent. `open-issue` creates a lane under the
+ * The office: a made-up directory, and a test fixture. It is created with a
+ * text beside its creation intent. `open-issue` creates a lane under the
  * pinned `issue` digest, and `open-change` one under the pinned `change`
  * digest. Each clause of a creation moves the row that asked for it.
  */
@@ -458,17 +458,17 @@ export class Graph {
   }
 }
 
-/** The text that travels beside the office's founding intent. */
+/** The text that travels beside the office's creation intent. */
 export const README = "The office of a test repository.";
 
 /**
- * A new graph: an office founded by rita, which retains the two lane
+ * A new graph: an office created by rita, which retains the two lane
  * declarations for the lanes it creates. Transport is undisturbed, and the
  * scripted capability refuses every guard, until the scenario says
  * otherwise: `capable` makes the stand-in's guards hold, and `onCode` runs
  * the namespace on the capability's code with no stand-in for it. With no
  * capability code at all, no scope runs under either lane definition: the
- * scope package's founding test shows that.
+ * scope package's creation test shows that.
  */
 export async function graph(creationTransport: Transport = transport): Promise<Graph> {
   net.hold = net.deaf = null;

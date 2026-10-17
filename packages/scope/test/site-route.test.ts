@@ -29,7 +29,7 @@ import diagram from "./site/completeness/diagram.svg?raw";
 // | Artifacts | A STAND-IN: `Scripted`, a binding double whose every answer the test writes, and a scripted fetch for its smart-HTTP upload-pack. Its refs and objects are a map; no repository exists. |
 // | The clock and the readers | The namespace's scripted clock and the test readers, as in every test of `PLATFORM`. The site route reads no session. |
 //
-// Tests that only read share the one founding. The cache test moves one branch of the stand-in host, which no other test reads.
+// Tests that only read share the one creation. The cache test moves one branch of the stand-in host, which no other test reads.
 
 const NAMESPACE = "artroom-demo";
 const SERVICE = "service.invalid";

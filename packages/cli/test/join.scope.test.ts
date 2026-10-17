@@ -10,7 +10,7 @@ import { command, memoryStore, type Context } from "../src/index.ts";
 // Invariant: uncertain join delivery and accepted enrollment awaiting its
 // inbox keep the exact signature, key, deadline and fact across restart.
 // Membership, inbox, their rules, and HTTP routes are real. The office is a
-// STAND-IN directory (no founding); sibling IDs in the link are placeholders
+// STAND-IN directory (no creation); sibling IDs in the link are placeholders
 // never read here. memoryStore stands for local persistence. Loss/unavailable
 // replies and pause are STAND-INs for transport and scheduling, with no sleep.
 test.each(["platform:membership@2", "platform:membership@6"] as const)("join retries its exact private envelope after accepted reply loss and inbox wait failure across restart; saved facts and links cannot substitute another enrollment (%s)", async definition => {

@@ -8,7 +8,7 @@ export default defineConfig({
     globalSetup: ["./test/support/local-clone-setup.ts"],
     include: ["test/**/*.test.ts"],
     exclude: ["test/operation-denial.test.ts"],
-    // One isolate for every file: the Worker is loaded once. Each test founds its own scope, which is its own object and storage.
+    // One isolate for every file: the Worker is loaded once. Each test creates its own scope, which is its own object and storage.
     isolate: false,
     maxWorkers: 1,
   },

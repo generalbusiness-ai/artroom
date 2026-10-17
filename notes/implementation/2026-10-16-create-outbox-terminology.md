@@ -317,3 +317,71 @@ single-case repair is
 No whole suite or full terminology gate has run. Whitespace and the
 484-link documentation check pass. Prose, the protected-literal/version
 inventory, owned generated outputs and final line counts remain pending.
+
+## Prose, owned assets and protected-literal preparation
+
+Active guides, package READMEs and source comments now use creation and
+creator, and describe pending work and the outbox with the current API
+names. Historical contract section titles, quoted native keys, fixed Git
+content and the inactive protocol specification retain their old names.
+The broad prose pass was followed by grammar corrections for collective
+pending work and explicit outbox IDs. User-facing browser, CLI and error
+copy is updated without changing stored handles or signatures. The MCP
+mark explanation values use the new prose while their native mark keys
+stay fixed. The owned MCP JSON catalog is regenerated through its existing
+MCP_WRITE_DOCS path, and the reference/description checks pass.
+
+The manual defines turn and settle and contains the five requested general
+patterns. The [protected-literal inventory](2026-10-16-create-outbox-protected-literals.md)
+lists 157 production key/reader occurrences in 126 file-and-line rows,
+the two fixed initial Git text values and the separate operational storage
+boundaries. Its proposed future versions are not activated by this task.
+The remaining Jam lookup clarification is explicit there. Current Source
+still has no terminology approval or landing.
+
+The Page, Counting and Lending owned local build commands completed after
+the final browser copy changes. They update all five tracked generated
+outputs from their current sources. Their logs are
+/tmp/artroom-create-outbox-page-owned-build-final-copy.log,
+/tmp/artroom-create-outbox-counting-owned-build-final-copy.log and
+/tmp/artroom-create-outbox-lending-owned-build-final-copy.log. These are
+local asset builds only, not rendered or hosted proof. Root manifests and
+the lock are unchanged. All 36 platform data values and defaults still
+compare exactly after the prose changes.
+
+The local demo public plan now calls its unsigned projection creation;
+its retained private state and signed fields stay unchanged. The first
+plain-node test invocation failed before its cases on unsupported
+TypeScript parameter-property syntax. An attempted one-class syntax
+experiment was reverted completely after inspecting the helper's explicit
+pinned tsx requirement; the second plain-node failure is also retained.
+Neither failure is a passing test, and the transient declared.test pass is
+not used as final evidence. Running the documented tsx 4.21.0 from scratch
+with the existing offline cache passes both demo preparation/custody
+cases, including the real child CLI invocation, in
+/tmp/artroom-create-outbox-demo-plan-pinned-tsx-focus.log. No dependency was
+installed in the checkout and no live provider request was made. Original
+attempt logs are demo-plan-projection-focus.log and
+ demo-plan-projection-second-focus.log under the same prefix.
+
+The line-count script is now retained at scripts/count-code-lines.py.
+It counts the same physical code lines as the earlier scratch method,
+including blank lines and comments. Classification now also recognizes
+retained deploy assets and the -assets.ts modules as generated; both
+before and after will use this corrected classification. On exact Main
+9a1238b7 the unchanged total is 142,509 lines in 814 code files: 61,847
+test lines, 75,912 other source lines, 3,367 tooling lines and 1,383
+generated lines. The earlier total was correct but its category split
+missed retained Jam and embedded assets. Final counts remain owed at the
+frozen implementation commit. No full terminology gate has run yet.
+
+The final connection-custody copy focus passes its four cases in
+/tmp/artroom-create-outbox-prose-connection-custody-focus.log. An attempted
+extra error-copy focus named a nonexistent test/genesis.test.ts file;
+/tmp/artroom-create-outbox-creation-error-copy-focus.log records no cases,
+not a passing check. Existing compose/mark and native creation witnesses
+above cover the genesis boundary; no replacement test was added merely
+for changed error words. The generated literal table's 126 file/line/value
+rows are independently checked against the current source. The normal
+484-link check excludes notes by design, so its zero broken links is not
+claimed as validation of that new inventory table.

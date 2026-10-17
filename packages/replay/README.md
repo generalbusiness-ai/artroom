@@ -40,7 +40,7 @@ The library runs under Node and under Workers.
   every entry is at one scope and incarnation, times do not go back, and a
   clamped entry has the time of the entry before it;
 - the scope ID is the digest of the genesis's seed;
-- the signature of each act, of a founding and of the signed intent of a
+- the signature of each act, of a creation and of the signed intent of a
   preparation entry.
 
 No judgment is derived again, and the report says so in words. A history

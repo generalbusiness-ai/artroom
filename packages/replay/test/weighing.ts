@@ -4,7 +4,7 @@
  * 15, 18.48, case 10, 18.50, case 11, and 18.52, cases 11 and 12).
  *
  * `Weighing` is a scope under derive's made-up platform data `weigher`,
- * founded by `rita`. Derive's judges wrote every entry, with the made-up
+ * created by `rita`. Derive's judges wrote every entry, with the made-up
  * rules of that fixture.
  *
  * STAND-INS, each written by hand, of which nothing here shows anything:

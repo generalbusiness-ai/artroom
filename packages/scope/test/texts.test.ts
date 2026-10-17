@@ -132,7 +132,7 @@ test("a detached text in a creation message: the child reads the bytes from its 
   expect([await asks.text(copied.fact.seq, textDigest(shared)), await asks.text(a, textDigest(shared))]).toEqual([JSON.stringify(shared), null]);
 
   // The send is held, and P redacts the text before it is delivered. The child cannot read the bytes, so it records nothing, and
-  // P keeps the duty. What ends such a duty is not decided by the contract.
+  // P keeps the task. What ends such a task is not decided by the contract.
   const b = await write("A body that is struck first.");
   net.hold = () => true;
   const late = await P.did(rita, "copy", { on: b, expected: { on: 1 } });

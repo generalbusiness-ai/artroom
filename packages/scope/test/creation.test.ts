@@ -19,26 +19,26 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       value: { entry: { seq: 0, prev: null, at: { scope: s.name, inc: s.at.inc, kind: "directory" }, input: { type: "genesis", inc: s.at.inc, "founding": s.signed, decision: "applied" } } },
     });
     expect([isIncarnation(s.at.inc), s.genesis.intent, s.genesis.definition]).toEqual([true, intentDigest(s.signed.intent), definition.digest]);
-    // The same founding again is answered from the genesis: the same receipt, with the incarnation minted the first time.
+    // The same creation again is answered from the genesis: the same receipt, with the incarnation minted the first time.
     expect(await s.stub.create(s.signed, definition.declared)).toEqual({ answer: "accepted", receipt: s.genesis });
     expect(await s.head()).toEqual({ seq: 0, hash: s.genesis.fact.hash });
 
-    // Another founding intent asks for another seed. Its digest is not this object's name, nor the name of an object with no entry.
+    // Another creation intent asks for another seed. Its digest is not this object's name, nor the name of an object with no entry.
     const other = creation();
     const empty = stubOf(creation().name);
     const unverified = { answer: "refused", reason: "source-unverified" };
     expect([await s.stub.create(other.signed, definition.declared), await empty.create(other.signed, definition.declared)]).toEqual([unverified, unverified]);
     expect(await empty.summary(reader)).toEqual({ ok: false, reason: "not-found" });
-    // A platform definition is supplied in code, by its name and version. This runtime holds none of that name, so it founds nothing
+    // A platform definition is supplied in code, by its name and version. This runtime holds none of that name, so it creates nothing
     // under it. The whole-scope rule for a version that lacks one rule is shown on real scopes in `membership.test.ts`, by a control,
-    // and where a founding stops in `creation-real.test.ts`.
+    // and where a creation stops in `creation-real.test.ts`.
     expect(await stubOf(other.name).create(other.signed, "platform:task@1")).toEqual({ answer: "refused", reason: "unsupported-definition" });
   });
 
   test("once a scope has a genesis it runs under its pinned definition and no other", async () => {
     const s = await create();
     const [hold] = await s.holds(1);
-    // The same lane, but the end of a hold tells nobody. A founding under it reaches the scope when the hold is due.
+    // The same lane, but the end of a hold tells nobody. A creation under it reaches the scope when the hold is due.
     const other = variant(definition.declared, (def) => { def.timed["hold-end"].attention = []; });
     s.c.clock.now = at(HOLD);
     expect(await s.stub.create(creation(at(HOLD + 60)).signed, other.declared)).toEqual({ answer: "refused", reason: "source-unverified" });
@@ -47,7 +47,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
   });
 
   test("a founding that names a foreign fact waits for it the first time; asked again, once the fact cannot be read, it is answered with its receipt and writes nothing", async () => {
-    // Another scope's entry from derive's fixture lane, which the founding names in an optional field of its genesis act.
+    // Another scope's entry from derive's fixture lane, which the creation names in an optional field of its genesis act.
     const l = new Scope(laneDefinition);
     l.did(rita, "offer", { fields: { intent: 0 }, expected: { intent: 1 } });
     const entry = l.did(rita, "assign", { on: 2, expected: { on: 1 }, fields: { performer: una.member } });
@@ -59,13 +59,13 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const name = scopeIdOf({ v: 1, kind: "directory", definition: naming.digest, creator: null, cause: intentDigest(signed.intent), ordinal: 0 });
     const c = controls(name, START);
     const stub = stubOf(name);
-    // The first founding reads the fact. Unread, it waits and records nothing.
+    // The first creation reads the fact. Unread, it waits and records nothing.
     expect(await stub.create(signed, naming.declared)).toEqual({ answer: "unavailable", reason: "dependency-unavailable" });
     expect(await stub.summary(reader)).toEqual({ ok: false, reason: "not-found" });
     c.foreign.set(proof.hash, { entry, under: "lane" });
     const first = await stub.create(signed, naming.declared);
     expect(first).toMatchObject({ answer: "accepted", receipt: { fact: { seq: 0 } } });
-    // The fact is lost. The same founding again is a repeat: it reads no fact, and is answered from the genesis.
+    // The fact is lost. The same creation again is a repeat: it reads no fact, and is answered from the genesis.
     c.foreign.clear();
     expect(await stub.create(signed, naming.declared)).toEqual(first);
     expect(await stub.summary(reader)).toMatchObject({ ok: true, at: { seq: 0 } });
@@ -93,7 +93,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const stored = (name: string, query: string, namespace = env.NET) => runInDurableObject(namespace.get(namespace.idFromName(name)), (_instance, state) => state.storage.sql.exec(query).toArray());
 
     // `AS_DEPLOYED` has every production default: the definitions port of `production()`, which supplies the inbox's data with its
-    // rule. Every mark has its rule, so the definition is one that this runtime can run, and the scope is founded.
+    // rule. Every mark has its rule, so the definition is one that this runtime can run, and the scope is created.
     const first = asked(timeOf(Date.now() + 60_000));
     const deployed = scopeIdOf(seedOf(first, NAMED));
     expect(await stubOf(deployed, env.AS_DEPLOYED).create(signIntent(first, rita.secret), NAMED)).toMatchObject({ answer: "accepted", receipt: { definition: NAMED, fact: { at: { scope: deployed }, seq: 0 } } });
@@ -105,7 +105,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       const intent = asked(soon(60));
       const name = scopeIdOf(seedOf(intent, NAMED));
       const I = new Node(name, inbox as unknown as DeclaredDefinition);
-      // The founding names the platform definition: the seed holds that name, and the object's name is the seed's digest.
+      // The creation names the platform definition: the seed holds that name, and the object's name is the seed's digest.
       const created = await I.stub.create(signIntent(intent, rita.secret), NAMED);
       if (created.answer !== "accepted") throw new Error(`not founded: ${JSON.stringify(created)}`);
       const ref: ScopeRef = created.receipt.fact.at;
@@ -164,7 +164,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
 
       // The same scope, in a runtime that has lost the rule: test support supplies the data with no rule. Section 6.1, "A mark with
       // no rule: the whole scope": the scope admits nothing, whatever the row. The act that was judged above is now not judged, and
-      // nothing is founded under the definition.
+      // nothing is created under the definition.
       net.platformCode = false;
       await I.restart();
       expect([await I.stub.summary(reader), await read(7), await I.stub.deliver({ ...notified, n: 1 })]).toEqual([{ ok: false, reason: "unsupported-definition" }, { answer: "unavailable", reason: "unavailable" }, { answer: "retry", reason: "unavailable" }]);
@@ -175,7 +175,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       net.platformCode = true;
 
       // The validator's platform option is reached by the name alone. The same data, given by an input as a declaration, is validated
-      // without it: a declared definition holds no mark, and nothing is founded.
+      // without it: a declared definition holds no mark, and nothing is created.
       const other = asked(soon(60));
       const declared = scopeIdOf(seedOf(other, definitionDigest(I.declared)));
       expect(await new Node(declared, I.declared).stub.create(signIntent(other, rita.secret), I.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
@@ -196,7 +196,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
     const commit = "c".repeat(40);
 
     // With the production defaults, the runtime has the code of `hold@1` and of `git-read@1`, so the definition is one that it can pin
-    // (section 6.1): the rule is on the code of the forms that a definition uses, and asks for no peer. The founding is written. That is
+    // (section 6.1): the rule is on the code of the forms that a definition uses, and asks for no peer. The creation is written. That is
     // all the scope does with those defaults. No grant is read, so its acts and its steps are refused `unauthorized`: no hold is opened, and so no
     // operation, and nothing is sent outside. No reader may read it.
     const asked: Intent = { v: 1, to: null, actor: rita.key, kind: "found", on: null, expected: {}, fields, idempotencyKey: crypto.randomUUID(), notAfter: timeOf(Date.now() + 60_000) };
@@ -214,7 +214,7 @@ describe("founding a directory (sections 2.2, 2.3 and 7.1)", () => {
       { answer: "refused", reason: "unauthorized" }, { answer: "refused", reason: "unauthorized" }, 0, { ok: false, reason: "forbidden" }, [{ entries: 1, operations: 0 }],
     ]);
 
-    // A runtime that lacks the code founds no scope under the definition, and writes nothing: the namespace `NET` with no capability.
+    // A runtime that lacks the code creates no scope under the definition, and writes nothing: the namespace `NET` with no capability.
     net.capability = null;
     const lacking = creationIn(staged, fields);
     expect(await new Node(lacking.name, staged.declared).stub.create(lacking.signed, staged.declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });

@@ -87,7 +87,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     });
     await G.restart();
     // Actual production first-head and receipt writes reach git http-backend.
-    // The scheduler remains a stand-in; no founding outcome is scripted here.
+    // The scheduler remains a stand-in; no creation outcome is scripted here.
     for (let pass = 0; pass < 32; pass++) if (await (G.stub as unknown as { effect(): Promise<number> }).effect() === 0) break;
     const published = (await G.summary()).value.items.find((item) => item.type === "branch")!;
     const creationEvidence = (await G.entries()).filter((entry) => entry.input.type === "outcome").map((entry) => ({ seq: entry.seq, input: entry.input, effects: entry.effects }));

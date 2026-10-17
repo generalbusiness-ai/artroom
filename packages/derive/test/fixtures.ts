@@ -497,7 +497,7 @@ export class Scope extends Ledger {
 // ---------------------------------------------------------------- entries passed between scopes
 
 /**
- * A directory founded by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or
+ * A directory created by rita's signed intent (section 7.1): its genesis is judged, sealed and folded. `definition`: the desk, or
  * a desk with a change, or with `given` another definition and the fields of its genesis act. `key` tells two foundings apart.
  */
 export function created(definition: ValidDefinition = deskDefinition, given: Intent["fields"] = { source: "a repository" }, key = "found"): Ledger {

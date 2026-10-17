@@ -146,7 +146,7 @@ test("explicit configuration creates the claim's exact name through the scripted
 });
 
 // Invariant: a creation token whose revocation is not confirmed becomes the
-// register's duty, `revoke-credential`; its send revokes the privately held
+// register's task, `revoke-credential`; its send revokes the privately held
 // plaintext once, and the history holds only the nonsecret handle.
 test("a creation token whose revocation fails is owed: the register opens revoke-credential, and its send revokes the held token", async () => {
   const storage = await create();

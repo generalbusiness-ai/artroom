@@ -7,7 +7,7 @@
  *
  * At genesis the scope checks that the digest of its seed equals this
  * object's name. An object that was not reached by a name has none, and
- * can be founded as nothing.
+ * can be created as nothing.
  *
  * With a transport, the object dispatches its outbox: after each call that
  * may have committed, without making the caller wait, and from its alarm.
@@ -501,7 +501,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return { streams, limits: this.#limits.counts() };
   }); }
   /**
-   * The operator's instruction to send one waiting request again, by its duty ID (authority note, section 12, G17; `operator.ts`).
+   * The operator's instruction to send one waiting request again, by its outbox ID (authority note, section 12, G17; `operator.ts`).
    * It has no route: who an operator is, and how one is authenticated, is the installation design's. It is reached over the
    * namespace binding, as `dispatch` is.
    */

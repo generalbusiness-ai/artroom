@@ -65,7 +65,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     const installed = await run("install", "--planned", "--cohort", "application-publication");
     expect(installed.code, installed.lines.join("\n")).toBe(0);
 
-    // The neighbour (rita) claims the room. She is its founder and admin.
+    // The neighbour (rita) claims the room. She is its creator and admin.
     const neighbour = rita, nasruddin = keys.una, passerby = keys.vic;
     const claim = await R.intent(neighbour, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", "founderHandle": "@neighbour", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: FILE_PUBLICATION_COHORT.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };

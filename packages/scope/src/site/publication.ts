@@ -129,7 +129,7 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
             || !reservation.entry.effects.some(e => e.effect === "state" && e.item === publicationId && e.state === "reserved")) continue;
           judged = reservation;
         } else {
-          // An imported first head is not a native founding publication.
+          // An imported first head is not a native creation publication.
           if (!branch || branch.values["import"] !== false || initialCommitOf(state, own, "sha1").commit !== commit
             || !opening.entry.effects.some(e => e.effect === "state" && e.item === branch.id && e.state === "ready")) continue;
         }
