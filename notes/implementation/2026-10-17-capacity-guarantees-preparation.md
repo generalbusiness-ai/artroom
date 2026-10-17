@@ -1,8 +1,8 @@
 # Capacity guarantees: preparation
 
-Request `113a54bd`, promise `0dc3ead9`; preparation Source `fa0583d5`,
-promise `3e32b45b`. This note maps Main
-`698a3d71337a6a03bdea0dfdac10043dd5cbf011`. It changes no runtime,
+Request `113a54bd`, promise `0dc3ead9`; preparation Source `32864765`,
+promise `4aa3f4fb`. This note maps Main
+`02a9180357171ad2d15d3dd9e44b1fe8833f3492`. It changes no runtime,
 definition, bound, refusal, storage schema, or replay rule.
 
 Entries have admission accounting. Bytes, items, records, and pending
@@ -139,4 +139,20 @@ preserved; no deployment or publication is authorized by this note.
 Review `94438c26` requested this correction at initial `7007a46b`.
 It found the current-source map and proposed witnesses accurate, with no
 other finding. This successor changes only this note and preserves all
-1,452 Main leaves. The full capacity guarantees remain owed.
+1,458 actual Judge Main leaves. The full capacity guarantees remain owed.
+
+## Actual Judge Main correspondence
+
+Judge Source `0f35a70a` landed as Main `02a91803`, tree `b43a07d1`,
+under exact approval `4cdf964d` and normal receipt `74977310`. This
+preparation incorporates that actual Main. All cited counting-source
+files remain exact to the earlier Main698 map; only this preparation
+document differs from current Main. All 1,458 Main leaves are exact.
+The Judge note preserves its failed gates and qualified residue; this
+preparation neither changes nor waives that history.
+
+The standalone preparation `746b5baf` was approved by `62aa0353` and
+adopted by `a9455973`. This is a changed candidate with a fresh Source
+commission on live capacity-root bases; those earlier approvals and the
+landing receipt are historical evidence only. A new exact-head review is
+required. No implementation or test changed and no gate was repeated.

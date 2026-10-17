@@ -20,6 +20,7 @@ import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/in
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { created as createRoom } from "./support/story.ts";
+import { MCP_METRIC_SCHEMA, type McpMetricPoint } from "../src/metrics.ts";
 
 /** Production default dispatch, in this isolate. The actual native PLATFORM namespace is this fixture's Scope binding;
  * REGISTRIES and AGENTS keep their existing native subclasses, clocks, custody and control fences. */
@@ -80,6 +81,8 @@ const post = (path: string, authorization: string, body: string, method = "POST"
 
 test.each(["platform:register@3", "platform:register@10"] as const)("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinned client in both revisions acts as the agent (%s)", async registerDefinition => {
   const room = mcpRoom();
+  const metrics: McpMetricPoint[] = [];
+  hostedTest.metrics = { report: point => { metrics.push(structuredClone(point)); } };
   hostedTest.now = () => room.now();
   hostedTest.pause = (waiting) => room.pause(waiting);
   try {
@@ -133,6 +136,14 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
     // The agent's own entries name its key: rita reads the directory's history for the opened issues.
     const steps = (await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[];
     expect(steps.filter((e) => e.kind === "open-issue" && e.signer === answer.key).length, "two issues signed by the agent's key").toBe(2);
+    expect(metrics.some(p => p.blobs[0] === "tools-list")).toBe(true);
+    expect(metrics.some(p => p.blobs[0] === "tool-call" && p.blobs[3] === "wait" && p.doubles[2]! > 0)).toBe(true);
+    for (const phase of ["prepared", "sent", "accepted"]) expect(metrics.filter(p => p.blobs[0] === "custody" && p.blobs[3] === "enrol" && p.blobs[5] === phase)).toHaveLength(2);
+    expect(metrics.every(p => p.blobs[8] === MCP_METRIC_SCHEMA)).toBe(true);
+    const observation = JSON.stringify(metrics);
+    expect(observation).not.toContain(invitation.secret);
+    expect(observation).not.toContain(answer.bearer);
+    expect(observation).not.toContain(b64url(rita.secret));
     // The secret of the invitation appears in no hosted row but the retained envelope: the agent object's tables hold no copy.
     const registry = env.REGISTRIES.get(env.REGISTRIES.idFromName(M.scope)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]> };
     expect(await registry.agents()).toEqual(expect.arrayContaining([{ agent: answer.agent, handle: "@bot", key: answer.key, state: "enrolled" }]));
@@ -149,7 +160,7 @@ test.each(["platform:register@3", "platform:register@10"] as const)("H1, the who
       expect(history).not.toContain(invitation.secret);
       expect(history).not.toContain('"secret"');
     }
-  } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
+  } finally { hostedTest.metrics = null; hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
 
 /** A room created by rita with the issue definition active, and one agent created under `op`; the agent's answer. */
@@ -172,7 +183,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };
 }
-const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; hostedTest.custodyBounds = null; hostedTest.failWrite = null; hostedTest.faultAt = null; hostedTest.failSession = false; room.done(); };
+const done = (room: Room) => { hostedTest.metrics = null; hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; hostedTest.custodyBounds = null; hostedTest.failWrite = null; hostedTest.faultAt = null; hostedTest.failSession = false; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
 const mcp = async (bearer: string, method: string, headers: Record<string, string>, body?: unknown): Promise<Response> => {
   const response = await routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
@@ -840,6 +851,9 @@ test("H6 through the endpoint: a write that fails while a result is written is r
 
 test("H6 through the endpoint: a preparation step whose answer the store could not keep is reported as such, with the step's identity and its own recovery; the step stays sent, the same step under the same key is sent again and kept, one preparation entry", async () => {
   const { room, rita } = await roomWithIssues();
+  const metrics: McpMetricPoint[] = [];
+  hostedTest.metrics = { report: point => { metrics.push(structuredClone(point)); } };
+  const stepPhases = () => metrics.filter(p => p.blobs[0] === "custody" && p.blobs[3] === "prepare" && p.doubles[5] === 1).map(p => p.blobs[5]);
   hostedTest.custodyBounds = { budget: 1024 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
   try {
     const bot = await hosted(room, rita, "@bot", "create-bot");
@@ -873,6 +887,7 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect(String(unkept["next"])).toMatch(/Do not use a new key or settle/);
     const kept = (await stub.custodyRecord("instance-bot"))!;
     expect([kept.phase, kept.steps], "the step is kept as sent, under a record that is still unresolved").toEqual(["sent", ["sent"]]);
+    expect(stepPhases()).toEqual(["sent"]);
     expect(await entriesBy(), "the lane admitted the step once").toBe(1);
     // The same step under the same key and arguments: the same signed step is sent again, the lane repeats its answer, the
     // answer is kept, the record settles and its capacity is released; the lane holds one preparation entry.
@@ -880,6 +895,7 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect((again["step"] as { phase: string; answer: { answer: string } }), JSON.stringify(again)).toMatchObject({ phase: "answered", answer: { answer: "accepted" } });
     const settled = (await stub.custodyRecord("instance-bot"))!;
     expect([settled.intent, settled.phase, settled.steps, settled.reserved], "the same intent, settled, nothing reserved").toEqual([kept.intent, "settled", ["answered"], 0]);
+    expect(stepPhases()).toEqual(["sent", "answered"]);
     expect(await entriesBy(), "one preparation entry").toBe(1);
     // Ordinary: an act prepared at a resource, the report staged at the lane, then its check step. The lane answers the check;
     // the store fails as that answer is written (the write of a prepared act's record, which the store's fault names `keep`);
@@ -895,11 +911,13 @@ test("H6 through the endpoint: a preparation step whose answer the store could n
     expect(String(checked["message"])).not.toMatch(/nothing was sent/);
     const unkeptCheck = (await stub.custodyRecord("report-bot"))!;
     expect([unkeptCheck.intent, unkeptCheck.phase, unkeptCheck.steps.sort()], "the act is not submitted; its check step is kept as sent beside the answered stage").toEqual([held.intent, "prepared", ["answered", "sent"]]);
+    expect(stepPhases()).toEqual(["sent", "answered", "sent", "answered", "sent"]);
     const checkedAgain = await result(await room.wait(() => modernCall(bot.bearer, "prepare", { ...report, step: "check" })));
     expect((checkedAgain["step"] as { phase: string }).phase, JSON.stringify(checkedAgain)).toBe("answered");
     expect((checkedAgain["act"] as { phase: string }).phase).toBe("prepared");
     const heldAgain = (await stub.custodyRecord("report-bot"))!;
     expect([heldAgain.intent, heldAgain.phase, heldAgain.steps.sort()], "the same act envelope, both steps answered").toEqual([held.intent, "prepared", ["answered", "answered"]]);
+    expect(stepPhases()).toEqual(["sent", "answered", "sent", "answered", "sent", "answered"]);
   } finally { done(room); }
 });
 

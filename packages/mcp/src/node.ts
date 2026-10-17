@@ -31,6 +31,7 @@ import type { Signer, Fetch } from "@generalbusiness/artroom-client";
 import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Outcome } from "./custody.ts";
 import type { ConfigPort } from "./inventory.ts";
 import { McpService } from "./service.ts";
+import { MCP_METRIC_SCHEMA, type McpMetricOptions } from "./metrics.ts";
 import type { Mode } from "./catalogue.ts";
 import { McpHttp } from "./http.ts";
 import { Wire, isFrame, newSession, type LegacySession, type Message } from "./wire.ts";
@@ -445,6 +446,7 @@ export interface ServeOptions {
   tools: readonly string[] | null;
   http: { host: string; port: number } | null;
   fetch?: Fetch;
+  metrics?: McpMetricOptions;
 }
 
 /** `dap mcp`: serve over stdio, or over loopback HTTP. Resolves when stdio ends; an HTTP server serves until the process ends. */
@@ -452,6 +454,7 @@ export async function serve(options: ServeOptions): Promise<void> {
   const service = new McpService({
     service: options.service, signer: options.signer, config: options.config, custody: fileStore(join(options.home, "private", "mcp-custody")),
     mode: options.mode, tools: options.tools, ...(options.fetch ? { fetch: options.fetch } : {}),
+    metrics: options.metrics ?? { report: point => { console.error(`dap.metric ${JSON.stringify({ schema: MCP_METRIC_SCHEMA, ...point })}`); } },
   });
   if (options.http) {
     await serveHttp(service, options.http.host, options.http.port);

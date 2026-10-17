@@ -23,6 +23,7 @@ import { reader } from "../../../scope/test/support.ts";
 import { driveFixture, nativeFixtureLifetime } from "../../../scope/test/support/native-fixture-lifetime.ts";
 import { Host } from "../../../../apps/room/lanes/test/support/graph.ts";
 import { McpService, memoryStore, type CallResult, type McpConfig, type Mode, type Root } from "../../src/index.ts";
+import type { McpMetricOptions } from "../../src/metrics.ts";
 
 export const SERVICE = "https://scopes.test";
 /** The generic tools in --generic=add mode, in the order the list sends them. */
@@ -53,7 +54,7 @@ export interface Agent {
 
 export interface Room {
   /** `share`: use this configuration object itself, as two connections of one `ARTROOM_HOME` share one config file. */
-  agent(name: string, options?: { mode?: Mode; config?: McpConfig; share?: boolean; secret?: Uint8Array; subscribe?: boolean; tools?: string[]; listPageBytes?: number }): Agent;
+  agent(name: string, options?: { mode?: Mode; config?: McpConfig; share?: boolean; secret?: Uint8Array; subscribe?: boolean; tools?: string[]; listPageBytes?: number; metrics?: McpMetricOptions }): Agent;
   pause(waiting?: readonly string[]): Promise<void>;
   wait<T>(action: () => Promise<T>): Promise<T>;
   active(): void;
@@ -125,6 +126,7 @@ export function mcpRoom(): Room {
       const service = new McpService({
         service: config.service, fetch: counted, signer: secretSigner(key), custody: memoryStore(), mode: options.mode ?? "default", ...(options.tools ? { tools: options.tools } : {}),
         ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
+        ...(options.metrics ? { metrics: options.metrics } : {}),
         now: lifetime.now, pause: (waiting) => pause(waiting),
         every: () => () => {},
         config: {

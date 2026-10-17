@@ -26,6 +26,7 @@ import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.
 import { Reads } from "./reads.ts";
 import { Unshaped, effectiveFields, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
 import { WORDS, type Words } from "./words.ts";
+import { McpMetrics, observedFetch, type McpMetricOptions } from "./metrics.ts";
 
 export interface ServerPort {
   /** The scope service's base URL. */
@@ -36,6 +37,8 @@ export interface ServerPort {
   signer: Signer;
   config: ConfigPort;
   custody: CustodyStore;
+  /** Operational observations only; absent or failed reporting does not own a result. */
+  metrics?: McpMetricOptions;
   mode?: Mode;
   /** `--tools`: only these definitions' act tools beside the generic ones. */
   tools?: readonly string[] | null;
@@ -163,6 +166,8 @@ export class McpService {
   readonly mode: Mode;
   readonly words: Words;
   readonly #port: ServerPort;
+  readonly #metrics: McpMetrics;
+  readonly #fetch: Fetch | undefined;
   readonly #tools: readonly string[] | null;
   #snapshot: Snapshot | null = null;
   #stale = false;
@@ -178,6 +183,9 @@ export class McpService {
 
   constructor(port: ServerPort) {
     this.#port = port;
+    this.#metrics = new McpMetrics(port.metrics);
+    const fetcher = port.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
+    this.#fetch = this.#metrics.enabled && fetcher ? observedFetch(fetcher) : port.fetch;
     this.mode = port.mode ?? "default";
     this.words = port.words ?? WORDS;
     this.#tools = port.tools ?? null;
@@ -191,7 +199,7 @@ export class McpService {
   get key(): string { return this.#port.signer.key; }
   get reads(): Reads { return this.#reads; }
   get service(): string { return this.#service; }
-  #readsOf(service: string): Reads { return new Reads({ service, ...(this.#port.fetch ? { fetch: this.#port.fetch } : {}), signer: this.#port.signer, now: this.#port.now ?? Date.now }); }
+  #readsOf(service: string): Reads { return new Reads({ service, ...(this.#fetch ? { fetch: this.#fetch } : {}), signer: this.#port.signer, now: this.#port.now ?? Date.now }); }
   #now(): number { return (this.#port.now ?? Date.now)(); }
 
   // ---------------------------------------------------------------- the list
@@ -233,7 +241,10 @@ export class McpService {
   #invalidate(): void { this.#stale = true; void this.check(); }
 
   /** One page of `tools/list`: at most 256 KiB, a cursor bound to the generation, and a restart for a cursor of another one. */
-  async page(cursor?: unknown): Promise<{ tools: Tool[]; nextCursor?: string; generation: Digest }> {
+  page(cursor?: unknown): Promise<{ tools: Tool[]; nextCursor?: string; generation: Digest }> {
+    return this.#metrics.list(() => this.#page(cursor), error => error instanceof ListRestart ? { end: "refused", reason: "restart" } : error instanceof TransportError ? { end: "unavailable", reason: "transport" } : { end: "error", reason: "exception" });
+  }
+  async #page(cursor?: unknown): Promise<{ tools: Tool[]; nextCursor?: string; generation: Digest }> {
     const s = await this.snapshot();
     let from = 0;
     if (cursor !== undefined && cursor !== null) {
@@ -277,7 +288,14 @@ export class McpService {
 
   // ---------------------------------------------------------------- calls
 
-  async call(name: string, args: unknown): Promise<CallResult> {
+  call(name: string, args: unknown): Promise<CallResult> {
+    return this.#metrics.call(name, () => this.#call(name, args), result => {
+      const c = result.structuredContent, answer = c["answer"], error = c["error"];
+      const end = answer === "refused" || answer === "mismatch" ? "refused" : answer === "unavailable" || error === "transport" ? "unavailable" : result.isError ? "error" : "ok";
+      return { end, reason: typeof c["reason"] === "string" ? c["reason"] : typeof error === "string" ? error : "none", bytes: bytesOf(result) };
+    });
+  }
+  async #call(name: string, args: unknown): Promise<CallResult> {
     const given = isRecord(args) ? args : {};
     try {
       const generic = Object.hasOwn(this.#generic, name) ? this.#generic[name]! : null;
@@ -1033,7 +1051,7 @@ export class McpService {
     if (ended) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} is ${ended}` });
     if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome up to entry ${next - 1}; call credential again, which goes on from entry ${next}, or wait first` });
     let answer: Read<{ token: string; ends: string; remote: string }>;
-    try { answer = await readCredential(this.#service, scope, reader, handle, this.#port.fetch ? { fetch: this.#port.fetch } : {}); }
+    try { answer = await readCredential(this.#service, scope, reader, handle, this.#fetch ? { fetch: this.#fetch } : {}); }
     catch { return failed({ error: "credential", destination: scope, why: "the credential reply was unavailable or invalid; the one-time credential may have been consumed" }); }
     if (!answer.ok) return failed({ error: "credential", destination: scope, why: answer.reason });
     const structured = { credential: answer.value.token, remote: answer.value.remote, ends: answer.value.ends, entry: seq };

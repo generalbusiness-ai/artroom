@@ -5,14 +5,15 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { encode } from "gpt-tokenizer/encoding/o200k_base";
 import type { DeclaredDefinition, Item, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
-import { canonicalize, definitionDigest, intentDigest, textDigest } from "@generalbusiness/artroom-bytes";
-import { secretSigner } from "@generalbusiness/artroom-client";
+import { canonicalize, definitionDigest, intentDigest, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
+import { secretSigner, TransportError, type Fetch } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/dap-lanes";
 import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
-import { ERROR_BYTES, failed } from "../src/service.ts";
+import { ERROR_BYTES, failed, ListRestart } from "../src/service.ts";
 import { finding } from "../src/errors.ts";
 import { fileStore } from "../src/node.ts";
+import type { McpMetricOptions, McpMetricPoint } from "../src/metrics.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
 /**
@@ -27,7 +28,7 @@ const secret = () => crypto.getRandomValues(new Uint8Array(32));
 interface Served { stand: StandIn; service: McpService; config: McpConfig; clock: { now: number }; key: Uint8Array }
 
 /** A room on the stand-in: the six platform scopes and the given lanes, for a caller of `role` with that role's first actions. */
-function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore } = {}): Served {
+function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[], options: { mode?: Mode; listPageBytes?: number; custody?: CustodyStore; metrics?: McpMetricOptions; wrapFetch?: (fetch: Fetch) => Fetch } = {}): Served {
   const key = secret();
   const signer = secretSigner(key);
   const stand = new StandIn(signer.key, role, FIRST_ACTIONS_OF["platform:membership@2"]![role]!);
@@ -38,8 +39,9 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
   for (const lane of lanes) stand.lane(lane);
   const config: McpConfig = { ...stand.config(), repository: { ...stand.config().repository!, inbox: inbox.scope } };
   const clock = { now: START };
-  const service = new McpService({ service: SERVICE, fetch: stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
+  const service = new McpService({ service: SERVICE, fetch: options.wrapFetch?.(stand.fetch) ?? stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
     ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
+    ...(options.metrics ? { metrics: options.metrics } : {}),
     config: { read: async () => structuredClone(config), addRoot: async (root) => { config.roots = [...(config.roots ?? []), root]; } } });
   return { stand, service, config, clock, key };
 }
@@ -76,12 +78,97 @@ async function listOf(service: McpService): Promise<{ tools: number; pages: numb
 }
 
 describe("what a call costs, end to end", () => {
+  test("settling an unresolved act counts the remote receipt lookup as a read", async () => {
+    const metrics: McpMetricPoint[] = [], custody = memoryStore();
+    let lost = false;
+    const s = roomOf("admin", [issueDemo], { custody, metrics: { report: point => { metrics.push(point); } }, wrapFetch: fetch => async (url, init) => {
+      const reply = await fetch(url, init);
+      if (!lost && init?.method === "POST" && new URL(url).pathname.endsWith("/acts")) {
+        lost = true;
+        throw new TransportError("scripted lost act reply after the stand-in recorded it");
+      }
+      return reply;
+    } });
+    await s.service.page();
+    await s.service.call("issue.comment", { target: 1, fields: { body: "Recover this reply." }, idempotencyKey: "recover" });
+    expect((await custody.unresolved()).map(record => record.key)).toEqual(["recover"]);
+    metrics.length = 0;
+    const settled = await counted(s, () => s.service.call("settle", { target: 1, idempotencyKey: "recover" }));
+    expect(settled.result.structuredContent["answer"]).toBe("accepted");
+    expect(settled.requests.filter(request => request.startsWith("POST ") && request.endsWith("/settle"))).toHaveLength(1);
+    expect(settled.requests.some(request => request.endsWith("/acts"))).toBe(false);
+    const calls = metrics.filter(point => point.blobs[0] === "tool-call");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.doubles[2]).toBe(reads(settled.requests) + sessions(settled.requests) + 1);
+    expect((await custody.unresolved()).length).toBe(0);
+    metrics.length = 0;
+    const retained = await counted(s, () => s.service.call("settle", { target: 1, idempotencyKey: "recover" }));
+    expect(retained.result.structuredContent["answer"]).toBe("accepted");
+    expect(retained.requests.some(request => request.endsWith("/settle"))).toBe(false);
+    expect(metrics.find(point => point.blobs[0] === "tool-call")!.doubles[2]).toBe(reads(retained.requests) + sessions(retained.requests));
+  });
+  // Actual MCP signing, custody and HTTP receipt reads; creation and receipt
+  // answers below are SCRIPTED. This proves no Native creation or admission.
+  test("creation settlement counts failed and successful receipt reads, then uses its retained result", async () => {
+    const metrics: McpMetricPoint[] = [], custody = memoryStore();
+    const signer = secretSigner(secret()), stand = new StandIn(signer.key);
+    const lookups: { url: string; body: string }[] = [];
+    let creation: SignedIntent | null = null, failLookup = true;
+    const service = new McpService({ service: SERVICE, signer, custody, now: () => START,
+      config: { read: async () => ({ service: SERVICE }), addRoot: async () => {} },
+      metrics: { report: point => { metrics.push(point); } },
+      fetch: async (url, init) => {
+        if (init?.method === "POST" && new URL(url).pathname === "/v1/scopes") {
+          creation = (JSON.parse(init.body!) as { creation: SignedIntent }).creation;
+          throw new TransportError("scripted lost creation reply");
+        }
+        expect(init?.method).toBe("POST");
+        expect(new URL(url).pathname.endsWith("/settle")).toBe(true);
+        lookups.push({ url, body: init!.body! });
+        if (failLookup) { failLookup = false; throw new TransportError("scripted failed receipt lookup"); }
+        const signed = creation!;
+        const scope = scopeIdOf({ v: 1, kind: "directory", definition: definitionDigest(issueDemo), creator: null, cause: intentDigest(signed.intent), ordinal: 0 });
+        expect(new URL(url).pathname).toBe(`/v1/scopes/${scope}/settle`);
+        const at = { seq: 0, hash: `sha256:${"a".repeat(64)}` };
+        const receipt = { fact: { at: { ...stand.directory, scope }, ...at }, definition: definitionDigest(issueDemo), intent: intentDigest(signed.intent), effects: [], sends: [], epoch: 0 };
+        return { status: 200, body: new Response(JSON.stringify({ ok: true, at, value: receipt, complete: true })).body as never };
+      } });
+    await service.call("create", { definition: issueDemo, kind: "file", fields: { opener: "@agent", title: "Lost creation", conditions: ["c"] }, membership: stand.membership, idempotencyKey: "creation" });
+    expect(creation).not.toBeNull();
+    expect((await custody.unresolved()).map(record => record.key)).toEqual(["creation"]);
+    const args = { definition: issueDemo, membership: stand.membership, idempotencyKey: "creation" };
+    for (const [answer, attempts] of [["unknown", 1], ["accepted", 1], ["accepted", 0]] as const) {
+      metrics.length = 0;
+      const before = lookups.length;
+      const result = await service.call("settle", args);
+      expect(result.structuredContent["answer"]).toBe(answer);
+      expect(lookups.length - before).toBe(attempts);
+      const calls = metrics.filter(point => point.blobs[0] === "tool-call");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.doubles.slice(2, 4)).toEqual([attempts, 0]);
+    }
+    expect(lookups.map(lookup => lookup.body)).toEqual([JSON.stringify({ signed: creation }), JSON.stringify({ signed: creation })]);
+    expect((await custody.unresolved()).length).toBe(0);
+  });
+  test("an invalid tool-list cursor retains the inventory read attempts before restart", async () => {
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo], { metrics: { report: point => { metrics.push(point); } } });
+    await expect(s.service.page("invalid-fixture-cursor")).rejects.toBeInstanceOf(ListRestart);
+    const observed = metrics.filter(point => point.blobs[0] === "tools-list");
+    expect(observed).toHaveLength(1);
+    expect(observed[0]!.blobs.slice(4, 6)).toEqual(["refused", "restart"]);
+    const attempts = reads(s.stand.requests) + sessions(s.stand.requests);
+    expect(attempts).toBeGreaterThan(0);
+    expect(observed[0]!.doubles.slice(2)).toEqual([0, 0, attempts, 0]);
+    expect(metrics.at(-1)!.doubles.slice(1, 3)).toEqual([0, 0]);
+  });
   // Invariant: each tool's reads, warm and cold, are within section 8's table, and its whole result within its bound: a cold
   // call adds one session request, an expired session one more, a refused session one signed read per read, and a session the
   // scope refuses on a read one signed-read fallback for that read.
   test("reads per tool, warm and cold, with expired, refused and forbidden sessions", async ({ annotate }) => {
     // --generic=add lists every tool, so one room measures them all.
-    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add" });
+    const metrics: McpMetricPoint[] = [];
+    const s = roomOf("admin", [issueDemo, changeDemo], { mode: "add", metrics: { report: point => { metrics.push(point); } } });
     await s.service.page();
     const M = s.config.repository!.membership.scope;
     const comment = await s.service.call("issue.comment", { target: 1, fields: { body: "First." }, idempotencyKey: "c-0" });
@@ -122,8 +209,16 @@ describe("what a call costs, end to end", () => {
       const name = label.split(" ")[0]!;
       // Cold: the session forgotten, as a process starting would hold none.
       s.service.reads.forget(M);
+      const metricStart = metrics.length;
       const cold = await counted(s, () => s.service.call(name, args()));
       const warm = await counted(s, () => s.service.call(name, args()));
+      // Dynamic act tool names are outside the closed metric name map. The
+      // generic tools retain exact measured attempts, including sessions.
+      if (!name.includes(".")) {
+        const calls = metrics.slice(metricStart).filter(p => p.blobs[0] === "tool-call");
+        expect(calls.map(p => p.doubles[2]), label).toEqual([reads(cold.requests) + sessions(cold.requests), reads(warm.requests) + sessions(warm.requests)]);
+        expect(calls.map(p => p.doubles[4]), label).toEqual([cold.bytes, warm.bytes]);
+      }
       expect([cold.result.isError, warm.result.isError], `${label}: ${JSON.stringify(warm.result.structuredContent)}`).toEqual([false, false]);
       expect(sessions(cold.requests), label).toBe(1);
       expect(sessions(warm.requests), label).toBe(0);

@@ -11,7 +11,7 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p apps/counter/tsconfig.json && tsc -p examples/lending/tsconfig.json && tsc -p examples/lending/browser/tsconfig.json && tsc -p apps/counter/browser/tsconfig.json",
     "pretest": "node scripts/cloudflare-pool-compat.mjs",
-    "test": "vitest run && node --test scripts/active-source.test.mjs scripts/cloudflare-pool-compat.test.mjs homepage/test/home.test.mjs packages/cli/test/config-dir.test.mjs apps/jam/test/managed-assets.test.mjs && node apps/counter/scripts/test-browser.mjs",
+    "test": "vitest run && node --test scripts/active-source.test.mjs scripts/cloudflare-pool-compat.test.mjs scripts/deploy-check.test.mjs homepage/test/home.test.mjs packages/cli/test/config-dir.test.mjs apps/jam/test/managed-assets.test.mjs && node apps/counter/scripts/test-browser.mjs",
     "pretest:changed": "node scripts/cloudflare-pool-compat.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gate": "bash scripts/gate.sh",
