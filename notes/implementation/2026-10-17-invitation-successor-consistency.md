@@ -2,9 +2,10 @@
 
 ## Current Source
 
-Source request `d7ddf44e`, promise `057a0548`, renews
-the complete original scope on actual Judge Main
-`02a9180357171ad2d15d3dd9e44b1fe8833f3492`, tree `b43a07d1`.
+Source request `47b965fb`, promise `1af83575`, renews
+the complete original scope on actual Main
+`532b1d0d00e05f32cb5e454a0e838b447bff0b12`, tree `c802c528`.
+That Main preserves the reviewed Judge and adds the reviewed journey plan.
 The older Source IDs, dependency waits and gate results below describe
 earlier preparation checkpoints. All original attempts remain recorded.
 
@@ -210,3 +211,37 @@ those are neither waived nor counted as a passing combined P3 gate. All
 five P3 scopes and their earlier evidence remain intact. No provider,
 deployment, publication or unreviewed branch push is performed. Further
 GitHub egress waits for the pending direct destination approval.
+
+
+## Passing final composition gate
+
+The clean implementation freeze was
+`39572e24115702e78e7e309a1ace958f886d8f40`, tree
+`fd00a9ed16e64fbe9343869e633bc179abc81f05`. Original session 64174
+closed with exit 0 (`1126ed`), at the same clean head and tree. The single
+pipeline passed 1,575 Vitest cases and skipped three; Node passed 25 and
+Counter passed 55. It took 587.393 seconds elapsed and 702.399 child CPU
+seconds on macOS 27.0.1 arm64, 18 logical CPUs, with pre-run load
+2.616/4.841/5.456. Existing-lock installation took 2.6 s elapsed/3.9CPU,
+typechecking 8.2 s/28.1CPU, and tests 576.2 s/670.1CPU. The lock remained
+unchanged. These are one run’s observations, not a diagnosis or a saving
+claim. Private log: `/tmp/artroom-p3-judge-39572e24-gate.log`; step logs:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.nYIMzv1BCH`.
+Path references grant no private-file or execution access.
+
+After that gate, the reviewed Main532 journey plan/index and these five
+delivery notes were incorporated. No runtime, test, dependency or asset
+body changes after the tested freeze. Final Source reports compare the
+complete 31-path P3 scope against actual Main532, with two report bindings
+for the shared MCP guide. The final tree carries the Main plan exactly;
+all tested runtime/test leaves remain exact. No gate is repeated for the
+document-only successor. The original failed Judge gates remain failed,
+with their cause and broader gate stability unresolved. This new passing
+P3 run does not rewrite them or satisfy operational/root acceptance.
+
+Fresh Source commissions preserve every original P3 condition and evidence.
+The earlier pre-plan commissions were normally retired after the new
+promises became effective. Complete independent exact-head review remains
+required; no approval is inferred from this gate. Direct GitHub destination
+approval is still pending, so no further push or automatic-push landing
+is performed. No provider or deployment action is part of this delivery.
