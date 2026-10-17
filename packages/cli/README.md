@@ -18,6 +18,11 @@ not the current directory, and installs or downloads nothing at launch.
 
 ## How to test
 
+Repository checks that import TypeScript directly, and the full gate,
+need Node 22.18 or later in the 22 series, or Node 23.6 or later. This is
+Replay's existing engine range. The launcher's Node 22.0 minimum uses its
+installed loader and does not state the runtime for the repository gate.
+
 ```
 npx vitest run --project cli            # the key files, in Node
 npx vitest run --project scope story    # the story on real scopes, in workerd

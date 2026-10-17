@@ -101,7 +101,7 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
     expect(canonicalize((await s.store.config())!.plan!["founding"])).toBe(canonicalize(original.plan!["founding"]));
     expect((await s.store.config())!.register!.scope).toBe(original.plan!.register);
 
-    // A separate memory store stands for an empty ARTROOM_HOME directory.
+    // A separate memory store stands for an empty selected config directory.
     // The expired selected plan is retained; planning there cannot renew it.
     const expired = scenario();
     const where = ["--cohort", name, "--host", "artifacts", "--namespace", "room"];
@@ -118,7 +118,9 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
     ]) {
       const refused = await command(expired.ctx, args);
       expect(refused.code).toBe(1);
-      expect(refused.lines[0]).toContain(`For a new ${name === "application" ? "application" : name === "application-publication" ? "application-publication" : "Counting"} plan, use a separate empty ARTROOM_HOME directory`);
+      expect(refused.lines[0]).toContain(`For a new ${name === "counting-commitments" ? "Counting" : name} plan, set DAP_HOME to a separate empty directory`);
+      expect(refused.lines[0]).toContain("If ARTROOM_HOME is set, unset it or set it to that same new directory");
+      expect(refused.lines[0]).toContain("different directories refuse before configuration is read");
       expect(refused.lines[0]).not.toContain("Plan again");
       expect([await expired.store.config(), expired.bodies]).toEqual([expiredConfig, []]);
     }

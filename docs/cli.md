@@ -21,6 +21,13 @@ The root URL returns 404 because it has no application page. This endpoint
 does not establish a completed live creation, publication, clone or
 authenticated replay.
 
+The launcher's Node 22.0 minimum is separate from the repository's test
+runtime. Built-in Node checks import TypeScript directly, as Replay already
+does. For those checks and `npm run gate`, use Node 22.18 or later in the
+22 series, or Node 23.6 or later. This is Replay's existing engine range;
+the launcher continues to use its installed loader. See
+[the testing guide](testing.md) for the gate.
+
 ## What it needs
 
 - **A base URL**: the scope Worker's address, given once to `install`
