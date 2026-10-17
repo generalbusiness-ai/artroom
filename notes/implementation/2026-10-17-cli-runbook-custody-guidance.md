@@ -21,7 +21,7 @@ separate empty directory for a new plan. If `ARTROOM_HOME` is set, the
 guidance says to unset it or set it to that same new directory, explaining
 that conflicting explicit variables refuse before configuration is read.
 The original plan and directory must remain unchanged. The printed cohort
-label also names `invitation-key` correctly instead of Calling it Counting.
+label also names `invitation-key` correctly instead of calling it Counting.
 Only the displayed recovery guidance and its label change. Refusal and
 admission conditions, stored envelopes, requests, keys, configuration
 selection and native versions are unchanged.
@@ -63,6 +63,10 @@ two use synthetic directory metadata ports. This was macOS, not Windows.
 CLI source, test and Scope-test typechecks passed (`54061`, exit 0;
 owner terminal `859e26`).
 
+The owned Page asset producer also ran (`c42a09`, exit 0), because the Page
+imports CLI code. Its tracked asset module remained byte-for-byte equal
+to Main; this guidance change adds no generated Page delta.
+
 One actual POSIX-shell check (`febc06`, exit 0) used only synthetic
 environment strings. With legacy-only configuration, the old expansion
 was `/lending.json`; the exact new export gave the same original directory
@@ -77,8 +81,9 @@ Original owner logs remain at:
 - `/tmp/artroom-cli-runbook-p3-repaired-guidance-focus.log`
 - `/tmp/artroom-cli-runbook-p3-config-dir-focus.log`
 - `/tmp/artroom-cli-runbook-p3-types.log`
+- `/tmp/artroom-cli-runbook-p3-owned-page-assets.log`
 
 These references grant no external-file, helper or execution access.
 No full gate, Source approval or landing is claimed yet. Original
 invitation schemes, custody and all hosted outputs remain unchanged.
-No provider call, deployment, publication or new package install ran.
+No provider call, deployment or publication ran, and no dependency was added.
