@@ -101,3 +101,11 @@ The shared gate does not replace archive's own gate or approve that
 dependency. P3 Source filing and landing still wait for archive's reviewed
 landing and exact correspondence with Main. Log references grant no
 raw-file, helper or execution access.
+
+Archive self-audit later reproduced acceptance of an unexpected empty
+directory in the immediate parent in both Git formats. Finding `bdcf6890`
+and withdrawal `24704f32` hold the old `c811785ea` Source. This local
+composition includes repair `83eb65d9c`; the earlier integration gate
+`24299` validates its original composition only. This changed dependency
+requires a new frozen integration gate, then archive's independent
+approval and landing before P3 Source filing or landing.

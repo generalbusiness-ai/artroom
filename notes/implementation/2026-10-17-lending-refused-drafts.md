@@ -152,3 +152,11 @@ bytes. It does not replace archive's original gate `79043`, approve an
 unreviewed dependency or permit P3 Source filing before archive's reviewed
 landing. Exact correspondence with landed Main and independent Source
 approval remain required. These paths grant no raw-log or execution access.
+
+Archive self-audit subsequently reproduced acceptance of an unexpected
+empty directory in the immediate parent, in both Git formats. Finding
+`bdcf6890` and withdrawal `24704f32` hold the old `c811785ea` Source.
+The local integration now includes repair `83eb65d9c`. The earlier gate
+`24299` remains evidence of its original composition only. A new frozen
+integration gate is required for this changed dependency; no P3 Source
+filing or landing can precede archive's independent approval and landing.
