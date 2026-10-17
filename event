@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6353e40bf860a8924810c3fc0d3119b88764f213","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/fixtures-hold.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6383370398741b57a65474a6e6486d51009b735c","text":"Merge retired a covered predecessor; the successor is at docs/mcp-tools.json."}
