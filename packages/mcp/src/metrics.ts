@@ -68,7 +68,7 @@ export function observedFetch(original: Fetch): Fetch {
       if (op) {
         const parts = new URL(url).pathname.split("/"), route = parts.at(-1), method = init?.method ?? "GET";
         if (method === "GET" || (method === "POST" && route === "sessions")) {
-          mcpRead(parts.at(-2) === "items" || ["items", "history", "outbox", "log"].includes(route ?? ""));
+          mcpRead(parts.at(-2) === "items" || ["items", "query-items", "history", "outbox", "log"].includes(route ?? ""));
         }
       }
     } catch { const op = active(); if (op) lost(op); }

@@ -1,7 +1,10 @@
 # Judge development
 
-Source request `be612eec`, promise `979cc1cc`, under observability
-`f57fc4da`. This renews standalone `e6c47499` / `830b56c2` after the
+Source request `d13caf1d`, promise `d36bcb78`, under observability
+`f57fc4da`. This renews stale `be612eec` / `979cc1cc` on live root
+bases only; archive receipt `2643d98e` is historical evidence. The
+complete conditions are unchanged. It follows standalone
+`e6c47499` / `830b56c2` after the
 archive dependency actually landed; the old child was normally retired
 by `f641b97c`, with its code and evidence preserved. This is work in
 progress on the approved third head. The
@@ -278,10 +281,9 @@ required workroom push completed. The full archive root remains owed.
 This Judge candidate now incorporates that actual Main. All thirteen
 archive leaves are exact, and its twenty-one Judge paths keep their
 standalone source bodies except this delivery note. The earlier standalone
-gate did not include the thirteen archive additions. One gate is due at
-this new composed implementation freeze; the earlier gate is historical,
-not combined validation. Source filing follows this correspondence and
-the completed gate. The five P3 slices remain separate, with Judge before
+gate did not include the thirteen archive additions. The first composed gate and subsequent repairs are recorded below.
+The earlier standalone gate is historical, not combined validation.
+Source filing requires the repaired composition’s completed gate. The five P3 slices remain separate, with Judge before
 P3 in the latest review order. Calibration and real SQL/health acceptance
 remain owed, and Cloudflare deployment remains held.
 
@@ -294,3 +296,53 @@ Its dataset and dialect are distinct from the newer Analytics SQL API.
 The [statement reference](https://developers.cloudflare.com/analytics/analytics-engine/sql-reference/statements/)
 documents query limits and the JSON response shape. Reading those public
 documents did not query an account or establish live SQL compatibility.
+
+## Composed gate failure and counter repairs
+
+The composed freeze was `aeafd364130fedf937101e2c3e960091b105fd00`,
+tree `329b8e934d05c5176755c490ec75daa35b108406`. Original gate
+session 30828 exited 1 (`d564e9`) at the unchanged clean freeze.
+Vitest passed 1,563 cases, skipped three, and failed one: the inherited
+archive parent-extension/retry case exceeded its original 5,000 ms
+deadline. Node and Counter checks did not run. The gate took 522.236
+seconds elapsed and 663.370 child CPU seconds on macOS 27.0.1 arm64,
+18 logical CPUs, with load averages 8.114, 6.770 and 5.237. The verified
+install stamp skipped installation; typechecking took 8.4 seconds elapsed
+and 29.6 CPU seconds; tests took 513.6 and 633.5. The private original
+log is `/tmp/artroom-judge-composed-aeafd364-gate.log`.
+
+The unchanged archive case passed alone in original session 87147
+(`3c8316`), taking 2,643.907 ms with the same deadline. Its outer command
+took 3.42 seconds elapsed and 3.23 CPU seconds at load averages 5.065,
+6.173 and 5.727. A small MCP focus overlapped. This does not establish
+the timeout’s cause or turn the failed gate into a pass. The first gate
+launcher (`a6d14d`, exit 2) failed before starting the gate; it ran no tests.
+
+Composing the P3 continuation cases exposed a separate metric defect:
+`/items/<type>` attempts counted as reads but not native pages. Both
+original cases failed (session 81911, `3d67d5`): zero pages versus one
+and four actual typed-page requests. The Judge concurrent-call witness
+also failed before repair (`e91312`). The repaired collector recognizes
+typed-item and bounded query-item pages, while retaining the original
+fetch arguments and never consuming response bodies. Its concurrent
+witness includes history, typed-item, query-item and ordinary entry reads.
+
+Checker advisory `befe2c42` identified a second defect: failure completion
+rows replaced accumulated counters with zeros. Before repair, the actual
+MCP service’s invalid-list-cursor witness lost eight observed inventory
+reads, and the rejecting-operation witness lost three reads and one page
+(`963817`, two assertion failures). Failure rows now retain reads/pages
+in their kind’s slots, zero unavailable result quantities, and rethrow
+the original exception. The list witness uses the actual service and a
+labelled HTTP stand-in; neither it nor the counter unit test proves Native
+admission or live Analytics Engine delivery.
+
+The affected Node checks passed 63 cases with one existing skip; twelve
+wire cases were unrun because the sandboxed loopback setup timed out
+(`1a618a`). Running only that file with local server access passed all
+twelve (`fe6623`). The P3 continuation cases then passed both (`35e06f`).
+MCP source and test typechecks passed (`d965ad`). A discarded exploratory
+W5 assertion (`04fd07`) assumed live comments used the final-item route;
+its failed premise was removed before the valid witnesses and repair.
+All these original outcomes remain recorded. The new source and tests
+require one gate at the repaired immutable freeze before Source review.
