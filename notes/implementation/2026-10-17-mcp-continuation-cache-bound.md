@@ -58,12 +58,12 @@ implements Native cursor validation.
 
 The repaired public-call cases passed. The first combined focus (`77400`,
 exit 1) also exposed an incorrect final expectation in the new pure cache
-test: after its lookups, key4 was oldest and correctly evicted. Correcting
+test: after its lookups, key 4 was oldest and correctly evicted. Correcting
 that expectation and making the expected capacity an independent literal
 sixty-four produced five passes (`7f5797`, exit 0).
 
 Two focused controls passed and restored the helper. Removing eviction
-(`e06303`, exit 0) changed the required oldest-key refusal to a retained
+(`e06303`, exit 0) changed the expected oldest-key miss to a retained
 value: baseline one pass, mutant one assertion failure. Removing lookup
 refresh (`c7c832`, exit 0) failed the recently-used-key assertion in the
 same way; the wrapper verified exact source SHA256 restoration
@@ -86,7 +86,38 @@ Original owner logs use `/tmp/artroom-mcp-cache-bound-` followed by
 `recency-control.log`, `complete-affected-focus.log`, `final-types.log`,
 `final-affected-focus.log` and `owned-page-assets.log`.
 
-These references grant no external-file, helper or execution access. One
-frozen final composition gate is still required before exact Source review.
-No Source approval, landing, provider operation, deployment, publication
-or dependency addition is claimed.
+These references grant no external-file, helper or execution access. The
+focused checkpoint preceded the composition gate below. Independent Source
+approval and landing remain owed. No provider operation, deployment,
+publication or dependency addition is claimed.
+
+## Frozen composition gate
+
+The six-path cache checkpoint `e50f920d4` was composed with prior passing
+P3 successor `e0aba034c`. Every prior leaf outside those six paths remained
+exact. The owned Page producer ran in that composition and added no tracked
+output change. Against Main `55e1970a5`, the union has exactly forty-three
+changed paths and 1,458 tracked leaves.
+
+Original gate `49806` ran once at clean implementation freeze
+`52c1a0fc1e44a604977a95698c8014cf0ab04b7d`, tree
+`409b91640dd326d867e2a329be5ffe99b3f72358`, and exited zero. Owner terminal
+`e291ce` records completion. Installation was skipped with a matching
+verified-lock stamp; whitespace took 0.0 seconds elapsed and 0.0 CPU,
+types 7.1 and 26.6, tests 445.5 and 556.9. All 1,567 Vitest tests passed
+with three skips; sixteen Node and fifty-five Counting cases passed.
+The original wrapper is `/tmp/artroom-p3-mcp-composed-gate.log`; step logs
+are under `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.btEhguDtAA`.
+
+This was macOS 27.0.1 arm64 with eighteen logical CPUs and observed
+pre-gate load 0.97, 1.14 and 1.26. These observations establish no load
+cause. The unchanged lock SHA256 is
+`a3dd5689f33c5181b5ff48553fbb3c45b44abf96720ba9935eed40853a3b09bc`.
+
+The final result update changes only the four P3 notes. Source preparation
+must verify all 1,454 other mode/type/blob leaves against the passing
+freeze. All thirteen archive `6d1a1973d` leaves remain exact; its grant and
+review `17dad8da` are unchanged. No repeated gate is needed for the
+notes-only successor. Archive approval/landing, exact Main correspondence
+and independent P3 review remain prerequisites to Source filing and landing.
+These paths grant no raw-log, helper, adjacent-file or execution access.

@@ -157,3 +157,20 @@ mode/type/blob leaves must be exact. Archive review `17dad8da` and its
 unchanged candidate remain separate; archive approval/landing and exact
 Main correspondence still precede P3 Source filing. These references
 grant no external-file or execution access and imply no Source approval.
+
+### Composition with bounded MCP continuation hints
+
+The independently queued MCP cache follow-up `4f37b980` / `9379959b`
+adds exactly six paths from `e50f920d4` to the prior passing composition.
+Original gate `49806` passed once at clean
+`52c1a0fc1e44a604977a95698c8014cf0ab04b7d`, tree
+`409b91640dd326d867e2a329be5ffe99b3f72358`; owner terminal `e291ce`.
+All 1,567 Vitest cases passed with three skips, followed by sixteen Node
+and fifty-five Counting passes. The [cache implementation note](2026-10-17-mcp-continuation-cache-bound.md)
+records phase costs, observed machine/cache state and original attempts.
+
+Only the four P3 notes change after this freeze; all 1,454 other
+mode/type/blob leaves must match. All thirteen archive `6d1a1973d` leaves
+remain exact. Source filing and landing still wait for archive review
+`17dad8da`, its reviewed landing, exact Main correspondence and independent
+P3 approval. No external-file or execution access follows from this record.
