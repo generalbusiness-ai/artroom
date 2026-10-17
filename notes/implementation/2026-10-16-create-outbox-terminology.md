@@ -125,3 +125,30 @@ Directory review b8b351f1 now requests regeneration of the Lending JS
 and Worker module. Terminology implementation is checkpointed while that
 higher-priority Directory correction proceeds. No terminology delivery,
 approval or landing is claimed.
+
+
+## Manual and protected-data preparation
+
+The ten-terms manual now defines turn and settle and adds the requested
+five-row general-patterns section. Its room-creator prose changes no
+native slot or key. This is documentation preparation while the Directory
+asset correction's original gate runs; it adds no runtime claim.
+
+Direct canonical comparison against the Directory catalog confirms all
+36 current definition data values and NEWEST are identical after the
+terminology checkpoints. The retained projection is
+/tmp/artroom-create-outbox-platform-catalog-correspondence.json. A separate
+read-only inventory finds 304 protected literal occurrences across the
+catalog, with nine distinct names: found, founder, founder-key,
+founderHandle, founders, founding-key, founding-policy, foundingHandle and
+foundingKey. Final Source still needs every source file/line and next
+version, plus the global genesis key and digest-addressed initial Git
+text. No catalog revision or default selection changes for this wording.
+
+The parent text limits found renames to making a scope; its condition
+could also be read to include ordinary lookup variables named found.
+Planner clarification is requested before widening the change into Jam
+lookups, autolinks and Git search results. The literal/version inventory
+and other authorized work continue independently. Global genesis input
+founding belongs to Entry-v1 bytes, so its future wire version is also
+being distinguished from definition-local field revisions.
